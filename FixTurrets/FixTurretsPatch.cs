@@ -14,11 +14,23 @@ namespace FixTurrets
     [PatchShim]
     public static class FixTurretsPatch
     {
+
+        private static int _counter = 0;
+        private static readonly int skipConst = 100;
         
         [ReflectedMethod(Name = "RotateModels")]
         private static Action<MyLargeTurretBase> RotateModels;
         
-
+        private static void OnPositionChanged(MyPositionComponentBase myPositionComponentBase, MyLargeTurretBase __instance)
+        {
+            _counter++;
+            if (_counter % skipConst == 0)
+            {
+                RotateModels.Invoke(__instance);
+                _counter = 0;
+            }
+            
+        }
 
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
@@ -40,9 +52,6 @@ namespace FixTurrets
                 OnPositionChanged(pos, __instance);
         }
         
-        private static void OnPositionChanged(MyPositionComponentBase myPositionComponentBase, MyLargeTurretBase __instance)
-        {
-            RotateModels.Invoke(__instance);
-        }
+
     }
 }
