@@ -2,6 +2,7 @@
 using System.Linq;
 using System.Reflection;
 using NLog;
+using Sandbox;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Weapons;
 using Torch.Managers.PatchManager;
@@ -14,22 +15,15 @@ namespace FixTurrets
     [PatchShim]
     public static class FixTurretsPatch
     {
-
-        private static int _counter = 0;
-        private static readonly int skipConst = 100;
         
         [ReflectedMethod(Name = "RotateModels")]
         private static Action<MyLargeTurretBase> RotateModels;
         
         private static void OnPositionChanged(MyPositionComponentBase myPositionComponentBase, MyLargeTurretBase __instance)
         {
-            _counter++;
-            if (_counter % skipConst == 0)
-            {
+            if ((ulong)__instance.EntityId % 100 == MySandboxGame.Static.SimulationFrameCounter % 100) {
                 RotateModels.Invoke(__instance);
-                _counter = 0;
             }
-            
         }
 
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
