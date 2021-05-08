@@ -1,6 +1,6 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FixTurrets", "FixTurrets\FixTurrets.csproj", "{669A88DE-B622-4E5F-9BFA-AA6755444906}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SentisOptimisations", "SentisOptimisations\SentisOptimisations.csproj", "{669A88DE-B622-4E5F-9BFA-AA6755444906}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
