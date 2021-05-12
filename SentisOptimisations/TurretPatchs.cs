@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using NLog;
@@ -8,10 +7,8 @@ using Sandbox.Game.Entities;
 using Sandbox.Game.Weapons;
 using Torch.Managers.PatchManager;
 using Torch.Utils;
-using VRage.Collections;
 using VRage.Game;
 using VRage.Game.Components;
-using VRage.Game.Entity;
 
 namespace FixTurrets
 {
@@ -22,8 +19,6 @@ namespace FixTurrets
         [ReflectedMethod(Name = "RotateModels")]
         private static Action<MyLargeTurretBase> RotateModels;
         
-        [ReflectedGetter(Name = "m_entitiesForUpdate10")]
-        private static Func<MyParallelEntityUpdateOrchestrator, MyDistributedUpdater<List<MyEntity>, MyEntity>> m_entitiesForUpdate10;
 
 
 
@@ -41,7 +36,6 @@ namespace FixTurrets
         public static void Patch(PatchContext ctx)
         {
             Log.Info("Patch init");
-            //
             var methodInfos = typeof(MyLargeTurretBase).GetMethods(BindingFlags.Instance | BindingFlags.Public);
             var initMethodInfo = methodInfos.Where(m => m.Name.Equals("Init")).ToArray()[0];
             ctx.GetPattern(initMethodInfo).Prefixes.Add(

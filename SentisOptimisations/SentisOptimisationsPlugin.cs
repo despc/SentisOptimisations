@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Linq;
 using NLog;
+using Sandbox.Engine.Voxels;
 using Sandbox.Game.Entities;
+using Sandbox.Game.World;
 using Sandbox.ModAPI;
 using Torch;
 using Torch.API;
@@ -36,14 +38,11 @@ namespace FixTurrets
                     {
                         var voxelMap = myVoxelMaps[i];
                         Vector3D positon = voxelMap.GetPosition();
-                        var voxelMapStorageName = voxelMap.StorageName;
                         byte[] storageData;
                         voxelMap.Storage.Save(out storageData);
                         IMyStorage storage = MyAPIGateway.Session.VoxelMaps.CreateStorage(storageData) as IMyStorage;
-                        var voxelMapEntityId = voxelMap.EntityId + 123123123;
                         voxelMap.Close();
-                        (MyAPIGateway.Session.VoxelMaps.CreateVoxelMapFromStorageName(voxelMapStorageName, "Bioresearch", positon
-                        ) as MyVoxelMap).Storage = storage;
+                        MyWorldGenerator.AddVoxelMap(voxelMap.Name, (MyStorageBase) storage, positon);
                         Log.Error("refresh voxels " + voxelMap.DisplayName);
                     }
                     catch (Exception e)
