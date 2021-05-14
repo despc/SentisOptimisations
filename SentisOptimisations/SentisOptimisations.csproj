@@ -32,6 +32,7 @@
         <WarningLevel>4</WarningLevel>
     </PropertyGroup>
     <ItemGroup>
+      <Compile Include="ContractPricePatch.cs" />
       <Compile Include="NoScrapPatch.cs" />
       <Compile Include="RemovePluginPatch.cs" />
       <Compile Include="TurretPatchs.cs" />

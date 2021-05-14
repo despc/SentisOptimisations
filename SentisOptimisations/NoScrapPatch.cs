@@ -6,7 +6,7 @@ using Sandbox.Game.Entities;
 using Torch.Managers.PatchManager;
 using VRage.Game.Entity;
 
-namespace NoScrapPatch
+namespace SentisOptimisationsPlugin
 {
     [PatchShim]
     public static class NoScrapPatch

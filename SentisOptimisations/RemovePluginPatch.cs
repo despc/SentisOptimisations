@@ -12,7 +12,7 @@ using VRage.Game.ModAPI;
 using VRage.Network;
 using VRageMath;
 
-namespace RemovePlugin
+namespace SentisOptimisationsPlugin
 {
     [PatchShim]
     public class RemovePluginPatch

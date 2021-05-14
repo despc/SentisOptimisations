@@ -10,7 +10,7 @@ using Torch.Utils;
 using VRage.Game;
 using VRage.Game.Components;
 
-namespace FixTurrets
+namespace SentisOptimisationsPlugin
 {
     [PatchShim]
     public static class FixTurretsPatch

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq;
 using NLog;
+using Sandbox.Engine.Utils;
 using Sandbox.Engine.Voxels;
 using Sandbox.Game.Entities;
 using Sandbox.Game.World;
@@ -13,15 +14,16 @@ using VRage.Game.ModAPI;
 using VRage.Game.Voxels;
 using VRageMath;
 
-namespace FixTurrets
+namespace SentisOptimisationsPlugin
 {
-    public class FixTurretsPlugin : TorchPluginBase
+    public class SentisOptimisationsPlugin : TorchPluginBase
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
         public override void Init(ITorchBase torch)
         {
-            Log.Info("Init FixTurretsPlugin");
+            Log.Info("Init SentisOptimisationsPlugin");
+            MyFakes.ENABLE_SCRAP = false;
         }
         
         public class TestCommands : CommandModule
