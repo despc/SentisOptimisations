@@ -32,8 +32,10 @@
         <WarningLevel>4</WarningLevel>
     </PropertyGroup>
     <ItemGroup>
+      <Compile Include="Config.cs" />
       <Compile Include="ContractPricePatch.cs" />
       <Compile Include="NoScrapPatch.cs" />
+      <Compile Include="NpcStorePatch.cs" />
       <Compile Include="RemovePluginPatch.cs" />
       <Compile Include="TurretPatchs.cs" />
       <Compile Include="SentisOptimisationsPlugin.cs" />

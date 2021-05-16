@@ -60,7 +60,7 @@ namespace SentisOptimisationsPlugin
         {
             try
             {
-                __result = (long) (baseRew * Math.Pow(2.0, Math.Log10(amount))) * 10;
+                __result = (long) (baseRew * Math.Pow(2.0, Math.Log10(amount)) * SentisOptimisationsPlugin.Config.ContractAcquisitionMultiplier);
             }
             catch (Exception e)
             {
@@ -72,7 +72,7 @@ namespace SentisOptimisationsPlugin
         {
             try
             {
-                __result = (long) (baseRew * Math.Pow(3.0, Math.Log10(distance))) * 10;
+                __result = (long) (baseRew * Math.Pow(3.0, Math.Log10(distance)) * SentisOptimisationsPlugin.Config.ContractEscortMultiplier);
             }
             catch (Exception e)
             {
@@ -87,7 +87,7 @@ namespace SentisOptimisationsPlugin
             {
                 double num1 = distance / JUMP_DRIVE_DISTANCE;
                 double num2 = num1 * (uraniumPrice * (double) AMOUNT_URANIUM_TO_RECHARGE);
-                __result = (long) (baseRew + baseRew * num1 + num2) * 10;
+                __result = (long) ((baseRew + baseRew * num1 + num2) * SentisOptimisationsPlugin.Config.ContractHaulingtMultiplier);
             }
             catch (Exception e)
             {
@@ -102,8 +102,8 @@ namespace SentisOptimisationsPlugin
         {
             try
             {
-                __result = (long) (baseRew * Math.Pow(2.0, Math.Log10(gridDistance))) +
-                           (long) (gridPriceToRewardcoef * (double) gridPrice) * 10;
+                __result = (long)  ((baseRew * Math.Pow(2.0, Math.Log10(gridDistance)) +
+                                   (long) (gridPriceToRewardcoef * (double) gridPrice)) * SentisOptimisationsPlugin.Config.ContractRepairMultiplier);
             }
             catch (Exception e)
             {
@@ -115,7 +115,7 @@ namespace SentisOptimisationsPlugin
         {
             try
             {
-                ob.RewardMoney = ob.RewardMoney * 10;
+                ob.RewardMoney = (long) (ob.RewardMoney * SentisOptimisationsPlugin.Config.ContractFindMultiplier);
             }
             catch (Exception e)
             {
