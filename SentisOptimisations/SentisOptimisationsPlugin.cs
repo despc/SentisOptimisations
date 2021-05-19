@@ -34,21 +34,25 @@ namespace SentisOptimisationsPlugin
         }
         
         
-        public override void Update() {
+        public override void Update()
+        {
             if (MySandboxGame.Static.SimulationFrameCounter % 6000 == 0)
             {
                 foreach (KeyValuePair<long, MyFaction> faction in MySession.Static.Factions)
                 {
                     foreach (MyStation station in faction.Value.Stations)
                     {
-                        if (station.StationEntityId != 0L && MyEntities.GetEntityById(station.StationEntityId) is MyCubeGrid entityById)
+                        if (station.StationEntityId != 0L &&
+                            MyEntities.GetEntityById(station.StationEntityId) is MyCubeGrid entityById)
                         {
-                            MyBatteryBlock batteryBlock = entityById.GetFirstBlockOfType<MyBatteryBlock>();
-                            if (batteryBlock == null)
+                            foreach (var mySlimBlock in entityById.GetBlocks())
                             {
-                                continue;
+                                if (mySlimBlock.FatBlock is MyBatteryBlock block)
+                                {
+                                    var myBatteryBlock = block;
+                                    myBatteryBlock.CurrentStoredPower = myBatteryBlock.MaxStoredPower;
+                                }
                             }
-                            batteryBlock.CurrentStoredPower = batteryBlock.MaxStoredPower;
                         }
                     }
                 }
