@@ -1,7 +1,8 @@
 <?xml version="1.0"?>
+
 <PluginManifest xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <Name>SentisOptimisations</Name>
-  <Guid>c0a3bdb8-1d43-11eb-adc1-0242ac120011</Guid>
-  <Repository>None</Repository>
-  <Version>v0.0.1</Version>
+    <Name>SentisOptimisations</Name>
+    <Guid>c0a3bdb8-1d43-11eb-adc1-0242ac120011</Guid>
+    <Repository>None</Repository>
+    <Version>v0.0.1</Version>
 </PluginManifest>

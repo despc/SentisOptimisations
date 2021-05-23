@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using NLog;
 using Sandbox;
@@ -9,11 +8,14 @@ using Sandbox.Engine.Voxels;
 using Sandbox.Game.Entities;
 using Sandbox.Game.World;
 using Sandbox.ModAPI;
+using SentisOptimisations;
 using Torch;
 using Torch.API;
+using Torch.API.Managers;
+using Torch.API.Session;
 using Torch.Commands;
 using Torch.Commands.Permissions;
-using Torch.Utils;
+using Torch.Session;
 using VRage.Game.ModAPI;
 using VRage.Game.Voxels;
 using VRageMath;
@@ -23,17 +25,39 @@ namespace SentisOptimisationsPlugin
     public class SentisOptimisationsPlugin : TorchPluginBase
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
-        public static Persistent<Config> _config;
-        public static Config  Config => _config?.Data;
+        public static PcuLimiter _limiter = new PcuLimiter();
+        private static TorchSessionManager SessionManager;
+        public static Config Config;
+        public static SentisOptimisationsPlugin Instance { get; private set; }
 
         public override void Init(ITorchBase torch)
         {
+            Instance = this;
             Log.Info("Init SentisOptimisationsPlugin");
             MyFakes.ENABLE_SCRAP = false;
             SetupConfig();
+            SessionManager = Torch.Managers.GetManager<TorchSessionManager>();
+            if (SessionManager == null)
+                return;
+            SessionManager.SessionStateChanged += SessionManager_SessionStateChanged;
         }
-        
-        
+
+        private void SessionManager_SessionStateChanged(
+            ITorchSession session,
+            TorchSessionState newState)
+        {
+            if (newState == TorchSessionState.Unloading)
+            {
+                _limiter.OnUnloading();
+            }
+            else
+            {
+                if (newState != TorchSessionState.Loaded)
+                    return;
+                _limiter.OnLoaded();
+            }
+        }
+
         public override void Update()
         {
             if (MySandboxGame.Static.SimulationFrameCounter % 6000 == 0)
@@ -58,31 +82,33 @@ namespace SentisOptimisationsPlugin
                 }
             }
         }
-        
-        private void SetupConfig() {
 
-            var configFile = Path.Combine(StoragePath, "SentisOptimisations.cfg");
+        private void SetupConfig()
+        {
+            
+            Config = ConfigUtils.Load<Config>( this, "SentisOptimisations.cfg");
+            ConfigUtils.Save( this, Config, "SentisOptimisations.cfg");
 
-            try {
-
-                _config = Persistent<Config>.Load(configFile);
-
-            } catch (Exception e) {
-                Log.Warn(e);
-            }
-
-            if (_config?.Data == null) {
-
-                Log.Info("Create Default Config, because none was found!");
-
-                _config = new Persistent<Config>(configFile, new Config());
-                _config.Save();
-            }
+            // try
+            // {
+            //     _config = Persistent<Config>.Load(configFile);
+            // }
+            // catch (Exception e)
+            // {
+            //     Log.Warn(e);
+            // }
+            //
+            // if (_config?.Data == null)
+            // {
+            //     Log.Info("Create Default Config, because none was found!");
+            //
+            //     _config = new Persistent<Config>(configFile, new Config());
+            //     _config.Save();
+            // }
         }
-        
+
         public class TestCommands : CommandModule
         {
-
             [Command("fix-asters", "Fix astersCommand")]
             [Permission(MyPromoteLevel.Moderator)]
             public void FixAsters()

@@ -15,11 +15,8 @@ namespace SentisOptimisationsPlugin
     [PatchShim]
     public static class FixTurretsPatch
     {
-
         [ReflectedMethod(Name = "RotateModels")]
         private static Action<MyLargeTurretBase> RotateModels;
-        
-
 
 
         private static void OnPositionChanged(MyPositionComponentBase myPositionComponentBase,
@@ -65,9 +62,8 @@ namespace SentisOptimisationsPlugin
             {
                 return true;
             }
+
             return false;
         }
-        
-
     }
 }

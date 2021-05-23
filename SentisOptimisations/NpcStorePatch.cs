@@ -14,15 +14,14 @@ namespace SentisOptimisationsPlugin
 
         public static void Patch(PatchContext ctx)
         {
-
             var MethodGetItemMinimalPrice = typeof(MyMinimalPriceCalculator).GetMethod(
-                nameof(MyMinimalPriceCalculator.TryGetItemMinimalPrice),BindingFlags.Instance | BindingFlags.Public);
+                nameof(MyMinimalPriceCalculator.TryGetItemMinimalPrice), BindingFlags.Instance | BindingFlags.Public);
 
             ctx.GetPattern(MethodGetItemMinimalPrice).Suffixes.Add(
                 typeof(NpcStorePatch).GetMethod(nameof(PatchGetItemMinimalPrice),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
         }
-        
+
         private static void PatchGetItemMinimalPrice(MyDefinitionId itemId, ref int minimalPrice)
         {
             try

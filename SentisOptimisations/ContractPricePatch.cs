@@ -14,7 +14,7 @@ namespace SentisOptimisationsPlugin
         private static readonly double JUMP_DRIVE_DISTANCE = 2000000.0;
         private static readonly float AMOUNT_URANIUM_TO_RECHARGE = 3.75f;
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
-
+        private static Random _random = new Random();
         public static void Patch(PatchContext ctx)
         {
             var MethodGetMoneyRewardForAcquisitionContract = typeof(MyContractTypeAcquisitionStrategy).GetMethod(
@@ -47,9 +47,9 @@ namespace SentisOptimisationsPlugin
             ctx.GetPattern(MethodGetMoneyRewardForRepairContract).Suffixes.Add(
                 typeof(ContractPricePatch).GetMethod(nameof(PatchGetMoneyRewardForRepairContract),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-            
+
             var MethodMyContractFindInit = typeof(MyContractFind).GetMethod(
-                nameof(MyContractFind.Init),BindingFlags.Instance | BindingFlags.Public);
+                nameof(MyContractFind.Init), BindingFlags.Instance | BindingFlags.Public);
 
             ctx.GetPattern(MethodMyContractFindInit).Prefixes.Add(
                 typeof(ContractPricePatch).GetMethod(nameof(PatchMyContractFindInit),
@@ -60,7 +60,8 @@ namespace SentisOptimisationsPlugin
         {
             try
             {
-                __result = (long) (baseRew * Math.Pow(2.0, Math.Log10(amount)) * SentisOptimisationsPlugin.Config.ContractAcquisitionMultiplier);
+                __result = (long) (baseRew * Math.Pow(2.0, Math.Log10(amount)) *
+                                   SentisOptimisationsPlugin.Config.ContractAcquisitionMultiplier);
             }
             catch (Exception e)
             {
@@ -72,7 +73,8 @@ namespace SentisOptimisationsPlugin
         {
             try
             {
-                __result = (long) (baseRew * Math.Pow(3.0, Math.Log10(distance)) * SentisOptimisationsPlugin.Config.ContractEscortMultiplier);
+                __result = (long) (baseRew * Math.Pow(3.0, Math.Log10(distance)) *
+                                   SentisOptimisationsPlugin.Config.ContractEscortMultiplier);
             }
             catch (Exception e)
             {
@@ -87,7 +89,8 @@ namespace SentisOptimisationsPlugin
             {
                 double num1 = distance / JUMP_DRIVE_DISTANCE;
                 double num2 = num1 * (uraniumPrice * (double) AMOUNT_URANIUM_TO_RECHARGE);
-                __result = (long) ((baseRew + baseRew * num1 + num2) * SentisOptimisationsPlugin.Config.ContractHaulingtMultiplier);
+                __result = (long) ((baseRew + baseRew * num1 + num2) *
+                                   SentisOptimisationsPlugin.Config.ContractHaulingtMultiplier);
             }
             catch (Exception e)
             {
@@ -102,8 +105,9 @@ namespace SentisOptimisationsPlugin
         {
             try
             {
-                __result = (long)  ((baseRew * Math.Pow(2.0, Math.Log10(gridDistance)) +
-                                   (long) (gridPriceToRewardcoef * (double) gridPrice)) * SentisOptimisationsPlugin.Config.ContractRepairMultiplier);
+                __result = (long) ((baseRew * Math.Pow(2.0, Math.Log10(gridDistance)) +
+                                    (long) (gridPriceToRewardcoef * (double) gridPrice)) *
+                                   SentisOptimisationsPlugin.Config.ContractRepairMultiplier);
             }
             catch (Exception e)
             {
@@ -115,7 +119,12 @@ namespace SentisOptimisationsPlugin
         {
             try
             {
-                ob.RewardMoney = (long) (ob.RewardMoney * SentisOptimisationsPlugin.Config.ContractFindMultiplier);
+                var rewardMoney = (long) (ob.RewardMoney * SentisOptimisationsPlugin.Config.ContractFindMultiplier);
+                if (rewardMoney > 10000000)
+                {
+                    rewardMoney = _random.Next(7000000, 10000000);
+                }
+                ob.RewardMoney = rewardMoney;
             }
             catch (Exception e)
             {

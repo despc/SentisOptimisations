@@ -17,8 +17,6 @@ namespace SentisOptimisationsPlugin
     [PatchShim]
     public class RemovePluginPatch
     {
-        
-       
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
         public static void Patch(PatchContext ctx)
@@ -35,27 +33,31 @@ namespace SentisOptimisationsPlugin
         {
             try
             {
-                if (!MyEventContext.Current.IsLocallyInvoked && (long) MySession.Static.Players.TryGetSteamId(identityID) != (long) MyEventContext.Current.Sender.Value)
-                    (MyMultiplayer.Static as MyMultiplayerServerBase).ValidationFailed(MyEventContext.Current.Sender.Value, true, (string) null, true);
+                if (!MyEventContext.Current.IsLocallyInvoked &&
+                    (long) MySession.Static.Players.TryGetSteamId(identityID) !=
+                    (long) MyEventContext.Current.Sender.Value)
+                    (MyMultiplayer.Static as MyMultiplayerServerBase).ValidationFailed(
+                        MyEventContext.Current.Sender.Value, true, (string) null, true);
                 else
                 {
-                    var method = typeof(MyBlockLimits).GetMethod("GetGridFromId", BindingFlags.Static | BindingFlags.NonPublic);
+                    var method = typeof(MyBlockLimits).GetMethod("GetGridFromId",
+                        BindingFlags.Static | BindingFlags.NonPublic);
                     MyCubeGrid grid = (MyCubeGrid) method.Invoke(obj: null, parameters: new object[] {gridEntityId});
-   
+
                     List<IMyPlayer> players = new List<IMyPlayer>();
-                    MyAPIGateway.Players.GetPlayers(players, player => player.GetRelationTo(identityID) == MyRelationsBetweenPlayerAndBlock.Enemies);
-                    
+                    MyAPIGateway.Players.GetPlayers(players,
+                        player => player.GetRelationTo(identityID) == MyRelationsBetweenPlayerAndBlock.Enemies);
+
                     foreach (var myPlayer in players)
                     {
                         if (Vector3D.Distance(grid.PositionComp.GetPosition(), myPlayer.GetPosition()) > 10000)
                         {
                             continue;
                         }
+
                         return false;
                     }
                 }
-                   
-
             }
             catch (Exception e)
             {
