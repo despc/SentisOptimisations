@@ -9,7 +9,7 @@ using VRage.Game.ObjectBuilders.Components.Contracts;
 namespace SentisOptimisationsPlugin
 {
     [PatchShim]
-    public class ContractPricePatch
+    public static class ContractPricePatch
     {
         private static readonly double JUMP_DRIVE_DISTANCE = 2000000.0;
         private static readonly float AMOUNT_URANIUM_TO_RECHARGE = 3.75f;

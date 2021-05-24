@@ -47,9 +47,9 @@ namespace SentisOptimisations
             IMyCubeGrid grid,
             bool includeConnectorDocked = false)
         {
-            if (grid == null || grid.Physics == null)
-                return (List<IMyCubeGrid>) null;
             List<IMyCubeGrid> source = new List<IMyCubeGrid>();
+            if (grid == null || grid.Physics == null)
+                return source;
             GridLinkTypeEnum type = GridLinkTypeEnum.Mechanical;
             if (includeConnectorDocked)
                 type = GridLinkTypeEnum.Physical;

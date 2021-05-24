@@ -2,10 +2,14 @@
 using System.Linq;
 using System.Reflection;
 using Sandbox.Definitions;
+using Sandbox.Game;
 using Sandbox.Game.Entities;
+using Sandbox.Game.Entities.Cube;
 using SentisOptimisations;
 using Torch.Managers.PatchManager;
+using VRage.Game;
 using VRage.Network;
+using VRageMath;
 
 namespace SentisOptimisationsPlugin
 {
@@ -76,13 +80,56 @@ namespace SentisOptimisationsPlugin
             }
             MyCubeBlockDefinition cubeBlockDefinition = MyDefinitionManager.Static.GetCubeBlockDefinition(locations.First().BlockDefinition);
             pcu = pcu + cubeBlockDefinition.PCU;
+            
+            bool enemyAround = false;
+            var owner = PlayerUtils.GetOwner(__instance);
+            foreach (var player in PlayerUtils.GetAllPlayers())
+            {
+                    
+                if (player.GetRelationTo(owner) != MyRelationsBetweenPlayerAndBlock.Enemies)
+                {
+                    continue;
+                }
+                var distance = Vector3D.Distance(player.GetPosition(), __instance.PositionComp.GetPosition());
+                if (distance > 15000)
+                {
+                    continue;
+                }
+
+                enemyAround = true;
+            }
+            if (pcu > maxPcu)
+            {
+                PcuLimiter.SendLimitMessage(identityId, pcu, maxPcu, __instance.DisplayName);
+            }
+            
+            maxPcu = enemyAround ? maxPcu : maxPcu + 5000;
+
+            CheckBeacon(__instance);
+            
             if (pcu <= maxPcu)
             {
                 return true;
             }
-            PcuLimiter.SendLimitMessage(identityId, pcu, maxPcu);
+            
             //SentisOptimisationsPlugin._limiter.LimitReached(__instance, identityId);
             return false;
+        }
+
+        private static void CheckBeacon(MyCubeGrid grid)
+        {
+            var beacon = grid.GetFirstBlockOfType<MyBeacon>();
+            if (beacon != null)
+            {
+                return;
+            }
+            foreach (var gridBigOwner in grid.BigOwners)
+            {
+                MyVisualScriptLogicProvider.ShowNotification("На постройке " + grid.DisplayName + " не установлен маяк", 5000, "Red",
+                    gridBigOwner);
+                MyVisualScriptLogicProvider.ShowNotification("она будет удалена при следующей очистке", 5000, "Red",
+                    gridBigOwner);
+            }
         }
     }
 }

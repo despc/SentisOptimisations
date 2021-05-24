@@ -15,7 +15,7 @@ using VRageMath;
 namespace SentisOptimisationsPlugin
 {
     [PatchShim]
-    public class RemovePluginPatch
+    public static class RemovePluginPatch
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
 

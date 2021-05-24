@@ -55,7 +55,7 @@ namespace SentisOptimisationsPlugin
                     return true;
                 __instance.Enabled = false;
                 var owner = PlayerUtils.GetOwner(__instance.CubeGrid);
-                PcuLimiter.SendLimitMessage(owner, pcu, maxPcu);
+                PcuLimiter.SendLimitMessage(owner, pcu, maxPcu, __instance.CubeGrid.DisplayName);
                 return true;
             }
             catch (Exception e)

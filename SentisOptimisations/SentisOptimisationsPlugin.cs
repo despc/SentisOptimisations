@@ -134,5 +134,10 @@ namespace SentisOptimisationsPlugin
                 }
             }
         }
+        public override void Dispose()
+        {
+            _limiter.CancellationTokenSource.Cancel();
+            base.Dispose();
+        }
     }
 }
