@@ -169,9 +169,15 @@ namespace SentisOptimisationsPlugin
                         return false;
                     }
 
+                    double explosionOffcet = 0;
+                    if (entity is MyCubeGrid)
+                    {
+                        explosionOffcet = ((MyCubeGrid) entity).GridSize / 5;
+                    }
+
                     var missileExplosionPosition = hitInfoRet.Position;  // точка взрыва
-                    // + (line.Direction * 0.2);
-                    __instance.PositionComp.SetPosition(missileExplosionPosition);
+                    //  - (line.Direction * explosionOffcet);
+                    // __instance.PositionComp.SetPosition(missileExplosionPosition);
                     Log.Error("Explosion Position " + missileExplosionPosition);
                     SetInstanceField(typeof(MyMissile), __instance, "m_collidedEntity", entity);
                     entity.Pin();
@@ -231,7 +237,7 @@ namespace SentisOptimisationsPlugin
                     //     }
                     // }
 
-                    m_gridExplosion.ComputeDamagedBlocks();
+                    //m_gridExplosion.ComputeDamagedBlocks();
                     ComputeDamagedBlocks(m_gridExplosion);
                     var attackerId = GetInstanceField(typeof(MyMissile), __instance, "m_owner");
                     ApplyVolumetricDamageToGrid(m_gridExplosion, (long) attackerId, hitInfoRet);
@@ -251,12 +257,13 @@ namespace SentisOptimisationsPlugin
 
         public static void ComputeDamagedBlocks(MyGridExplosion m_gridExplosion)
         {
-            Dictionary<MySlimBlock, MyGridExplosion.MyRaycastDamageInfo> m_damageRemaining =
-                new Dictionary<MySlimBlock, MyGridExplosion.MyRaycastDamageInfo>();
+
             Dictionary<MySlimBlock, float> m_damagedBlocks = new Dictionary<MySlimBlock, float>();
 
             foreach (MySlimBlock affectedCubeBlock in m_gridExplosion.AffectedCubeBlocks)
             {
+                Dictionary<MySlimBlock, MyGridExplosion.MyRaycastDamageInfo> m_damageRemaining =
+                    new Dictionary<MySlimBlock, MyGridExplosion.MyRaycastDamageInfo>();
                 Stack<MySlimBlock> m_castBlocks = new Stack<MySlimBlock>();
                 MyGridExplosion.MyRaycastDamageInfo raycastDamageInfo =
                     CastDDA(affectedCubeBlock, m_castBlocks, m_damageRemaining, m_gridExplosion);
@@ -269,21 +276,43 @@ namespace SentisOptimisationsPlugin
                     }
                     else
                     {
-                        float num1 = (float) (key.WorldAABB.Center - m_gridExplosion.Sphere.Center).Length();
+                        float blockCenterToExplosionCenter = (float) (key.WorldAABB.Center - m_gridExplosion.Sphere.Center).Length();
                         if ((double) raycastDamageInfo.DamageRemaining > 0.0)
                         {
+                            // var sphereRadius = m_gridExplosion.Sphere.Radius; //4m
+                            // var distanceBlockSurfaceToExplosion = raycastDamageInfo.DistanceToExplosion;  //3m
+                            // if (distanceBlockSurfaceToExplosion < key.CubeGrid.GridSize / 2)
+                            // {
+                            //     m_damagedBlocks.Add(key, m_gridExplosion.Damage);
+                            //     continue;
+                            // }
+                            // var damageMultiplier = 1 - (distanceBlockSurfaceToExplosion / sphereRadius);
+                            // double damage = m_gridExplosion.Damage * damageMultiplier;
+                            //
+                            // if (raycastDamageInfo.DamageRemaining < damage)
+                            // {
+                            //     damage = raycastDamageInfo.DamageRemaining;
+                            // }
+                            // raycastDamageInfo.DamageRemaining = (float) (raycastDamageInfo.DamageRemaining - damage);
+                            // m_damagedBlocks.Add(key, (float) damage);
+                            // float num1 = (float) (key.WorldAABB.Center - m_gridExplosion.Sphere.Center).Length(); // 1.5m
+
                             float num2 =
                                 MathHelper.Clamp(
-                                    (float) (1.0 - ((double) num1 - (double) raycastDamageInfo.DistanceToExplosion) /
+                                    (float) (1.0 - ((double) blockCenterToExplosionCenter - (double) raycastDamageInfo.DistanceToExplosion) /
                                         (m_gridExplosion.Sphere.Radius -
                                          (double) raycastDamageInfo.DistanceToExplosion)), 0.0f, 1f);
+                            if (m_damagedBlocks.ContainsKey(key))
+                            {
+                                continue;
+                            }
                             if ((double) num2 > 0.0)
                             {
                                 m_damagedBlocks.Add(key,
-                                    raycastDamageInfo.DamageRemaining * num2 * key.DeformationRatio);
+                                    raycastDamageInfo.DamageRemaining * num2 * key.BlockDefinition.GeneralDamageMultiplier);
                                 raycastDamageInfo.DamageRemaining = Math.Max(0.0f,
                                     (float) ((double) raycastDamageInfo.DamageRemaining * (double) num2 -
-                                             (double) key.Integrity / (double) key.DeformationRatio));
+                                             (double) key.Integrity ));
                             }
                             else
                                 m_damagedBlocks.Add(key, raycastDamageInfo.DamageRemaining);
@@ -291,10 +320,15 @@ namespace SentisOptimisationsPlugin
                         else
                             raycastDamageInfo.DamageRemaining = 0.0f;
 
-                        raycastDamageInfo.DistanceToExplosion = Math.Abs(num1);
+                        raycastDamageInfo.DistanceToExplosion = Math.Abs(blockCenterToExplosionCenter);
                         m_damageRemaining.Add(key, raycastDamageInfo);
                     }
                 }
+            }
+            //m_gridExplosion.DamagedBlocks.Clear();
+            foreach (var mDamagedBlock in m_damagedBlocks)
+            {
+                m_gridExplosion.DamagedBlocks.Add(mDamagedBlock.Key, mDamagedBlock.Value);
             }
         }
 
