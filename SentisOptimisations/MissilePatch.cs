@@ -47,25 +47,25 @@ namespace SentisOptimisationsPlugin
             ctx.GetPattern(ExecuteExplosionMethod).Prefixes.Add(
                 typeof(MissilePatch).GetMethod(nameof(ExecuteExplosionMethodPatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            //
+            // var DoDamageInternalMethod = typeof(MySlimBlock).GetMethod(
+            //     "DoDamageInternal", BindingFlags.Instance | BindingFlags.NonPublic);
+            // ctx.GetPattern(DoDamageInternalMethod).Prefixes.Add(
+            //     typeof(MissilePatch).GetMethod(nameof(DoDamageInternalPatched),
+            //         BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            //
+            // var ApplyAccumulatedDamageMethod = typeof(MySlimBlock).GetMethod(
+            //     "ApplyAccumulatedDamage", BindingFlags.Instance | BindingFlags.Public);
+            // ctx.GetPattern(ApplyAccumulatedDamageMethod).Prefixes.Add(
+            //     typeof(MissilePatch).GetMethod(nameof(ApplyAccumulatedDamagePatched),
+            //         BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
 
-            var DoDamageInternalMethod = typeof(MySlimBlock).GetMethod(
-                "DoDamageInternal", BindingFlags.Instance | BindingFlags.NonPublic);
-            ctx.GetPattern(DoDamageInternalMethod).Prefixes.Add(
-                typeof(MissilePatch).GetMethod(nameof(DoDamageInternalPatched),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
 
-            var ApplyAccumulatedDamageMethod = typeof(MySlimBlock).GetMethod(
-                "ApplyAccumulatedDamage", BindingFlags.Instance | BindingFlags.Public);
-            ctx.GetPattern(ApplyAccumulatedDamageMethod).Prefixes.Add(
-                typeof(MissilePatch).GetMethod(nameof(ApplyAccumulatedDamagePatched),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-
-
-            var MyComponentStackApplyDamageMethod = typeof(MyComponentStack).GetMethod(
-                "ApplyDamage", BindingFlags.Instance | BindingFlags.Public);
-            ctx.GetPattern(MyComponentStackApplyDamageMethod).Prefixes.Add(
-                typeof(MissilePatch).GetMethod(nameof(MyComponentStackApplyDamageMethodPatched),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            // var MyComponentStackApplyDamageMethod = typeof(MyComponentStack).GetMethod(
+            //     "ApplyDamage", BindingFlags.Instance | BindingFlags.Public);
+            // ctx.GetPattern(MyComponentStackApplyDamageMethod).Prefixes.Add(
+            //     typeof(MissilePatch).GetMethod(nameof(MyComponentStackApplyDamageMethodPatched),
+            //         BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
 
 
             var MoveMissileMethod = typeof(MyMissiles).GetMethod(
@@ -77,7 +77,6 @@ namespace SentisOptimisationsPlugin
 
             var registerMissileMethod = typeof(MyMissiles).GetMethod(
                 "RegisterMissile", BindingFlags.Static | BindingFlags.NonPublic);
-
             ctx.GetPattern(registerMissileMethod).Prefixes.Add(
                 typeof(MissilePatch).GetMethod(nameof(RegisterMissilePatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
@@ -90,7 +89,7 @@ namespace SentisOptimisationsPlugin
             {
                 if ((bool) GetInstanceField(typeof(MyMissile), __instance, "m_shouldExplode"))
                 {
-                    Log.Error("ExecuteExplosion ");
+                    //Log.Error("ExecuteExplosion ");
                     InvokeInstanceMethod(typeof(MyMissile), __instance, "ExecuteExplosion", new Object[0]);
                 }
                 else
@@ -172,13 +171,12 @@ namespace SentisOptimisationsPlugin
                     double explosionOffcet = 0;
                     if (entity is MyCubeGrid)
                     {
-                        explosionOffcet = ((MyCubeGrid) entity).GridSize / 5;
+                        explosionOffcet = mMissileAmmoDefinition.MissileExplosionRadius / 2;
                     }
 
-                    var missileExplosionPosition = hitInfoRet.Position;  // точка взрыва
-                    //  - (line.Direction * explosionOffcet);
-                    // __instance.PositionComp.SetPosition(missileExplosionPosition);
-                    Log.Error("Explosion Position " + missileExplosionPosition);
+                    var missileExplosionPosition = hitInfoRet.Position // точка взрыва
+                                                   - (line.Direction * explosionOffcet);
+                    //Log.Error("Explosion Position " + missileExplosionPosition);
                     SetInstanceField(typeof(MyMissile), __instance, "m_collidedEntity", entity);
                     entity.Pin();
                     SetInstanceField(typeof(MyMissile), __instance, "m_collisionPoint", hitInfoRet.Position);
@@ -188,56 +186,16 @@ namespace SentisOptimisationsPlugin
                         (Action) (() =>
                             InvokeInstanceMethod(typeof(MyMissile), __instance, "MarkForExplosion", new Object[0])),
                         "MyMissile - collision invoke");
-                    // Log.Error("missileExplosionPosition " + missileExplosionPosition);
 
                     BoundingSphereD explosionSphere = new BoundingSphereD(missileExplosionPosition,
                         mMissileAmmoDefinition.MissileExplosionRadius);
                     long OriginEntity = (long) GetInstanceField(typeof(MyMissile), __instance, "m_originEntity");
 
-                    // explosionSphere.Radius *= 2.0;
                     var topMostEntitiesInSphere =
                         new HashSet<MyEntity>(MyEntities.GetTopMostEntitiesInSphere(ref explosionSphere));
-                    // foreach (var myEntity in topMostEntitiesInSphere)
-                    // {
-                    //     Log.Error("myEntity in sphere " + myEntity.DisplayName);
-                    // }
                     MyGridExplosion m_gridExplosion = ApplyVolumetricExplosionOnGrid(
                         mMissileAmmoDefinition.MissileExplosionDamage, ref explosionSphere, OriginEntity,
                         new List<MyEntity>(topMostEntitiesInSphere), line.Direction);
-                    // foreach (var myEntity in topMostEntitiesInSphere)
-                    // {
-                    //     if (myEntity is MyCubeGrid)
-                    //     {
-                    //         Log.Error("MyCubeGrid procesing " + myEntity.DisplayName);
-                    //         var myCubeGrid = (MyCubeGrid) myEntity;
-                    //         m_gridExplosion.AffectedCubeGrids.Add(myCubeGrid);
-                    //         BoundingSphereD sphere1 = new BoundingSphereD(explosionSphere.Center,
-                    //             Math.Max(0.100000001490116, explosionSphere.Radius - (double) myCubeGrid.GridSize));
-                    //         BoundingSphereD sphere2 =
-                    //             new BoundingSphereD(explosionSphere.Center, explosionSphere.Radius);
-                    //         BoundingSphereD sphere3 = new BoundingSphereD(explosionSphere.Center,
-                    //             explosionSphere.Radius + (double) myCubeGrid.GridSize * 0.5 * Math.Sqrt(3.0));
-                    //         MatrixD matrix = __instance.WorldMatrix;
-                    //         Vector3D location = matrix.Translation;
-                    //         AddGps("Center ", missileExplosionPosition);
-                    //         AddGps("1 sphere ", missileExplosionPosition - line.Direction * sphere1.Radius);
-                    //         AddGps("2 sphere ", missileExplosionPosition - line.Direction * sphere2.Radius);
-                    //         AddGps("3 sphere ", missileExplosionPosition - line.Direction * sphere3.Radius);
-                    //         HashSet<MySlimBlock> m_explodedBlocksInner = new HashSet<MySlimBlock>();
-                    //         HashSet<MySlimBlock> m_explodedBlocksExact = new HashSet<MySlimBlock>();
-                    //         HashSet<MySlimBlock> m_explodedBlocksOuter = new HashSet<MySlimBlock>();
-                    //         float detectionBlockHalfSize = (float) ((double) myCubeGrid.GridSize / 2.0 / 1.25);
-                    //         MatrixD invWorldGrid = myCubeGrid.PositionComp.WorldMatrixInvScaled;
-                    //         myCubeGrid.GetBlocksInsideSpheres(ref sphere1, ref sphere2, ref sphere3,
-                    //             m_explodedBlocksInner, m_explodedBlocksExact, m_explodedBlocksOuter, false,
-                    //             detectionBlockHalfSize, ref invWorldGrid);
-                    //         m_explodedBlocksInner.UnionWith((IEnumerable<MySlimBlock>) m_explodedBlocksExact);
-                    //         m_gridExplosion.AffectedCubeBlocks.UnionWith(
-                    //             (IEnumerable<MySlimBlock>) m_explodedBlocksInner);
-                    //     }
-                    // }
-
-                    //m_gridExplosion.ComputeDamagedBlocks();
                     ComputeDamagedBlocks(m_gridExplosion);
                     var attackerId = GetInstanceField(typeof(MyMissile), __instance, "m_owner");
                     ApplyVolumetricDamageToGrid(m_gridExplosion, (long) attackerId, hitInfoRet);
@@ -257,7 +215,6 @@ namespace SentisOptimisationsPlugin
 
         public static void ComputeDamagedBlocks(MyGridExplosion m_gridExplosion)
         {
-
             Dictionary<MySlimBlock, float> m_damagedBlocks = new Dictionary<MySlimBlock, float>();
 
             foreach (MySlimBlock affectedCubeBlock in m_gridExplosion.AffectedCubeBlocks)
@@ -273,59 +230,44 @@ namespace SentisOptimisationsPlugin
                     if (key.FatBlock is MyWarhead)
                     {
                         m_damagedBlocks[key] = 1E+07f;
+                        continue;
                     }
-                    else
-                    {
-                        float blockCenterToExplosionCenter = (float) (key.WorldAABB.Center - m_gridExplosion.Sphere.Center).Length();
-                        if ((double) raycastDamageInfo.DamageRemaining > 0.0)
-                        {
-                            // var sphereRadius = m_gridExplosion.Sphere.Radius; //4m
-                            // var distanceBlockSurfaceToExplosion = raycastDamageInfo.DistanceToExplosion;  //3m
-                            // if (distanceBlockSurfaceToExplosion < key.CubeGrid.GridSize / 2)
-                            // {
-                            //     m_damagedBlocks.Add(key, m_gridExplosion.Damage);
-                            //     continue;
-                            // }
-                            // var damageMultiplier = 1 - (distanceBlockSurfaceToExplosion / sphereRadius);
-                            // double damage = m_gridExplosion.Damage * damageMultiplier;
-                            //
-                            // if (raycastDamageInfo.DamageRemaining < damage)
-                            // {
-                            //     damage = raycastDamageInfo.DamageRemaining;
-                            // }
-                            // raycastDamageInfo.DamageRemaining = (float) (raycastDamageInfo.DamageRemaining - damage);
-                            // m_damagedBlocks.Add(key, (float) damage);
-                            // float num1 = (float) (key.WorldAABB.Center - m_gridExplosion.Sphere.Center).Length(); // 1.5m
 
-                            float num2 =
-                                MathHelper.Clamp(
-                                    (float) (1.0 - ((double) blockCenterToExplosionCenter - (double) raycastDamageInfo.DistanceToExplosion) /
-                                        (m_gridExplosion.Sphere.Radius -
-                                         (double) raycastDamageInfo.DistanceToExplosion)), 0.0f, 1f);
-                            if (m_damagedBlocks.ContainsKey(key))
-                            {
-                                continue;
-                            }
-                            if ((double) num2 > 0.0)
-                            {
-                                m_damagedBlocks.Add(key,
-                                    raycastDamageInfo.DamageRemaining * num2 * key.BlockDefinition.GeneralDamageMultiplier);
-                                raycastDamageInfo.DamageRemaining = Math.Max(0.0f,
-                                    (float) ((double) raycastDamageInfo.DamageRemaining * (double) num2 -
-                                             (double) key.Integrity ));
-                            }
-                            else
-                                m_damagedBlocks.Add(key, raycastDamageInfo.DamageRemaining);
+                    if (m_damagedBlocks.ContainsKey(key))
+                    {
+                        break;
+                    }
+
+                    float blockCenterToExplosionCenter =
+                        (float) (key.WorldAABB.Center - m_gridExplosion.Sphere.Center).Length();
+                    if ((double) raycastDamageInfo.DamageRemaining > 0.0)
+                    {
+                        float num2 =
+                            MathHelper.Clamp(
+                                (float) (1.0 - ((double) blockCenterToExplosionCenter -
+                                                (double) raycastDamageInfo.DistanceToExplosion) /
+                                    (m_gridExplosion.Sphere.Radius -
+                                     (double) raycastDamageInfo.DistanceToExplosion)), 0.0f, 1f);
+
+                        if ((double) num2 > 0.0)
+                        {
+                            m_damagedBlocks.Add(key,
+                                raycastDamageInfo.DamageRemaining * num2 * key.BlockDefinition.GeneralDamageMultiplier);
+                            var effectiveBlockHP = (double) key.Integrity / key.BlockDefinition.GeneralDamageMultiplier;
+                            raycastDamageInfo.DamageRemaining = Math.Max(0.0f,
+                                (float) ((double) raycastDamageInfo.DamageRemaining * (double) num2 -
+                                         effectiveBlockHP));
                         }
                         else
-                            raycastDamageInfo.DamageRemaining = 0.0f;
-
-                        raycastDamageInfo.DistanceToExplosion = Math.Abs(blockCenterToExplosionCenter);
-                        m_damageRemaining.Add(key, raycastDamageInfo);
+                            m_damagedBlocks.Add(key, raycastDamageInfo.DamageRemaining);
                     }
+                    else
+                        raycastDamageInfo.DamageRemaining = 0.0f;
+
+                    raycastDamageInfo.DistanceToExplosion = Math.Abs(blockCenterToExplosionCenter);
+                    m_damageRemaining.Add(key, raycastDamageInfo);
                 }
             }
-            //m_gridExplosion.DamagedBlocks.Clear();
             foreach (var mDamagedBlock in m_damagedBlocks)
             {
                 m_gridExplosion.DamagedBlocks.Add(mDamagedBlock.Key, mDamagedBlock.Value);
@@ -344,7 +286,6 @@ namespace SentisOptimisationsPlugin
             Vector3D worldCenter;
             cubeBlock.ComputeWorldCenter(out worldCenter);
             List<Vector3I> m_cells = new List<Vector3I>();
-            // this.m_cells.Clear();
             cubeBlock.CubeGrid.RayCastCells(worldCenter, m_gridExplosion.Sphere.Center, m_cells, new Vector3I?(),
                 false, true);
             (m_gridExplosion.Sphere.Center - worldCenter).Normalize();
@@ -358,7 +299,8 @@ namespace SentisOptimisationsPlugin
                     return IsExplosionInsideCell(cell, cubeBlock.CubeGrid, m_gridExplosion)
                         ? new MyGridExplosion.MyRaycastDamageInfo(m_gridExplosion.Damage,
                             (float) (fromWorldPos - m_gridExplosion.Sphere.Center).Length())
-                        : CastPhysicsRay(fromWorldPos, ref stackOverflowGuard, m_gridExplosion, m_castBlocks, m_damageRemaining);
+                        : CastPhysicsRay(fromWorldPos, ref stackOverflowGuard, m_gridExplosion, m_castBlocks,
+                            m_damageRemaining);
                 if (cubeBlock1 != cubeBlock)
                 {
                     if (m_damageRemaining.ContainsKey(cubeBlock1))
@@ -375,7 +317,8 @@ namespace SentisOptimisationsPlugin
                 (float) (worldCenter - m_gridExplosion.Sphere.Center).Length());
         }
 
-        private static bool IsExplosionInsideCell(Vector3I cell, MyCubeGrid cellGrid, MyGridExplosion m_gridExplosion) =>
+        private static bool
+            IsExplosionInsideCell(Vector3I cell, MyCubeGrid cellGrid, MyGridExplosion m_gridExplosion) =>
             cellGrid.WorldToGridInteger(m_gridExplosion.Sphere.Center) == cell;
 
         private static MyGridExplosion.MyRaycastDamageInfo CastPhysicsRay(Vector3D fromWorldPos,
@@ -404,6 +347,7 @@ namespace SentisOptimisationsPlugin
             {
                 myCubeGrid = (MyCubeGrid) myEntity;
             }
+
             if (myCubeGrid != null)
             {
                 Vector3D vector3D1 = Vector3D.Transform(position, myCubeGrid.PositionComp.WorldMatrixNormalizedInv) *
@@ -435,7 +379,8 @@ namespace SentisOptimisationsPlugin
                 }
 
                 int num1 = MyDebugDrawSettings.DEBUG_DRAW_EXPLOSION_HAVOK_RAYCASTS ? 1 : 0;
-                return CastPhysicsRay(fromWorldPos1, ref stackOverflowGuard, m_gridExplosion, m_castBlocks, m_damageRemaining);
+                return CastPhysicsRay(fromWorldPos1, ref stackOverflowGuard, m_gridExplosion, m_castBlocks,
+                    m_damageRemaining);
             }
 
             if (!nullable.HasValue)
@@ -484,15 +429,13 @@ namespace SentisOptimisationsPlugin
                     MatrixD invWorldGrid = Node.PositionComp.WorldMatrixInvScaled;
                     BoundingSphereD sphere1 = new BoundingSphereD(sphere.Center,
                         Math.Max(0.100000001490116, sphere.Radius - (double) Node.GridSize));
-                    // BoundingSphereD sphere1 = new BoundingSphereD(sphere.Center,
-                    //     0.100000001490116);
                     BoundingSphereD sphere2 = new BoundingSphereD(sphere.Center, sphere.Radius);
                     BoundingSphereD sphere3 = new BoundingSphereD(sphere.Center,
                         sphere.Radius + (double) Node.GridSize * 0.5 * Math.Sqrt(3.0));
-                    AddGps("Center ", sphere.Center);
-                    AddGps("1 sphere ", sphere.Center - Direction * sphere1.Radius);
-                    AddGps("2 sphere ", sphere.Center - Direction * sphere2.Radius);
-                    AddGps("3 sphere ", sphere.Center - Direction * sphere3.Radius);
+                    // AddGps("Center ", sphere.Center);
+                    // AddGps("1 sphere ", sphere.Center - Direction * sphere1.Radius);
+                    // AddGps("2 sphere ", sphere.Center - Direction * sphere2.Radius);
+                    // AddGps("3 sphere ", sphere.Center - Direction * sphere3.Radius);
                     HashSet<MySlimBlock> m_explodedBlocksInner = new HashSet<MySlimBlock>();
                     HashSet<MySlimBlock> m_explodedBlocksExact = new HashSet<MySlimBlock>();
                     HashSet<MySlimBlock> m_explodedBlocksOuter = new HashSet<MySlimBlock>();
@@ -559,32 +502,23 @@ namespace SentisOptimisationsPlugin
                             continue;
                     }
 
-                    if (affectedCubeBlocks.Contains(keyValuePair.Key) && !true)
+                    if (key.FatBlock == null &&
+                        (double) key.Integrity / (double) key.DeformationRatio < (double) amount)
                     {
                         key.CubeGrid.RemoveDestroyedBlock(key, 0L);
                     }
                     else
                     {
-                        if (key.FatBlock == null &&
-                            (double) key.Integrity / (double) key.DeformationRatio < (double) amount
-                            // || key.FatBlock == this.m_explosionInfo.HitEntity
-                        )
-                        {
-                            key.CubeGrid.RemoveDestroyedBlock(key, 0L);
-                        }
-                        else
-                        {
-                            if (key.FatBlock != null)
-                                amount *= 7f;
-                            key.DoDamage(amount, MyDamageType.Explosion, true, null, attackerId: attackerId);
-                            if (!key.IsDestroyed)
-                                key.CubeGrid.ApplyDestructionDeformation(key, 1f, new MyHitInfo?(), 0L);
-                        }
-
-                        foreach (MySlimBlock neighbour in key.Neighbours)
-                            neighbour.CubeGrid.Physics.AddDirtyBlock(neighbour);
-                        key.CubeGrid.Physics.AddDirtyBlock(key);
+                        if (key.FatBlock != null)
+                            amount *= 7f;
+                        key.DoDamage(amount, MyDamageType.Explosion, true, null, attackerId: attackerId);
+                        if (!key.IsDestroyed)
+                            key.CubeGrid.ApplyDestructionDeformation(key, 1f, new MyHitInfo?(), 0L);
                     }
+
+                    foreach (MySlimBlock neighbour in key.Neighbours)
+                        neighbour.CubeGrid.Physics.AddDirtyBlock(neighbour);
+                    key.CubeGrid.Physics.AddDirtyBlock(key);
                 }
             }
         }
@@ -608,15 +542,15 @@ namespace SentisOptimisationsPlugin
             var instanceFatBlock = __instance.FatBlock;
             if (instanceFatBlock == null)
             {
-                Log.Error("instanceFatBlock == null ");
+                Log.Error("SlimBlock damage " + damage);
                 return;
             }
 
             Log.Error(
-                "MySlimBlock " + instanceFatBlock.DisplayName + " damage " + damage + " damage type " + damageType);
+                "FatBlock " + instanceFatBlock.DisplayName + " damage " + damage + " damage type " + damageType);
         }
 
-        private static void ApplyAccumulatedDamagePatched(bool addDirtyParts = true, long attackerId = 0)
+        private static void ApplyAccumulatedDamagePatched(bool addDirtyParts, long attackerId)
         {
             Log.Error("ApplyAccumulatedDamagePatched");
         }
