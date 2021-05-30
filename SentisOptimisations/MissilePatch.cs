@@ -273,57 +273,44 @@ namespace SentisOptimisationsPlugin
                     if (key.FatBlock is MyWarhead)
                     {
                         m_damagedBlocks[key] = 1E+07f;
+                        continue;
                     }
-                    else
-                    {
-                        float blockCenterToExplosionCenter = (float) (key.WorldAABB.Center - m_gridExplosion.Sphere.Center).Length();
-                        if ((double) raycastDamageInfo.DamageRemaining > 0.0)
-                        {
-                            // var sphereRadius = m_gridExplosion.Sphere.Radius; //4m
-                            // var distanceBlockSurfaceToExplosion = raycastDamageInfo.DistanceToExplosion;  //3m
-                            // if (distanceBlockSurfaceToExplosion < key.CubeGrid.GridSize / 2)
-                            // {
-                            //     m_damagedBlocks.Add(key, m_gridExplosion.Damage);
-                            //     continue;
-                            // }
-                            // var damageMultiplier = 1 - (distanceBlockSurfaceToExplosion / sphereRadius);
-                            // double damage = m_gridExplosion.Damage * damageMultiplier;
-                            //
-                            // if (raycastDamageInfo.DamageRemaining < damage)
-                            // {
-                            //     damage = raycastDamageInfo.DamageRemaining;
-                            // }
-                            // raycastDamageInfo.DamageRemaining = (float) (raycastDamageInfo.DamageRemaining - damage);
-                            // m_damagedBlocks.Add(key, (float) damage);
-                            // float num1 = (float) (key.WorldAABB.Center - m_gridExplosion.Sphere.Center).Length(); // 1.5m
 
-                            float num2 =
-                                MathHelper.Clamp(
-                                    (float) (1.0 - ((double) blockCenterToExplosionCenter - (double) raycastDamageInfo.DistanceToExplosion) /
-                                        (m_gridExplosion.Sphere.Radius -
-                                         (double) raycastDamageInfo.DistanceToExplosion)), 0.0f, 1f);
-                            if (m_damagedBlocks.ContainsKey(key))
-                            {
-                                continue;
-                            }
-                            if ((double) num2 > 0.0)
-                            {
-                                m_damagedBlocks.Add(key,
-                                    raycastDamageInfo.DamageRemaining * num2 * key.BlockDefinition.GeneralDamageMultiplier);
-                                raycastDamageInfo.DamageRemaining = Math.Max(0.0f,
-                                    (float) ((double) raycastDamageInfo.DamageRemaining * (double) num2 -
-                                             (double) key.Integrity ));
-                            }
-                            else
-                                m_damagedBlocks.Add(key, raycastDamageInfo.DamageRemaining);
+                    if (m_damagedBlocks.ContainsKey(key))
+                    {
+                        break;
+                    }
+
+                    float blockCenterToExplosionCenter =
+                        (float) (key.WorldAABB.Center - m_gridExplosion.Sphere.Center).Length();
+                    if ((double) raycastDamageInfo.DamageRemaining > 0.0)
+                    {
+                        float num2 =
+                            MathHelper.Clamp(
+                                (float) (1.0 - ((double) blockCenterToExplosionCenter -
+                                                (double) raycastDamageInfo.DistanceToExplosion) /
+                                    (m_gridExplosion.Sphere.Radius -
+                                     (double) raycastDamageInfo.DistanceToExplosion)), 0.0f, 1f);
+
+                        if ((double) num2 > 0.0)
+                        {
+                            m_damagedBlocks.Add(key,
+                                raycastDamageInfo.DamageRemaining * num2 * key.BlockDefinition.GeneralDamageMultiplier);
+                            var effectiveBlockHP = (double) key.Integrity / key.BlockDefinition.GeneralDamageMultiplier;
+                            raycastDamageInfo.DamageRemaining = Math.Max(0.0f,
+                                (float) ((double) raycastDamageInfo.DamageRemaining * (double) num2 -
+                                         effectiveBlockHP));
                         }
                         else
-                            raycastDamageInfo.DamageRemaining = 0.0f;
-
-                        raycastDamageInfo.DistanceToExplosion = Math.Abs(blockCenterToExplosionCenter);
-                        m_damageRemaining.Add(key, raycastDamageInfo);
+                            m_damagedBlocks.Add(key, raycastDamageInfo.DamageRemaining);
                     }
+                    else
+                        raycastDamageInfo.DamageRemaining = 0.0f;
+
+                    raycastDamageInfo.DistanceToExplosion = Math.Abs(blockCenterToExplosionCenter);
+                    m_damageRemaining.Add(key, raycastDamageInfo);
                 }
+                
             }
             //m_gridExplosion.DamagedBlocks.Clear();
             foreach (var mDamagedBlock in m_damagedBlocks)
