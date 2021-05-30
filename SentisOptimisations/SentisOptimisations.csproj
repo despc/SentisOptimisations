@@ -39,6 +39,7 @@
       <Compile Include="Limits\ConvertPatch.cs" />
       <Compile Include="Limits\MergePatch.cs" />
       <Compile Include="Limits\PcuLimiter.cs" />
+      <Compile Include="MissilePatch.cs" />
       <Compile Include="NoScrapPatch.cs" />
       <Compile Include="NpcStorePatch.cs" />
       <Compile Include="RemovePluginPatch.cs" />
@@ -58,6 +59,9 @@
       <Compile Include="Utils\SoundUtils.cs" />
     </ItemGroup>
     <ItemGroup>
+      <Reference Include="HavokWrapper, Version=0.1.1.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>D:\torch-server\DedicatedServer64\HavokWrapper.dll</HintPath>
+      </Reference>
       <Reference Include="NLog, Version=4.0.0.0, Culture=neutral, PublicKeyToken=5120e14c03d0593c">
         <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\NLog.dll</HintPath>
       </Reference>
