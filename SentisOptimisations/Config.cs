@@ -1,4 +1,5 @@
-﻿using Torch;
+﻿using System;
+using Torch;
 
 namespace SentisOptimisationsPlugin
 {
@@ -10,12 +11,16 @@ namespace SentisOptimisationsPlugin
         private double _contractRepairMultiplier = 10;
         private double _contractFindMultiplier = 25;
         private bool _enabledPcuLimiter = true;
-        private int _maxStaticGridPCU = 100000;
+        private int _maxStaticGridPCU = 200000;
         private int _maxDinamycGridPCU = 30000;
         private bool _allowProjection = true;
         private bool _allowMerge = false;
         private bool _includeConnectedGrids = false;
+        private String _pathToAsters = "C:\\Asteroids";
 
+        
+        public String PathToAsters { get => _pathToAsters; set => SetValue(ref _pathToAsters, value); }
+        
         public double ContractEscortMultiplier
         {
             get => _contractEscortMultiplier;
