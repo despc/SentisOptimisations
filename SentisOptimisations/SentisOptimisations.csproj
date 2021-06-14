@@ -69,7 +69,7 @@
         <HintPath>D:\torch-server\DedicatedServer64\Sandbox.Common.dll</HintPath>
       </Reference>
       <Reference Include="Sandbox.Game, Version=0.1.1.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\Sandbox.Game.dll</HintPath>
+        <HintPath>D:\torch-server\DedicatedServer64\Sandbox.Game.dll</HintPath>
       </Reference>
       <Reference Include="SpaceEngineers.Game, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
         <HintPath>D:\torch-server\DedicatedServer64\SpaceEngineers.Game.dll</HintPath>

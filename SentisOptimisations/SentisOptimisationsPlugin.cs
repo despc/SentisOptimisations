@@ -119,12 +119,13 @@ namespace SentisOptimisationsPlugin
                     try
                     {
                         var voxelMap = myVoxelMaps[i];
-                        Vector3D positon = voxelMap.GetPosition();
+                        Vector3D position = voxelMap.GetPosition();
                         byte[] storageData;
                         voxelMap.Storage.Save(out storageData);
                         IMyStorage storage = MyAPIGateway.Session.VoxelMaps.CreateStorage(storageData) as IMyStorage;
                         voxelMap.Close();
-                        MyWorldGenerator.AddVoxelMap(voxelMap.Name, (MyStorageBase) storage, positon);
+                        var addVoxelMap = MyWorldGenerator.AddVoxelMap(voxelMap.Name, (MyStorageBase) storage, position);
+                        addVoxelMap.PositionComp.SetPosition(position);
                         Log.Error("refresh voxels " + voxelMap.DisplayName);
                     }
                     catch (Exception e)

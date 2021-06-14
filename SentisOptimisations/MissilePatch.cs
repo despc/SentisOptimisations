@@ -196,7 +196,7 @@ namespace SentisOptimisationsPlugin
                     MyGridExplosion m_gridExplosion = ApplyVolumetricExplosionOnGrid(
                         mMissileAmmoDefinition.MissileExplosionDamage, ref explosionSphere, OriginEntity,
                         new List<MyEntity>(topMostEntitiesInSphere), line.Direction);
-                    ComputeDamagedBlocks(m_gridExplosion);
+                    ComputeDamagedBlocks(m_gridExplosion, isPearcingDamage(mMissileAmmoDefinition));
                     var attackerId = GetInstanceField(typeof(MyMissile), __instance, "m_owner");
                     ApplyVolumetricDamageToGrid(m_gridExplosion, (long) attackerId, hitInfoRet);
                     missileExplosionPosition = hitInfoRet.Position
@@ -213,9 +213,32 @@ namespace SentisOptimisationsPlugin
             return false;
         }
 
-        public static void ComputeDamagedBlocks(MyGridExplosion m_gridExplosion)
+        
+        public static bool isPearcingDamage(MyMissileAmmoDefinition missileAmmoDefinition)
+        {
+            if (missileAmmoDefinition.Id.SubtypeId.Equals(MyStringHash.GetOrCompute("2500mm_saatory")))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+
+        public static void ComputeDamagedBlocks(MyGridExplosion m_gridExplosion, bool pearcingDamage)
         {
             Dictionary<MySlimBlock, float> m_damagedBlocks = new Dictionary<MySlimBlock, float>();
+
+
+            if (pearcingDamage)
+            {
+                foreach (MySlimBlock affectedCubeBlock in m_gridExplosion.AffectedCubeBlocks)
+                {
+                    m_gridExplosion.DamagedBlocks.Add(affectedCubeBlock, m_gridExplosion.Damage);
+                }
+
+                return;
+            }
 
             foreach (MySlimBlock affectedCubeBlock in m_gridExplosion.AffectedCubeBlocks)
             {
@@ -511,9 +534,10 @@ namespace SentisOptimisationsPlugin
                     {
                         if (key.FatBlock != null)
                             amount *= 7f;
+                        //Log.Error("attackerId " + attackerId);
                         key.DoDamage(amount, MyDamageType.Explosion, true, null, attackerId: attackerId);
                         if (!key.IsDestroyed)
-                            key.CubeGrid.ApplyDestructionDeformation(key, 1f, new MyHitInfo?(), 0L);
+                            key.CubeGrid.ApplyDestructionDeformation(key, 1f, new MyHitInfo?(), attackerId);
                     }
 
                     foreach (MySlimBlock neighbour in key.Neighbours)
