@@ -17,9 +17,11 @@ namespace SentisOptimisationsPlugin
         private bool _allowMerge = false;
         private bool _includeConnectedGrids = false;
         private String _pathToAsters = "C:\\Asteroids";
+        private String _acceptedAsteroidMaterials = "Iron;Ice;Stone;Nickel;Cobalt;Silicon;Silver;Gold;Platinum;Uranium;Magnesium";
 
         
         public String PathToAsters { get => _pathToAsters; set => SetValue(ref _pathToAsters, value); }
+        public String AcceptedAsteroidMaterials { get => _acceptedAsteroidMaterials; set => SetValue(ref _acceptedAsteroidMaterials, value); }
         
         public double ContractEscortMultiplier
         {
