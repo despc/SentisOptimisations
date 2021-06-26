@@ -35,6 +35,7 @@
       <Compile Include="AdminCommands.cs" />
       <Compile Include="Config.cs" />
       <Compile Include="ContractPricePatch.cs" />
+      <Compile Include="DamagePatch.cs" />
       <Compile Include="Limits\BuildBlockPatch.cs" />
       <Compile Include="Limits\ConvertPatch.cs" />
       <Compile Include="Limits\MergePatch.cs" />

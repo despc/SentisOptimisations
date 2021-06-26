@@ -14,36 +14,36 @@ namespace SentisOptimisationsPlugin
 
         public static void Patch(PatchContext ctx)
         {
-            var assembly = typeof(MyContractGenerator).Assembly;
-            var type = assembly.GetType("Sandbox.Game.World.Generator.MyCompositeShapes");
-
-            var IsAcceptedAsteroidMaterial = type.GetMethod("IsAcceptedAsteroidMaterial",
-                BindingFlags.Static | BindingFlags.NonPublic);
-
-
-            
-            ctx.GetPattern(IsAcceptedAsteroidMaterial).Prefixes.Add(
-                typeof(VoxelPatch).GetMethod(nameof(IsAcceptedAsteroidMaterialPatched),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            // var assembly = typeof(MyContractGenerator).Assembly;
+            // var type = assembly.GetType("Sandbox.Game.World.Generator.MyCompositeShapes");
+            //
+            // var IsAcceptedAsteroidMaterial = type.GetMethod("IsAcceptedAsteroidMaterial",
+            //     BindingFlags.Static | BindingFlags.NonPublic);
+            //
+            //
+            //
+            // ctx.GetPattern(IsAcceptedAsteroidMaterial).Prefixes.Add(
+            //     typeof(VoxelPatch).GetMethod(nameof(IsAcceptedAsteroidMaterialPatched),
+            //         BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
         }
 
-        private static bool IsAcceptedAsteroidMaterialPatched(MyVoxelMaterialDefinition material, int version, ref bool __result)
-        {
-            try
-            {
-                var acceptedAsteroidMaterials = SentisOptimisationsPlugin.Config.AcceptedAsteroidMaterials;
-                var materials = acceptedAsteroidMaterials.Split(';');
-                if (materials.Contains(material.MinedOre))
-                {
-                    __result = true;
-                }
-                return false;
-            }
-            catch (Exception e)
-            {
-                Log.Error("Exception in time  IsAcceptedAsteroidMaterial patch", e);
-                return true;
-            }
-        }
+        // private static bool IsAcceptedAsteroidMaterialPatched(MyVoxelMaterialDefinition material, int version, ref bool __result)
+        // {
+        //     try
+        //     {
+        //         var acceptedAsteroidMaterials = SentisOptimisationsPlugin.Config.AcceptedAsteroidMaterials;
+        //         var materials = acceptedAsteroidMaterials.Split(';');
+        //         if (materials.Contains(material.MinedOre))
+        //         {
+        //             __result = true;
+        //         }
+        //         return false;
+        //     }
+        //     catch (Exception e)
+        //     {
+        //         Log.Error("Exception in time  IsAcceptedAsteroidMaterial patch", e);
+        //         return true;
+        //     }
+        // }
     }
 }
