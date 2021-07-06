@@ -58,7 +58,7 @@
       <Compile Include="Utils\PlayerUtils.cs" />
       <Compile Include="Utils\ProjectorUtils.cs" />
       <Compile Include="Utils\SoundUtils.cs" />
-      <Compile Include="VoxelPatch.cs" />
+      <Compile Include="ConveyorPatch.cs" />
     </ItemGroup>
     <ItemGroup>
       <Reference Include="HavokWrapper, Version=0.1.1.0, Culture=neutral, PublicKeyToken=null">

@@ -1,11 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using NLog;
 using Sandbox;
 using Sandbox.Engine.Utils;
 using Sandbox.Engine.Voxels;
 using Sandbox.Game.Entities;
+using Sandbox.Game.GameSystems;
 using Sandbox.Game.World;
 using Sandbox.ModAPI;
 using SentisOptimisations;
@@ -26,8 +28,10 @@ namespace SentisOptimisationsPlugin
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
         public static PcuLimiter _limiter = new PcuLimiter();
+        public static Dictionary<long,long> stuckGrids = new Dictionary<long, long>();
         private static TorchSessionManager SessionManager;
         public static Config Config;
+        private Random _random = new Random();
         public static SentisOptimisationsPlugin Instance { get; private set; }
 
         public override void Init(ITorchBase torch)
@@ -60,6 +64,67 @@ namespace SentisOptimisationsPlugin
 
         public override void Update()
         {
+            if (MySandboxGame.Static.SimulationFrameCounter % 120 == 0)
+            {
+                foreach (var keyValuePair in DamagePatch.contactInfo)
+                {
+                    var entityId = keyValuePair.Key;
+                    var entityById = MyEntities.GetEntityById(entityId);
+                    if (!(entityById is MyCubeGrid))
+                    {
+                        continue;
+                    }
+
+                    var contactCount = keyValuePair.Value;
+                    Log.Error("Entity  " + entityById.DisplayName + " contact count - " + contactCount);
+                    if (contactCount < 2000)
+                    {
+                        continue;
+                    }
+
+                    if (stuckGrids.ContainsKey(entityId))
+                    {
+                        if (stuckGrids[entityId] > 5)
+                        {
+                            var myCubeGrid = ((MyCubeGrid) entityById);
+                            if (!Vector3.IsZero(
+                                MyGravityProviderSystem.CalculateNaturalGravityInPoint(entityById.WorldMatrix
+                                    .Translation)))
+                            {
+                                myCubeGrid.ConvertToStatic();
+                            }
+                            else
+                            {
+                                try
+                                {
+                                    Log.Info("Teleport stuck grid " + myCubeGrid.DisplayName);
+                                    MatrixD worldMatrix = myCubeGrid.WorldMatrix;
+                                    var position = myCubeGrid.PositionComp.GetPosition();
+
+                                    var garbageLocation = new Vector3D(position.X + _random.Next(-100000, 100000),
+                                        position.Y + _random.Next(-100000, 100000),
+                                        position.Z + _random.Next(-100000, 100000));
+                                    worldMatrix.Translation = garbageLocation;
+                                    myCubeGrid.Teleport(worldMatrix, (object) null, false);
+                                }
+                                catch (Exception e)
+                                {
+                                    Log.Error("Exception in time try teleport entity to garbage", e);
+                                }
+                            }
+
+                            stuckGrids.Remove(entityId);
+                            continue;
+                        }
+
+                        stuckGrids[entityId] = stuckGrids[entityId] + 1;
+                        continue;
+                    }
+                    stuckGrids[entityId] = 1;
+                }
+
+                DamagePatch.contactInfo.Clear();
+            }
             if (MySandboxGame.Static.SimulationFrameCounter % 6000 == 0)
             {
                 foreach (KeyValuePair<long, MyFaction> faction in MySession.Static.Factions)

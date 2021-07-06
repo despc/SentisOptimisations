@@ -106,7 +106,15 @@ namespace SentisOptimisationsPlugin
                 }
 
                 ((IMyFunctionalBlock) mySlimBlock.FatBlock).EnabledChanged -= OnEnabledChanged();
-                ((IMyFunctionalBlock) mySlimBlock.FatBlock).Enabled = true;
+                try
+                {
+                    ((IMyFunctionalBlock) mySlimBlock.FatBlock).Enabled = true;
+                }
+                catch (Exception e)
+                {
+                    Log.Error("Set Enabled exception", e);
+                }
+                
             }
 
 

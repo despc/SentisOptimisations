@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Reflection;
 using Havok;
 using NLog;
@@ -13,7 +14,7 @@ namespace SentisOptimisationsPlugin
     public static class DamagePatch
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
-
+        public static Dictionary<long,long> contactInfo = new Dictionary<long, long>();
         public static void Patch(PatchContext ctx)
         {
 
@@ -43,6 +44,18 @@ namespace SentisOptimisationsPlugin
 
             if (otherEntity is MyVoxelBase && separatingVelocity < 40)
             {
+                if (separatingVelocity < 5)
+                {
+                    var myCubeGrid = (MyCubeGrid)__instance.Entity;
+                    if (contactInfo.ContainsKey(myCubeGrid.EntityId))
+                    {
+                        contactInfo[myCubeGrid.EntityId] = contactInfo[myCubeGrid.EntityId] + 1;
+                    }
+                    else
+                    {
+                        contactInfo[myCubeGrid.EntityId] = 1;
+                    }
+                }
                 return false;
             }
             
