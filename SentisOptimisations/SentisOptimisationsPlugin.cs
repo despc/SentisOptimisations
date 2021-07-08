@@ -4,8 +4,10 @@ using System.Linq;
 using System.Threading.Tasks;
 using NLog;
 using Sandbox;
+using Sandbox.Engine.Multiplayer;
 using Sandbox.Engine.Utils;
 using Sandbox.Engine.Voxels;
+using Sandbox.Game;
 using Sandbox.Game.Entities;
 using Sandbox.Game.GameSystems;
 using Sandbox.Game.World;
@@ -20,6 +22,7 @@ using Torch.Commands.Permissions;
 using Torch.Session;
 using VRage.Game.ModAPI;
 using VRage.Game.Voxels;
+using VRage.Network;
 using VRageMath;
 
 namespace SentisOptimisationsPlugin
@@ -29,6 +32,7 @@ namespace SentisOptimisationsPlugin
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
         public static PcuLimiter _limiter = new PcuLimiter();
         public static Dictionary<long,long> stuckGrids = new Dictionary<long, long>();
+        public static Dictionary<long,long> gridsInSZ = new Dictionary<long, long>();
         private static TorchSessionManager SessionManager;
         public static Config Config;
         private Random _random = new Random();
@@ -64,6 +68,85 @@ namespace SentisOptimisationsPlugin
 
         public override void Update()
         {
+
+            if (MySandboxGame.Static.SimulationFrameCounter % 500 == 0)
+            {
+                
+                foreach (var keyValuePair in new Dictionary<long, long>(PerfomanceProfilePatch.entityesInSZ))
+                {
+                    var entityId = keyValuePair.Key;
+                    var entityById = MyEntities.GetEntityById(entityId);
+                    var displayName = "";
+                    if (entityById != null)
+                    {
+                        displayName = entityById.DisplayName;  
+                    }
+
+                    var time = keyValuePair.Value;
+                    if (time > 5)
+                    {
+                        Log.Error("Entity in sz " + entityId + "   " + displayName + " time - " + time);
+                        if (gridsInSZ.ContainsKey(entityId))
+                        {
+                            if (gridsInSZ[entityId] > 3)
+                            {
+                                if (entityById is MyCubeGrid)
+                                {
+                                    try
+                                    {
+                                        var myCubeGrid = ((MyCubeGrid)entityById);
+                                        if (!myCubeGrid.IsStatic)
+                                        {
+                                            myCubeGrid.Physics?.SetSpeeds(Vector3.Zero, Vector3.Zero);
+                                            myCubeGrid.ConvertToStatic();
+                                            try
+                                            {
+                                                MyMultiplayer.RaiseEvent<MyCubeGrid>(myCubeGrid, (MyCubeGrid x) => new Action(x.ConvertToStatic), default(EndpointId));
+                                                foreach (var player in MySession.Static.Players.GetOnlinePlayers())
+                                                {
+                                                    MyMultiplayer.RaiseEvent<MyCubeGrid>(myCubeGrid, (MyCubeGrid x) => new Action(x.ConvertToStatic), new EndpointId(player.Id.SteamId));
+                                                }
+                                            }
+                                            catch (Exception ex)
+                                            {
+                                                Log.Error(ex, "()Exception in RaiseEvent.");
+                                            }
+                                            if (myCubeGrid.BigOwners.Count > 0)
+                                            {
+                                           
+                                                ChatUtils.SendTo(myCubeGrid.BigOwners[0], "Структура " + displayName + " конвертирована в статику в связи с дудосом");
+                                                MyVisualScriptLogicProvider.ShowNotification("Структура " + displayName + " конвертирована в статику в связи с дудосом", 10000,
+                                                    "Red",
+                                                    myCubeGrid.BigOwners[0]);  
+                                            }
+                                            Log.Error("Grid " + displayName + " Converted To Static");
+                                            gridsInSZ[entityId] = 0;
+                                            continue; 
+                                        }
+                                    }
+                                    catch (Exception e)
+                                    {
+                                        Log.Error(e);
+                                    }
+                                    
+                                }
+                                Log.Error("Anything else fck sz " + entityId + "   " + displayName + " time - " + time);
+                                gridsInSZ[entityId] = 0;
+                                continue;
+                            }
+                            gridsInSZ[entityId] = gridsInSZ[entityId] + 1; 
+                            
+                        }
+                        else
+                        {
+                            gridsInSZ[entityId] = 1;
+                        }
+                    }
+                }
+                PerfomanceProfilePatch.entityesInSZ.Clear();
+            }
+            
+
             if (MySandboxGame.Static.SimulationFrameCounter % 120 == 0)
             {
                 foreach (var keyValuePair in DamagePatch.contactInfo)
@@ -76,7 +159,11 @@ namespace SentisOptimisationsPlugin
                     }
 
                     var contactCount = keyValuePair.Value;
-                    Log.Error("Entity  " + entityById.DisplayName + " contact count - " + contactCount);
+                    if (contactCount > 150)
+                    {
+                        Log.Error("Entity  " + entityById.DisplayName + " contact count - " + contactCount);
+                    }
+                    
                     if (contactCount < 2000)
                     {
                         continue;

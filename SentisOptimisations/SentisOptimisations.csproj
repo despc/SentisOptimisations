@@ -33,6 +33,7 @@
     </PropertyGroup>
     <ItemGroup>
       <Compile Include="AdminCommands.cs" />
+      <Compile Include="PerfomanceProfilePatch.cs" />
       <Compile Include="Config.cs" />
       <Compile Include="ContractPricePatch.cs" />
       <Compile Include="DamagePatch.cs" />

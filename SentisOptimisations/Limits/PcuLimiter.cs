@@ -182,7 +182,7 @@ namespace SentisOptimisationsPlugin
 
         public static void LimitReached(MyCubeGrid cube)
         {
-            Log.Error("Grid " + cube.DisplayName + " is over limit");
+            //Log.Error("Grid " + cube.DisplayName + " is over limit");
             gridsOverlimit.Add(cube.EntityId);
             List<IMySlimBlock> blocks = GridUtils.GetBlocks<IMyFunctionalBlock>(cube);
             foreach (var mySlimBlock in blocks)
