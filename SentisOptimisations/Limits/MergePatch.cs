@@ -9,11 +9,11 @@ namespace SentisOptimisationsPlugin
     [PatchShim]
     public static class MergeBlockPatch
     {
-        public static void Patch(PatchContext ctx) =>
-            ctx.GetPattern(typeof(MyShipMergeBlock).GetMethod("UpdateBeforeSimulation10",
-                    BindingFlags.Instance | BindingFlags.Public))
-                .Prefixes.Add(typeof(MergeBlockPatch).GetMethod("MergeCheck",
-                    BindingFlags.Static | BindingFlags.NonPublic));
+       //public static void Patch(PatchContext ctx) =>
+       //    ctx.GetPattern(typeof(MyShipMergeBlock).GetMethod("UpdateBeforeSimulation10",
+       //            BindingFlags.Instance | BindingFlags.Public))
+       //        .Prefixes.Add(typeof(MergeBlockPatch).GetMethod("MergeCheck",
+       //            BindingFlags.Static | BindingFlags.NonPublic));
 
         private static bool MergeCheck(MyShipMergeBlock __instance)
         {

@@ -72,7 +72,7 @@ namespace SentisOptimisationsPlugin
             if (MySandboxGame.Static.SimulationFrameCounter % 500 == 0)
             {
                 
-                foreach (var keyValuePair in new Dictionary<long, long>(PerfomanceProfilePatch.entityesInSZ))
+                foreach (var keyValuePair in new Dictionary<long, long>(PerfomancePatch.entityesInSZ))
                 {
                     var entityId = keyValuePair.Key;
                     var entityById = MyEntities.GetEntityById(entityId);
@@ -143,7 +143,7 @@ namespace SentisOptimisationsPlugin
                         }
                     }
                 }
-                PerfomanceProfilePatch.entityesInSZ.Clear();
+                PerfomancePatch.entityesInSZ.Clear();
             }
             
 
@@ -161,9 +161,10 @@ namespace SentisOptimisationsPlugin
                     var contactCount = keyValuePair.Value;
                     if (contactCount > 150)
                     {
-                        Log.Error("Entity  " + entityById.DisplayName + " contact count - " + contactCount);
+                        Log.Error("Entity  " + entityById.DisplayName + " position " +
+                                  entityById.PositionComp.GetPosition() + " contact count - " + contactCount);
                     }
-                    
+
                     if (contactCount < 2000)
                     {
                         continue;
@@ -178,7 +179,20 @@ namespace SentisOptimisationsPlugin
                                 MyGravityProviderSystem.CalculateNaturalGravityInPoint(entityById.WorldMatrix
                                     .Translation)))
                             {
+                                myCubeGrid.Physics?.SetSpeeds(Vector3.Zero, Vector3.Zero);
                                 myCubeGrid.ConvertToStatic();
+                                try
+                                {
+                                    MyMultiplayer.RaiseEvent<MyCubeGrid>(myCubeGrid, (MyCubeGrid x) => new Action(x.ConvertToStatic), default(EndpointId));
+                                    foreach (var player in MySession.Static.Players.GetOnlinePlayers())
+                                    {
+                                        MyMultiplayer.RaiseEvent<MyCubeGrid>(myCubeGrid, (MyCubeGrid x) => new Action(x.ConvertToStatic), new EndpointId(player.Id.SteamId));
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    Log.Error(ex, "()Exception in RaiseEvent.");
+                                }
                             }
                             else
                             {

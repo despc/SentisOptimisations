@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using NLog;
 using Sandbox;
@@ -49,11 +50,25 @@ namespace SentisOptimisationsPlugin
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
             
             
-            // var MyWarheadExplodeMethod = typeof(MyWarhead).GetMethod(
-            //    nameof(MyWarhead.Explode), BindingFlags.Instance | BindingFlags.Public);
-            //ctx.GetPattern(MyWarheadExplodeMethod).Prefixes.Add(
-            //    typeof(MissilePatch).GetMethod(nameof(MyWarheadExplodePatched),
-            //        BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            var MyWarheadExplodeMethod = typeof(MyWarhead).GetMethod(
+                nameof(MyWarhead.Explode), BindingFlags.Instance | BindingFlags.Public);
+            ctx.GetPattern(MyWarheadExplodeMethod).Prefixes.Add(
+                typeof(MissilePatch).GetMethod(nameof(MyWarheadExplodePatched),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
+            var MyWarheadDoDamageMethod = typeof(MyWarhead)
+                .GetMethods(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
+                .First(info => info.Name.Contains("DoDamage"));
+            ctx.GetPattern(MyWarheadDoDamageMethod).Prefixes.Add(
+                typeof(MissilePatch).GetMethod(nameof(MyWarheadDoDamagePatched),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
+            
+            var MyWarheadOnDestroyMethod = typeof(MyWarhead)
+                .GetMethod( nameof(MyWarhead.OnDestroy), BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            ctx.GetPattern(MyWarheadOnDestroyMethod).Prefixes.Add(
+                typeof(MissilePatch).GetMethod(nameof(MyWarheadOnDestroyPatched),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
 
             var MoveMissileMethod = typeof(MyMissiles).GetMethod(
                 "OnMissileMoved", BindingFlags.Static | BindingFlags.Public);
@@ -193,14 +208,14 @@ namespace SentisOptimisationsPlugin
         }
 
         private static void MakeExplosionAndDamage(long attackerId, Vector3D explosionPosition,
-            float explosionRadius, float explosionDamage, long originEntity, bool isPearcingDamage)
+            float explosionRadius, float explosionDamage, long originEntity, bool isPearcingDamage, bool isWarhead = false)
         {
             BoundingSphereD explosionSphere = new BoundingSphereD(explosionPosition, explosionRadius);
             var topMostEntitiesInSphere =
                 new HashSet<MyEntity>(MyEntities.GetTopMostEntitiesInSphere(ref explosionSphere));
             MyGridExplosion m_gridExplosion = ApplyVolumetricExplosionOnGrid(
                 explosionDamage, ref explosionSphere, originEntity,
-                new List<MyEntity>(topMostEntitiesInSphere));
+                new List<MyEntity>(topMostEntitiesInSphere), isWarhead);
             ComputeDamagedBlocks(m_gridExplosion, isPearcingDamage);
             ApplyVolumetricDamageToGrid(m_gridExplosion, attackerId);
         }
@@ -408,7 +423,7 @@ namespace SentisOptimisationsPlugin
             float MissileExplosionDamage,
             ref BoundingSphereD sphere,
             long OriginEntity,
-            List<MyEntity> entities)
+            List<MyEntity> entities, bool isWarhead = false)
         {
             MyGridExplosion m_gridExplosion = new MyGridExplosion();
             m_gridExplosion.Init(sphere, MissileExplosionDamage);
@@ -430,12 +445,16 @@ namespace SentisOptimisationsPlugin
 
             foreach (MyEntity entity in entities)
             {
+                var Node = entity as MyCubeGrid;
+                if (Node == null)
+                {
+                    continue;
+                }
                 // Log.Error("Process Entity " + entity.DisplayName);
-                if (
+                if (isWarhead || (
                     // entity != explosionInfo.ExcludedEntity &&
-                    entity is MyCubeGrid Node &&
                     (Node.CreatePhysics && Node != Node2) &&
-                    (group == null || MyCubeGridGroups.Static.Logical.GetGroup(Node) != group))
+                    (group == null || MyCubeGridGroups.Static.Logical.GetGroup(Node) != group)))
                 {
                     m_gridExplosion.AffectedCubeGrids.Add(Node);
                     float detectionBlockHalfSize = (float) ((double) Node.GridSize / 2.0 / 1.25);
@@ -545,6 +564,10 @@ namespace SentisOptimisationsPlugin
         {
             return false;
         }
+        private static bool MyWarheadOnDestroyPatched()
+        {
+            return false;
+        }
 
         private static void DoDamageInternalPatched(MySlimBlock __instance, float damage,
             MyStringHash damageType,
@@ -572,48 +595,99 @@ namespace SentisOptimisationsPlugin
         {
             Log.Error("MyComponentStackApplyDamageMethodPatched " + damage);
         }
+        
+        private static bool MyWarheadDoDamagePatched(MyWarhead __instance, ref bool __result,
+            float damage,
+            MyStringHash damageType,
+            bool sync,
+            MyHitInfo? hitInfo,
+            long attackerId)
+        {
+            try
+            {
+                __result = true;
+                bool m_marked = (bool) GetInstanceField(typeof(MyWarhead), __instance, "m_marked");
+                MyDamageInformation info = new MyDamageInformation(false, damage, damageType, attackerId);
+                if (!m_marked)
+                {
+                    InvokeInstanceMethod(typeof(MyWarhead), __instance, "MarkForExplosion", new Object[0]);
+                    InvokeInstanceMethod(typeof(MyWarhead), __instance, "ExplodeDelayed", new Object[]{500});
+                }
+            }
+            catch (Exception e)
+            {
+                Log.Error(e);
+                throw;
+            }
+            return false;
+        }
 
         private static bool MyWarheadExplodePatched(MyWarhead __instance)
         {
-            
-            bool m_isExploded = (bool) GetInstanceField(typeof(MyWarhead), __instance, "m_isExploded");
-            MyWarheadDefinition m_warheadDefinition = (MyWarheadDefinition) GetInstanceField(typeof(MyWarhead), __instance, "m_warheadDefinition");
-            if (m_isExploded || !MySession.Static.WeaponsEnabled || __instance.CubeGrid.Physics == null)
+            try
+            {
+                bool m_isExploded = (bool) GetInstanceField(typeof(MyWarhead), __instance, "m_isExploded");
+                MyWarheadDefinition m_warheadDefinition =
+                    (MyWarheadDefinition) GetInstanceField(typeof(MyWarhead), __instance, "m_warheadDefinition");
+                if (m_isExploded || !MySession.Static.WeaponsEnabled || __instance.CubeGrid.Physics == null)
+                    return false;
+                //this.m_isExploded = true;
+                SetInstanceField(typeof(MyWarhead), __instance, "m_isExploded", true);
+                bool m_marked = (bool) GetInstanceField(typeof(MyWarhead), __instance, "m_marked");
+                if (!m_marked)
+                {
+                    InvokeInstanceMethod(typeof(MyWarhead), __instance, "MarkForExplosion", new Object[0]);
+                }
+
+                BoundingSphereD m_explosionFullSphere =
+                    (BoundingSphereD) GetInstanceField(typeof(MyWarhead), __instance, "m_explosionFullSphere");
+                MyExplosionTypeEnum explosionTypeEnum = m_explosionFullSphere.Radius > 6.0
+                    ? (m_explosionFullSphere.Radius > 20.0
+                        ? (m_explosionFullSphere.Radius > 40.0
+                            ? MyExplosionTypeEnum.WARHEAD_EXPLOSION_50
+                            : MyExplosionTypeEnum.WARHEAD_EXPLOSION_30)
+                        : MyExplosionTypeEnum.WARHEAD_EXPLOSION_15)
+                    : MyExplosionTypeEnum.WARHEAD_EXPLOSION_02;
+                MyExplosionInfo explosionInfo = new MyExplosionInfo()
+                {
+                    PlayerDamage = 0.0f,
+                    Damage = 0,
+                    ExplosionType = explosionTypeEnum,
+                    ExplosionSphere = m_explosionFullSphere,
+                    LifespanMiliseconds = 700,
+                    HitEntity = __instance,
+                    ParticleScale = 1f,
+                    OwnerEntity = __instance.CubeGrid,
+                    Direction = new Vector3?((Vector3) __instance.WorldMatrix.Forward),
+                    VoxelExplosionCenter = m_explosionFullSphere.Center,
+                    ExplosionFlags = MyExplosionFlags.CREATE_DEBRIS | MyExplosionFlags.AFFECT_VOXELS |
+                                     MyExplosionFlags.CREATE_DECALS | MyExplosionFlags.CREATE_PARTICLE_EFFECT |
+                                     MyExplosionFlags.CREATE_SHRAPNELS | MyExplosionFlags.APPLY_DEFORMATION,
+                    VoxelCutoutScale = 1f,
+                    PlaySound = true,
+                    ApplyForceAndDamage = true,
+                    ObjectsRemoveDelayInMiliseconds = 40
+                };
+                if (__instance.CubeGrid.Physics != null)
+                    explosionInfo.Velocity = __instance.CubeGrid.Physics.LinearVelocity;
+                var instanceOwnerId = __instance.OwnerId;
+                var instanceEntityId = __instance.EntityId;
+
+                MyExplosions.AddExplosion(ref explosionInfo);
+                MakeExplosionAndDamage(instanceOwnerId, m_explosionFullSphere.Center,
+                    (float) m_explosionFullSphere.Radius,
+                    m_warheadDefinition.WarheadExplosionDamage, instanceEntityId, false, true);
+                //MySyncDamage.DoDamageSynced(__instance, 999999, MyDamageType.Bullet, 0);
+                InvokeInstanceMethod(typeof(MyCubeGrid), __instance.CubeGrid, "RemoveBlockByCubeBuilder",
+                    new Object[] {__instance.SlimBlock});
+                //__instance.SlimBlock.Rem
                 return false;
-            //this.m_isExploded = true;
-            SetInstanceField(typeof(MyWarhead), __instance, "m_isExploded", true);
-            bool m_marked = (bool) GetInstanceField(typeof(MyWarhead), __instance, "m_marked");
-            if (!m_marked)
-            {
-                InvokeInstanceMethod(typeof(MyWarhead), __instance, "MarkForExplosion", new Object[0]);
             }
-            BoundingSphereD m_explosionFullSphere = (BoundingSphereD) GetInstanceField(typeof(MyWarhead), __instance, "m_explosionFullSphere");
-            MyExplosionTypeEnum explosionTypeEnum = m_explosionFullSphere.Radius > 6.0 ? (m_explosionFullSphere.Radius > 20.0 ? (m_explosionFullSphere.Radius > 40.0 ? MyExplosionTypeEnum.WARHEAD_EXPLOSION_50 : MyExplosionTypeEnum.WARHEAD_EXPLOSION_30) : MyExplosionTypeEnum.WARHEAD_EXPLOSION_15) : MyExplosionTypeEnum.WARHEAD_EXPLOSION_02;
-            MyExplosionInfo explosionInfo = new MyExplosionInfo()
+            catch (Exception e)
             {
-                PlayerDamage = 0.0f,
-                Damage = 0,
-                ExplosionType = explosionTypeEnum,
-                ExplosionSphere = m_explosionFullSphere,
-                LifespanMiliseconds = 700,
-                HitEntity = __instance,
-                ParticleScale = 1f,
-                OwnerEntity = __instance.CubeGrid,
-                Direction = new Vector3?((Vector3) __instance.WorldMatrix.Forward),
-                VoxelExplosionCenter = m_explosionFullSphere.Center,
-                ExplosionFlags = MyExplosionFlags.CREATE_DEBRIS | MyExplosionFlags.AFFECT_VOXELS | MyExplosionFlags.CREATE_DECALS | MyExplosionFlags.CREATE_PARTICLE_EFFECT | MyExplosionFlags.CREATE_SHRAPNELS | MyExplosionFlags.APPLY_DEFORMATION,
-                VoxelCutoutScale = 1f,
-                PlaySound = true,
-                ApplyForceAndDamage = true,
-                ObjectsRemoveDelayInMiliseconds = 40
-            };
-            if (__instance.CubeGrid.Physics != null)
-                explosionInfo.Velocity = __instance.CubeGrid.Physics.LinearVelocity;
-            MyExplosions.AddExplosion(ref explosionInfo);
-            MakeExplosionAndDamage(__instance.OwnerId, m_explosionFullSphere.Center,
-                (float) m_explosionFullSphere.Radius,
-                m_warheadDefinition.WarheadExplosionDamage, __instance.EntityId, false);
-            __instance.SlimBlock.DoDamage(9999999, MyDamageType.Explosion, true, null, 0);
+                Log.Error(e);
+            }
+
             return false;
         }
         
