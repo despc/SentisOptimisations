@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using NLog;
 using Sandbox;
@@ -9,6 +10,7 @@ using Sandbox.Engine.Utils;
 using Sandbox.Engine.Voxels;
 using Sandbox.Game;
 using Sandbox.Game.Entities;
+using Sandbox.Game.Entities.Blocks;
 using Sandbox.Game.GameSystems;
 using Sandbox.Game.World;
 using Sandbox.ModAPI;
@@ -33,9 +35,10 @@ namespace SentisOptimisationsPlugin
         public static PcuLimiter _limiter = new PcuLimiter();
         public static Dictionary<long,long> stuckGrids = new Dictionary<long, long>();
         public static Dictionary<long,long> gridsInSZ = new Dictionary<long, long>();
+        public static MethodInfo m_myProgrammableBlockKillProgramm;
         private static TorchSessionManager SessionManager;
         public static Config Config;
-        private Random _random = new Random();
+        public static Random _random = new Random();
         public static SentisOptimisationsPlugin Instance { get; private set; }
 
         public override void Init(ITorchBase torch)
@@ -48,6 +51,7 @@ namespace SentisOptimisationsPlugin
             if (SessionManager == null)
                 return;
             SessionManager.SessionStateChanged += SessionManager_SessionStateChanged;
+            m_myProgrammableBlockKillProgramm = typeof (MyProgrammableBlock).GetMethod("OnProgramTermination", BindingFlags.Instance | BindingFlags.NonPublic);
         }
 
         private void SessionManager_SessionStateChanged(
