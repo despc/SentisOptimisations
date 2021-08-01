@@ -6,8 +6,11 @@ using NLog;
 using ParallelTasks;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Cube;
+using Sandbox.ModAPI;
 using Torch.Managers.PatchManager;
+using VRage.Game;
 using VRage.Game.Entity;
+using VRage.Game.ModAPI;
 
 namespace SentisOptimisationsPlugin
 {
@@ -16,6 +19,59 @@ namespace SentisOptimisationsPlugin
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
         public static Dictionary<long,long> contactInfo = new Dictionary<long, long>();
+        private static bool _init;
+        
+        public static void Init()
+        {
+            if (_init)
+                return;
+            _init = true;
+            MyAPIGateway.Session.DamageSystem.RegisterBeforeDamageHandler(0, ProcessDamage);
+        }    
+        
+        private static void ProcessDamage(object target, ref MyDamageInformation info)
+        {
+            try
+            {
+                DoProcessDamage(target, ref info);
+            }
+            catch (Exception e)
+            {
+                Log.Error(e);
+            }
+        }
+
+        private static void DoProcessDamage(object target, ref MyDamageInformation info)
+        {
+            
+            if (info.Type != MyDamageType.Deformation)
+            {
+                return;
+            }
+            
+            IMySlimBlock damagedBlock = target as IMySlimBlock;
+            
+            if (damagedBlock == null)
+            {
+                return;
+            }
+            
+            if (damagedBlock.FatBlock != null)
+            {
+                return;
+            }
+
+            if (damagedBlock.BlockDefinition.Id.SubtypeName.Contains("Titanium"))
+            {
+                info.Amount = info.Amount / 20;
+            }
+            
+            if (damagedBlock.BlockDefinition.Id.SubtypeName.Contains("Aluminum"))
+            {
+                info.Amount = info.Amount / 5;
+            }
+        }
+
         public static void Patch(PatchContext ctx)
         {
 
@@ -34,6 +90,8 @@ namespace SentisOptimisationsPlugin
             ctx.GetPattern(MethodSpinOnce).Prefixes.Add(
                 typeof(DamagePatch).GetMethod(nameof(SpinOnce),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
+            
         }
 
 

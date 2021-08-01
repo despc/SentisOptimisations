@@ -33,49 +33,6 @@ namespace SentisOptimisationsPlugin
             ctx.GetPattern(MethodPhantom_Leave).Prefixes.Add(
                 typeof(PerfomancePatch).GetMethod(nameof(MethodPhantom_LeavePatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-            
-            
-            var MethodThrustDamageAsync = typeof(MyThrust).GetMethod
-                ("ThrustDamageAsync", BindingFlags.Instance | BindingFlags.NonPublic);
-
-            ctx.GetPattern(MethodThrustDamageAsync).Prefixes.Add(
-                typeof(PerfomancePatch).GetMethod(nameof(MethodThrustDamageAsyncPatched),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-
-            // Кажется это уменьшает тягу)
-           // var assembly = typeof(MySafeZone).Assembly;
-           // var MethodUpdateThrusts = assembly.GetType("Sandbox.Game.EntityComponents.MyThrusterBlockThrustComponent").GetMethod
-           //     ("UpdateThrusts", BindingFlags.Instance | BindingFlags.NonPublic);
-           // 
-           // ctx.GetPattern(MethodUpdateThrusts).Prefixes.Add(
-           //     typeof(PerfomancePatch).GetMethod(nameof(MethodUpdateThrustsPatched),
-           //         BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-            
-            var MethodFindProjectedBlocks = typeof(MyShipWelder).GetMethod
-                ("FindProjectedBlocks", BindingFlags.Instance | BindingFlags.NonPublic);
-            
-            ctx.GetPattern(MethodFindProjectedBlocks).Prefixes.Add(
-                typeof(PerfomancePatch).GetMethod(nameof(MethodFindProjectedBlocksPatched),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-            
-            //ctx.GetPattern(MethodFindProjectedBlocks).Suffixes.Add(
-            //    typeof(PerfomancePatch).GetMethod(nameof(MethodFindProjectedBlocksPatchedAddCache),
-            //        BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-            
-            
-            
-            //var MethodBuildInternal = typeof(MyProjectorBase).GetMethod
-            //    ("BuildInternal", BindingFlags.Instance | BindingFlags.NonPublic);
-            //
-            //ctx.GetPattern(MethodBuildInternal).Prefixes.Add(
-            //    typeof(PerfomancePatch).GetMethod(nameof(MethodBuildInternalPatched),
-            //        BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-            //var MethodMyReplicationServerDestroy = typeof(MyReplicationServer).GetMethod
-            //    (nameof(MyReplicationServer.Destroy), BindingFlags.Instance | BindingFlags.Public);
-            //
-            //ctx.GetPattern(MethodMyReplicationServerDestroy).Prefixes.Add(
-            //    typeof(PerfomancePatch).GetMethod(nameof(MethodMyReplicationServerDestroyPatched),
-            //        BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
         }
 
         private static bool MethodPhantom_LeavePatched(MySafeZone __instance, HkPhantomCallbackShape sender,

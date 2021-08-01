@@ -66,6 +66,7 @@ namespace SentisOptimisationsPlugin
             {
                 if (newState != TorchSessionState.Loaded)
                     return;
+                DamagePatch.Init();
                 _limiter.OnLoaded();
             }
         }
