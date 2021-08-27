@@ -33,6 +33,7 @@
     </PropertyGroup>
     <ItemGroup>
       <Compile Include="AdminCommands.cs" />
+      <Compile Include="ConfigShipInMarket.cs" />
       <Compile Include="ConnectorPatch.cs" />
       <Compile Include="Garage\Delegate.cs" />
       <Compile Include="Garage\GarageCommands.cs" />
@@ -48,6 +49,14 @@
       <Compile Include="NoScrapPatch.cs" />
       <Compile Include="NpcStorePatch.cs" />
       <Compile Include="RemovePluginPatch.cs" />
+      <Compile Include="Shipyard\Communication.cs" />
+      <Compile Include="Shipyard\Dto\ClientBuyRequest.cs" />
+      <Compile Include="Shipyard\Dto\FillListRequest.cs" />
+      <Compile Include="Shipyard\Dto\FillListResponse.cs" />
+      <Compile Include="Shipyard\Dto\GridForList.cs" />
+      <Compile Include="Shipyard\Dto\MessageType.cs" />
+      <Compile Include="Shipyard\Dto\StartSellRequest.cs" />
+      <Compile Include="Shipyard\ShipyardLogic\Shipyard.cs" />
       <Compile Include="TurretPatchs.cs" />
       <Compile Include="SentisOptimisationsPlugin.cs" />
       <Compile Include="Utils\BlockUtils.cs" />
@@ -70,6 +79,12 @@
       </Reference>
       <Reference Include="NLog, Version=4.0.0.0, Culture=neutral, PublicKeyToken=5120e14c03d0593c">
         <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\NLog.dll</HintPath>
+      </Reference>
+      <Reference Include="ProtoBuf.Net, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\ProtoBuf.Net.dll</HintPath>
+      </Reference>
+      <Reference Include="ProtoBuf.Net.Core, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\ProtoBuf.Net.Core.dll</HintPath>
       </Reference>
       <Reference Include="Sandbox.Common, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
         <HintPath>D:\torch-server\DedicatedServer64\Sandbox.Common.dll</HintPath>

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.ObjectModel;
 using Torch;
 
 namespace SentisOptimisationsPlugin
@@ -19,7 +20,21 @@ namespace SentisOptimisationsPlugin
         private String _pathToAsters = "C:\\Asteroids";
         private String _pathToGarage = "D:\\torch-server\\GARAGE";
         private String _acceptedAsteroidMaterials = "Iron;Ice;Stone;Nickel;Cobalt;Silicon;Silver;Gold;Platinum;Uranium;Magnesium";
+        private ObservableCollection<ConfigShipInMarket> configShipsInMarket = new ObservableCollection<ConfigShipInMarket>();
 
+        public ObservableCollection<ConfigShipInMarket> ConfigShipsInMarket
+
+        {
+            get { return configShipsInMarket; }
+            set
+            {
+                configShipsInMarket.Clear();
+                foreach (ConfigShipInMarket shipInMarket in value)
+                {
+                    configShipsInMarket.Add(shipInMarket);
+                }
+            }
+        }
         
         public String PathToAsters { get => _pathToAsters; set => SetValue(ref _pathToAsters, value); }
         public String PathToGarage { get => _pathToGarage; set => SetValue(ref _pathToGarage, value); }

@@ -68,6 +68,7 @@ namespace SentisOptimisationsPlugin
                     return;
                 DamagePatch.Init();
                 _limiter.OnLoaded();
+                Communication.RegisterHandlers();
             }
         }
 
