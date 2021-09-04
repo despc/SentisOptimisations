@@ -43,13 +43,23 @@ namespace SentisOptimisationsPlugin
                     try
                     {
                         await Task.Delay(30000);
-                        IEnumerable<IMyVoxelMap> voxelMaps;
                         var myCubeGrids = MyEntities.GetEntities().OfType<MyCubeGrid>();
                         await Task.Run(() => { CheckAllGrids(myCubeGrids); });
                     }
                     catch (Exception e)
                     {
                         Log.Error("CheckLoop Error", e);
+                    }
+                    
+                    try
+                    {
+                        await Task.Delay(30000);
+                        var myCubeGrids = MyEntities.GetEntities().OfType<MyCubeGrid>();
+                        await Task.Run(() => { CheckNobodyOwner(myCubeGrids); });
+                    }
+                    catch (Exception e)
+                    {
+                        Log.Error("Nobody check", e);
                     }
                 }
             }
@@ -67,6 +77,33 @@ namespace SentisOptimisationsPlugin
                     break;
                 if (grid.IsStatic || IsLimitNotReached(grid)) continue;
                 MyAPIGateway.Utilities.InvokeOnGameThread(() => { LimitReached(grid); });
+            }
+        }
+        
+        private void CheckNobodyOwner(IEnumerable<MyCubeGrid> myCubeGrids)
+        {
+            foreach (var grid in myCubeGrids)
+            {
+                if (CancellationTokenSource.Token.IsCancellationRequested)
+                    break;
+                if (grid.IsStatic)
+                {
+                    continue;
+                }
+                foreach (var myCubeBlock in grid.GetFatBlocks())
+                {
+                    if (myCubeBlock.BlockDefinition.OwnershipIntegrityRatio != 0 && myCubeBlock.OwnerId == 0)
+                    {
+                        MyAPIGateway.Utilities.InvokeOnGameThread(() =>
+                        {
+                            if (myCubeBlock is IMyFunctionalBlock)
+                            {
+                                ((IMyFunctionalBlock) myCubeBlock).Enabled = false;
+                            }
+                        });
+                        
+                    }
+                }
             }
         }
 

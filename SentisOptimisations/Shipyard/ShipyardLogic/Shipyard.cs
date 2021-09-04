@@ -10,6 +10,7 @@ using Sandbox.Game.Entities.Blocks;
 using Sandbox.Game.GameSystems.BankingAndCurrency;
 using Sandbox.Game.GUI;
 using Sandbox.Game.Multiplayer;
+using Sandbox.Game.World;
 using Sandbox.ModAPI;
 using SentisOptimisations;
 using VRage.Game;
@@ -25,8 +26,7 @@ namespace SentisOptimisationsPlugin.ShipyardLogic
         {
             var gridShipyardIdWithSelection = buyRequest.ShipyardId;
             MyProjectorBase projectorBase = (MyProjectorBase) MyEntities.GetEntityById(gridShipyardIdWithSelection);
-            var seller = PlayerUtils.GetPlayer(projectorBase.BuiltBy);
-            var steamSellerId = seller.SteamUserId;
+            var steamSellerId = MySession.Static.Players.TryGetSteamId(projectorBase.BuiltBy);
             var playerGaragePath = Path.Combine(SentisOptimisationsPlugin.Config.PathToGarage, steamSellerId.ToString());
             var gridName = GetFromConfig(gridShipyardIdWithSelection);
             if (gridName == null)
@@ -38,12 +38,16 @@ namespace SentisOptimisationsPlugin.ShipyardLogic
             var buyRequestSteamId = buyRequest.SteamId;
             string gridPath = Path.Combine(playerGaragePath, gridName);
             var clientGaragePath = Path.Combine(SentisOptimisationsPlugin.Config.PathToGarage, buyRequestSteamId.ToString());
+            if (!Directory.Exists(clientGaragePath))
+            {
+                Directory.CreateDirectory(clientGaragePath);
+            }
             string gridNewPath = Path.Combine(clientGaragePath, "NEW_" + Path.GetFileName(gridName));
             File.Move(gridPath, gridNewPath);
             var identityId = Sync.Players.TryGetIdentityId(buyRequestSteamId, 0);
             Log.Info("Продаём структуру " + Path.GetFileName(gridName) + " за " + buyRequest.Price);
             MyBankingSystem.ChangeBalance(identityId, -buyRequest.Price);
-            var sellerIdentityId = seller.IdentityId;
+            var sellerIdentityId = projectorBase.BuiltBy;
             Log.Info("Продавец " + sellerIdentityId + " ( " + steamSellerId + ")");
             MyBankingSystem.ChangeBalance(sellerIdentityId, buyRequest.Price);
             projectorBase.Enabled = false;
@@ -167,6 +171,10 @@ namespace SentisOptimisationsPlugin.ShipyardLogic
 
         private static void SendGridListToClient(ulong listRequestSteamId, long listRequestShipyardId)
         {
+            if (listRequestSteamId == 0)
+            {
+                return;
+            }
             var playerGaragePath = Path.Combine(SentisOptimisationsPlugin.Config.PathToGarage,
                 listRequestSteamId.ToString());
             var files = Directory.GetFiles(playerGaragePath, "*.sbc");

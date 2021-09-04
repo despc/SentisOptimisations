@@ -259,6 +259,10 @@ namespace SentisOptimisationsPlugin
                     DoSpawnGrids(identityId, gridPath, spawnPosition, (grid, identity) => AddGps(grid, identity));
                     Context.Respond("Структура перенесена в мир");
                     Log.Info("Структура" + gridNameToLoad + " перенесена в мир");
+                    if (File.Exists(gridPath + "_spawned"))
+                    {
+                        File.Delete(gridPath + "_spawned");
+                    }
                     File.Move(gridPath, gridPath + "_spawned");
                     return;
                 }
