@@ -1,33 +1,20 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
+using FixTurrets.Garage;
 using NLog;
-using Sandbox.Engine.Networking;
 using Sandbox.Engine.Physics;
-using Sandbox.Engine.Voxels;
 using Sandbox.Game.Entities;
-using Sandbox.Game.Entities.Blocks;
 using Sandbox.Game.GameSystems;
-using Sandbox.Game.Gui;
 using Sandbox.Game.GUI;
-using Sandbox.Game.Multiplayer;
-using Sandbox.Game.Weapons;
-using Sandbox.Game.World;
 using Sandbox.ModAPI;
-using SentisOptimisations;
-using Torch;
 using Torch.Commands;
 using Torch.Commands.Permissions;
 using VRage;
 using VRage.Game;
 using VRage.Game.Entity;
 using VRage.Game.ModAPI;
-using VRage.Game.Voxels;
 using VRage.ModAPI;
-using VRage.ObjectBuilders;
-using VRage.Utils;
 using VRageMath;
 using Delegate = Garage.Delegate;
 
@@ -48,6 +35,7 @@ namespace SentisOptimisationsPlugin
                 Context.Respond("Проиграл, попробуй ещё");
                 return;
             }
+
             var players = new List<IMyPlayer>();
             MyAPIGateway.Players.GetPlayers(players);
             long identityId = player.IdentityId;
@@ -58,6 +46,7 @@ namespace SentisOptimisationsPlugin
                 {
                     continue;
                 }
+
                 var distance = Vector3D.Distance(myPlayer.GetPosition(), character.GetPosition());
                 if (distance < 10000)
                 {
@@ -97,119 +86,20 @@ namespace SentisOptimisationsPlugin
                 var hitEntity = hitInfo.HkHitInfo.GetHitEntity();
                 if (hitEntity is MyCubeGrid)
                 {
-                    var myCubeGrid = ((MyCubeGrid) hitEntity);
-                    if (!myCubeGrid.BigOwners.Contains(identityId))
-                    {
-                        this.Context.Respond("Сохранить структуру может только владелец " + hitEntity.DisplayName);
-                        return;
-                    }
-
-                    this.Context.Respond("Сохраняем структуру " + hitEntity.DisplayName);
-                    var pathToGarage = SentisOptimisationsPlugin.Config.PathToGarage;
-                    var displayName = myCubeGrid.DisplayName;
-                    // List<MyCubeGrid> grids = MyCubeGridGroups.Static.GetGroups(GridLinkTypeEnum.Mechanical)
-                    //     .GetGroupNodes(myCubeGrid);
-                    // grids.SortNoAlloc<MyCubeGrid>((Comparison<MyCubeGrid>) ((x, y) =>
-                    //     x.BlocksCount.CompareTo(y.BlocksCount)));
-                    // grids.Reverse();
-                    // grids.SortNoAlloc<MyCubeGrid>((Comparison<MyCubeGrid>) ((x, y) =>
-                    //     x.GridSizeEnum.CompareTo((object) y.GridSizeEnum)));
-                    
-                    List<MyCubeGrid> grids = new List<MyCubeGrid>();
-                    grids.Add(myCubeGrid);
-                    int index = 0;
-                    int totalpcu = 0;
-                    int totalblocks = 0;
-                    List<MyObjectBuilder_CubeGrid> gridsOB = new List<MyObjectBuilder_CubeGrid>();
-                    foreach (MyCubeGrid сubeGrid in grids)
-                    {
-                        try
-                        {
-                            foreach (MyCubeBlock fatBlock in сubeGrid.GetFatBlocks())
-                            {
-                                MyCubeBlock c = fatBlock;
-                                if (c is MyCockpit)
-                                    (c as MyCockpit).RemovePilot();
-                                if (c is MyProgrammableBlock)
-                                {
-                                    try
-                                    {
-                                        SentisOptimisationsPlugin.m_myProgrammableBlockKillProgramm.Invoke(
-                                            (object) (c as MyProgrammableBlock), new object[1]
-                                            {
-                                                (object) MyProgrammableBlock.ScriptTerminationReason.None
-                                            });
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        Log.Error(ex, "MyProgrammableBlock hack eval");
-                                    }
-                                }
-
-                                if (c is MyShipDrill)
-                                    (c as MyShipDrill).Enabled = false;
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            Log.Error(ex, "(SaveGrid)Exception in block disables ex");
-                        }
-
-                        totalpcu += сubeGrid.BlocksPCU;
-                        totalblocks += сubeGrid.BlocksCount;
-                        MyObjectBuilder_CubeGrid objectBuilder =
-                            (MyObjectBuilder_CubeGrid) сubeGrid.GetObjectBuilder(true);
-                        gridsOB.Add(objectBuilder);
-                        ++index;
-                    }
-
-                    string gridName = gridsOB[0].DisplayName.Length <= 30
-                        ? gridsOB[0].DisplayName
-                        : gridsOB[0].DisplayName.Substring(0, 30);
-                    string filenameexported = DateTime.Now.ToLongTimeString()
-                                              + "_" + (object) totalpcu + "_" + (object) totalblocks + "_" + gridName;
-
-                    MyObjectBuilder_ShipBlueprintDefinition newObject1 =
-                        MyObjectBuilderSerializer.CreateNewObject<MyObjectBuilder_ShipBlueprintDefinition>();
-                    newObject1.Id = (SerializableDefinitionId) new MyDefinitionId(
-                        new MyObjectBuilderType(typeof(MyObjectBuilder_ShipBlueprintDefinition)),
-                        MyUtils.StripInvalidChars(filenameexported));
-                    newObject1.CubeGrids = gridsOB.ToArray();
-                    newObject1.RespawnShip = false;
-                    newObject1.DisplayName = MyGameService.UserName;
-                    newObject1.OwnerSteamId = Sync.MyId;
-                    newObject1.CubeGrids[0].DisplayName = hitEntity.DisplayName;
-                    MyObjectBuilder_Definitions newObject2 =
-                        MyObjectBuilderSerializer.CreateNewObject<MyObjectBuilder_Definitions>();
-                    newObject2.ShipBlueprints = new MyObjectBuilder_ShipBlueprintDefinition[1];
-                    newObject2.ShipBlueprints[0] = newObject1;
-
-                    string str = Path.Combine(pathToGarage, MyAPIGateway.Players.TryGetSteamId(identityId).ToString());
-                    if (!Directory.Exists(str))
-                        Directory.CreateDirectory(str);
-                    foreach (char ch in ((IEnumerable<char>) Path.GetInvalidPathChars()).Concat<char>((IEnumerable<char>) Path.GetInvalidFileNameChars()))
-                        filenameexported = filenameexported.Replace(ch.ToString(), ".");
-                    string path = Path.Combine(str, filenameexported + ".sbc");
-                    bool flag = MyObjectBuilderSerializer.SerializeXML(path, false, (MyObjectBuilder_Base) newObject2);
-                    if (flag)
-                        MyObjectBuilderSerializer.SerializePB(path + "B5", true, (MyObjectBuilder_Base) newObject2);
-                    MyAPIGateway.Utilities.InvokeOnGameThread((Action) (() =>
-                    {
-                        foreach (MyEntity myEntity in grids)
-                            myEntity.Close();
-                    }));
-                    this.Context.Respond("Cтруктура " + hitEntity.DisplayName + " сохранена в гараж");
+                    if (GarageCore.Instance.MoveToGarage(identityId, (MyCubeGrid) hitEntity, Context)) return;
 
                     return;
                 }
             }
         }
 
+
         [Command("load", ".", null)]
         [Permission(MyPromoteLevel.None)]
         public void Load(int index)
         {
-            var path = Path.Combine(SentisOptimisationsPlugin.Config.PathToGarage, Context.Player.SteamUserId.ToString());
+            var path = Path.Combine(SentisOptimisationsPlugin.Config.PathToGarage,
+                Context.Player.SteamUserId.ToString());
             var files = Directory.GetFiles(
                 Path.Combine(SentisOptimisationsPlugin.Config.PathToGarage, Context.Player.SteamUserId.ToString()),
                 "*.sbc");
@@ -225,14 +115,16 @@ namespace SentisOptimisationsPlugin
 
             long identityId = player.IdentityId;
             IMyCharacter character = player.Character;
-            
+
             float naturalGravityMultiplier;
-            MyGravityProviderSystem.CalculateNaturalGravityInPoint(character.GetPosition(), out naturalGravityMultiplier);
+            MyGravityProviderSystem.CalculateNaturalGravityInPoint(character.GetPosition(),
+                out naturalGravityMultiplier);
             if (naturalGravityMultiplier > 0.5)
             {
                 Context.Respond("Гараж недоступен в гравитации > 0.5");
                 return;
             }
+
             var players = new List<IMyPlayer>();
             MyAPIGateway.Players.GetPlayers(players);
             foreach (var myPlayer in players)
@@ -241,6 +133,7 @@ namespace SentisOptimisationsPlugin
                 {
                     continue;
                 }
+
                 var distance = Vector3D.Distance(myPlayer.GetPosition(), character.GetPosition());
                 if (distance < 10000)
                 {
@@ -248,7 +141,7 @@ namespace SentisOptimisationsPlugin
                     return;
                 }
             }
-            
+
             var spawnPosition = SpawnPosition(character, out var collisions);
             int tryCount = 0;
             while (tryCount < 5)
@@ -263,21 +156,24 @@ namespace SentisOptimisationsPlugin
                     {
                         File.Delete(gridPath + "_spawned");
                     }
+
                     File.Move(gridPath, gridPath + "_spawned");
                     return;
                 }
+
                 spawnPosition = SpawnPosition(character, out var newcollisions);
                 collisions = newcollisions;
                 tryCount++;
             }
-            
+
             Context.Respond("Слишком много всего вокруг, найдите место посвободнее");
             Log.Info("Слишком много всего вокруг, найдите место посвободнее " + gridNameToLoad);
         }
 
         private static Vector3D SpawnPosition(IMyCharacter character, out List<MyEntity> collisions)
         {
-            var spawnPosition = new Vector3D(character.GetPosition().X + SentisOptimisationsPlugin._random.Next(-170, 170),
+            var spawnPosition = new Vector3D(
+                character.GetPosition().X + SentisOptimisationsPlugin._random.Next(-170, 170),
                 character.GetPosition().Y + SentisOptimisationsPlugin._random.Next(-170, 170),
                 character.GetPosition().Z + SentisOptimisationsPlugin._random.Next(-170, 170));
 
@@ -295,16 +191,18 @@ namespace SentisOptimisationsPlugin
             grid.Physics?.SetSpeeds(Vector3.Zero, Vector3.Zero);
             grid.ConvertToStatic();
             var gridGPS =
-                MyAPIGateway.Session?.GPS.Create(grid.DisplayName, grid.DisplayName, grid.PositionComp.GetPosition(), true, true);
+                MyAPIGateway.Session?.GPS.Create(grid.DisplayName, grid.DisplayName, grid.PositionComp.GetPosition(),
+                    true, true);
             gridGPS.GPSColor = Color.Yellow;
             MyAPIGateway.Session?.GPS.AddGps(myPlayerIdentity, gridGPS);
         }
+
         public static void DoSpawnGrids(long masterIdentityId, string str, Vector3D spawnPosition,
-           Delegate.AddListenerDelegate addListenerDelegate = null)
+            Delegate.AddListenerDelegate addListenerDelegate = null)
         {
             MyObjectBuilder_Definitions loadedPrefab = MyBlueprintUtils.LoadPrefab(str);
             MyObjectBuilder_CubeGrid[] cubeGrids = loadedPrefab.ShipBlueprints[0].CubeGrids;
-            
+
 
             SpawnSomeGrids(cubeGrids, spawnPosition, masterIdentityId, addListenerDelegate);
         }
@@ -353,7 +251,6 @@ namespace SentisOptimisationsPlugin
                     valueOrDefault.Position = valueOrDefault.Position - vector3D;
                     cubeGrid.PositionAndOrientation = valueOrDefault;
                 }
-
             }
 
             //TODO: Добавить проверку на коллизии
@@ -368,7 +265,6 @@ namespace SentisOptimisationsPlugin
                             addListenerDelegate.Invoke(((MyCubeGrid) entity), masterIdentityId);
                         }));
             }
-           
         }
 
         [Command("list", ".", null)]
