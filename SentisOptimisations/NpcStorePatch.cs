@@ -28,7 +28,7 @@ namespace SentisOptimisationsPlugin
             {
                 if (itemId.SubtypeName.Equals("ZoneChip"))
                 {
-                    minimalPrice = 450000;
+                    minimalPrice = 90000;
                 }
             }
             catch (Exception e)

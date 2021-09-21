@@ -277,6 +277,10 @@ namespace SentisOptimisationsPlugin
 
         public static void SendLimitMessage(long identityId, int pcu, int maxPcu, String gridName)
         {
+            if (identityId == 0)
+            {
+                return;
+            }
             ChatUtils.SendTo(identityId, "Для структуры " + gridName + " достигнут лимит PCU!");
             ChatUtils.SendTo(identityId, "Использовано " + pcu + " PCU из возможных " + maxPcu);
             MyVisualScriptLogicProvider.ShowNotification("Достигнут лимит PCU!", 10000, "Red",

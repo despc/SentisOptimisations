@@ -39,6 +39,7 @@
       <Compile Include="Garage\GarageCommands.cs" />
       <Compile Include="Garage\GarageCore.cs" />
       <Compile Include="Garage\OldGridProcessor.cs" />
+      <Compile Include="ParallelPatch.cs" />
       <Compile Include="PerfomancePatch.cs" />
       <Compile Include="Config.cs" />
       <Compile Include="ContractPricePatch.cs" />
@@ -72,6 +73,7 @@
       <Compile Include="Utils\NotificationUtils.cs" />
       <Compile Include="Utils\PlayerUtils.cs" />
       <Compile Include="Utils\ProjectorUtils.cs" />
+      <Compile Include="Utils\ReflectionUtils.cs" />
       <Compile Include="Utils\SoundUtils.cs" />
       <Compile Include="ConveyorPatch.cs" />
     </ItemGroup>

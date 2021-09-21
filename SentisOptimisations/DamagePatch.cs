@@ -26,7 +26,7 @@ namespace SentisOptimisationsPlugin
             if (_init)
                 return;
             _init = true;
-            MyAPIGateway.Session.DamageSystem.RegisterBeforeDamageHandler(0, ProcessDamage);
+            //MyAPIGateway.Session.DamageSystem.RegisterBeforeDamageHandler(0, ProcessDamage);
         }    
         
         private static void ProcessDamage(object target, ref MyDamageInformation info)
@@ -108,7 +108,7 @@ namespace SentisOptimisationsPlugin
             MyEntity otherEntity)
         {
 
-            if (otherEntity is MyVoxelBase && separatingVelocity < 40)
+            if (otherEntity is MyVoxelBase && separatingVelocity < 30)
             {
                 if (separatingVelocity < 5)
                 {
@@ -125,13 +125,13 @@ namespace SentisOptimisationsPlugin
                 return false;
             }
             
-            if (otherEntity is MyCubeGrid)
-            {
-                if (((MyCubeGrid) otherEntity).Mass < 500000)
-                {
-                    return false;
-                }
-            }
+            // if (otherEntity is MyCubeGrid)
+            // {
+            //     if (((MyCubeGrid) otherEntity).Mass < 500000)
+            //     {
+            //         return false;
+            //     }
+            // }
             return true;
         }
      

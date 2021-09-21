@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Reflection;
 using Havok;
 using NLog;
@@ -11,6 +12,9 @@ using Sandbox.Game.Entities.Blocks;
 using Sandbox.Game.Weapons;
 using SpaceEngineers.Game.Entities.Blocks;
 using Torch.Managers.PatchManager;
+using VRage;
+using VRage.Game.Entity;
+using VRage.Game.ObjectBuilders.Components;
 using VRage.ModAPI;
 using VRageMath;
 
@@ -21,7 +25,6 @@ namespace SentisOptimisationsPlugin
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
         public static Dictionary<long, long> entityesInSZ = new Dictionary<long, long>();
-            //public static Dictionary<long, MyWelder.ProjectionRaycastData[]> welderCache = new Dictionary<long, MyWelder.ProjectionRaycastData[]>();
         public static Dictionary<long, long> welderCounter = new Dictionary<long, long>();
         public static Dictionary<long, long> thrustCounter = new Dictionary<long, long>();
 
@@ -33,7 +36,23 @@ namespace SentisOptimisationsPlugin
             ctx.GetPattern(MethodPhantom_Leave).Prefixes.Add(
                 typeof(PerfomancePatch).GetMethod(nameof(MethodPhantom_LeavePatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
+            
+            var MethodIsTargetInSz = typeof(MyLargeTurretBase).GetMethod
+                (nameof(MyLargeTurretBase.IsTargetInSafeZone), BindingFlags.Instance | BindingFlags.Public);
+           
+            ctx.GetPattern(MethodIsTargetInSz).Prefixes.Add(
+                typeof(PerfomancePatch).GetMethod(nameof(MethodIsTargetInSzPatched),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic)); 
+            
         }
+
+        private static bool MethodIsTargetInSzPatched(ref bool __result)
+        {
+            __result = false;
+            return false;
+        }
+
 
         private static bool MethodPhantom_LeavePatched(MySafeZone __instance, HkPhantomCallbackShape sender,
             HkRigidBody body)
@@ -61,87 +80,6 @@ namespace SentisOptimisationsPlugin
 
             return false;
         }
-
-        //private static bool MethodMyReplicationServerDestroyPatched(MyReplicationServer __instance, IMyReplicable obj)
-        //{
-//
-        //    if (obj is MyExternalReplicable)
-        //    {
-        //        if (obj is MyExternalReplicable<MyCubeGrid>)
-        //        {
-        //            Log.Error("Удаляем грид " + ((MyExternalReplicable<MyCubeGrid>) obj).Instance.DisplayName);
-        //        }
-        //        if (obj is MyExternalReplicable<MySyncedBlock>)
-        //        {
-        //            Log.Error("Удаляем блок " + ((MyExternalReplicable<MySyncedBlock>) obj).Instance.DisplayName);
-        //        }
-        //        var instanceName = ((MyExternalReplicable) obj).InstanceName;
-        //    }
-        //    return true;
-        //}
-        
-        private static bool MethodFindProjectedBlocksPatched(MyShipWelder __instance, ref MyWelder.ProjectionRaycastData[] __result)
-        {
-            
-            if (welderCounter.ContainsKey(__instance.EntityId))
-            {
-                if (welderCounter[__instance.EntityId] < 5)
-                {
-                    //if (welderCache.ContainsKey(__instance.EntityId))
-                    //{
-                        __result = new MyWelder.ProjectionRaycastData[0];
-                        welderCounter[__instance.EntityId] = welderCounter[__instance.EntityId] + 1; 
-                    //    return false;
-                    //}
-                }
-            }
-            welderCounter[__instance.EntityId] = 0; 
-            return true;
-        }
-
-
-        private static bool MethodBuildInternalPatched(MyProjectorBase __instance,
-            Vector3I cubeBlockPosition,
-            long owner,
-            long builder,
-            bool requestInstant = true,
-            long builtBy = 0)
-        {
-            try
-            {
-                InvokeInstanceMethod(typeof(MyProjectorBase), __instance, "BuildInternal",
-                    new object[] {cubeBlockPosition, owner, builder, requestInstant, builtBy});
-            }
-            catch (Exception e)
-            {
-                //welderCache.Clear();
-                welderCounter.Clear();
-                Log.Error(e);
-            }
-            return false;
-    }
-        
-        private static void MethodFindProjectedBlocksPatchedAddCache(MyShipWelder __instance,
-            ref MyWelder.ProjectionRaycastData[] __result)
-        {
-            //welderCache[__instance.EntityId] = __result;
-        }
-
-        private static bool MethodThrustDamageAsyncPatched(MyThrust __instance)
-        {
-            if (thrustCounter.ContainsKey(__instance.EntityId))
-            {
-                if (thrustCounter[__instance.EntityId] < 5)
-                {
-                    thrustCounter[__instance.EntityId] = thrustCounter[__instance.EntityId] + 1;
-                    return false;
-                }
-            }
-
-            thrustCounter[__instance.EntityId] = 0;
-            return true;
-        }
-
         private static object InvokeInstanceMethod(Type type, object instance, string methodName, Object[] args)
         {
             BindingFlags bindFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
