@@ -40,12 +40,12 @@ namespace SentisOptimisationsPlugin
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
 
 
-            var methodInfo = typeof(MyLargeTurretBase).GetMethod("CheckAndSelectNearTargetsParallel",
-                BindingFlags.Instance | BindingFlags.NonPublic);
-
-            ctx.GetPattern(methodInfo).Prefixes.Add(
-                typeof(FixTurretsPatch).GetMethod(nameof(DisableCheckAndSelectNearTargetsParallel),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            // var methodInfo = typeof(MyLargeTurretBase).GetMethod("CheckAndSelectNearTargetsParallel",
+            //     BindingFlags.Instance | BindingFlags.NonPublic);
+            //
+            // ctx.GetPattern(methodInfo).Prefixes.Add(
+            //     typeof(FixTurretsPatch).GetMethod(nameof(DisableCheckAndSelectNearTargetsParallel),
+            //         BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
         }
 
 

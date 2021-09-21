@@ -33,20 +33,6 @@ namespace SentisOptimisationsPlugin
             this.Context.Respond("Configuration reloaded.");
         }
 
-        [Command("p", ".", null)]
-        [Permission(MyPromoteLevel.Admin)]
-        public void EnableParallel(int index)
-        {
-            if (index == 0)
-            {
-                ParallelPatch.Enabled = false;
-            }
-            if (index == 1)
-            {
-                ParallelPatch.Enabled = true;
-            }
-        }
-
         [Command("config", ".", null)]
         [Permission(MyPromoteLevel.Moderator)]
         public void Config()
