@@ -50,6 +50,10 @@ namespace FixTurrets.Garage
                 {
                     try
                     {
+                        if (myCubeGrid.DisplayName.Contains("@"))
+                        {
+                            return;
+                        }
                         var bigOwners = myCubeGrid.BigOwners;
                         if (bigOwners == null || bigOwners.Count == 0)
                         {
