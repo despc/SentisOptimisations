@@ -13,6 +13,22 @@ namespace SentisOptimisations
             field.SetValue(instance, value);
         }
         
+        public static object GetInstanceField(Type type, object instance, string fieldName)
+        {
+            BindingFlags bindFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+                                     | BindingFlags.Static;
+            FieldInfo field = type.GetField(fieldName, bindFlags);
+            return field.GetValue(instance);
+        }
+        
+        public static object GetPrivateStaticField(Type type, string fieldName)
+        {
+            BindingFlags bindFlags = BindingFlags.Public | BindingFlags.NonPublic
+                                     | BindingFlags.Static;
+            FieldInfo field = type.GetField(fieldName, bindFlags);
+            return field.GetValue(null);
+        }
+        
         internal static void InvokeInstanceMethod(Type type, object instance, string methodName, Object[] args)
         {
             BindingFlags bindFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
