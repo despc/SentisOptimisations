@@ -92,6 +92,13 @@ namespace SentisOptimisationsPlugin
             ctx.GetPattern(MethodUpdateBeforeSimulationParallel).Prefixes.Add(
                 typeof(ParallelPatch).GetMethod(nameof(UpdateBeforeSimulationParallel),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
+            var MethodUpdateBeforeSimulation = typeof(MyCubeGrid).GetMethod
+                ("UpdateBeforeSimulation", BindingFlags.Instance | BindingFlags.Public);
+
+            ctx.GetPattern(MethodUpdateBeforeSimulation).Prefixes.Add(
+                typeof(ParallelPatch).GetMethod(nameof(UpdateBeforeSimulation),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
 
             m_parallelUpdateHandlerAfterSimulation =
                 new Action<KeyValuePair<long, HashSet<MyEntity>>>(ParallelUpdateHandlerAfterSimulation);
@@ -159,6 +166,26 @@ namespace SentisOptimisationsPlugin
             {
                 Log.Error(e);
             }
+            return false;
+        }
+
+        private static bool UpdateBeforeSimulation(MyCubeGrid __instance)
+        {
+            try
+            {
+                MySimpleProfiler.Begin("Grid", MySimpleProfiler.ProfilingBlockType.BLOCK,
+                    nameof(MyCubeGrid.UpdateBeforeSimulation));
+                ReflectionUtils.InvokeInstanceMethod(typeof(MyCubeGrid), __instance, "DispatchOnce",
+                    new object[] {MyCubeGrid.UpdateQueue.OnceBeforeSimulation, false});
+                ReflectionUtils.InvokeInstanceMethod(typeof(MyCubeGrid), __instance, "Dispatch",
+                    new object[] {MyCubeGrid.UpdateQueue.BeforeSimulation, false});
+                MySimpleProfiler.End(nameof(MyCubeGrid.UpdateBeforeSimulation));
+            }
+            catch (Exception e)
+            {
+                Log.Error(e);
+            }
+
             return false;
         }
                 
