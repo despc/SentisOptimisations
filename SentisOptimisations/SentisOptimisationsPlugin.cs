@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Threading.Tasks;
 using FixTurrets.Garage;
 using NLog;
 using Sandbox;
@@ -16,6 +15,7 @@ using Sandbox.Game.GameSystems;
 using Sandbox.Game.World;
 using Sandbox.ModAPI;
 using SentisOptimisations;
+using SentisOptimisationsPlugin.Clusters;
 using Torch;
 using Torch.API;
 using Torch.API.Managers;
@@ -35,6 +35,7 @@ namespace SentisOptimisationsPlugin
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
         public static PcuLimiter _limiter = new PcuLimiter();
         public static OldGridProcessor _oldGridProcessor = new OldGridProcessor();
+        public static ClusterBuilder _cb = new ClusterBuilder();
         public static Dictionary<long,long> stuckGrids = new Dictionary<long, long>();
         public static Dictionary<long,long> gridsInSZ = new Dictionary<long, long>();
         public static MethodInfo m_myProgrammableBlockKillProgramm;
@@ -63,6 +64,7 @@ namespace SentisOptimisationsPlugin
             if (newState == TorchSessionState.Unloading)
             {
                 _limiter.OnUnloading();
+                _cb.OnUnloading();
             }
             else
             {
@@ -70,6 +72,7 @@ namespace SentisOptimisationsPlugin
                     return;
                 DamagePatch.Init();
                 _limiter.OnLoaded();
+                _cb.OnLoaded();
                 _oldGridProcessor.OnLoaded();
                 Communication.RegisterHandlers();
             }
@@ -313,6 +316,7 @@ namespace SentisOptimisationsPlugin
         public override void Dispose()
         {
             _limiter.CancellationTokenSource.Cancel();
+            _cb.CancellationTokenSource.Cancel();
             base.Dispose();
         }
     }
