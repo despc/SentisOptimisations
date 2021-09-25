@@ -85,6 +85,20 @@ namespace SentisOptimisationsPlugin
             ctx.GetPattern(MethodDoDisconnects).Prefixes.Add(
                 typeof(ParallelPatch).GetMethod(nameof(DoDisconnectsPatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
+            var MethodUpdateBeforeSimulationParallel = typeof(MyCubeGrid).GetMethod
+                ("UpdateBeforeSimulationParallel", BindingFlags.Instance | BindingFlags.Public);
+
+            ctx.GetPattern(MethodUpdateBeforeSimulationParallel).Prefixes.Add(
+                typeof(ParallelPatch).GetMethod(nameof(UpdateBeforeSimulationParallel),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
+            var MethodUpdateBeforeSimulation = typeof(MyCubeGrid).GetMethod
+                ("UpdateBeforeSimulation", BindingFlags.Instance | BindingFlags.Public);
+
+            ctx.GetPattern(MethodUpdateBeforeSimulation).Prefixes.Add(
+                typeof(ParallelPatch).GetMethod(nameof(UpdateBeforeSimulation),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
 
             m_parallelUpdateHandlerAfterSimulation =
                 new Action<KeyValuePair<long, HashSet<MyEntity>>>(ParallelUpdateHandlerAfterSimulation);
@@ -141,6 +155,40 @@ namespace SentisOptimisationsPlugin
             return false;
         }
 
+        private static bool UpdateBeforeSimulationParallel(MyCubeGrid __instance)
+        {
+            try
+            {
+                ReflectionUtils.InvokeInstanceMethod(typeof(MyCubeGrid), __instance, "DispatchOnce", new object[]{MyCubeGrid.UpdateQueue.OnceBeforeSimulation, true});
+                ReflectionUtils.InvokeInstanceMethod(typeof(MyCubeGrid), __instance, "Dispatch", new object[]{MyCubeGrid.UpdateQueue.BeforeSimulation, true});
+            }
+            catch (Exception e)
+            {
+                Log.Error(e);
+            }
+            return false;
+        }
+
+        private static bool UpdateBeforeSimulation(MyCubeGrid __instance)
+        {
+            try
+            {
+                MySimpleProfiler.Begin("Grid", MySimpleProfiler.ProfilingBlockType.BLOCK,
+                    nameof(MyCubeGrid.UpdateBeforeSimulation));
+                ReflectionUtils.InvokeInstanceMethod(typeof(MyCubeGrid), __instance, "DispatchOnce",
+                    new object[] {MyCubeGrid.UpdateQueue.OnceBeforeSimulation, false});
+                ReflectionUtils.InvokeInstanceMethod(typeof(MyCubeGrid), __instance, "Dispatch",
+                    new object[] {MyCubeGrid.UpdateQueue.BeforeSimulation, false});
+                MySimpleProfiler.End(nameof(MyCubeGrid.UpdateBeforeSimulation));
+            }
+            catch (Exception e)
+            {
+                Log.Error(e);
+            }
+
+            return false;
+        }
+                
         private static bool DoDisconnectsPatched(MyDisconnectHelper __instance, MyCubeGrid grid,
             MyCubeGrid.MyTestDisconnectsReason reason)
         {
