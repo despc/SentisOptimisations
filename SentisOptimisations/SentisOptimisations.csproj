@@ -36,6 +36,7 @@
       <Compile Include="Clusters\ClusterBuilder.cs" />
       <Compile Include="ConfigShipInMarket.cs" />
       <Compile Include="ConnectorPatch.cs" />
+      <Compile Include="CrashFix\CrashFixPatch.cs" />
       <Compile Include="Garage\Delegate.cs" />
       <Compile Include="Garage\GarageCommands.cs" />
       <Compile Include="Garage\GarageCore.cs" />
@@ -79,6 +80,9 @@
       <Compile Include="ConveyorPatch.cs" />
     </ItemGroup>
     <ItemGroup>
+      <Reference Include="DePatch, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>..\..\..\Downloads\DePatch-1.18.65\DePatch.dll</HintPath>
+      </Reference>
       <Reference Include="HavokWrapper, Version=0.1.1.0, Culture=neutral, PublicKeyToken=null">
         <HintPath>D:\torch-server\DedicatedServer64\HavokWrapper.dll</HintPath>
       </Reference>
