@@ -101,19 +101,25 @@
       <Reference Include="Sandbox.Game, Version=0.1.1.0, Culture=neutral, PublicKeyToken=null">
         <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\Sandbox.Game.dll</HintPath>
       </Reference>
+      <Reference Include="Sandbox.RenderDirect, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\Sandbox.RenderDirect.dll</HintPath>
+      </Reference>
       <Reference Include="SpaceEngineers.Game, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
         <HintPath>D:\torch-server\DedicatedServer64\SpaceEngineers.Game.dll</HintPath>
+      </Reference>
+      <Reference Include="SpaceEngineers.ObjectBuilders, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>D:\torch-server\DedicatedServer64\SpaceEngineers.ObjectBuilders.dll</HintPath>
       </Reference>
       <Reference Include="System" />
       <Reference Include="System.Core" />
       <Reference Include="System.Xml" />
-      <Reference Include="Torch, Version=1.3.1.149, Culture=neutral, PublicKeyToken=null">
+      <Reference Include="Torch, Version=1.3.1.153, Culture=neutral, PublicKeyToken=null">
         <HintPath>D:\torch-server\Torch.dll</HintPath>
       </Reference>
-      <Reference Include="Torch.API, Version=1.3.1.149, Culture=neutral, PublicKeyToken=null">
+      <Reference Include="Torch.API, Version=1.3.1.153, Culture=neutral, PublicKeyToken=null">
         <HintPath>D:\torch-server\Torch.API.dll</HintPath>
       </Reference>
-      <Reference Include="Torch.Server, Version=1.3.1.149, Culture=neutral, PublicKeyToken=null">
+      <Reference Include="Torch.Server, Version=1.3.1.153, Culture=neutral, PublicKeyToken=null">
         <HintPath>D:\torch-server\Torch.Server.exe</HintPath>
       </Reference>
       <Reference Include="VRage, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">

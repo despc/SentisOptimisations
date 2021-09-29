@@ -36,5 +36,13 @@ namespace SentisOptimisations
             var method = type.GetMethod(methodName, bindFlags);
             method.Invoke(instance, args);
         }
+        
+        internal static void InvokeStaticMethod(Type type, string methodName, Object[] args)
+        {
+            BindingFlags bindFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+                                     | BindingFlags.Static;
+            var method = type.GetMethod(methodName, bindFlags);
+            method.Invoke(null, args);
+        }
     }
 }
