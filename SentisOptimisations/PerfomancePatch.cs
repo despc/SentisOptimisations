@@ -1,22 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Reflection;
 using Havok;
 using NLog;
-using Sandbox;
+using ParallelTasks;
 using Sandbox.Engine.Physics;
 using Sandbox.Game.Entities;
-using Sandbox.Game.Entities.Blocks;
 using Sandbox.Game.Weapons;
-using SpaceEngineers.Game.Entities.Blocks;
 using Torch.Managers.PatchManager;
-using VRage;
-using VRage.Game.Entity;
-using VRage.Game.ObjectBuilders.Components;
 using VRage.ModAPI;
-using VRageMath;
 
 namespace SentisOptimisationsPlugin
 {
@@ -25,8 +18,6 @@ namespace SentisOptimisationsPlugin
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
         public static Dictionary<long, long> entityesInSZ = new Dictionary<long, long>();
-        public static Dictionary<long, long> welderCounter = new Dictionary<long, long>();
-        public static Dictionary<long, long> thrustCounter = new Dictionary<long, long>();
 
         public static void Patch(PatchContext ctx)
         {
@@ -45,6 +36,19 @@ namespace SentisOptimisationsPlugin
                 typeof(PerfomancePatch).GetMethod(nameof(MethodIsTargetInSzPatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic)); 
             
+            
+            var MethodInitializeWorkerArrays = typeof(PrioritizedScheduler).GetMethod
+                ("InitializeWorkerArrays", BindingFlags.Instance | BindingFlags.NonPublic);
+
+            ctx.GetPattern(MethodInitializeWorkerArrays).Prefixes.Add(
+                typeof(PerfomancePatch).GetMethod(nameof(InitializeWorkerArraysPatched),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+        }
+
+        private static void InitializeWorkerArraysPatched(ref int threadCount, ref bool amd)
+        {
+            amd = false;
+            threadCount = 10;
         }
 
         private static bool MethodIsTargetInSzPatched(ref bool __result)
