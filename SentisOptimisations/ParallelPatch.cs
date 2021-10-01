@@ -6,13 +6,11 @@ using Havok;
 using NLog;
 using ParallelTasks;
 using Sandbox;
-using Sandbox.Common.ObjectBuilders;
 using Sandbox.Engine.Utils;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Cube;
 using Sandbox.Game.Entities.Debris;
 using Sandbox.Game.Multiplayer;
-using Sandbox.Game.Weapons;
 using Sandbox.Game.World;
 using Sandbox.RenderDirect.ActorComponents;
 using SentisOptimisations;
@@ -23,7 +21,6 @@ using VRage.Collections;
 using VRage.Game.Entity;
 using VRage.Library.Utils;
 using VRage.ModAPI;
-using VRage.ObjectBuilders;
 using VRageMath;
 
 namespace SentisOptimisationsPlugin
@@ -33,10 +30,10 @@ namespace SentisOptimisationsPlugin
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
         public static readonly Random r = new Random();
-        private static Action<KeyValuePair<long, HashSet<MyEntity>>> m_parallelUpdateHandlerAfterSimulation;
-        private static Action<KeyValuePair<long, HashSet<MyEntity>>> m_parallelUpdateHandlerAfterSimulation10;
-        private static Action<KeyValuePair<long, HashSet<MyEntity>>> m_parallelUpdateHandlerAfterSimulation100;
-        private static Action<KeyValuePair<long, HashSet<MyEntity>>> m_parallelUpdateHandlerBeforeSimulation;
+        private static Action<KeyValuePair<long, List<MyEntity>>> m_parallelUpdateHandlerAfterSimulation;
+        private static Action<KeyValuePair<long, List<MyEntity>>> m_parallelUpdateHandlerAfterSimulation10;
+        private static Action<KeyValuePair<long, List<MyEntity>>> m_parallelUpdateHandlerAfterSimulation100;
+        private static Action<KeyValuePair<long, List<MyEntity>>> m_parallelUpdateHandlerBeforeSimulation;
 
         private static readonly object AllocateIdLock = new object();
         private static readonly object DisconnectsLock = new object();
@@ -55,7 +52,7 @@ namespace SentisOptimisationsPlugin
             // ctx.GetPattern(UpdateBeforeSimulation).Prefixes.Add(
             //     typeof(ParallelPatch).GetMethod(nameof(UpdateBeforeSimulationPatched),
             //         BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-            
+
 
             var UpdateAfterSimulation = typeof(MyParallelEntityUpdateOrchestrator).GetMethod
                 ("UpdateAfterSimulation", BindingFlags.Instance | BindingFlags.NonPublic);
@@ -66,14 +63,14 @@ namespace SentisOptimisationsPlugin
             //
             var UpdateAfterSimulation10 = typeof(MyParallelEntityUpdateOrchestrator).GetMethod
                 ("UpdateAfterSimulation10", BindingFlags.Instance | BindingFlags.NonPublic);
-            
+
             ctx.GetPattern(UpdateAfterSimulation10).Prefixes.Add(
                 typeof(ParallelPatch).GetMethod(nameof(UpdateAfterSimulation10Patched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-            
+
             var UpdateAfterSimulation100 = typeof(MyParallelEntityUpdateOrchestrator).GetMethod
                 ("UpdateAfterSimulation100", BindingFlags.Instance | BindingFlags.NonPublic);
-            
+
             ctx.GetPattern(UpdateAfterSimulation100).Prefixes.Add(
                 typeof(ParallelPatch).GetMethod(nameof(UpdateAfterSimulation100Patched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
@@ -84,7 +81,7 @@ namespace SentisOptimisationsPlugin
             ctx.GetPattern(UpdateExplosions).Prefixes.Add(
                 typeof(ParallelPatch).GetMethod(nameof(UpdateExplosionsPatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-            
+
             var ThrustDamageAsync = typeof(MyThrust).GetMethod
                 ("ThrustDamageAsync", BindingFlags.Instance | BindingFlags.NonPublic);
 
@@ -112,40 +109,44 @@ namespace SentisOptimisationsPlugin
             ctx.GetPattern(MethodDoDisconnects).Prefixes.Add(
                 typeof(ParallelPatch).GetMethod(nameof(DoDisconnectsPatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-            
+
             var MethodUpdateBeforeSimulationParallel = typeof(MyCubeGrid).GetMethod
                 ("UpdateBeforeSimulationParallel", BindingFlags.Instance | BindingFlags.Public);
 
             ctx.GetPattern(MethodUpdateBeforeSimulationParallel).Prefixes.Add(
                 typeof(ParallelPatch).GetMethod(nameof(UpdateBeforeSimulationParallel),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-            
+
             var MethodUpdateBeforeSimulation = typeof(MyCubeGrid).GetMethod
                 ("UpdateBeforeSimulation", BindingFlags.Instance | BindingFlags.Public);
 
             ctx.GetPattern(MethodUpdateBeforeSimulation).Prefixes.Add(
                 typeof(ParallelPatch).GetMethod(nameof(UpdateBeforeSimulationFixPatched),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic)); 
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
 
             m_parallelUpdateHandlerAfterSimulation =
-                new Action<KeyValuePair<long, HashSet<MyEntity>>>(ParallelUpdateHandlerAfterSimulation);
+                new Action<KeyValuePair<long, List<MyEntity>>>(ParallelUpdateHandlerAfterSimulation);
             m_parallelUpdateHandlerAfterSimulation10 =
-                new Action<KeyValuePair<long, HashSet<MyEntity>>>(ParallelUpdateHandlerAfterSimulation10);
+                new Action<KeyValuePair<long, List<MyEntity>>>(ParallelUpdateHandlerAfterSimulation10);
             m_parallelUpdateHandlerAfterSimulation100 =
-                new Action<KeyValuePair<long, HashSet<MyEntity>>>(ParallelUpdateHandlerAfterSimulation100);
+                new Action<KeyValuePair<long, List<MyEntity>>>(ParallelUpdateHandlerAfterSimulation100);
             m_parallelUpdateHandlerBeforeSimulation =
-                new Action<KeyValuePair<long, HashSet<MyEntity>>>(ParallelUpdateHandlerBeforeSimulation);
+                new Action<KeyValuePair<long, List<MyEntity>>>(ParallelUpdateHandlerBeforeSimulation);
         }
 
         private static bool ThrustDamageAsyncPatched(MyThrust __instance, uint dmgTimeMultiplier)
         {
             try
             {
-                
-                ListReader<MyThrustFlameAnimator.FlameInfo> m_flames =  (ListReader<MyThrustFlameAnimator.FlameInfo>) ReflectionUtils.GetInstanceField(typeof(MyThrust), __instance, "m_flames");
-                if (m_flames.Count <= 0 || !MySession.Static.ThrusterDamage || (!__instance.IsWorking || !__instance.CubeGrid.InScene) 
-                    || (__instance.CubeGrid.Physics == null || !__instance.CubeGrid.Physics.Enabled || !Sandbox.Game.Multiplayer.Sync.IsServer) 
-                    || ((double) __instance.CurrentStrength == 0.0 && !MyFakes.INACTIVE_THRUSTER_DMG || !MyFakes.INACTIVE_THRUSTER_DMG))
+                ListReader<MyThrustFlameAnimator.FlameInfo> m_flames =
+                    (ListReader<MyThrustFlameAnimator.FlameInfo>) ReflectionUtils.GetInstanceField(typeof(MyThrust),
+                        __instance, "m_flames");
+                if (m_flames.Count <= 0 || !MySession.Static.ThrusterDamage ||
+                    (!__instance.IsWorking || !__instance.CubeGrid.InScene)
+                    || (__instance.CubeGrid.Physics == null || !__instance.CubeGrid.Physics.Enabled ||
+                        !Sync.IsServer)
+                    || ((double) __instance.CurrentStrength == 0.0 && !MyFakes.INACTIVE_THRUSTER_DMG ||
+                        !MyFakes.INACTIVE_THRUSTER_DMG))
                     return false;
                 foreach (MyThrustFlameAnimator.FlameInfo flame in m_flames)
                 {
@@ -167,6 +168,7 @@ namespace SentisOptimisationsPlugin
             {
                 Log.Error(e);
             }
+
             return false;
         }
 
@@ -225,13 +227,16 @@ namespace SentisOptimisationsPlugin
         {
             try
             {
-                ReflectionUtils.InvokeInstanceMethod(typeof(MyCubeGrid), __instance, "DispatchOnce", new object[]{MyCubeGrid.UpdateQueue.OnceBeforeSimulation, true});
-                ReflectionUtils.InvokeInstanceMethod(typeof(MyCubeGrid), __instance, "Dispatch", new object[]{MyCubeGrid.UpdateQueue.BeforeSimulation, true});
+                ReflectionUtils.InvokeInstanceMethod(typeof(MyCubeGrid), __instance, "DispatchOnce",
+                    new object[] {MyCubeGrid.UpdateQueue.OnceBeforeSimulation, true});
+                ReflectionUtils.InvokeInstanceMethod(typeof(MyCubeGrid), __instance, "Dispatch",
+                    new object[] {MyCubeGrid.UpdateQueue.BeforeSimulation, true});
             }
             catch (Exception e)
             {
                 Log.Error(e);
             }
+
             return false;
         }
 
@@ -254,7 +259,7 @@ namespace SentisOptimisationsPlugin
 
             return false;
         }
-                
+
         private static bool DoDisconnectsPatched(MyDisconnectHelper __instance, MyCubeGrid grid,
             MyCubeGrid.MyTestDisconnectsReason reason)
         {
@@ -324,17 +329,18 @@ namespace SentisOptimisationsPlugin
         }
 
 
-        private static void ParallelUpdateHandlerAfterSimulation(KeyValuePair<long, HashSet<MyEntity>> pair)
+        private static void ParallelUpdateHandlerAfterSimulation(KeyValuePair<long, List<MyEntity>> pair)
         {
-            HashSet<MyEntity> entities = pair.Value;
+            List<MyEntity> entities = pair.Value;
             UpdateSetAfterSimulation(entities);
         }
 
-        private static void UpdateSetAfterSimulation(HashSet<MyEntity> entities)
+        private static void UpdateSetAfterSimulation(List<MyEntity> entities)
         {
             foreach (var myEntity in entities)
             {
-                if (!myEntity.MarkedForClose && (myEntity.Flags & EntityFlags.NeedsUpdate) != (EntityFlags) 0 &&
+                if (myEntity != null && !myEntity.MarkedForClose &&
+                    (myEntity.Flags & EntityFlags.NeedsUpdate) != (EntityFlags) 0 &&
                     myEntity.InScene)
                 {
                     try
@@ -349,17 +355,22 @@ namespace SentisOptimisationsPlugin
             }
         }
 
-        private static void ParallelUpdateHandlerAfterSimulation10(KeyValuePair<long, HashSet<MyEntity>> pair)
+        private static void ParallelUpdateHandlerAfterSimulation10(KeyValuePair<long, List<MyEntity>> pair)
         {
-            HashSet<MyEntity> entities = pair.Value;
+            List<MyEntity> entities = pair.Value;
 
             UpdateSetAfterSimulation10(entities);
         }
 
-        private static void UpdateSetAfterSimulation10(HashSet<MyEntity> entities)
+        private static void UpdateSetAfterSimulation10(List<MyEntity> entities)
         {
             foreach (var myEntity in entities)
             {
+                if (myEntity == null)
+                {
+                    continue;
+                }
+
                 if ((ulong) myEntity.EntityId % 10 != MySandboxGame.Static.SimulationFrameCounter % 10)
                 {
                     continue;
@@ -380,26 +391,32 @@ namespace SentisOptimisationsPlugin
             }
         }
 
-        private static void ParallelUpdateHandlerAfterSimulation100(KeyValuePair<long, HashSet<MyEntity>> pair)
+        private static void ParallelUpdateHandlerAfterSimulation100(KeyValuePair<long, List<MyEntity>> pair)
         {
-            HashSet<MyEntity> entities = pair.Value;
+            List<MyEntity> entities = pair.Value;
             UpdateSetAfterSimulation100(entities);
         }
 
-        private static void UpdateSetAfterSimulation100(HashSet<MyEntity> entities)
+        private static void UpdateSetAfterSimulation100(List<MyEntity> entities)
         {
             foreach (var myEntity in entities)
             {
+                if (myEntity == null)
+                {
+                    continue;
+                }
+
                 if ((ulong) myEntity.EntityId % 100 != MySandboxGame.Static.SimulationFrameCounter % 100)
                 {
                     continue;
                 }
+
                 if (!myEntity.MarkedForClose && (myEntity.Flags & EntityFlags.NeedsUpdate100) != (EntityFlags) 0 &&
                     myEntity.InScene)
                 {
                     try
                     {
-                            myEntity.UpdateAfterSimulation100();
+                        myEntity.UpdateAfterSimulation100();
                     }
                     catch (Exception e)
                     {
@@ -409,12 +426,13 @@ namespace SentisOptimisationsPlugin
             }
         }
 
-        private static void ParallelUpdateHandlerBeforeSimulation(KeyValuePair<long, HashSet<MyEntity>> pair)
+        private static void ParallelUpdateHandlerBeforeSimulation(KeyValuePair<long, List<MyEntity>> pair)
         {
-            HashSet<MyEntity> entities = pair.Value;
+            List<MyEntity> entities = pair.Value;
             foreach (var myEntity in entities)
             {
-                if (!myEntity.MarkedForClose && (myEntity.Flags & EntityFlags.NeedsUpdate) != (EntityFlags) 0 && myEntity.InScene)
+                if (!myEntity.MarkedForClose && (myEntity.Flags & EntityFlags.NeedsUpdate) != (EntityFlags) 0 &&
+                    myEntity.InScene)
                 {
                     try
                     {
@@ -439,6 +457,7 @@ namespace SentisOptimisationsPlugin
                     {
                         DelayFlag = true;
                     }
+
                     return true;
                 }
 
@@ -455,7 +474,7 @@ namespace SentisOptimisationsPlugin
 
             return false;
         }
-        
+
         private static bool UpdateAfterSimulation10Patched()
         {
             try
@@ -467,6 +486,7 @@ namespace SentisOptimisationsPlugin
                     {
                         DelayFlag = true;
                     }
+
                     return true;
                 }
 
@@ -483,7 +503,7 @@ namespace SentisOptimisationsPlugin
 
             return false;
         }
-        
+
         private static bool UpdateAfterSimulation100Patched()
         {
             try
@@ -495,6 +515,7 @@ namespace SentisOptimisationsPlugin
                     {
                         DelayFlag = true;
                     }
+
                     return true;
                 }
 
@@ -511,7 +532,7 @@ namespace SentisOptimisationsPlugin
 
             return false;
         }
-        
+
         private static bool UpdateBeforeSimulationPatched()
         {
             try
@@ -523,6 +544,7 @@ namespace SentisOptimisationsPlugin
                     {
                         DelayFlag = true;
                     }
+
                     return true;
                 }
 
@@ -536,52 +558,53 @@ namespace SentisOptimisationsPlugin
             return false;
         }
 
-        public static void UpdateBeforeSimulationInThread(Dictionary<long, HashSet<MyEntity>> clusters)
+        public static void UpdateBeforeSimulationInThread(Dictionary<long, List<MyEntity>> clusters)
         {
             using (HkAccessControl.PushState(HkAccessControl.AccessState.SharedRead))
             {
                 using (MyEntities.StartAsyncUpdateBlock())
                     lock (ClusterBuilder.buildClustersLock)
                     {
-                        Parallel.ForEach(new Dictionary<long, HashSet<MyEntity>>(clusters),
+                        Parallel.ForEach(new Dictionary<long, List<MyEntity>>(clusters),
                             m_parallelUpdateHandlerBeforeSimulation, WorkPriority.VeryHigh, blocking: true);
                     }
             }
         }
-        
-        public static void UpdateAfterSimulationInThread(Dictionary<long, HashSet<MyEntity>> clusters)
+
+        public static void UpdateAfterSimulationInThread(Dictionary<long, List<MyEntity>> clusters)
         {
             using (HkAccessControl.PushState(HkAccessControl.AccessState.SharedRead))
             {
                 using (MyEntities.StartAsyncUpdateBlock())
                     lock (ClusterBuilder.buildClustersLock)
                     {
-                        Parallel.ForEach(new Dictionary<long, HashSet<MyEntity>>(clusters),
+                        Parallel.ForEach(new Dictionary<long, List<MyEntity>>(clusters),
                             m_parallelUpdateHandlerAfterSimulation, WorkPriority.VeryHigh, blocking: true);
                     }
             }
         }
-        
-        public static void UpdateAfterSimulation10InThread(Dictionary<long, HashSet<MyEntity>> clusters)
+
+        public static void UpdateAfterSimulation10InThread(Dictionary<long, List<MyEntity>> clusters)
         {
             using (HkAccessControl.PushState(HkAccessControl.AccessState.SharedRead))
             {
                 using (MyEntities.StartAsyncUpdateBlock())
                     lock (ClusterBuilder.buildClustersLock10)
                     {
-                        Parallel.ForEach(new Dictionary<long, HashSet<MyEntity>>(clusters),
+                        Parallel.ForEach(new Dictionary<long, List<MyEntity>>(clusters),
                             m_parallelUpdateHandlerAfterSimulation10, WorkPriority.VeryHigh, blocking: true);
                     }
             }
         }
-        public static void UpdateAfterSimulation100InThread(Dictionary<long, HashSet<MyEntity>> clusters)
+
+        public static void UpdateAfterSimulation100InThread(Dictionary<long, List<MyEntity>> clusters)
         {
             using (HkAccessControl.PushState(HkAccessControl.AccessState.SharedRead))
             {
                 using (MyEntities.StartAsyncUpdateBlock())
                     lock (ClusterBuilder.buildClustersLock100)
                     {
-                        Parallel.ForEach(new Dictionary<long, HashSet<MyEntity>>(clusters),
+                        Parallel.ForEach(new Dictionary<long, List<MyEntity>>(clusters),
                             m_parallelUpdateHandlerAfterSimulation100, WorkPriority.VeryHigh, blocking: true);
                     }
             }

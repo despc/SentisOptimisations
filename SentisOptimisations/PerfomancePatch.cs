@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.Reflection;
 using Havok;
 using NLog;
-using Sandbox;
+using ParallelTasks;
 using Sandbox.Engine.Physics;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Blocks;
@@ -33,6 +33,19 @@ namespace SentisOptimisationsPlugin
             ctx.GetPattern(MethodPhantom_Leave).Prefixes.Add(
                 typeof(PerfomancePatch).GetMethod(nameof(MethodPhantom_LeavePatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
+            var MethodInitializeWorkerArrays = typeof(PrioritizedScheduler).GetMethod
+                ("InitializeWorkerArrays", BindingFlags.Instance | BindingFlags.NonPublic);
+
+            ctx.GetPattern(MethodInitializeWorkerArrays).Prefixes.Add(
+                typeof(PerfomancePatch).GetMethod(nameof(InitializeWorkerArraysPatched),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+        }
+
+        private static void InitializeWorkerArraysPatched(ref int threadCount, ref bool amd)
+        {
+            amd = false;
+            threadCount = 10;
         }
 
         private static bool MethodPhantom_LeavePatched(MySafeZone __instance, HkPhantomCallbackShape sender,

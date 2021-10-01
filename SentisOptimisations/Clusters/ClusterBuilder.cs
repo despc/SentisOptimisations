@@ -7,11 +7,13 @@ using NLog;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Blocks;
 using Sandbox.Game.Entities.Cube;
+using Sandbox.Game.Weapons;
 using SentisOptimisations;
 using SpaceEngineers.Game.Entities.Blocks;
 using VRage.Collections;
 using VRage.Game.Entity;
 using VRageMath;
+
 // ReSharper disable ArrangeTypeMemberModifiers
 // ReSharper disable InconsistentNaming
 
@@ -20,48 +22,50 @@ namespace SentisOptimisationsPlugin.Clusters
     public class ClusterBuilder
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
-        
+
         //         <ид грида, ид кластера>
         Dictionary<long, int> clustersByGrid = new Dictionary<long, int>();
 
         //         <ид кластера, список сущностей>
-        Dictionary<long, HashSet<MyEntity>> clusters = new Dictionary<long, HashSet<MyEntity>>();
-        Dictionary<long, HashSet<MyEntity>> tmpClusters = new Dictionary<long, HashSet<MyEntity>>();
-        HashSet<MyEntity> forSerialUpdate = new HashSet<MyEntity>();
-        HashSet<MyEntity> tmpforSerialUpdate = new HashSet<MyEntity>();
-        
+        Dictionary<long, List<MyEntity>> clusters = new Dictionary<long, List<MyEntity>>();
+        Dictionary<long, List<MyEntity>> tmpClusters = new Dictionary<long, List<MyEntity>>();
+        List<MyEntity> forSerialUpdate = new List<MyEntity>();
+        List<MyEntity> tmpforSerialUpdate = new List<MyEntity>();
+
         //         <ид грида, ид кластера>
         Dictionary<long, int> clustersByGrid10 = new Dictionary<long, int>();
 
         //         <ид кластера, список сущностей>
-        Dictionary<long, HashSet<MyEntity>> clusters10 = new Dictionary<long, HashSet<MyEntity>>();
-        Dictionary<long, HashSet<MyEntity>> tmpClusters10 = new Dictionary<long, HashSet<MyEntity>>();
-        HashSet<MyEntity> forSerialUpdate10 = new HashSet<MyEntity>();
-        HashSet<MyEntity> tmpforSerialUpdate10 = new HashSet<MyEntity>();
+        Dictionary<long, List<MyEntity>> clusters10 = new Dictionary<long, List<MyEntity>>();
+        Dictionary<long, List<MyEntity>> tmpClusters10 = new Dictionary<long, List<MyEntity>>();
+        List<MyEntity> forSerialUpdate10 = new List<MyEntity>();
+
+        List<MyEntity> tmpforSerialUpdate10 = new List<MyEntity>();
+
         //         <ид грида, ид кластера>
         Dictionary<long, int> clustersByGrid100 = new Dictionary<long, int>();
 
         //         <ид кластера, список сущностей>
-        Dictionary<long, HashSet<MyEntity>> clusters100 = new Dictionary<long, HashSet<MyEntity>>();
-        Dictionary<long, HashSet<MyEntity>> tmpClusters100 = new Dictionary<long, HashSet<MyEntity>>();
-        HashSet<MyEntity> forSerialUpdate100 = new HashSet<MyEntity>();
-        HashSet<MyEntity> tmpforSerialUpdate100 = new HashSet<MyEntity>();
-        
+        Dictionary<long, List<MyEntity>> clusters100 = new Dictionary<long, List<MyEntity>>();
+        Dictionary<long, List<MyEntity>> tmpClusters100 = new Dictionary<long, List<MyEntity>>();
+        List<MyEntity> forSerialUpdate100 = new List<MyEntity>();
+        List<MyEntity> tmpforSerialUpdate100 = new List<MyEntity>();
+
         public static readonly object buildClustersLock = new object();
         public static readonly object buildClustersLock10 = new object();
         public static readonly object buildClustersLock100 = new object();
         public static readonly Random r = new Random();
         public CancellationTokenSource CancellationTokenSource { get; set; }
 
-        public Dictionary<long, HashSet<MyEntity>> Clusters => clusters;
-        public Dictionary<long, HashSet<MyEntity>> Clusters10 => clusters10;
-        public Dictionary<long, HashSet<MyEntity>> Clusters100 => clusters100;
+        public Dictionary<long, List<MyEntity>> Clusters => clusters;
+        public Dictionary<long, List<MyEntity>> Clusters10 => clusters10;
+        public Dictionary<long, List<MyEntity>> Clusters100 => clusters100;
 
-        public HashSet<MyEntity> ForSerialUpdate => forSerialUpdate;
+        public List<MyEntity> ForSerialUpdate => forSerialUpdate;
 
-        public HashSet<MyEntity> ForSerialUpdate10 => forSerialUpdate10;
+        public List<MyEntity> ForSerialUpdate10 => forSerialUpdate10;
 
-        public HashSet<MyEntity> ForSerialUpdate100 => forSerialUpdate100;
+        public List<MyEntity> ForSerialUpdate100 => forSerialUpdate100;
 
         public void OnLoaded()
         {
@@ -72,12 +76,12 @@ namespace SentisOptimisationsPlugin.Clusters
             StartBuildClustersLoop10();
             StartBuildClustersLoop100();
         }
-        
+
         public void OnUnloading()
         {
             CancellationTokenSource.Cancel();
         }
-        
+
         private async void StartBuildClustersLoop()
         {
             try
@@ -88,12 +92,12 @@ namespace SentisOptimisationsPlugin.Clusters
                 {
                     try
                     {
-                        await Task.Delay(15);
+                        await Task.Delay(30);
                         await Task.Run(BuildClusters);
                     }
                     catch (ArgumentException e)
                     {
-                       // Log.Error("BuildClustersLoop Error", e);
+                        // Log.Error("BuildClustersLoop Error", e);
                     }
                     catch (Exception e)
                     {
@@ -106,7 +110,7 @@ namespace SentisOptimisationsPlugin.Clusters
                 Log.Error("BuildClustersLoop start Error", e);
             }
         }
-        
+
         private async void StartBuildClustersLoop10()
         {
             try
@@ -117,7 +121,7 @@ namespace SentisOptimisationsPlugin.Clusters
                 {
                     try
                     {
-                        await Task.Delay(100);
+                        await Task.Delay(250);
                         await Task.Run(BuildClusters10);
                     }
                     catch (ArgumentException e)
@@ -135,7 +139,7 @@ namespace SentisOptimisationsPlugin.Clusters
                 Log.Error("BuildClustersLoop10 start Error", e);
             }
         }
-        
+
         private async void StartBuildClustersLoop100()
         {
             try
@@ -146,7 +150,7 @@ namespace SentisOptimisationsPlugin.Clusters
                 {
                     try
                     {
-                        await Task.Delay(300);
+                        await Task.Delay(1000);
                         await Task.Run(BuildClusters100);
                     }
                     catch (ArgumentException e)
@@ -167,11 +171,12 @@ namespace SentisOptimisationsPlugin.Clusters
 
         private void BuildClusters()
         {
-            tmpClusters = new Dictionary<long, HashSet<MyEntity>>();
-            tmpforSerialUpdate = new HashSet<MyEntity>();
+            tmpClusters = new Dictionary<long, List<MyEntity>>();
+            tmpforSerialUpdate = new List<MyEntity>();
             clustersByGrid = new Dictionary<long, int>();
             HashSet<MyEntity> m_entitiesForUpdate =
-                (HashSet<MyEntity>) ReflectionUtils.GetInstanceField(typeof(MyParallelEntityUpdateOrchestrator), MyEntities.Orchestrator,
+                (HashSet<MyEntity>) ReflectionUtils.GetInstanceField(typeof(MyParallelEntityUpdateOrchestrator),
+                    MyEntities.Orchestrator,
                     "m_entitiesForUpdate");
             var startNew = Stopwatch.StartNew();
             try
@@ -182,7 +187,7 @@ namespace SentisOptimisationsPlugin.Clusters
                     {
                         continue;
                     }
-                    
+
                     MyEntity topEntity;
                     if (myEntity is MyCubeBlock)
                     {
@@ -193,28 +198,31 @@ namespace SentisOptimisationsPlugin.Clusters
                     {
                         topEntity = myEntity;
                     }
+
                     if (topEntity == null)
                     {
                         continue;
                     }
+
                     var entityId = topEntity.EntityId;
 
-                        
+
                     if (clustersByGrid.ContainsKey(entityId))
                     {
                         var clusterId = clustersByGrid[entityId];
                         if (!tmpClusters.ContainsKey(clusterId))
                         {
-                            tmpClusters[clusterId] = new HashSet<MyEntity>();
+                            tmpClusters[clusterId] = new List<MyEntity>();
                         }
+
                         tmpClusters[clusterId].Add(myEntity);
                         continue;
                     }
 
                     var newClusterId = r.Next(-2000000000, 2000000000);
                     clustersByGrid[entityId] = newClusterId;
-                    CollectGridsInCluster(newClusterId, topEntity, new List<MyEntity>(m_entitiesForUpdate), ref clustersByGrid);
-                    tmpClusters[newClusterId] = new HashSet<MyEntity>();
+                    CollectGridsInCluster(newClusterId, topEntity, ref clustersByGrid);
+                    tmpClusters[newClusterId] = new List<MyEntity>();
                     tmpClusters[newClusterId].Add(myEntity);
                 }
 
@@ -222,36 +230,42 @@ namespace SentisOptimisationsPlugin.Clusters
                 //Log.Error("BuildClusters Run for " + startNew.ElapsedMilliseconds);
                 lock (buildClustersLock)
                 {
-                    clusters = new Dictionary<long, HashSet<MyEntity>>(tmpClusters);
-                    forSerialUpdate = new HashSet<MyEntity>(tmpforSerialUpdate);
+                    clusters = new Dictionary<long, List<MyEntity>>(tmpClusters);
+                    forSerialUpdate = new List<MyEntity>(tmpforSerialUpdate);
                 }
             }
             catch (InvalidOperationException e)
             {
                 //Log.Error("Collection is Modified");
             }
-            
         }
+
         private bool ToSerialUpdate(MyEntity myEntity)
         {
-            if (myEntity is MyVoxelBase )
+            if (myEntity is MyGasGenerator ||
+                 myEntity is MyAdvancedDoor ||
+                 myEntity is MyLargeTurretBase ||
+                 myEntity is MyShipToolBase ||
+                 myEntity is MyShipDrill)
             {
-                tmpforSerialUpdate.Add(myEntity);
-                return true;
+                return false;
             }
 
-            return false;
+            tmpforSerialUpdate.Add(myEntity);
+            return true;
         }
+
         private void BuildClusters10()
         {
-            tmpClusters10 = new Dictionary<long, HashSet<MyEntity>>();
-            tmpforSerialUpdate10 = new HashSet<MyEntity>();
+            tmpClusters10 = new Dictionary<long, List<MyEntity>>();
+            tmpforSerialUpdate10 = new List<MyEntity>();
             clustersByGrid10 = new Dictionary<long, int>();
             MyDistributedUpdater<List<MyEntity>, MyEntity> m_entitiesForUpdate10 =
-                (MyDistributedUpdater<List<MyEntity>, MyEntity>) ReflectionUtils.GetInstanceField(typeof(MyParallelEntityUpdateOrchestrator), MyEntities.Orchestrator,
+                (MyDistributedUpdater<List<MyEntity>, MyEntity>) ReflectionUtils.GetInstanceField(
+                    typeof(MyParallelEntityUpdateOrchestrator), MyEntities.Orchestrator,
                     "m_entitiesForUpdate10");
             var startNew = Stopwatch.StartNew();
-            
+
             try
             {
                 foreach (var myEntity in new List<MyEntity>(m_entitiesForUpdate10.List))
@@ -262,6 +276,7 @@ namespace SentisOptimisationsPlugin.Clusters
                     {
                         continue;
                     }
+
                     if (myEntity is MyCubeBlock)
                     {
                         var grid = ((MyCubeBlock) myEntity).CubeGrid;
@@ -271,70 +286,76 @@ namespace SentisOptimisationsPlugin.Clusters
                     {
                         topEntity = myEntity;
                     }
+
                     var entityId = topEntity.EntityId;
 
-                        
+
                     if (clustersByGrid10.ContainsKey(entityId))
                     {
                         var clusterId = clustersByGrid10[entityId];
                         if (!tmpClusters10.ContainsKey(clusterId))
                         {
-                            tmpClusters10[clusterId] = new HashSet<MyEntity>();
+                            tmpClusters10[clusterId] = new List<MyEntity>();
                         }
+
                         tmpClusters10[clusterId].Add(myEntity);
                         continue;
                     }
 
                     var newClusterId = r.Next(-2000000000, 2000000000);
                     clustersByGrid10[entityId] = newClusterId;
-                    CollectGridsInCluster(newClusterId, topEntity, m_entitiesForUpdate10.List,  ref clustersByGrid10);
-                    tmpClusters10[newClusterId] = new HashSet<MyEntity>();
+                    CollectGridsInCluster(newClusterId, topEntity, ref clustersByGrid10);
+                    tmpClusters10[newClusterId] = new List<MyEntity>();
                     tmpClusters10[newClusterId].Add(myEntity);
                 }
+
                 var startNewElapsedMilliseconds = startNew.ElapsedMilliseconds;
                 //Log.Error("BuildClusters10 Run for " + startNew.ElapsedMilliseconds);
                 lock (buildClustersLock10)
                 {
-                    
-                    clusters10 = new Dictionary<long, HashSet<MyEntity>>(tmpClusters10);
-                    forSerialUpdate10 = new HashSet<MyEntity>(tmpforSerialUpdate10);
+                    clusters10 = new Dictionary<long, List<MyEntity>>(tmpClusters10);
+                    forSerialUpdate10 = new List<MyEntity>(tmpforSerialUpdate10);
                 }
             }
             catch (InvalidOperationException e)
             {
                 //Log.Error("Collection is Modified");
             }
-            
         }
 
         private bool ToSerialUpdate10(MyEntity myEntity)
         {
-            if (myEntity is MySensorBlock || myEntity is MyAssembler)
-            {
-                tmpforSerialUpdate10.Add(myEntity);
-                return true;
-            }
-            if (myEntity is MyFunctionalBlock)
+            if (myEntity is MyGasGenerator ||
+                myEntity is MyBatteryBlock ||
+                myEntity is MyAdvancedDoor ||
+                myEntity is MyLargeTurretBase ||
+                myEntity is MyShipToolBase ||
+                myEntity is MyShipDrill ||
+                myEntity is MyGasTank ||
+                myEntity is MyAirVent ||
+                myEntity is MyShipConnector)
             {
                 return false;
             }
+
             tmpforSerialUpdate10.Add(myEntity);
             return true;
         }
-        
+
 
         private void BuildClusters100()
         {
-            tmpClusters100 = new Dictionary<long, HashSet<MyEntity>>();
+            tmpClusters100 = new Dictionary<long, List<MyEntity>>();
             clustersByGrid100 = new Dictionary<long, int>();
-            tmpforSerialUpdate100 = new HashSet<MyEntity>();
+            tmpforSerialUpdate100 = new List<MyEntity>();
             MyDistributedUpdater<List<MyEntity>, MyEntity> m_entitiesForUpdate100 =
-                (MyDistributedUpdater<List<MyEntity>, MyEntity>) ReflectionUtils.GetInstanceField(typeof(MyParallelEntityUpdateOrchestrator), MyEntities.Orchestrator,
+                (MyDistributedUpdater<List<MyEntity>, MyEntity>) ReflectionUtils.GetInstanceField(
+                    typeof(MyParallelEntityUpdateOrchestrator), MyEntities.Orchestrator,
                     "m_entitiesForUpdate100");
             var startNew = Stopwatch.StartNew();
 
             var thrusterClusterId = r.Next(-2000000000, 2000000000);
-            tmpClusters100[thrusterClusterId] = new HashSet<MyEntity>();
+            tmpClusters100[thrusterClusterId] = new List<MyEntity>();
 
             try
             {
@@ -347,10 +368,12 @@ namespace SentisOptimisationsPlugin.Clusters
                         clustersByGrid100[myEntity.EntityId] = thrusterClusterId;
                         continue;
                     }
+
                     if (ToSerialUpdate100(myEntity))
                     {
                         continue;
                     }
+
                     if (myEntity is MyCubeBlock)
                     {
                         var grid = ((MyCubeBlock) myEntity).CubeGrid;
@@ -360,105 +383,88 @@ namespace SentisOptimisationsPlugin.Clusters
                     {
                         topEntity = myEntity;
                     }
+
                     var entityId = topEntity.EntityId;
 
-                        
+
                     if (clustersByGrid100.ContainsKey(entityId))
                     {
                         var clusterId = clustersByGrid100[entityId];
                         if (!tmpClusters100.ContainsKey(clusterId))
                         {
-                            tmpClusters100[clusterId] = new HashSet<MyEntity>();
+                            tmpClusters100[clusterId] = new List<MyEntity>();
                         }
+
                         tmpClusters100[clusterId].Add(myEntity);
                         continue;
                     }
 
                     var newClusterId = r.Next(-2000000000, 2000000000);
                     clustersByGrid100[entityId] = newClusterId;
-                    CollectGridsInCluster(newClusterId, topEntity, m_entitiesForUpdate100.List, ref clustersByGrid100);
-                    tmpClusters100[newClusterId] = new HashSet<MyEntity>();
+                    CollectGridsInCluster(newClusterId, topEntity, ref clustersByGrid100);
+                    tmpClusters100[newClusterId] = new List<MyEntity>();
                     tmpClusters100[newClusterId].Add(myEntity);
                 }
+
                 var startNewElapsedMilliseconds = startNew.ElapsedMilliseconds;
                 //Log.Error("BuildClusters100 Run for " + startNew.ElapsedMilliseconds);
                 lock (buildClustersLock100)
                 {
-                    clusters100 = new Dictionary<long, HashSet<MyEntity>>(tmpClusters100);
-                    forSerialUpdate100 = new HashSet<MyEntity>(tmpforSerialUpdate100);
+                    clusters100 = new Dictionary<long, List<MyEntity>>(tmpClusters100);
+                    forSerialUpdate100 = new List<MyEntity>(tmpforSerialUpdate100);
                 }
             }
             catch (InvalidOperationException e)
             {
                 //Log.Error("Collection is Modified");
             }
-            
         }
+
         private bool ToSerialUpdate100(MyEntity myEntity)
         {
             if (myEntity is MyGasGenerator ||
                 myEntity is MyBatteryBlock ||
-                myEntity is MyAirVent )
+                myEntity is MyAdvancedDoor ||
+                myEntity is MyLargeTurretBase ||
+                myEntity is MyShipDrill ||
+                myEntity is MyGasTank ||
+                myEntity is MyAirVent)
             {
                 return false;
             }
+
             tmpforSerialUpdate100.Add(myEntity);
             return true;
-            
         }
 
-        private void CollectGridsInCluster(int clusterId, MyEntity e, ICollection<MyEntity> allEntities, ref Dictionary<long, int> clustersByGridfc)
+        private void CollectGridsInCluster(int clusterId, MyEntity e, ref Dictionary<long, int> clustersByGridfc)
         {
             var thisEntityPosition = e.PositionComp.GetPosition();
-            var radius = 51000f;
+            var radius = 16000f;
             if (e is MyPlanet)
             {
-                radius = radius + ((MyPlanet)e).MaximumRadius;
+                radius = radius + ((MyPlanet) e).MaximumRadius;
             }
 
-
-            
-            MyDynamicAABBTreeD m_dynamicObjectsTree = (MyDynamicAABBTreeD) ReflectionUtils.GetPrivateStaticField(typeof(MyGamePruningStructure), "m_dynamicObjectsTree");
-            MyDynamicAABBTreeD m_staticObjectsTree = (MyDynamicAABBTreeD) ReflectionUtils.GetPrivateStaticField(typeof(MyGamePruningStructure), "m_staticObjectsTree");
+            MyDynamicAABBTreeD m_dynamicObjectsTree =
+                (MyDynamicAABBTreeD) ReflectionUtils.GetPrivateStaticField(typeof(MyGamePruningStructure),
+                    "m_dynamicObjectsTree");
+            MyDynamicAABBTreeD m_staticObjectsTree =
+                (MyDynamicAABBTreeD) ReflectionUtils.GetPrivateStaticField(typeof(MyGamePruningStructure),
+                    "m_staticObjectsTree");
             BoundingSphereD boundingSphere = new BoundingSphereD(thisEntityPosition, radius);
             List<MyEntity> result = new List<MyEntity>();
             m_dynamicObjectsTree.OverlapAllBoundingSphere(ref boundingSphere, result);
             m_staticObjectsTree.OverlapAllBoundingSphere(ref boundingSphere, result);
-            
-            // foreach (var entity in allEntities)
-            // {
-            //     if (entity is MyVoxelBase)
-            //     {
-            //         continue;
-            //     }
-            //     if (clustersByGridfc.ContainsKey(entity.EntityId))
-            //     {
-            //         continue;
-            //     }
-            //
-            //     var potentialEntityPosition = entity.PositionComp.GetPosition();
-            //     if (entity.EntityId == e.EntityId)
-            //     {
-            //         continue;
-            //     }
-            //     
-            //     var distance = Vector3D.Distance(thisEntityPosition, potentialEntityPosition);
-            //     if (distance > radius)
-            //     {
-            //         continue;
-            //     }
-            //     result.Add(entity);
-            // }
-            
+
             foreach (var entity in new List<MyEntity>(result))
             {
-
                 MyEntity topEntity;
                 if (entity.EntityId == e.EntityId)
                 {
                     continue;
                 }
-                
+
                 if (entity is MyCubeBlock)
                 {
                     var grid = ((MyCubeBlock) entity).CubeGrid;
@@ -468,14 +474,15 @@ namespace SentisOptimisationsPlugin.Clusters
                 {
                     topEntity = entity;
                 }
+
                 var entityId = topEntity.EntityId;
                 if (clustersByGridfc.ContainsKey(entityId))
                 {
                     continue;
                 }
+
                 clustersByGridfc[entityId] = clusterId;
-                allEntities.Remove(entity);
-                CollectGridsInCluster(clusterId, entity, allEntities,ref clustersByGridfc);
+                CollectGridsInCluster(clusterId, entity, ref clustersByGridfc);
             }
         }
     }
