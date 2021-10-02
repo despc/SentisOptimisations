@@ -118,16 +118,27 @@ namespace SentisOptimisationsPlugin
 
         private static void CheckBeacon(MyCubeGrid grid)
         {
-            var beacon = grid.GetFirstBlockOfType<MyBeacon>();
-            if (beacon != null)
+            var myCubeGrids = GridUtils.GetSubGrids(grid);
+            foreach (var myCubeGrid in myCubeGrids)
             {
-                return;
+                var beacon = ((MyCubeGrid)myCubeGrid).GetFirstBlockOfType<MyBeacon>();
+                if (beacon != null)
+                {
+                    return;
+                }
             }
+
             foreach (var gridBigOwner in grid.BigOwners)
             {
-                MyVisualScriptLogicProvider.ShowNotification("На постройке " + grid.DisplayName + " не установлен маяк", 5000, "Red",
+                MyVisualScriptLogicProvider.ShowNotification("На постройке " + grid.DisplayName + " не установлен маяк",
+                    5000, "Red",
                     gridBigOwner);
                 MyVisualScriptLogicProvider.ShowNotification("она будет удалена при следующей очистке", 5000, "Red",
+                    gridBigOwner);
+                MyVisualScriptLogicProvider.ShowNotification("There is no beacon on the structure " + grid.DisplayName,
+                    5000, "Red",
+                    gridBigOwner);
+                MyVisualScriptLogicProvider.ShowNotification("it will be removed on next cleanup", 5000, "Red",
                     gridBigOwner);
             }
         }
