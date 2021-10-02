@@ -54,6 +54,7 @@
       <Compile Include="NoScrapPatch.cs" />
       <Compile Include="NpcStorePatch.cs" />
       <Compile Include="RemovePluginPatch.cs" />
+      <Compile Include="ShipTool\ShipToolPatch.cs" />
       <Compile Include="Shipyard\Communication.cs" />
       <Compile Include="Shipyard\Dto\ClientBuyRequest.cs" />
       <Compile Include="Shipyard\Dto\FillListRequest.cs" />
