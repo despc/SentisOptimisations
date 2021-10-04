@@ -127,6 +127,11 @@ namespace SentisOptimisationsPlugin
                     return;
                 }
             }
+            var beacon2 = grid.GetFirstBlockOfType<MyBeacon>();
+            if (beacon2 != null)
+            {
+                return;
+            }
 
             foreach (var gridBigOwner in grid.BigOwners)
             {

@@ -61,25 +61,33 @@ namespace SentisOptimisationsPlugin
         private static bool MethodPhantom_LeavePatched(MySafeZone __instance, HkPhantomCallbackShape sender,
             HkRigidBody body)
         {
-            IMyEntity entity = body.GetEntity(0U);
-            if (entity == null)
-                return false;
-            var stopwatch = Stopwatch.StartNew();
-            InvokeInstanceMethod(__instance.GetType(), __instance, "RemoveEntityPhantom", new object[] {body, entity});
-            stopwatch.Stop();
-            var stopwatchElapsedMilliseconds = stopwatch.ElapsedMilliseconds;
-            if (stopwatchElapsedMilliseconds < 4)
+            try
             {
-                return false;
-            }
+                IMyEntity entity = body.GetEntity(0U);
+                if (entity == null)
+                    return false;
+                var stopwatch = Stopwatch.StartNew();
+                InvokeInstanceMethod(__instance.GetType(), __instance, "RemoveEntityPhantom",
+                    new object[] {body, entity});
+                stopwatch.Stop();
+                var stopwatchElapsedMilliseconds = stopwatch.ElapsedMilliseconds;
+                if (stopwatchElapsedMilliseconds < 4)
+                {
+                    return false;
+                }
 
-            if (entityesInSZ.ContainsKey(entity.EntityId))
-            {
-                entityesInSZ[entity.EntityId] = entityesInSZ[entity.EntityId] + stopwatchElapsedMilliseconds;
+                if (entityesInSZ.ContainsKey(entity.EntityId))
+                {
+                    entityesInSZ[entity.EntityId] = entityesInSZ[entity.EntityId] + stopwatchElapsedMilliseconds;
+                }
+                else
+                {
+                    entityesInSZ[entity.EntityId] = stopwatchElapsedMilliseconds;
+                }
             }
-            else
+            catch (Exception e)
             {
-                entityesInSZ[entity.EntityId] = stopwatchElapsedMilliseconds;
+                SentisOptimisationsPlugin.Log.Warn("MethodPhantom_LeavePatched Exception ", e);
             }
 
             return false;

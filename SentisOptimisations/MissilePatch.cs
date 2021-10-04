@@ -605,6 +605,10 @@ namespace SentisOptimisationsPlugin
         {
             try
             {
+                if (!__instance.IsArmed)
+                {
+                    return true;
+                }
                 __result = true;
                 bool m_marked = (bool) GetInstanceField(typeof(MyWarhead), __instance, "m_marked");
                 MyDamageInformation info = new MyDamageInformation(false, damage, damageType, attackerId);
