@@ -245,6 +245,9 @@ namespace SentisOptimisationsPlugin.Clusters
             if (myEntity is MyGasGenerator ||
                  myEntity is MyAdvancedDoor ||
                  myEntity is MyLargeTurretBase ||
+                 myEntity is MyWelder ||
+                 myEntity is MyShipWelder ||
+                 myEntity is MyGasTank ||
                  myEntity is MyShipToolBase ||
                  myEntity is MyShipDrill)
             {
@@ -333,6 +336,8 @@ namespace SentisOptimisationsPlugin.Clusters
                 myEntity is MyShipDrill ||
                 myEntity is MyGasTank ||
                 myEntity is MyAirVent ||
+                myEntity is MyAssembler ||
+                myEntity is MyRefinery ||
                 myEntity is MyShipConnector)
             {
                 return false;
