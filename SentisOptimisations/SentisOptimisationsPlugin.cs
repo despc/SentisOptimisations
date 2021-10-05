@@ -84,7 +84,7 @@ namespace SentisOptimisationsPlugin
             if (MySandboxGame.Static.SimulationFrameCounter % 500 == 0)
             {
                 
-                foreach (var keyValuePair in new Dictionary<long, long>(PerfomancePatch.entityesInSZ))
+                foreach (var keyValuePair in new Dictionary<long, long>(PerfomancePatch.entitiesInSZ))
                 {
                     var entityId = keyValuePair.Key;
                     var entityById = MyEntities.GetEntityById(entityId);
@@ -155,7 +155,7 @@ namespace SentisOptimisationsPlugin
                         }
                     }
                 }
-                PerfomancePatch.entityesInSZ.Clear();
+                PerfomancePatch.entitiesInSZ.Clear();
             }
             
 

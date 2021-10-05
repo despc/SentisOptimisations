@@ -5,9 +5,11 @@ using System.Reflection;
 using Havok;
 using NLog;
 using ParallelTasks;
+using Sandbox;
 using Sandbox.Engine.Physics;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Weapons;
+using SentisOptimisations;
 using Torch.Managers.PatchManager;
 using VRage.ModAPI;
 
@@ -17,8 +19,8 @@ namespace SentisOptimisationsPlugin
     public static class PerfomancePatch
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
-        public static Dictionary<long, long> entityesInSZ = new Dictionary<long, long>();
-
+        public static Dictionary<long, long> entitiesInSZ = new Dictionary<long, long>();
+       
         public static void Patch(PatchContext ctx)
         {
             var MethodPhantom_Leave = typeof(MySafeZone).GetMethod
@@ -28,6 +30,19 @@ namespace SentisOptimisationsPlugin
                 typeof(PerfomancePatch).GetMethod(nameof(MethodPhantom_LeavePatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
             
+            var MySafeZoneUpdateBeforeSimulation = typeof(MySafeZone).GetMethod
+                (nameof(MySafeZone.UpdateBeforeSimulation), BindingFlags.Instance | BindingFlags.Public);
+
+            ctx.GetPattern(MySafeZoneUpdateBeforeSimulation).Prefixes.Add(
+                typeof(PerfomancePatch).GetMethod(nameof(MySafeZoneUpdateBeforeSimulationPatched),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
+            var MyPhysicsLoadData = typeof(MyPhysics).GetMethod
+                (nameof(MyPhysics.LoadData), BindingFlags.Instance | BindingFlags.Public);
+
+            ctx.GetPattern(MyPhysicsLoadData).Suffixes.Add(
+                typeof(PerfomancePatch).GetMethod(nameof(MyPhysicsLoadDataPatched),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
             
             var MethodIsTargetInSz = typeof(MyLargeTurretBase).GetMethod
                 (nameof(MyLargeTurretBase.IsTargetInSafeZone), BindingFlags.Instance | BindingFlags.Public);
@@ -76,13 +91,13 @@ namespace SentisOptimisationsPlugin
                     return false;
                 }
 
-                if (entityesInSZ.ContainsKey(entity.EntityId))
+                if (entitiesInSZ.ContainsKey(entity.EntityId))
                 {
-                    entityesInSZ[entity.EntityId] = entityesInSZ[entity.EntityId] + stopwatchElapsedMilliseconds;
+                    entitiesInSZ[entity.EntityId] = entitiesInSZ[entity.EntityId] + stopwatchElapsedMilliseconds;
                 }
                 else
                 {
-                    entityesInSZ[entity.EntityId] = stopwatchElapsedMilliseconds;
+                    entitiesInSZ[entity.EntityId] = stopwatchElapsedMilliseconds;
                 }
             }
             catch (Exception e)
@@ -91,6 +106,35 @@ namespace SentisOptimisationsPlugin
             }
 
             return false;
+        }
+        private static bool MySafeZoneUpdateBeforeSimulationPatched(MySafeZone __instance)
+        {
+            try
+            {
+                if ((ulong) __instance.EntityId % 5 != MySandboxGame.Static.SimulationFrameCounter % 5)
+                {
+                    return true;
+                }
+                return false;
+            }
+            catch (Exception e)
+            {
+                SentisOptimisationsPlugin.Log.Warn("MySafeZoneUpdateBeforeSimulationPatched Exception ", e);
+            }
+            return true;
+        }
+        
+        private static void MyPhysicsLoadDataPatched()
+        {
+            try
+            {
+                ReflectionUtils.SetPrivateStaticField(typeof(MyPhysics), "m_threadPool", new HkJobThreadPool(11));
+                ReflectionUtils.SetPrivateStaticField(typeof(MyPhysics), "m_jobQueue", new HkJobQueue(12));
+            }
+            catch (Exception e)
+            {
+                SentisOptimisationsPlugin.Log.Warn("MySafeZoneUpdateBeforeSimulationPatched Exception ", e);
+            }
         }
         private static object InvokeInstanceMethod(Type type, object instance, string methodName, Object[] args)
         {
