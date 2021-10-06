@@ -1,10 +1,12 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Reflection;
 using NLog;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Cube;
 using Sandbox.Game.GameSystems;
 using Sandbox.Game.GameSystems.Conveyors;
+using SentisOptimisations;
 using Torch.Managers.PatchManager;
 
 namespace SentisOptimisationsPlugin
@@ -47,6 +49,39 @@ namespace SentisOptimisationsPlugin
             if (__instance.ConveyorSystem != null && block.FatBlock is IMyConveyorEndpointBlock)
             {
                 __instance.ConveyorSystem.UpdateLines();
+                try
+                {
+                    List<PerfomancePatch.Key> toDel = new List<PerfomancePatch.Key>();
+                    foreach (var keyValuePair in PerfomancePatch.conveyourCache)
+                    {
+                        try
+                        {
+                            MyCubeGrid cubeGrid =
+                                (MyCubeGrid) ReflectionUtils.GetInstanceField(typeof(MyCubeGridSystems), __instance,
+                                    "m_cubeGrid");
+                            var topMostParent = ((MyCubeBlock) MyEntities.GetEntityById(keyValuePair.Key.Part1))
+                                .GetTopMostParent();
+                            if (topMostParent.EntityId == cubeGrid.EntityId)
+                            {
+                                toDel.Add(keyValuePair.Key);
+                            }
+                        }
+                        catch (Exception e)
+                        {
+                            toDel.Add(keyValuePair.Key);
+                        }
+                    }
+
+                    foreach (var key in toDel)
+                    {
+                        PerfomancePatch.conveyourCache.Remove(key);
+                    }
+                }
+                catch (Exception e)
+                {
+                   Log.Error(e);
+                }
+               
             }
             return false;
         }
@@ -64,6 +99,37 @@ namespace SentisOptimisationsPlugin
             if (__instance.ConveyorSystem != null && block.FatBlock is IMyConveyorEndpointBlock)
             {
                 __instance.ConveyorSystem.UpdateLines();
+                try
+                {
+                    List<PerfomancePatch.Key> toDel = new List<PerfomancePatch.Key>();
+                    foreach (var keyValuePair in PerfomancePatch.conveyourCache)
+                    {
+                        try
+                        {
+                            MyCubeGrid cubeGrid =
+                                (MyCubeGrid) ReflectionUtils.GetInstanceField(typeof(MyCubeGridSystems), __instance,
+                                    "m_cubeGrid");
+                            var topMostParent = ((MyCubeBlock) MyEntities.GetEntityById(keyValuePair.Key.Part1))
+                                .GetTopMostParent();
+                            if (topMostParent.EntityId == cubeGrid.EntityId)
+                            {
+                                toDel.Add(keyValuePair.Key);
+                            }
+                        } 
+                        catch (Exception e)
+                        {
+                            toDel.Add(keyValuePair.Key);
+                        }
+                    }
+                    foreach (var key in toDel)
+                    {
+                        PerfomancePatch.conveyourCache.Remove(key);
+                    }
+                }
+                catch (Exception e)
+                {
+                    Log.Error(e);
+                }
             }
             return false;
         }

@@ -6,7 +6,6 @@ using NLog;
 using ParallelTasks;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Cube;
-using Sandbox.ModAPI;
 using Torch.Managers.PatchManager;
 using VRage.Game;
 using VRage.Game.Entity;
