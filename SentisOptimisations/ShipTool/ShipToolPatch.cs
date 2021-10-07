@@ -10,7 +10,7 @@ using VRageMath;
 namespace SentisOptimisationsPlugin.ShipTool
 {
     [PatchShim]
-    public class ShipToolPatch
+    public static class ShipToolPatch
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
         public static void Patch(PatchContext ctx)

@@ -7,7 +7,7 @@ using VRage.Sync;
 namespace SentisOptimisationsPlugin.CrashFix
 {
     [PatchShim]
-    public class CrashFixPatch
+    public static class CrashFixPatch
     {
         
         public static void Patch(PatchContext ctx)
