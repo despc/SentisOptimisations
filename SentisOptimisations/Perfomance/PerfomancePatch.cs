@@ -1,13 +1,9 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Reflection;
 using Havok;
 using NLog;
 using ParallelTasks;
 using Sandbox.Engine.Physics;
-using Sandbox.Game.Entities;
-using Sandbox.Game.GameSystems;
-using Sandbox.Game.GameSystems.Conveyors;
 using Sandbox.Game.Weapons;
 using SentisOptimisations;
 using Torch.Managers.PatchManager;
@@ -18,8 +14,6 @@ namespace SentisOptimisationsPlugin
     public static class PerfomancePatch
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
-        public static ConcurrentDictionary<Key, bool> conveyourCache = new ConcurrentDictionary<Key, bool>();
-
         public static void Patch(PatchContext ctx)
         {
             var MyPhysicsLoadData = typeof(MyPhysics).GetMethod
@@ -43,22 +37,7 @@ namespace SentisOptimisationsPlugin
             ctx.GetPattern(MethodInitializeWorkerArrays).Prefixes.Add(
                 typeof(PerfomancePatch).GetMethod(nameof(InitializeWorkerArraysPatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-
-
-            //Кэш конвеера
-            var MethodComputeCanTransfer = typeof(MyGridConveyorSystem).GetMethod
-                (nameof(MyGridConveyorSystem.ComputeCanTransfer), BindingFlags.Static | BindingFlags.Public);
-
-            ctx.GetPattern(MethodComputeCanTransfer).Prefixes.Add(
-                typeof(PerfomancePatch).GetMethod(nameof(ComputeCanTransferPatched),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-
-            var MethodComputeCanTransferPost = typeof(MyGridConveyorSystem).GetMethod
-                (nameof(MyGridConveyorSystem.ComputeCanTransfer), BindingFlags.Static | BindingFlags.Public);
-
-            ctx.GetPattern(MethodComputeCanTransferPost).Suffixes.Add(
-                typeof(PerfomancePatch).GetMethod(nameof(ComputeCanTransferPatchedPost),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
         }
 
         private static void InitializeWorkerArraysPatched(ref int threadCount, ref bool amd)
@@ -66,53 +45,7 @@ namespace SentisOptimisationsPlugin
             amd = false;
             threadCount = 10;
         }
-
-        private static bool ComputeCanTransferPatched(IMyConveyorEndpointBlock start,
-            IMyConveyorEndpointBlock end, ref bool __result)
-        {
-            try
-            {
-                if (start is MyCubeBlock && end is MyCubeBlock)
-                {
-                    var startEntityId = ((MyCubeBlock) start).EntityId;
-                    var endEntityId = ((MyCubeBlock) end).EntityId;
-                    var key = new Key(startEntityId, endEntityId);
-                    if (conveyourCache.ContainsKey(key))
-                    {
-                        __result = conveyourCache[key];
-                        return false;
-                    }
-                }
-            }
-            catch (Exception e)
-            {
-                Log.Error(e);
-            }
-
-            return true;
-        }
-
-        private static void ComputeCanTransferPatchedPost(IMyConveyorEndpointBlock start,
-            IMyConveyorEndpointBlock end, bool __result)
-        {
-            try
-            {
-                if (start is MyCubeBlock && end is MyCubeBlock)
-                {
-                    var startEntityId = ((MyCubeBlock) start).EntityId;
-                    var endEntityId = ((MyCubeBlock) end).EntityId;
-                    var key = new Key(startEntityId, endEntityId);
-                    var hashCode = key.GetHashCode();
-                    conveyourCache[key] = __result;
-                }
-            }
-            catch (Exception e)
-            {
-                Log.Error(e);
-            }
-        }
-
-
+        
         private static bool MethodIsTargetInSzPatched(ref bool __result)
         {
             __result = false;
@@ -140,31 +73,6 @@ namespace SentisOptimisationsPlugin
             return method.Invoke(instance, args);
         }
 
-        public struct Key
-        {
-            public readonly long Part1;
-            public readonly long Part2;
-
-            public Key(long p1, long p2)
-            {
-                Part1 = p1;
-                Part2 = p2;
-            }
-
-            public override bool Equals(object obj)
-            {
-                if (obj is Key)
-                {
-                    return Part1.Equals(((Key) obj).Part1) && Part2.Equals(((Key) obj).Part2);
-                }
-
-                return false;
-            }
-
-            public override int GetHashCode()
-            {
-                return Part1.GetHashCode() + Part2.GetHashCode();
-            }
-        }
+ 
     }
 }

@@ -50,7 +50,7 @@ namespace FixTurrets.Clusters
                         if (m_queue.Count > 0)
                         {
                             __result = cubeBlock;
-                            return true;
+                            return false;
                         }
                     }
                 }
