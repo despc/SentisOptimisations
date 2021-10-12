@@ -65,6 +65,7 @@ namespace SentisOptimisationsPlugin
             {
                 _limiter.OnUnloading();
                 _cb.OnUnloading();
+                ConveyorPatch.OnUnloading();
             }
             else
             {
@@ -74,6 +75,7 @@ namespace SentisOptimisationsPlugin
                 _limiter.OnLoaded();
                 _cb.OnLoaded();
                 _oldGridProcessor.OnLoaded();
+                ConveyorPatch.OnLoaded();
                 Communication.RegisterHandlers();
             }
         }
