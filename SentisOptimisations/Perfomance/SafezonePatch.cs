@@ -47,6 +47,12 @@ namespace SentisOptimisationsPlugin
             ctx.GetPattern(MySafeZoneIsSafe).Prefixes.Add(
                 typeof(SafezonePatch).GetMethod(nameof(MySafeZoneIsSafePatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+
+            
+            enumStringMapping["NOT_SAFE"] = SubgridCheckResult.NOT_SAFE;
+            enumStringMapping["NEED_EXTRA_CHECK"] = SubgridCheckResult.NEED_EXTRA_CHECK;
+            enumStringMapping["SAFE"] = SubgridCheckResult.SAFE;
+            enumStringMapping["ADMIN"] = SubgridCheckResult.ADMIN;
         }
 
 
@@ -89,7 +95,7 @@ namespace SentisOptimisationsPlugin
         {
             try
             {
-                if ((ulong) __instance.EntityId % 5 != MySandboxGame.Static.SimulationFrameCounter % 5)
+                if ((ulong) __instance.EntityId % 10 != MySandboxGame.Static.SimulationFrameCounter % 10)
                 {
                     return true;
                 }
@@ -203,9 +209,15 @@ namespace SentisOptimisationsPlugin
 
         private static SubgridCheckResult MapToResult(object result)
         {
-            SubgridCheckResult mappedResult;
-            Enum.TryParse(result.ToString(), out mappedResult);
-            return mappedResult;
+            SubgridCheckResult response;
+            if (enumMapping.TryGetValue(result, out response))
+            {
+                return response;
+            }
+
+            response = enumStringMapping[result.ToString()];
+            enumMapping[result] = response;
+            return response;
         }
 
         private enum SubgridCheckResult
@@ -213,7 +225,9 @@ namespace SentisOptimisationsPlugin
             NOT_SAFE,
             NEED_EXTRA_CHECK,
             SAFE,
-            ADMIN,
+            ADMIN
         }
+        private  static Dictionary<string, SubgridCheckResult> enumStringMapping = new Dictionary<string, SubgridCheckResult>();
+        private  static Dictionary<object, SubgridCheckResult> enumMapping = new Dictionary<object, SubgridCheckResult>();
     }
 }

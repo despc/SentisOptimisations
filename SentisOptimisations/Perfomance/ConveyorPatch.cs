@@ -251,7 +251,7 @@ namespace SentisOptimisationsPlugin
                 {
                     try
                     {
-                        await Task.Delay(1200000);
+                        await Task.Delay(3600000);
                         await Task.Run(ClearCache);
                     }
                     catch (Exception e)
