@@ -1,6 +1,6 @@
 ﻿using Sandbox.Game.Entities;
 
-namespace Garage
+namespace SentisOptimisationsPlugin.Garage
 {
     public class Delegate
     {

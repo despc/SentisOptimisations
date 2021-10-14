@@ -35,7 +35,7 @@ namespace SentisOptimisationsPlugin.ShipTool
             try
             {
                 BoundingSphere boundingSphere = (BoundingSphere) ReflectionUtils.GetInstanceField(typeof(MyShipToolBase), __instance, "m_detectorSphere");
-                boundingSphere.Radius = boundingSphere.Radius * 2;
+                boundingSphere.Radius = boundingSphere.Radius * SentisOptimisationsPlugin.Config.ShipGrinderWelderRadiusMultiplier;
                 ReflectionUtils.SetInstanceField(typeof(MyShipToolBase), __instance, "m_detectorSphere", boundingSphere);
             }
             catch (Exception e)
@@ -50,7 +50,7 @@ namespace SentisOptimisationsPlugin.ShipTool
             {
                 MyDrillBase drillBase = (MyDrillBase) ReflectionUtils.GetInstanceField(typeof(MyShipDrill), __instance, "m_drillBase");
                 var myDrillCutOut = new MyDrillCutOut(((MyShipDrillDefinition) __instance.BlockDefinition).CutOutOffset,
-                    ((MyShipDrillDefinition) __instance.BlockDefinition).CutOutRadius * 2);
+                    ((MyShipDrillDefinition) __instance.BlockDefinition).CutOutRadius * SentisOptimisationsPlugin.Config.ShipDrillRadiusMultiplier);
                 ReflectionUtils.SetInstanceField(typeof(MyDrillBase), drillBase, "m_cutOut", myDrillCutOut);
             }
             catch (Exception e)

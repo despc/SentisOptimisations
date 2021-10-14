@@ -8,7 +8,7 @@ using Sandbox.Game.World;
 using Sandbox.ModAPI;
 using SentisOptimisations;
 
-namespace FixTurrets.Garage
+namespace SentisOptimisationsPlugin.Garage
 {
     public class OldGridProcessor
     {
@@ -16,6 +16,10 @@ namespace FixTurrets.Garage
 
         public void OnLoaded()
         {
+            if (!SentisOptimisationsPlugin.Config.GarageEnabled)
+            {
+                return;
+            }
             CheckOldGridAsync();
         }
 

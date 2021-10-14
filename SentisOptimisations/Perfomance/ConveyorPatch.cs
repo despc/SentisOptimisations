@@ -19,12 +19,12 @@ namespace SentisOptimisationsPlugin
     public static class ConveyorPatch
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
-
         public static CancellationTokenSource CancellationTokenSource { get; set; }
 
-        public static ConcurrentDictionary<long, ConcurrentDictionary<Key, bool>> conveyourCache =
+        public static ConcurrentDictionary<long, ConcurrentDictionary<Key, bool>> ConveyourCache =
             new ConcurrentDictionary<long, ConcurrentDictionary<Key, bool>>();
 
+        public static long UncachedCalls = 0;
         public static void Patch(PatchContext ctx)
         {
             var MethodOnBlockAdded = typeof(MyCubeGridSystems).GetMethod
@@ -80,7 +80,7 @@ namespace SentisOptimisationsPlugin
                     var cubeGridEntityId = ((MyCubeBlock) end).CubeGrid.EntityId;
                     var key = new Key(startEntityId, endEntityId, itemId);
                     ConcurrentDictionary<Key, bool> cacheEntry;
-                    if (conveyourCache.TryGetValue(cubeGridEntityId, out cacheEntry))
+                    if (ConveyourCache.TryGetValue(cubeGridEntityId, out cacheEntry))
                     {
                         if (cacheEntry.TryGetValue(key, out __result))
                         {
@@ -88,6 +88,7 @@ namespace SentisOptimisationsPlugin
                         }
                     }
                 }
+                UncachedCalls += 1;
             }
             catch (Exception e)
             {
@@ -109,7 +110,7 @@ namespace SentisOptimisationsPlugin
                     var cubeGridEntityId = ((MyCubeBlock) end).CubeGrid.EntityId;
                     ConcurrentDictionary<Key, bool> cacheEntry;
                     var key = new Key(startEntityId, endEntityId, itemId);
-                    if (conveyourCache.TryGetValue(cubeGridEntityId, out cacheEntry))
+                    if (ConveyourCache.TryGetValue(cubeGridEntityId, out cacheEntry))
                     {
                         cacheEntry[key] = __result;
                         return;
@@ -117,7 +118,7 @@ namespace SentisOptimisationsPlugin
 
                     cacheEntry = new ConcurrentDictionary<Key, bool>();
                     cacheEntry[key] = __result;
-                    conveyourCache[cubeGridEntityId] = cacheEntry;
+                    ConveyourCache[cubeGridEntityId] = cacheEntry;
                 }
             }
             catch (Exception e)
@@ -143,7 +144,7 @@ namespace SentisOptimisationsPlugin
                 __instance.ConveyorSystem.UpdateLines();
                 try
                 {
-                    conveyourCache.Remove(m_cubeGrid.EntityId);
+                    ConveyourCache.Remove(m_cubeGrid.EntityId);
                 }
                 catch (Exception e)
                 {
@@ -160,7 +161,7 @@ namespace SentisOptimisationsPlugin
             {
                 MyCubeGrid Grid = (MyCubeGrid) ReflectionUtils.GetInstanceField(typeof(MyUpdateableGridSystem),
                     __instance, "<Grid>k__BackingField");
-                conveyourCache.Remove(Grid.EntityId);
+                ConveyourCache.Remove(Grid.EntityId);
             }
             catch (Exception e)
             {
@@ -185,7 +186,7 @@ namespace SentisOptimisationsPlugin
                 __instance.ConveyorSystem.UpdateLines();
                 try
                 {
-                    conveyourCache.Remove(m_cubeGrid.EntityId);
+                    ConveyourCache.Remove(m_cubeGrid.EntityId);
                 }
                 catch (Exception e)
                 {
@@ -268,7 +269,7 @@ namespace SentisOptimisationsPlugin
 
         private static void ClearCache()
         {
-            conveyourCache.Clear();
+            ConveyourCache.Clear();
         }
     }
 }

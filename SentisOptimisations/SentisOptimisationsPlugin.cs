@@ -1,8 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
-using FixTurrets.Garage;
+using System.Threading.Tasks;
 using NLog;
 using Sandbox;
 using Sandbox.Engine.Multiplayer;
@@ -19,6 +20,7 @@ using SentisOptimisationsPlugin.Clusters;
 using Torch;
 using Torch.API;
 using Torch.API.Managers;
+using Torch.API.Plugins;
 using Torch.API.Session;
 using Torch.Commands;
 using Torch.Commands.Permissions;
@@ -27,10 +29,13 @@ using VRage.Game.ModAPI;
 using VRage.Game.Voxels;
 using VRage.Network;
 using VRageMath;
+using System.Windows.Controls;
+using SentisOptimisationsPlugin.Garage;
+using SOPlugin.GUI;
 
 namespace SentisOptimisationsPlugin
 {
-    public class SentisOptimisationsPlugin : TorchPluginBase
+    public class SentisOptimisationsPlugin : TorchPluginBase, IWpfPlugin
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
         public static PcuLimiter _limiter = new PcuLimiter();
@@ -40,8 +45,10 @@ namespace SentisOptimisationsPlugin
         public static Dictionary<long,long> gridsInSZ = new Dictionary<long, long>();
         public static MethodInfo m_myProgrammableBlockKillProgramm;
         private static TorchSessionManager SessionManager;
-        public static Config Config;
+        private static Persistent<MainConfig> _config;
+        public static MainConfig Config => _config.Data;
         public static Random _random = new Random();
+        public UserControl _control = null;
         public static SentisOptimisationsPlugin Instance { get; private set; }
 
         public override void Init(ITorchBase torch)
@@ -80,12 +87,73 @@ namespace SentisOptimisationsPlugin
             }
         }
 
+        public void UpdateGui()
+        {
+            try
+            {
+                var clusters = _cb.Clusters.Count;
+                var clustersTime = _cb.ClusterTime;
+                var clusters10 = _cb.Clusters10.Count;
+                var clustersTime10 = _cb.ClusterTime10;
+                var clusters100 = _cb.Clusters100.Count;
+                var clustersTime100 = _cb.ClusterTime100;
+
+                var conveyourCache = ConveyorPatch.ConveyourCache;
+                var cachedGrids = conveyourCache.Count;
+                var totalCacheCount = 0;
+                var uncachedCalls = ConveyorPatch.UncachedCalls;
+                foreach (var keyValuePair in conveyourCache)
+                {
+                    totalCacheCount = totalCacheCount + keyValuePair.Value.Count;
+                }
+                
+                Instance.UpdateUI((x) =>
+                {
+                    var gui = x as ConfigGUI;
+                    gui.ClustersStatistic.Text =
+                        $"Tick1: {clusters} - {clustersTime}ms || Tick10: {clusters10} - {clustersTime10}ms || Tick100: {clusters100} - {clustersTime100}ms";
+                    gui.CacheStatistic.Text =
+                        $"Cached grids: {cachedGrids} ||  Total cache size: {totalCacheCount} ||  Uncached calls: {uncachedCalls}";
+                });
+                ConveyorPatch.UncachedCalls = 0;
+            }
+            catch (Exception e)
+            {
+                Log.Error(e, "WTF?");
+            }
+        }
+        
+        public void UpdateUI(Action<UserControl> action)
+        {
+            try
+            {
+                if (_control != null)
+                {
+                    _control.Dispatcher.Invoke(() =>
+                    {
+                        try
+                        {
+                            action.Invoke(_control);
+                        }
+                        catch (Exception e)
+                        {
+                            Log.Error(e, "Something wrong in executing function:" + action);
+                        }
+                    });
+                }
+            }
+            catch (Exception e)
+            {
+                Log.Error(e, "Cant UpdateUI");
+            }
+        }
+        
         public override void Update()
         {
 
             if (MySandboxGame.Static.SimulationFrameCounter % 500 == 0)
             {
-                
+                Task.Run(UpdateGui);
                 foreach (var keyValuePair in new Dictionary<long, long>(SafezonePatch.entitiesInSZ))
                 {
                     var entityId = keyValuePair.Key;
@@ -263,28 +331,18 @@ namespace SentisOptimisationsPlugin
             }
         }
 
+        public UserControl GetControl()
+        {
+            if (_control == null)
+            {
+                _control = new ConfigGUI();
+            }
+            return _control;
+        }
+
         private void SetupConfig()
         {
-            
-            Config = ConfigUtils.Load<Config>( this, "SentisOptimisations.cfg");
-            ConfigUtils.Save( this, Config, "SentisOptimisations.cfg");
-
-            // try
-            // {
-            //     _config = Persistent<Config>.Load(configFile);
-            // }
-            // catch (Exception e)
-            // {
-            //     Log.Warn(e);
-            // }
-            //
-            // if (_config?.Data == null)
-            // {
-            //     Log.Info("Create Default Config, because none was found!");
-            //
-            //     _config = new Persistent<Config>(configFile, new Config());
-            //     _config.Save();
-            // }
+            _config = Persistent<MainConfig>.Load(Path.Combine(StoragePath, "SentisOptimisations.cfg"));
         }
 
         public class TestCommands : CommandModule
@@ -317,6 +375,7 @@ namespace SentisOptimisationsPlugin
         }
         public override void Dispose()
         {
+            _config.Save(Path.Combine(StoragePath, "SentisOptimisations.cfg"));
             _limiter.CancellationTokenSource.Cancel();
             _cb.CancellationTokenSource.Cancel();
             base.Dispose();

@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using FixTurrets.Garage;
 using NLog;
 using Sandbox.Engine.Physics;
 using Sandbox.Game.Entities;
@@ -16,9 +15,8 @@ using VRage.Game.Entity;
 using VRage.Game.ModAPI;
 using VRage.ModAPI;
 using VRageMath;
-using Delegate = Garage.Delegate;
 
-namespace SentisOptimisationsPlugin
+namespace SentisOptimisationsPlugin.Garage
 {
     [Category("g")]
     public class GarageCommands : CommandModule
@@ -29,6 +27,10 @@ namespace SentisOptimisationsPlugin
         [Permission(MyPromoteLevel.None)]
         public void Reload()
         {
+            if (!SentisOptimisationsPlugin.Config.GarageEnabled)
+            {
+                return;
+            }
             IMyPlayer player = this.Context.Player;
             if (player == null)
             {
@@ -98,6 +100,10 @@ namespace SentisOptimisationsPlugin
         [Permission(MyPromoteLevel.None)]
         public void Load(int index)
         {
+            if (!SentisOptimisationsPlugin.Config.GarageEnabled)
+            {
+                return;
+            }
             var path = Path.Combine(SentisOptimisationsPlugin.Config.PathToGarage,
                 Context.Player.SteamUserId.ToString());
             var files = Directory.GetFiles(
@@ -271,6 +277,10 @@ namespace SentisOptimisationsPlugin
         [Permission(MyPromoteLevel.None)]
         public void List()
         {
+            if (!SentisOptimisationsPlugin.Config.GarageEnabled)
+            {
+                return;
+            }
             try
             {
                 IMyPlayer player = this.Context.Player;

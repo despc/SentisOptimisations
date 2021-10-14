@@ -61,6 +61,9 @@ namespace SentisOptimisationsPlugin.Clusters
         public Dictionary<long, List<MyEntity>> Clusters10 => clusters10;
         public Dictionary<long, List<MyEntity>> Clusters100 => clusters100;
 
+        public long ClusterTime = 0;
+        public long ClusterTime10 = 0;
+        public long ClusterTime100 = 0;
         public List<MyEntity> ForSerialUpdate => forSerialUpdate;
 
         public List<MyEntity> ForSerialUpdate10 => forSerialUpdate10;
@@ -92,7 +95,7 @@ namespace SentisOptimisationsPlugin.Clusters
                 {
                     try
                     {
-                        await Task.Delay(30);
+                        await Task.Delay(SentisOptimisationsPlugin.Config.Cluster1BuildDelay);
                         await Task.Run(BuildClusters);
                     }
                     catch (ArgumentException e)
@@ -121,7 +124,8 @@ namespace SentisOptimisationsPlugin.Clusters
                 {
                     try
                     {
-                        await Task.Delay(250);
+                        await Task.Delay(SentisOptimisationsPlugin.Config.Cluster10BuildDelay);
+                        Stopwatch sw;
                         await Task.Run(BuildClusters10);
                     }
                     catch (ArgumentException e)
@@ -150,7 +154,7 @@ namespace SentisOptimisationsPlugin.Clusters
                 {
                     try
                     {
-                        await Task.Delay(1000);
+                        await Task.Delay(SentisOptimisationsPlugin.Config.Cluster100BuildDelay);
                         await Task.Run(BuildClusters100);
                     }
                     catch (ArgumentException e)
@@ -225,14 +229,12 @@ namespace SentisOptimisationsPlugin.Clusters
                     tmpClusters[newClusterId] = new List<MyEntity>();
                     tmpClusters[newClusterId].Add(myEntity);
                 }
-
-                var startNewElapsedMilliseconds = startNew.ElapsedMilliseconds;
-                //Log.Error("BuildClusters Run for " + startNew.ElapsedMilliseconds);
                 lock (buildClustersLock)
                 {
                     clusters = new Dictionary<long, List<MyEntity>>(tmpClusters);
                     forSerialUpdate = new List<MyEntity>(tmpforSerialUpdate);
                 }
+                ClusterTime = startNew.ElapsedMilliseconds;
             }
             catch (InvalidOperationException e)
             {
@@ -267,7 +269,7 @@ namespace SentisOptimisationsPlugin.Clusters
                 (MyDistributedUpdater<List<MyEntity>, MyEntity>) ReflectionUtils.GetInstanceField(
                     typeof(MyParallelEntityUpdateOrchestrator), MyEntities.Orchestrator,
                     "m_entitiesForUpdate10");
-            var startNew = Stopwatch.StartNew();
+            var sw = Stopwatch.StartNew();
 
             try
             {
@@ -312,13 +314,12 @@ namespace SentisOptimisationsPlugin.Clusters
                     tmpClusters10[newClusterId].Add(myEntity);
                 }
 
-                var startNewElapsedMilliseconds = startNew.ElapsedMilliseconds;
-                //Log.Error("BuildClusters10 Run for " + startNew.ElapsedMilliseconds);
                 lock (buildClustersLock10)
                 {
                     clusters10 = new Dictionary<long, List<MyEntity>>(tmpClusters10);
                     forSerialUpdate10 = new List<MyEntity>(tmpforSerialUpdate10);
                 }
+                ClusterTime10 = sw.ElapsedMilliseconds;
             }
             catch (InvalidOperationException e)
             {
@@ -357,7 +358,7 @@ namespace SentisOptimisationsPlugin.Clusters
                 (MyDistributedUpdater<List<MyEntity>, MyEntity>) ReflectionUtils.GetInstanceField(
                     typeof(MyParallelEntityUpdateOrchestrator), MyEntities.Orchestrator,
                     "m_entitiesForUpdate100");
-            var startNew = Stopwatch.StartNew();
+            var sw = Stopwatch.StartNew();
 
             var thrusterClusterId = r.Next(-2000000000, 2000000000);
             tmpClusters100[thrusterClusterId] = new List<MyEntity>();
@@ -411,13 +412,12 @@ namespace SentisOptimisationsPlugin.Clusters
                     tmpClusters100[newClusterId].Add(myEntity);
                 }
 
-                var startNewElapsedMilliseconds = startNew.ElapsedMilliseconds;
-                //Log.Error("BuildClusters100 Run for " + startNew.ElapsedMilliseconds);
                 lock (buildClustersLock100)
                 {
                     clusters100 = new Dictionary<long, List<MyEntity>>(tmpClusters100);
                     forSerialUpdate100 = new List<MyEntity>(tmpforSerialUpdate100);
                 }
+                ClusterTime100 = sw.ElapsedMilliseconds;
             }
             catch (InvalidOperationException e)
             {
@@ -445,7 +445,7 @@ namespace SentisOptimisationsPlugin.Clusters
         private void CollectGridsInCluster(int clusterId, MyEntity e, ref Dictionary<long, int> clustersByGridfc)
         {
             var thisEntityPosition = e.PositionComp.GetPosition();
-            var radius = 16000f;
+            var radius = SentisOptimisationsPlugin.Config.ClusterRadius;
             if (e is MyPlanet)
             {
                 radius = radius + ((MyPlanet) e).MaximumRadius;

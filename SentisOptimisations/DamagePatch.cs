@@ -107,7 +107,7 @@ namespace SentisOptimisationsPlugin
             MyEntity otherEntity)
         {
 
-            if (otherEntity is MyVoxelBase && separatingVelocity < 30)
+            if (otherEntity is MyVoxelBase && separatingVelocity < SentisOptimisationsPlugin.Config.NoDamageFromVoxelsBeforeSpeed)
             {
                 if (separatingVelocity < 5)
                 {
@@ -124,22 +124,14 @@ namespace SentisOptimisationsPlugin
                 return false;
             }
             
-            // if (otherEntity is MyCubeGrid)
-            // {
-            //     if (((MyCubeGrid) otherEntity).Mass < 500000)
-            //     {
-            //         return false;
-            //     }
-            // }
+            if (otherEntity is MyCubeGrid)
+            {
+                if (((MyCubeGrid) otherEntity).Mass < SentisOptimisationsPlugin.Config.MinimumMassForKineticDamage)
+                {
+                    return false;
+                }
+            }
             return true;
-        }
-     
-        internal static object GetInstanceField(Type type, object instance, string fieldName)
-        {
-            BindingFlags bindFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
-                                     | BindingFlags.Static;
-            FieldInfo field = type.GetField(fieldName, bindFlags);
-            return field.GetValue(instance);
         }
     }
 }

@@ -15,7 +15,7 @@ using VRage.Game.Entity;
 using VRage.ObjectBuilders;
 using VRage.Utils;
 
-namespace FixTurrets.Garage
+namespace SentisOptimisationsPlugin.Garage
 {
     
     public class GarageCore
@@ -33,7 +33,7 @@ namespace FixTurrets.Garage
             }
 
             context?.Respond("Сохраняем структуру " + myCubeGrid.DisplayName);
-            var pathToGarage = SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.PathToGarage;
+            var pathToGarage = SentisOptimisationsPlugin.Config.PathToGarage;
 
             List<MyCubeGrid> grids = new List<MyCubeGrid>();
             grids.Add(myCubeGrid);
@@ -53,7 +53,7 @@ namespace FixTurrets.Garage
                         {
                             try
                             {
-                                SentisOptimisationsPlugin.SentisOptimisationsPlugin.m_myProgrammableBlockKillProgramm.Invoke(
+                                SentisOptimisationsPlugin.m_myProgrammableBlockKillProgramm.Invoke(
                                     (object) (c as MyProgrammableBlock), new object[1]
                                     {
                                         (object) MyProgrammableBlock.ScriptTerminationReason.None
