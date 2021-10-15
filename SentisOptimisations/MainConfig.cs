@@ -27,8 +27,8 @@ namespace SentisOptimisationsPlugin
         private bool _garageEnabled = true;
         private String _pathToGarage = "D:\\torch-server\\GARAGE";
         
-        private int _shipDrillRadiusMultiplier = 2;
-        private int _shipGrinderWelderRadiusMultiplier = 2;
+        private float _shipDrillRadiusMultiplier = 2;
+        private float _shipGrinderWelderRadiusMultiplier = 2;
         
         private int _minimumMassForKineticDamage = 5000;
         
@@ -156,14 +156,14 @@ namespace SentisOptimisationsPlugin
         }
         
         [DisplayTab(Name = "Ship drill radius multiplier", GroupName = "Ship tool", Tab = "Ship tool", Order = 0, Description = "Ship drill radius multiplier")]
-        public int ShipDrillRadiusMultiplier
+        public float ShipDrillRadiusMultiplier
         {
             get => _shipDrillRadiusMultiplier;
             set => SetValue(ref _shipDrillRadiusMultiplier, value);
         }
         
         [DisplayTab(Name = "Ship grinder/welder radius multiplier", GroupName = "Ship tool", Tab = "Ship tool", Order = 0, Description = "Ship grinder/welder radius multiplier")]
-        public int ShipGrinderWelderRadiusMultiplier
+        public float ShipGrinderWelderRadiusMultiplier
         {
             get => _shipGrinderWelderRadiusMultiplier;
             set => SetValue(ref _shipGrinderWelderRadiusMultiplier, value);
