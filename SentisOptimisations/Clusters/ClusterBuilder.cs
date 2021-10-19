@@ -331,6 +331,7 @@ namespace SentisOptimisationsPlugin.Clusters
         {
             if (myEntity is MySurvivalKit)
             {
+                tmpforSerialUpdate10.Add(myEntity);
                 return true;
             }
             if (myEntity is MyGasGenerator ||
