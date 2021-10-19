@@ -329,6 +329,10 @@ namespace SentisOptimisationsPlugin.Clusters
 
         private bool ToSerialUpdate10(MyEntity myEntity)
         {
+            if (myEntity is MySurvivalKit)
+            {
+                return true;
+            }
             if (myEntity is MyGasGenerator ||
                 myEntity is MyBatteryBlock ||
                 myEntity is MyAdvancedDoor ||
