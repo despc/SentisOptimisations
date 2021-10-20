@@ -21,6 +21,7 @@ namespace SentisOptimisationsPlugin
         private int _cluster10BuildDelay = 250;
         private int _cluster100BuildDelay = 1000;
         private bool _allowProjection = true;
+        private bool _clustersEnabled = false;
         private bool _allowMerge = false;
         private bool _includeConnectedGrids = false;
         private String _pathToAsters = "C:\\Asteroids";
@@ -173,6 +174,12 @@ namespace SentisOptimisationsPlugin
         {
             get => _allowProjection;
             set => SetValue(ref _allowProjection, value);
+        }
+        [DisplayTab(Name = "Clusters enabled", GroupName = "Clusters", Tab = "Clusters", Order = 0, Description = "Clusters enabled")]
+        public bool ClustersEnabled
+        {
+            get => _clustersEnabled;
+            set => SetValue(ref _clustersEnabled, value);
         }
 
         public bool AllowMerge

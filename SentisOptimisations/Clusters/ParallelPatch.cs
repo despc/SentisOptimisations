@@ -448,6 +448,10 @@ namespace SentisOptimisationsPlugin
 
         private static bool UpdateAfterSimulationPatched()
         {
+            if (!SentisOptimisationsPlugin.Config.ClustersEnabled)
+            {
+                return true;
+            }
             try
             {
                 if (!DelayFlag)
@@ -477,6 +481,11 @@ namespace SentisOptimisationsPlugin
 
         private static bool UpdateAfterSimulation10Patched()
         {
+            if (!SentisOptimisationsPlugin.Config.ClustersEnabled)
+            {
+                return true;
+            }
+            
             try
             {
                 if (!DelayFlag)
@@ -506,6 +515,10 @@ namespace SentisOptimisationsPlugin
 
         private static bool UpdateAfterSimulation100Patched()
         {
+            if (!SentisOptimisationsPlugin.Config.ClustersEnabled)
+            {
+                return true;
+            }
             try
             {
                 if (!DelayFlag)
@@ -535,6 +548,10 @@ namespace SentisOptimisationsPlugin
 
         private static bool UpdateBeforeSimulationPatched()
         {
+            if (!SentisOptimisationsPlugin.Config.ClustersEnabled)
+            {
+                return true;
+            }
             try
             {
                 if (!DelayFlag)

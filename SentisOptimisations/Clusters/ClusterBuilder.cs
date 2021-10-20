@@ -96,6 +96,10 @@ namespace SentisOptimisationsPlugin.Clusters
                     try
                     {
                         await Task.Delay(SentisOptimisationsPlugin.Config.Cluster1BuildDelay);
+                        if (!SentisOptimisationsPlugin.Config.ClustersEnabled)
+                        {
+                            continue;
+                        }
                         await Task.Run(BuildClusters);
                     }
                     catch (ArgumentException e)
@@ -125,7 +129,10 @@ namespace SentisOptimisationsPlugin.Clusters
                     try
                     {
                         await Task.Delay(SentisOptimisationsPlugin.Config.Cluster10BuildDelay);
-                        Stopwatch sw;
+                        if (!SentisOptimisationsPlugin.Config.ClustersEnabled)
+                        {
+                            continue;
+                        }
                         await Task.Run(BuildClusters10);
                     }
                     catch (ArgumentException e)
@@ -155,6 +162,10 @@ namespace SentisOptimisationsPlugin.Clusters
                     try
                     {
                         await Task.Delay(SentisOptimisationsPlugin.Config.Cluster100BuildDelay);
+                        if (!SentisOptimisationsPlugin.Config.ClustersEnabled)
+                        {
+                            continue;
+                        }
                         await Task.Run(BuildClusters100);
                     }
                     catch (ArgumentException e)
