@@ -35,6 +35,7 @@
       <Compile Include="AdminCommands.cs" />
       <Compile Include="Clusters\AssemblersConcurrencyFix.cs" />
       <Compile Include="Clusters\ClusterBuilder.cs" />
+      <Compile Include="Clusters\ConveyorSystemConcurrencyFix.cs" />
       <Compile Include="Clusters\ParallelPatch.cs" />
       <Compile Include="ConfigShipInMarket.cs" />
       <Compile Include="ConnectorPatch.cs" />
