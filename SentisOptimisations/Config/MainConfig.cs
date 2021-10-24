@@ -7,6 +7,12 @@ namespace SentisOptimisationsPlugin
 {
     public class MainConfig : ViewModel
     {
+        
+        public MainConfig()
+        {
+            ConfigAnomalyZone.CollectionChanged += (sender, args) => OnPropertyChanged();
+            ConfigShipsInMarket.CollectionChanged += (sender, args) => OnPropertyChanged();
+        }
         private double _contractEscortMultiplier = 10;
         private double _contractAcquisitionMultiplier = 30; //Доставка
         private double _contractHaulingtMultiplier = 10; //Перевозка
@@ -15,6 +21,7 @@ namespace SentisOptimisationsPlugin
         private float _clusterRadius = 16000;
         private bool _enabledPcuLimiter = true;
         private int _maxStaticGridPCU = 200000;
+        private int _azMessageTime = 960;
         private int _maxDinamycGridPCU = 30000;
         private int _noDamageFromVoxelsBeforeSpeed = 30;
         private int _cluster1BuildDelay = 30;
@@ -27,6 +34,7 @@ namespace SentisOptimisationsPlugin
         private String _pathToAsters = "C:\\Asteroids";
         private bool _garageEnabled = true;
         private String _pathToGarage = "D:\\torch-server\\GARAGE";
+        private long _azOwner = 144115188075855912;
         
         private float _shipDrillRadiusMultiplier = 2;
         private float _shipGrinderWelderRadiusMultiplier = 2;
@@ -45,6 +53,22 @@ namespace SentisOptimisationsPlugin
                 foreach (ConfigShipInMarket shipInMarket in value)
                 {
                     configShipsInMarket.Add(shipInMarket);
+                }
+            }
+        }
+        
+        private ObservableCollection<ConfigAnomalyZone> configAnomalyZone = new ObservableCollection<ConfigAnomalyZone>();
+
+        public ObservableCollection<ConfigAnomalyZone> ConfigAnomalyZone
+
+        {
+            get { return configAnomalyZone; }
+            set
+            {
+                configShipsInMarket.Clear();
+                foreach (ConfigAnomalyZone shipInMarket in value)
+                {
+                    configAnomalyZone.Add(shipInMarket);
                 }
             }
         }
@@ -106,6 +130,21 @@ namespace SentisOptimisationsPlugin
             get => _maxStaticGridPCU;
             set => SetValue(ref _maxStaticGridPCU, value);
         }
+        
+        [DisplayTab(Name = "Anomaly Zone Message Time", GroupName = "Anomaly Zone", Tab = "Anomaly Zone", Order = 0, Description = "Anomaly Zone Message Time")]
+        public int AzMessageTime
+        {
+            get => _azMessageTime;
+            set => SetValue(ref _azMessageTime, value);
+        }
+        
+        [DisplayTab(Name = "Zone owner", GroupName = "Anomaly Zone", Tab = "Anomaly Zone", Order = 0, Description = "Anomaly Zone owner")]
+        public long AzOwner
+        {
+            get => _azOwner;
+            set => SetValue(ref _azOwner, value);
+        }
+        
         [DisplayTab(Name = "Max dynamic grid PCU", GroupName = "PCU limiter", Tab = "PCU limiter", Order = 0, Description = "Max dynamic grid PCU")]
         public int MaxDinamycGridPCU
         {

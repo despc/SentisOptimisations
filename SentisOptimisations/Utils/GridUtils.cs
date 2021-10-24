@@ -9,12 +9,15 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Windows.Documents;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Cube;
 using Sandbox.ModAPI;
+using VRage.Game.Entity;
 using VRage.Game.ModAPI;
 using VRage.Groups;
 using VRage.ModAPI;
+using VRageMath;
 
 namespace SentisOptimisations
 {
@@ -149,5 +152,29 @@ namespace SentisOptimisations
                 return playerId == myCubeGrid.BigOwners[0];
             return (ulong) playerId <= 0UL;
         }
+        
+        public static List<MyCubeGrid> FindAllGridsInRadius(Vector3 center, float radius)
+        {
+            MyDynamicAABBTreeD m_dynamicObjectsTree =
+                (MyDynamicAABBTreeD) ReflectionUtils.GetPrivateStaticField(typeof(MyGamePruningStructure),
+                    "m_dynamicObjectsTree");
+            MyDynamicAABBTreeD m_staticObjectsTree =
+                (MyDynamicAABBTreeD) ReflectionUtils.GetPrivateStaticField(typeof(MyGamePruningStructure),
+                    "m_staticObjectsTree");
+            BoundingSphereD boundingSphere = new BoundingSphereD(center, radius);
+            List<MyEntity> result = new List<MyEntity>();
+            m_dynamicObjectsTree.OverlapAllBoundingSphere(ref boundingSphere, result);
+            m_staticObjectsTree.OverlapAllBoundingSphere(ref boundingSphere, result);
+            List<MyCubeGrid> grids = new List<MyCubeGrid>();
+            foreach (var myEntity in result)
+            {
+                if (myEntity is MyCubeGrid)
+                {
+                    grids.Add((MyCubeGrid) myEntity);
+                }
+            }
+            return grids;
+        }
+
     }
 }

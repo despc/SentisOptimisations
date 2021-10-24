@@ -6,6 +6,8 @@ using NLog;
 using ParallelTasks;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Cube;
+using Sandbox.ModAPI;
+using SentisOptimisationsPlugin.AnomalyZone;
 using Torch.Managers.PatchManager;
 using VRage.Game;
 using VRage.Game.Entity;
@@ -25,7 +27,7 @@ namespace SentisOptimisationsPlugin
             if (_init)
                 return;
             _init = true;
-            //MyAPIGateway.Session.DamageSystem.RegisterBeforeDamageHandler(0, ProcessDamage);
+            MyAPIGateway.Session.DamageSystem.RegisterBeforeDamageHandler(0, ProcessDamage);
         }    
         
         private static void ProcessDamage(object target, ref MyDamageInformation info)
@@ -40,35 +42,59 @@ namespace SentisOptimisationsPlugin
             }
         }
 
-        private static void DoProcessDamage(object target, ref MyDamageInformation info)
+        private static void DoProcessDamage(object target, ref MyDamageInformation damage)
         {
-            
-            if (info.Type != MyDamageType.Deformation)
-            {
-                return;
-            }
-            
             IMySlimBlock damagedBlock = target as IMySlimBlock;
-            
             if (damagedBlock == null)
             {
                 return;
             }
-            
-            if (damagedBlock.FatBlock != null)
+
+            IMyCubeGrid damagedGrid = damagedBlock.CubeGrid;
+            if (damagedGrid == null)
             {
                 return;
             }
-
-            if (damagedBlock.BlockDefinition.Id.SubtypeName.Contains("Titanium"))
+            
+            if (ProtectAZGrids(ref damage, damagedGrid)) return;
+            // if (info.Type != MyDamageType.Deformation)
+            // {
+            //     return;
+            // }
+            //
+            // IMySlimBlock damagedBlock = target as IMySlimBlock;
+            //
+            // if (damagedBlock == null)
+            // {
+            //     return;
+            // }
+            //
+            // if (damagedBlock.FatBlock != null)
+            // {
+            //     return;
+            // }
+            //
+            // if (damagedBlock.BlockDefinition.Id.SubtypeName.Contains("Titanium"))
+            // {
+            //     info.Amount = info.Amount / 20;
+            // }
+            //
+            // if (damagedBlock.BlockDefinition.Id.SubtypeName.Contains("Aluminum"))
+            // {
+            //     info.Amount = info.Amount / 5;
+            // }
+        }
+        
+        private static bool ProtectAZGrids(ref MyDamageInformation damage, IMyCubeGrid damagedGrid)
+        {
+            if (AZCore.ImmortalGrids.Contains(damagedGrid.EntityId))
             {
-                info.Amount = info.Amount / 20;
+                damage.Amount = 0;
+                damage.IsDeformation = false;
+                return true;
             }
             
-            if (damagedBlock.BlockDefinition.Id.SubtypeName.Contains("Aluminum"))
-            {
-                info.Amount = info.Amount / 5;
-            }
+            return false;
         }
 
         public static void Patch(PatchContext ctx)

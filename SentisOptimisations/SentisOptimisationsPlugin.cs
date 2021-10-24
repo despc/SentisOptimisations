@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
+using System.Windows.Controls;
 using NLog;
 using Sandbox;
 using Sandbox.Engine.Multiplayer;
@@ -16,7 +17,10 @@ using Sandbox.Game.GameSystems;
 using Sandbox.Game.World;
 using Sandbox.ModAPI;
 using SentisOptimisations;
+using SentisOptimisationsPlugin.AnomalyZone;
 using SentisOptimisationsPlugin.Clusters;
+using SentisOptimisationsPlugin.Garage;
+using SOPlugin.GUI;
 using Torch;
 using Torch.API;
 using Torch.API.Managers;
@@ -29,9 +33,6 @@ using VRage.Game.ModAPI;
 using VRage.Game.Voxels;
 using VRage.Network;
 using VRageMath;
-using System.Windows.Controls;
-using SentisOptimisationsPlugin.Garage;
-using SOPlugin.GUI;
 
 namespace SentisOptimisationsPlugin
 {
@@ -39,6 +40,7 @@ namespace SentisOptimisationsPlugin
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
         public static PcuLimiter _limiter = new PcuLimiter();
+        public static AZCore AzCore = new AZCore();
         public static OldGridProcessor _oldGridProcessor = new OldGridProcessor();
         public static ClusterBuilder _cb = new ClusterBuilder();
         public static Dictionary<long,long> stuckGrids = new Dictionary<long, long>();
@@ -72,12 +74,14 @@ namespace SentisOptimisationsPlugin
             {
                 _limiter.OnUnloading();
                 _cb.OnUnloading();
+                AzCore.OnUnloading();
                 ConveyorPatch.OnUnloading();
             }
             else
             {
                 if (newState != TorchSessionState.Loaded)
                     return;
+                AzCore.Init();
                 DamagePatch.Init();
                 _limiter.OnLoaded();
                 _cb.OnLoaded();
@@ -378,6 +382,7 @@ namespace SentisOptimisationsPlugin
             _config.Save(Path.Combine(StoragePath, "SentisOptimisations.cfg"));
             _limiter.CancellationTokenSource.Cancel();
             _cb.CancellationTokenSource.Cancel();
+            AzCore.CancellationTokenSource.Cancel();
             base.Dispose();
         }
     }

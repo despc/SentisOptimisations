@@ -33,17 +33,23 @@
     </PropertyGroup>
     <ItemGroup>
       <Compile Include="AdminCommands.cs" />
+      <Compile Include="AnomalyZone\AZBlockProcessor.cs" />
+      <Compile Include="AnomalyZone\AZCommands.cs" />
+      <Compile Include="AnomalyZone\AZCore.cs" />
+      <Compile Include="AnomalyZone\AZReward.cs" />
+      <Compile Include="AnomalyZone\ScoreDescription.cs" />
       <Compile Include="Clusters\AssemblersConcurrencyFix.cs" />
       <Compile Include="Clusters\ClusterBuilder.cs" />
       <Compile Include="Clusters\ParallelPatch.cs" />
-      <Compile Include="ConfigShipInMarket.cs" />
+      <Compile Include="Config\ConfigAnomalyZone.cs" />
+      <Compile Include="Config\ConfigShipInMarket.cs" />
+      <Compile Include="Config\MainConfig.cs" />
       <Compile Include="ConnectorPatch.cs" />
       <Compile Include="CrashFix\CrashFixPatch.cs" />
       <Compile Include="Garage\Delegate.cs" />
       <Compile Include="Garage\GarageCommands.cs" />
       <Compile Include="Garage\GarageCore.cs" />
       <Compile Include="Garage\OldGridProcessor.cs" />
-      <Compile Include="MainConfig.cs" />
       <Compile Include="ContractPricePatch.cs" />
       <Compile Include="DamagePatch.cs" />
       <Compile Include="GUI\ConfigGUI.cs">
@@ -141,7 +147,7 @@
         <HintPath>D:\torch-server\Torch.Server.exe</HintPath>
       </Reference>
       <Reference Include="VRage, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\VRage.dll</HintPath>
+        <HintPath>D:\torch-server\DedicatedServer64\VRage.dll</HintPath>
       </Reference>
       <Reference Include="VRage.Game, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
         <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\VRage.Game.dll</HintPath>
@@ -151,6 +157,15 @@
       </Reference>
       <Reference Include="VRage.Math, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
         <HintPath>D:\torch-server\DedicatedServer64\VRage.Math.dll</HintPath>
+      </Reference>
+      <Reference Include="VRage.Network, Version=1.0.53.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>D:\torch-server\DedicatedServer64\VRage.Network.dll</HintPath>
+      </Reference>
+      <Reference Include="VRage.Platform.Windows, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>D:\torch-server\DedicatedServer64\VRage.Platform.Windows.dll</HintPath>
+      </Reference>
+      <Reference Include="VRage.RemoteClient.Core, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>D:\torch-server\DedicatedServer64\VRage.RemoteClient.Core.dll</HintPath>
       </Reference>
       <Reference Include="WindowsBase" />
     </ItemGroup>

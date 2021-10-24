@@ -34,12 +34,12 @@ namespace SentisOptimisationsPlugin
                 typeof(SafezonePatch).GetMethod(nameof(MethodPhantom_LeavePatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
 
-            var MySafeZoneUpdateBeforeSimulation = typeof(MySafeZone).GetMethod
-                (nameof(MySafeZone.UpdateBeforeSimulation), BindingFlags.Instance | BindingFlags.Public);
-
-            ctx.GetPattern(MySafeZoneUpdateBeforeSimulation).Prefixes.Add(
-                typeof(SafezonePatch).GetMethod(nameof(MySafeZoneUpdateBeforeSimulationPatched),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            // var MySafeZoneUpdateBeforeSimulation = typeof(MySafeZone).GetMethod
+            //     (nameof(MySafeZone.UpdateBeforeSimulation), BindingFlags.Instance | BindingFlags.Public);
+            //
+            // ctx.GetPattern(MySafeZoneUpdateBeforeSimulation).Prefixes.Add(
+            //     typeof(SafezonePatch).GetMethod(nameof(MySafeZoneUpdateBeforeSimulationPatched),
+            //         BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
             
             var MySafeZoneIsSafe = typeof(MySafeZone).GetMethod
                 ("IsSafe", BindingFlags.Instance | BindingFlags.NonPublic);
