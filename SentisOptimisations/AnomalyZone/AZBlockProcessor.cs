@@ -19,21 +19,14 @@ namespace SentisOptimisationsPlugin.AnomalyZone
 
         private Dictionary<long, int> ActiveEnemiesPerFaction = new Dictionary<long, int>();
 
-        private static Dictionary<long, ScoreDescription>
-            Scores = new Dictionary<long, ScoreDescription>(); // faction, score
-
         bool ActivateOnCharacter = false;
         bool ActivateOnLargeGrid = true;
         bool ActivateOnSmallGrid = true;
         bool IgnoreCopilot = true;
-        int MinLargeGridBlockCount = 300;
-        int MinSmallGridBlockCount = 300;
-        float ProgressWhenComplete = 300;
         float ContestedDrainRate = 0;
         float Progress = 0;
-        public float IdleDrainRate;
+        public float IdleDrainRate = 3;
         private int lastPlayerCount = 0;
-        public int PointsRemovedOnDeath = 0;
         public long ControlledBy;
 
         public enum ZoneStates
@@ -180,7 +173,7 @@ namespace SentisOptimisationsPlugin.AnomalyZone
                                     blockCount++;
                                     return false;
                                 });
-                                if (blockCount < MinLargeGridBlockCount)
+                                if (blockCount < SentisOptimisationsPlugin.Config.AzMinLargeGridBlockCount)
                                 {
                                     validatedPlayers.Remove(p);
                                     continue;
@@ -200,7 +193,7 @@ namespace SentisOptimisationsPlugin.AnomalyZone
                                     blockCount++;
                                     return false;
                                 });
-                                if (blockCount < MinSmallGridBlockCount)
+                                if (blockCount < SentisOptimisationsPlugin.Config.AzMinSmallGridBlockCount)
                                 {
                                     validatedPlayers.Remove(p);
                                     continue;
@@ -315,7 +308,7 @@ namespace SentisOptimisationsPlugin.AnomalyZone
                     }
                 }
 
-                if (Progress >= ProgressWhenComplete)
+                if (Progress >= SentisOptimisationsPlugin.Config.AzProgressWhenComplete)
                 {
                     OnAwardPoints.Invoke(mySafeZoneBlock, ControlledByFaction);
                     ResetActiveEnemies();
@@ -329,21 +322,6 @@ namespace SentisOptimisationsPlugin.AnomalyZone
                 if (Progress <= 0)
                 {
                     Progress = 0;
-                }
-
-                // display info
-
-                if (MyAPIGateway.Multiplayer.IsServer)
-                {
-                    int percent = (int) Math.Floor((Progress / ProgressWhenComplete) * 100f);
-
-                    // mySafeZoneBlock.CustomData =
-                    //    $"{State.ToString().ToUpper()} - {percent}% {(State != ZoneStates.Idle ? $"[{ControlledByFaction.Tag}]" : "")}";
-
-                    // if (lastState != State)
-                    // {
-                    //     MyAPIGateway.Utilities.SendModMessage(Tools.ModMessageId, $"KotH: {ModBlock.CustomName}");
-                    // }
                 }
 
                 foreach (var localPlayer in playersInZone)
@@ -384,13 +362,9 @@ namespace SentisOptimisationsPlugin.AnomalyZone
                                 break;
                         }
 
-                        if (Progress % 5 == 0)
-                        {
-                            MyVisualScriptLogicProvider.ShowNotification(
-                                $"Allies: {allies}  Neutral: {neutral}  Enemies: {enemies} - {State.ToString().ToUpper()}: {((Progress / ProgressWhenComplete) * 100).ToString("n0")}% Speed: {speed * 100}% {(ControlledByFaction != null ? $"Controlled by: {ControlledByFaction.Tag}" : "")}",
-                                SentisOptimisationsPlugin.Config.AzMessageTime, specialColor, localPlayer.IdentityId);
-                        }
-                        
+                        MyVisualScriptLogicProvider.ShowNotification(
+                            $"Allies: {allies}  Neutral: {neutral}  Enemies: {enemies} - {State.ToString().ToUpper()}: {((Progress / SentisOptimisationsPlugin.Config.AzProgressWhenComplete) * 100).ToString("n0")}% Speed: {speed * 100}% {(ControlledByFaction != null ? $"Controlled by: {ControlledByFaction.Tag}" : "")}",
+                            SentisOptimisationsPlugin.Config.AzMessageTime, specialColor, localPlayer.IdentityId);
                     }
                 }
 
@@ -420,36 +394,15 @@ namespace SentisOptimisationsPlugin.AnomalyZone
                 Log.Error(e);
             }
         }
-
         private void PlayerDied(IMyPlayer player, IMyFaction faction)
         {
-            if (PointsRemovedOnDeath == 0) return;
+            if (SentisOptimisationsPlugin.Config.AzPointsRemovedOnDeath == 0) return;
 
-            long facId = faction.FactionId;
-            if (!Scores.ContainsKey(faction.FactionId))
-            {
-                Scores.Add(facId, new ScoreDescription()
-                {
-                    FactionId = facId,
-                    FactionName = faction.Name,
-                    FactionTag = faction.Tag,
-                    Points = 1
-                });
-            }
+            AZReward.ChangePoints(mySafeZoneBlock, faction, -SentisOptimisationsPlugin.Config.AzPointsRemovedOnDeath);
 
-            Scores[facId].Points -= PointsRemovedOnDeath;
-
-            if (Scores[facId].Points < 1)
-            {
-                Scores[facId].Points = 1;
-            }
-
-            string message = $"[{faction.Tag}] {player.DisplayName} Died: -{PointsRemovedOnDeath} point";
+            string message = $"[{faction.Tag}] {player.DisplayName} Died: -{SentisOptimisationsPlugin.Config.AzPointsRemovedOnDeath} point";
             Log.Warn(message);
-            MyVisualScriptLogicProvider.ShowNotification(message, 5000, "Gray");
-            //MyAPIGateway.Utilities.SendModMessage(Tools.ModMessageId, $"KotH: {message}");
-            // Network.SendCommand("update", message: message,
-            //     data: MyAPIGateway.Utilities.SerializeToBinary(GenerateUpdate()));
+            MyVisualScriptLogicProvider.ShowNotification(message, 5000, "Red");
         }
 
         public static event Action<IMyPlayer, IMyFaction> OnPlayerDied = delegate { };

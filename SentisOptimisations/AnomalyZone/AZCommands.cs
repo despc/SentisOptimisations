@@ -40,6 +40,10 @@ namespace SentisOptimisationsPlugin.AnomalyZone
                 foreach (var configAnomalyZonePointse in configAnomalyZone.Points)
                 {
                     IMyFaction f = MySession.Static.Factions.TryGetFactionById(configAnomalyZonePointse.FactionId);
+                    if (f == null)
+                    {
+                        continue;
+                    }
                     formatedScores.AppendLine($"[{f.Tag}] {f.Name}: {configAnomalyZonePointse.Points}");
                 }
             }

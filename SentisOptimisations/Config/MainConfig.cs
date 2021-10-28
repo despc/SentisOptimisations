@@ -35,11 +35,19 @@ namespace SentisOptimisationsPlugin
         private bool _garageEnabled = true;
         private String _pathToGarage = "D:\\torch-server\\GARAGE";
         private long _azOwner = 144115188075855912;
+        private String _azReward = "PhysicalObject_SpaceCredit=120000;Component_ZoneChip=1";
+        private int _azPointsRemovedOnDeath = 1;
+        private int _azPointsAddOnCaptured = 1;
+        private int _azProgressWhenComplete = 300;
+        private int _azMinLargeGridBlockCount = 300;
+        private int _azMinSmallGridBlockCount = 300;
         
         private float _shipDrillRadiusMultiplier = 2;
         private float _shipGrinderWelderRadiusMultiplier = 2;
         
         private int _minimumMassForKineticDamage = 5000;
+        
+        private bool _safeZoneSubGridOptimisation = true;
         
         private ObservableCollection<ConfigShipInMarket> configShipsInMarket = new ObservableCollection<ConfigShipInMarket>();
 
@@ -124,6 +132,13 @@ namespace SentisOptimisationsPlugin
             set => SetValue(ref _enabledPcuLimiter, value);
         }
         
+        [DisplayTab(Name = "Safe zone subgrid optimisation", GroupName = "Safe zone", Tab = "Safe zone", Order = 0, Description = "Safe zone subgrid optimisation")]
+        public bool SafeZoneSubGridOptimisation
+        {
+            get => _safeZoneSubGridOptimisation;
+            set => SetValue(ref _safeZoneSubGridOptimisation, value);
+        }
+        
         [DisplayTab(Name = "Max static grid PCU", GroupName = "PCU limiter", Tab = "PCU limiter", Order = 0, Description = "Max static grid PCU")]
         public int MaxStaticGridPCU
         {
@@ -144,6 +159,49 @@ namespace SentisOptimisationsPlugin
             get => _azOwner;
             set => SetValue(ref _azOwner, value);
         }
+        
+        [DisplayTab(Name = "Zone reward", GroupName = "Anomaly Zone", Tab = "Anomaly Zone", Order = 0, Description = "Zone reward")]
+        public string AzReward
+        {
+            get => _azReward;
+            set => SetValue(ref _azReward, value);
+        }
+        
+        [DisplayTab(Name = "Progress when complete", GroupName = "Anomaly Zone", Tab = "Anomaly Zone", Order = 0, Description = "Progress when complete")]
+        public int AzProgressWhenComplete
+        {
+            get => _azProgressWhenComplete;
+            set => SetValue(ref _azProgressWhenComplete, value);
+        }
+                
+        [DisplayTab(Name = "Min large grid block count", GroupName = "Anomaly Zone", Tab = "Anomaly Zone", Order = 0, Description = "Min large grid block count")]
+        public int AzMinLargeGridBlockCount
+        {
+            get => _azMinLargeGridBlockCount;
+            set => SetValue(ref _azMinLargeGridBlockCount, value);
+        }
+        
+        [DisplayTab(Name = "Min small grid block count", GroupName = "Anomaly Zone", Tab = "Anomaly Zone", Order = 0, Description = "Min small grid block count")]
+        public int AzMinSmallGridBlockCount
+        {
+            get => _azMinSmallGridBlockCount;
+            set => SetValue(ref _azMinSmallGridBlockCount, value);
+        }
+        
+        [DisplayTab(Name = "Points removed on death", GroupName = "Anomaly Zone", Tab = "Anomaly Zone", Order = 0, Description = "Points removed on death")]
+        public int AzPointsRemovedOnDeath
+        {
+            get => _azPointsRemovedOnDeath;
+            set => SetValue(ref _azPointsRemovedOnDeath, value);
+        }
+        
+        [DisplayTab(Name = "Points reward", GroupName = "Anomaly Zone", Tab = "Anomaly Zone", Order = 0, Description = "Points reward")]
+        public int AzPointsAddOnCaptured
+        {
+            get => _azPointsAddOnCaptured;
+            set => SetValue(ref _azPointsAddOnCaptured, value);
+        }
+        
         
         [DisplayTab(Name = "Max dynamic grid PCU", GroupName = "PCU limiter", Tab = "PCU limiter", Order = 0, Description = "Max dynamic grid PCU")]
         public int MaxDinamycGridPCU

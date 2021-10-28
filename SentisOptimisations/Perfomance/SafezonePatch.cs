@@ -27,12 +27,12 @@ namespace SentisOptimisationsPlugin
 
         public static void Patch(PatchContext ctx)
         {
-            var MethodPhantom_Leave = typeof(MySafeZone).GetMethod
-                ("phantom_Leave", BindingFlags.Instance | BindingFlags.NonPublic);
-
-            ctx.GetPattern(MethodPhantom_Leave).Prefixes.Add(
-                typeof(SafezonePatch).GetMethod(nameof(MethodPhantom_LeavePatched),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            // var MethodPhantom_Leave = typeof(MySafeZone).GetMethod
+            //     ("phantom_Leave", BindingFlags.Instance | BindingFlags.NonPublic);
+            //
+            // ctx.GetPattern(MethodPhantom_Leave).Prefixes.Add(
+            //     typeof(SafezonePatch).GetMethod(nameof(MethodPhantom_LeavePatched),
+            //         BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
 
             // var MySafeZoneUpdateBeforeSimulation = typeof(MySafeZone).GetMethod
             //     (nameof(MySafeZone.UpdateBeforeSimulation), BindingFlags.Instance | BindingFlags.Public);
@@ -112,6 +112,11 @@ namespace SentisOptimisationsPlugin
 
         private static bool MySafeZoneIsSafePatched(MySafeZone __instance, MyEntity entity, ref bool __result)
         {
+
+            if (!SentisOptimisationsPlugin.Config.SafeZoneSubGridOptimisation)
+            {
+                return true;
+            }
             try
             {
                 MyFloatingObject myFloatingObject = entity as MyFloatingObject;
@@ -163,12 +168,7 @@ namespace SentisOptimisationsPlugin
                         switch (subgridCheckResult2)
                         {
                             case SubgridCheckResult.NOT_SAFE:
-                                if (subgridCheckResult1 != SubgridCheckResult.ADMIN)
-                                {
-                                    subgridCheckResult1 = SubgridCheckResult.NOT_SAFE;
-                                    continue;
-                                }
-
+                                subgridCheckResult1 = SubgridCheckResult.NOT_SAFE;
                                 continue;
                             case SubgridCheckResult.NEED_EXTRA_CHECK:
                                 if (subgridCheckResult2 > subgridCheckResult1)
@@ -185,7 +185,8 @@ namespace SentisOptimisationsPlugin
                         }
                     }
 
-                    __result = subgridCheckResult1 >= SubgridCheckResult.SAFE;
+                    __result = false;
+                    return false;
                 }
 
                 switch (entity)

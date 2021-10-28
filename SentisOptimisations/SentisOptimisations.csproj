@@ -95,6 +95,9 @@
       <Compile Include="Utils\SoundUtils.cs" />
     </ItemGroup>
     <ItemGroup>
+      <Reference Include="0Harmony, Version=2.1.1.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>lib\0Harmony.dll</HintPath>
+      </Reference>
       <Reference Include="DePatch, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
         <HintPath>..\..\..\Downloads\DePatch-1.18.65\DePatch.dll</HintPath>
       </Reference>
