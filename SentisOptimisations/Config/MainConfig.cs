@@ -28,6 +28,7 @@ namespace SentisOptimisationsPlugin
         private int _cluster10BuildDelay = 250;
         private int _cluster100BuildDelay = 1000;
         private bool _allowProjection = true;
+        private bool _azPointsForOnlineEnemies = false;
         private bool _clustersEnabled = false;
         private bool _allowMerge = false;
         private bool _includeConnectedGrids = false;
@@ -36,6 +37,7 @@ namespace SentisOptimisationsPlugin
         private String _pathToGarage = "D:\\torch-server\\GARAGE";
         private long _azOwner = 144115188075855912;
         private String _azReward = "PhysicalObject_SpaceCredit=120000;Component_ZoneChip=1";
+        private String _azWinners = "";
         private int _azPointsRemovedOnDeath = 1;
         private int _azPointsAddOnCaptured = 1;
         private int _azProgressWhenComplete = 300;
@@ -44,6 +46,8 @@ namespace SentisOptimisationsPlugin
         
         private float _shipDrillRadiusMultiplier = 2;
         private float _shipGrinderWelderRadiusMultiplier = 2;
+        private float _shipWelderRadius = 8;
+        private float _shipSuperWelderRadius = 150;
         
         private int _minimumMassForKineticDamage = 5000;
         
@@ -152,6 +156,9 @@ namespace SentisOptimisationsPlugin
             get => _azMessageTime;
             set => SetValue(ref _azMessageTime, value);
         }
+        
+        [DisplayTab(Name = "Anomaly Zone week winners", GroupName = "Anomaly Zone", Tab = "Anomaly Zone", Order = 0, Description = "Anomaly Zone week winners")]
+        public String AzWinners { get => _azWinners; set => SetValue(ref _azWinners, value); }
         
         [DisplayTab(Name = "Zone owner", GroupName = "Anomaly Zone", Tab = "Anomaly Zone", Order = 0, Description = "Anomaly Zone owner")]
         public long AzOwner
@@ -267,6 +274,20 @@ namespace SentisOptimisationsPlugin
             set => SetValue(ref _shipGrinderWelderRadiusMultiplier, value);
         }
         
+        [DisplayTab(Name = "Ship welder radius" , GroupName = "Ship tool", Tab = "Ship tool", Order = 0, Description = "Ship welder radius")]
+        public float ShipWelderRadius
+        {
+            get => _shipWelderRadius;
+            set => SetValue(ref _shipWelderRadius, value);
+        }
+        
+        [DisplayTab(Name = "Ship SUPER welder radius" , GroupName = "Ship tool", Tab = "Ship tool", Order = 0, Description = "Ship SUPER welder radius")]
+        public float ShipSuperWelderRadius
+        {
+            get => _shipSuperWelderRadius;
+            set => SetValue(ref _shipSuperWelderRadius, value);
+        }
+        
         public bool AllowProjection
         {
             get => _allowProjection;
@@ -277,6 +298,13 @@ namespace SentisOptimisationsPlugin
         {
             get => _clustersEnabled;
             set => SetValue(ref _clustersEnabled, value);
+        }
+        
+        [DisplayTab(Name = "Points by online enemies", GroupName = "Anomaly Zone", Tab = "Anomaly Zone", Order = 0, Description = "Points by online enemies")]
+        public bool AzPointsForOnlineEnemies
+        {
+            get => _azPointsForOnlineEnemies;
+            set => SetValue(ref _azPointsForOnlineEnemies, value);
         }
 
         public bool AllowMerge

@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using Sandbox.Game;
+using Sandbox.Game.World;
 using Sandbox.ModAPI;
+using SentisOptimisations;
 using SpaceEngineers.Game.Entities.Blocks.SafeZone;
 using VRage.Game;
 using VRage.Game.ModAPI;
@@ -13,10 +15,33 @@ namespace SentisOptimisationsPlugin.AnomalyZone
     {
         public static void AwardPointsAndRewards(MySafeZoneBlock szBlock, IMyFaction faction)
         {
-            var fPoints = ChangePoints(szBlock, faction, SentisOptimisationsPlugin.Config.AzPointsAddOnCaptured);
+            List<IMyPlayer> players = new List<IMyPlayer>();
+            MyAPIGateway.Players.GetPlayers(players);
+            int enemies = 0;
+            foreach (var myPlayer in players)
+            {
+                var factionOfPlayer = FactionUtils.GetFactionOfPlayer(myPlayer.IdentityId);
+                if (factionOfPlayer == null)
+                {
+                    continue;
+                }
+
+                if (MySession.Static.Factions.AreFactionsEnemies(faction.FactionId, factionOfPlayer.FactionId))
+                {
+                    enemies = enemies + 1;
+                }
+            }
+            
+            var pointsToAdd = SentisOptimisationsPlugin.Config.AzPointsAddOnCaptured;
+            if (SentisOptimisationsPlugin.Config.AzPointsForOnlineEnemies)
+            {
+                pointsToAdd = pointsToAdd + enemies;
+            }
+            var fPoints = ChangePoints(szBlock, faction, pointsToAdd);
+            
             MyAPIGateway.Utilities.InvokeOnGameThread(() =>
             {
-                DoReward(faction, szBlock.CubeGrid.EntityId, fPoints);
+                DoReward(faction, szBlock.CubeGrid.EntityId);
             });
         }
 
@@ -66,7 +91,7 @@ namespace SentisOptimisationsPlugin.AnomalyZone
             return fPoints;
         }
 
-        private static void DoReward(IMyFaction faction, long gridEntityId, ConfigAnomalyZonePoints fPoints)
+        private static void DoReward(IMyFaction faction, long gridEntityId)
         {
             
             //PhysicalObject_SpaceCredit=120000;Component_ZoneChip=1

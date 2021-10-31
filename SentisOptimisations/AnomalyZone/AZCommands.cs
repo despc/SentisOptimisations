@@ -54,7 +54,13 @@ namespace SentisOptimisationsPlugin.AnomalyZone
         [Permission(MyPromoteLevel.Moderator)]
         public void AZReset()
         {
-            SentisOptimisationsPlugin.Config.ConfigAnomalyZone.Clear();
+            foreach (var configAnomalyZone in SentisOptimisationsPlugin.Config.ConfigAnomalyZone)
+            {
+                configAnomalyZone.Points.Clear();
+            }
+            var tmp = new ConfigAnomalyZone();
+            SentisOptimisationsPlugin.Config.ConfigAnomalyZone.Add(tmp);
+            SentisOptimisationsPlugin.Config.ConfigAnomalyZone.Remove(tmp);
         }
         
     }

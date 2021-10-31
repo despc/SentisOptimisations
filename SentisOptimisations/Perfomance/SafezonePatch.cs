@@ -122,9 +122,13 @@ namespace SentisOptimisationsPlugin
                 MyFloatingObject myFloatingObject = entity as MyFloatingObject;
                 MyInventoryBagEntity inventoryBagEntity = entity as MyInventoryBagEntity;
                 if (myFloatingObject != null || inventoryBagEntity != null)
+                {
                     __result = __instance.Entities.Contains(entity.EntityId)
                         ? __instance.AccessTypeFloatingObjects == MySafeZoneAccess.Whitelist
                         : (uint) __instance.AccessTypeFloatingObjects > 0U;
+                    return false;
+                }
+
                 MyEntity topMostParent = entity.GetTopMostParent((System.Type) null);
                 MyIDModule component;
                 if (topMostParent is IMyComponentOwner<MyIDModule> myComponentOwner &&
@@ -132,27 +136,47 @@ namespace SentisOptimisationsPlugin
                 {
                     ulong steamId = MySession.Static.Players.TryGetSteamId(component.Owner);
                     if (steamId != 0UL && MySafeZone.CheckAdminIgnoreSafezones(steamId))
+                    {
                         __result = true;
+                        return false;  
+                    }
+                        
                     if (__instance.AccessTypePlayers == MySafeZoneAccess.Whitelist)
                     {
                         if (__instance.Players.Contains(component.Owner))
+                        {
                             __result = true;
+                            return false;  
+                        }
+                            
                     }
                     else if (__instance.Players.Contains(component.Owner))
+                    {
                         __result = false;
+                        return false; 
+                    }
+                        
 
                     if (MySession.Static.Factions.TryGetPlayerFaction(component.Owner) is MyFaction playerFaction)
                     {
                         if (__instance.AccessTypeFactions == MySafeZoneAccess.Whitelist)
                         {
                             if (__instance.Factions.Contains(playerFaction))
+                            {
                                 __result = true;
+                                return false; 
+                            }
+
                         }
                         else if (__instance.Factions.Contains(playerFaction))
+                        {
                             __result = false;
+                            return false; 
+                        }
                     }
 
                     __result = __instance.AccessTypePlayers == MySafeZoneAccess.Blacklist;
+                    return false;
                 }
 
                 if (topMostParent is MyCubeGrid nodeInGroup)
@@ -194,11 +218,16 @@ namespace SentisOptimisationsPlugin
                     case MyAmmoBase _:
                     case MyMeteor _:
                         if ((__instance.AllowedActions & MySafeZoneAction.Shooting) == (MySafeZoneAction) 0)
+                        {
                             __result = false;
+                            return false;
+                        }
+                            
                         break;
                 }
 
                 __result = true;
+                return false;
             }
             catch (Exception e)
             {

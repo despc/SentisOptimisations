@@ -1,4 +1,5 @@
-﻿using System.Collections.ObjectModel;
+﻿using System;
+using System.Collections.ObjectModel;
 using Torch;
 
 namespace SentisOptimisationsPlugin
@@ -6,6 +7,8 @@ namespace SentisOptimisationsPlugin
     public class ConfigAnomalyZone : ViewModel
     {
         private long _blockId;
+        private long _lastWeekWinnerFactionId;
+        private DateTime _lastWeekWinnerSavedTime;
         
         ObservableCollection<ConfigAnomalyZonePoints> _points = new ObservableCollection<ConfigAnomalyZonePoints>();
         
@@ -23,6 +26,8 @@ namespace SentisOptimisationsPlugin
             }
         }
         public long BlockId { get => _blockId; set => SetValue(ref _blockId, value); }
+        public long LastWeekWinnerFactionId { get => _lastWeekWinnerFactionId; set => SetValue(ref _lastWeekWinnerFactionId, value); }
+        public DateTime LastWeekWinnerSavedTime { get => _lastWeekWinnerSavedTime; set => SetValue(ref _lastWeekWinnerSavedTime, value); }
         
     }
     

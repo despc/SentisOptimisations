@@ -5,9 +5,11 @@ using System.Threading.Tasks;
 using NLog;
 using Sandbox.Common.ObjectBuilders;
 using Sandbox.Game.Entities;
+using Sandbox.Game.World;
 using Sandbox.ModAPI;
 using SentisOptimisations;
 using SpaceEngineers.Game.Entities.Blocks.SafeZone;
+using VRage.Game.ModAPI;
 using VRage.Game.ObjectBuilders.Components;
 using VRageMath;
 
@@ -37,6 +39,7 @@ namespace SentisOptimisationsPlugin.AnomalyZone
         public void StartAzProcessing()
         {
             StartAzProcessingLoop();
+            StartAzWeekRewardLoop();
         }
 
         private async void StartAzProcessingLoop()
@@ -63,12 +66,88 @@ namespace SentisOptimisationsPlugin.AnomalyZone
                 Log.Error("AzProcessingLoop start Error", e);
             }
         }
+        
+        private async void StartAzWeekRewardLoop()
+        {
+            try
+            {
+                Log.Info("AzWeekRewardLoop started");
+                while (!CancellationTokenSource.Token.IsCancellationRequested)
+                {
+                    try
+                    {
+                        await Task.Delay(60000);
+                        await Task.Run(CheckAzWeekReward);
+                    }
+                    catch (Exception e)
+                    {
+                        Log.Error("AzWeekRewardLoop Error", e);
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Log.Error("AzWeekRewardLoop start Error", e);
+            }
+        }
 
         public void ProcessAz()
         {
             foreach (var processor in azBlockProcessors)
             {
                 processor.Update();
+            }
+        }
+
+        public void CheckAzWeekReward()
+        {
+            var now = DateTime.Now;
+            if (now.DayOfWeek == DayOfWeek.Sunday && now.Hour == 23 && now.Minute < 3)
+            {
+                SentisOptimisationsPlugin.Config.AzWinners = "";
+                var configConfigAnomalyZone = SentisOptimisationsPlugin.Config.ConfigAnomalyZone;
+                foreach (var configAnomalyZone in configConfigAnomalyZone)
+                {
+                    if ((now - configAnomalyZone.LastWeekWinnerSavedTime).TotalDays > 5)
+                    {
+                        configAnomalyZone.LastWeekWinnerSavedTime = now;
+                        long factionId = 0;
+                        int maxPoints = 0;
+                        foreach (var configAnomalyZonePoints in configAnomalyZone.Points)
+                        {
+                            if (configAnomalyZonePoints.Points > maxPoints)
+                            {
+                                maxPoints = configAnomalyZonePoints.Points;
+                                factionId = configAnomalyZonePoints.FactionId;
+
+                            }
+                        }
+                        configAnomalyZone.LastWeekWinnerFactionId = factionId;
+                    }
+                    
+                }
+                
+                foreach (var configAnomalyZone in configConfigAnomalyZone)
+                {
+                    var factionId = configAnomalyZone.LastWeekWinnerFactionId;
+                    IMyFaction f = MySession.Static.Factions.TryGetFactionById(factionId);
+                    if (SentisOptimisationsPlugin.Config.AzWinners.Length == 0)
+                    {
+                        SentisOptimisationsPlugin.Config.AzWinners = f.Tag;
+                    }
+                    else
+                    {
+                        SentisOptimisationsPlugin.Config.AzWinners = SentisOptimisationsPlugin.Config.AzWinners + ":" + f.Tag;
+                    }
+                }
+               
+                foreach (var configAnomalyZone in SentisOptimisationsPlugin.Config.ConfigAnomalyZone)
+                {
+                    configAnomalyZone.Points.Clear();
+                }
+                var tmp = new ConfigAnomalyZone();
+                SentisOptimisationsPlugin.Config.ConfigAnomalyZone.Add(tmp);
+                SentisOptimisationsPlugin.Config.ConfigAnomalyZone.Remove(tmp);
             }
         }
 
