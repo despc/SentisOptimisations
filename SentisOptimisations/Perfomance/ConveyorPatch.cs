@@ -11,6 +11,7 @@ using Sandbox.Game.GameSystems;
 using Sandbox.Game.GameSystems.Conveyors;
 using SentisOptimisations;
 using Torch.Managers.PatchManager;
+using VRage;
 using VRage.Game;
 
 namespace SentisOptimisationsPlugin
@@ -25,6 +26,7 @@ namespace SentisOptimisationsPlugin
             new ConcurrentDictionary<long, ConcurrentDictionary<Key, bool>>();
 
         public static long UncachedCalls = 0;
+        public static Random r = new Random();
         public static void Patch(PatchContext ctx)
         {
             var MethodOnBlockAdded = typeof(MyCubeGridSystems).GetMethod
@@ -43,10 +45,8 @@ namespace SentisOptimisationsPlugin
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
             // Кэш конвеера
 
-
             var MethodFlagForRecomputation = typeof(MyGridConveyorSystem).GetMethod
                 (nameof(MyGridConveyorSystem.FlagForRecomputation), BindingFlags.Instance | BindingFlags.Public);
-
 
             ctx.GetPattern(MethodFlagForRecomputation).Prefixes.Add(
                 typeof(ConveyorPatch).GetMethod(nameof(MethodFlagForRecomputationPatched),
@@ -66,6 +66,47 @@ namespace SentisOptimisationsPlugin
             ctx.GetPattern(MethodComputeCanTransferPost).Suffixes.Add(
                 typeof(ConveyorPatch).GetMethod(nameof(ComputeCanTransferPatchedPost),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+
+            // Замедление конвеерки
+            var MethodPullItem = typeof(MyGridConveyorSystem).GetMethod
+                (nameof(MyGridConveyorSystem.PullItem), BindingFlags.Instance | BindingFlags.Public);
+
+
+            ctx.GetPattern(MethodPullItem).Prefixes.Add(
+                typeof(ConveyorPatch).GetMethod(nameof(PullItemPatched),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
+            var MethodPullItems = typeof(MyGridConveyorSystem).GetMethod
+                (nameof(MyGridConveyorSystem.PullItems), BindingFlags.Instance | BindingFlags.Public);
+
+
+            ctx.GetPattern(MethodPullItems).Prefixes.Add(
+                typeof(ConveyorPatch).GetMethod(nameof(PullItemsPatched),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+        }
+
+        private static bool PullItemPatched(ref MyFixedPoint __result)
+        {
+            var pullItemsSlowdown = SentisOptimisationsPlugin.Config.PullItemsSlowdown;
+            var chance = 1 / pullItemsSlowdown;
+            var run = r.NextDouble() <= chance;
+            if (!run)
+            {
+                __result = (MyFixedPoint) 0;
+            }
+            return run;
+        }
+        
+        private static bool PullItemsPatched(ref MyFixedPoint __result)
+        {
+            var pullItemsSlowdown = SentisOptimisationsPlugin.Config.PullItemsSlowdown;
+            var chance = 1 / pullItemsSlowdown;
+            var run = r.NextDouble() <= chance;
+            if (!run)
+            {
+                __result = (MyFixedPoint) 0;
+            }
+            return run;
         }
 
         private static bool ComputeCanTransferPatched(IMyConveyorEndpointBlock start,

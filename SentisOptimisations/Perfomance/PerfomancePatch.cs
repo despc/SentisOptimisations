@@ -56,23 +56,13 @@ namespace SentisOptimisationsPlugin
         {
             try
             {
-                ReflectionUtils.SetPrivateStaticField(typeof(MyPhysics), "m_threadPool", new HkJobThreadPool(11));
-                ReflectionUtils.SetPrivateStaticField(typeof(MyPhysics), "m_jobQueue", new HkJobQueue(12));
+                ReflectionUtils.SetPrivateStaticField(typeof(MyPhysics), "m_threadPool", new HkJobThreadPool(10));
+                ReflectionUtils.SetPrivateStaticField(typeof(MyPhysics), "m_jobQueue", new HkJobQueue(10));
             }
             catch (Exception e)
             {
-                SentisOptimisationsPlugin.Log.Warn("MySafeZoneUpdateBeforeSimulationPatched Exception ", e);
+                SentisOptimisationsPlugin.Log.Warn("MyPhysicsLoadDataPatched Exception ", e);
             }
         }
-
-        private static object InvokeInstanceMethod(Type type, object instance, string methodName, Object[] args)
-        {
-            BindingFlags bindFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
-                                     | BindingFlags.Static;
-            var method = type.GetMethod(methodName, bindFlags);
-            return method.Invoke(instance, args);
-        }
-
- 
     }
 }

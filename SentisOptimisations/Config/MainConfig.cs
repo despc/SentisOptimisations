@@ -49,6 +49,8 @@ namespace SentisOptimisationsPlugin
         private float _shipWelderRadius = 8;
         private float _shipSuperWelderRadius = 150;
         
+        private float _pullItemsSlowdown = 1;
+        
         private int _minimumMassForKineticDamage = 5000;
         
         private bool _safeZoneSubGridOptimisation = true;
@@ -223,6 +225,13 @@ namespace SentisOptimisationsPlugin
         {
             get => _clusterRadius;
             set => SetValue(ref _clusterRadius, value);
+        }
+        
+        [DisplayTab(Name = "Pull Items Slowdown", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Pull Items Slowdown")]
+        public float PullItemsSlowdown
+        {
+            get => _pullItemsSlowdown;
+            set => SetValue(ref _pullItemsSlowdown, value);
         }
         
         [DisplayTab(Name = "Cluster1 build delay", GroupName = "Clusters", Tab = "Clusters", Order = 0, Description = "Cluster1 build delay")]
