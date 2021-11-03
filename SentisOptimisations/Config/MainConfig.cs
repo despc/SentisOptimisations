@@ -27,6 +27,7 @@ namespace SentisOptimisationsPlugin
         private int _cluster1BuildDelay = 30;
         private int _cluster10BuildDelay = 250;
         private int _cluster100BuildDelay = 1000;
+        private int _oldGridProcessorDays = 10;
         private bool _allowProjection = true;
         private bool _azPointsForOnlineEnemies = false;
         private bool _clustersEnabled = false;
@@ -150,6 +151,13 @@ namespace SentisOptimisationsPlugin
         {
             get => _maxStaticGridPCU;
             set => SetValue(ref _maxStaticGridPCU, value);
+        }
+        
+        [DisplayTab(Name = "Move grids to garage after player offline days", GroupName = "Garage", Tab = "Garage", Order = 0, Description = "Move grids to garage after player offline days")]
+        public int OldGridProcessorDays
+        {
+            get => _oldGridProcessorDays;
+            set => SetValue(ref _oldGridProcessorDays, value);
         }
         
         [DisplayTab(Name = "Anomaly Zone Message Time", GroupName = "Anomaly Zone", Tab = "Anomaly Zone", Order = 0, Description = "Anomaly Zone Message Time")]

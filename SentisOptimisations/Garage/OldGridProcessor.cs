@@ -74,7 +74,7 @@ namespace SentisOptimisationsPlugin.Garage
                         var identityById = PlayerUtils.GetIdentityById(owner);
                         var lastLogoutTime = identityById.LastLogoutTime;
                         var totalDays = (DateTime.Now - lastLogoutTime).TotalDays;
-                        if (totalDays > 14)
+                        if (totalDays > SentisOptimisationsPlugin.Config.OldGridProcessorDays)
                         {
                             Log.Warn("Товарища " + owner + " нет с нами уже " + totalDays +
                                      " дней, приберём его грид " +
