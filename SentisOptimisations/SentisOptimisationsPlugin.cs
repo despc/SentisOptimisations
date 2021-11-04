@@ -19,7 +19,6 @@ using Sandbox.ModAPI;
 using SentisOptimisations;
 using SentisOptimisationsPlugin.AnomalyZone;
 using SentisOptimisationsPlugin.Clusters;
-using SentisOptimisationsPlugin.Garage;
 using SOPlugin.GUI;
 using Torch;
 using Torch.API;
@@ -41,7 +40,6 @@ namespace SentisOptimisationsPlugin
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
         public static PcuLimiter _limiter = new PcuLimiter();
         public static AZCore AzCore = new AZCore();
-        public static OldGridProcessor _oldGridProcessor = new OldGridProcessor();
         public static ClusterBuilder _cb = new ClusterBuilder();
         public static Dictionary<long,long> stuckGrids = new Dictionary<long, long>();
         public static Dictionary<long,long> gridsInSZ = new Dictionary<long, long>();
@@ -85,7 +83,6 @@ namespace SentisOptimisationsPlugin
                 DamagePatch.Init();
                 _limiter.OnLoaded();
                 _cb.OnLoaded();
-                _oldGridProcessor.OnLoaded();
                 ConveyorPatch.OnLoaded();
                 Communication.RegisterHandlers();
             }

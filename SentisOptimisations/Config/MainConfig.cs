@@ -33,6 +33,7 @@ namespace SentisOptimisationsPlugin
         private bool _clustersEnabled = false;
         private bool _allowMerge = false;
         private bool _includeConnectedGrids = false;
+        private bool _removeEntityPhantomPatch = false;
         private String _pathToAsters = "C:\\Asteroids";
         private bool _garageEnabled = true;
         private String _pathToGarage = "D:\\torch-server\\GARAGE";
@@ -335,6 +336,13 @@ namespace SentisOptimisationsPlugin
         {
             get => _includeConnectedGrids;
             set => SetValue(ref _includeConnectedGrids, value);
+        }
+        
+        [DisplayTab(Name = "Experimental crash fix RemoveEntityPhantom", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Experimental crash fix RemoveEntityPhantom")]
+        public bool RemoveEntityPhantomPatch
+        {
+            get => _removeEntityPhantomPatch;
+            set => SetValue(ref _removeEntityPhantomPatch, value);
         }
     }
 }
