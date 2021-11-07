@@ -58,6 +58,10 @@ namespace SentisOptimisationsPlugin
         private float _findProjectedBlocksSlowdown = 1;
         
         private float _thrustPowerMultiplier = 10f;
+        private float _missileInitialSpeed = 500f;
+        private float _missileAcceleration = 0f;
+        private float _missileDamage = 1500f;
+        private float _turretsDamageMultiplier = 0.1f;
         private float _physicsMsToAlert = 1.5f;
         private float _physicsMsToPunish = 2f;
         private float _physicsMsToPunishImmediately = 5f;
@@ -280,6 +284,35 @@ namespace SentisOptimisationsPlugin
             get => _thrustPowerMultiplier;
             set => SetValue(ref _thrustPowerMultiplier, value);
         }
+        
+        [DisplayTab(Name = "Missile initial Speed", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Missile initial Speed")]
+        public float MissileInitialSpeed
+        {
+            get => _missileInitialSpeed;
+            set => SetValue(ref _missileInitialSpeed, value);
+        }
+        
+        [DisplayTab(Name = "Missile Acceleration", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Missile Acceleration")]
+        public float MissileAcceleration
+        {
+            get => _missileAcceleration;
+            set => SetValue(ref _missileAcceleration, value);
+        }
+        
+        [DisplayTab(Name = "Missile Damage", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Missile Damage")]
+        public float MissileDamage
+        {
+            get => _missileDamage;
+            set => SetValue(ref _missileDamage, value);
+        }
+        
+        [DisplayTab(Name = "Damage to turrets multiplier", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Damage to turrets multiplier")]
+        public float TurretsDamageMultiplier
+        {
+            get => _turretsDamageMultiplier;
+            set => SetValue(ref _turretsDamageMultiplier, value);
+        }
+        
         [DisplayTab(Name = "Physics ms to punish", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Physics ms to punish")]
         public float PhysicsMsToPunish
         {

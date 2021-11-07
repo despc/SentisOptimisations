@@ -21,6 +21,10 @@ namespace TorchMonitor.ProfilerMonitors
         private Dictionary<long, int> timeToFixDictionary = new Dictionary<long, int>();
         public void AlertPlayerGrid(IMyCubeGrid grid)
         {
+            if (grid.DisplayName.Contains("@"))
+            {
+                return;
+            }
             if (grid.BigOwners.Count == 0)
             {
                 ConvertToStatic((MyCubeGrid) grid);
@@ -40,6 +44,10 @@ namespace TorchMonitor.ProfilerMonitors
 
         public void PunishPlayerGrid(IMyCubeGrid grid)
         {
+            if (grid.DisplayName.Contains("@"))
+            {
+                return;
+            }
             if (grid.BigOwners.Count == 0)
             {
                 ConvertToStatic((MyCubeGrid) grid);

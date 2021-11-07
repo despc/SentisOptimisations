@@ -40,6 +40,7 @@
       <Compile Include="AnomalyZone\ScoreDescription.cs" />
       <Compile Include="Balance\MergePatch.cs" />
       <Compile Include="Balance\ThrustPatch.cs" />
+      <Compile Include="Balance\WeaponsPatch.cs" />
       <Compile Include="Clusters\AssemblersConcurrencyFix.cs" />
       <Compile Include="Clusters\ClusterBuilder.cs" />
       <Compile Include="Clusters\ParallelPatch.cs" />
