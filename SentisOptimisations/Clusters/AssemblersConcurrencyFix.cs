@@ -15,7 +15,8 @@ namespace FixTurrets.Clusters
     public static class AssemblersConcurrencyFix
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
-
+        private static Random r = new Random();
+        
         public static void Patch(PatchContext ctx)
         {
             var MethodGetMasterAssembler = typeof(MyAssembler).GetMethod
@@ -24,6 +25,27 @@ namespace FixTurrets.Clusters
             ctx.GetPattern(MethodGetMasterAssembler).Prefixes.Add(
                 typeof(AssemblersConcurrencyFix).GetMethod(nameof(GetMasterAssemblerPatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
+            var MethodUpdateAssembleMode = typeof(MyAssembler).GetMethod
+                ("UpdateAssembleMode", BindingFlags.Instance | BindingFlags.NonPublic);
+
+            ctx.GetPattern(MethodUpdateAssembleMode).Prefixes.Add(
+                typeof(AssemblersConcurrencyFix).GetMethod(nameof(UpdateAssembleModePatched),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+        }
+
+
+        private static bool UpdateAssembleModePatched()
+        {
+            var pullItemsSlowdown = SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.AssemblerPullItemsSlowdown;
+            var chance = 1 / pullItemsSlowdown;
+            var run = r.NextDouble() <= chance;
+            if (run)
+            {
+                return true;
+            }
+
+            return false;
         }
 
         private static bool GetMasterAssemblerPatched(MyAssembler __instance, ref MyAssembler __result)

@@ -53,6 +53,16 @@ namespace SentisOptimisationsPlugin
         
         private float _pullItemsSlowdown = 1;
         
+        private float _assemblerPullItemsSlowdown = 1;
+        
+        private float _findProjectedBlocksSlowdown = 1;
+        
+        private float _thrustPowerMultiplier = 10f;
+        private float _physicsMsToAlert = 1.5f;
+        private float _physicsMsToPunish = 2f;
+        private float _physicsMsToPunishImmediately = 5f;
+        private int _physicsChecksBeforePunish = 5;
+        
         private int _minimumMassForKineticDamage = 5000;
         
         private bool _safeZoneSubGridOptimisation = true;
@@ -241,6 +251,54 @@ namespace SentisOptimisationsPlugin
         {
             get => _pullItemsSlowdown;
             set => SetValue(ref _pullItemsSlowdown, value);
+        }
+        
+        [DisplayTab(Name = "Assembler Pull Items Slowdown", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Assembler Pull Items Slowdown")]
+        public float AssemblerPullItemsSlowdown
+        {
+            get => _assemblerPullItemsSlowdown;
+            set => SetValue(ref _assemblerPullItemsSlowdown, value);
+        }
+        
+        [DisplayTab(Name = "Find Projected Blocks Slowdown", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Find Projected Blocks Slowdown")]
+        public float FindProjectedBlocksSlowdown
+        {
+            get => _findProjectedBlocksSlowdown;
+            set => SetValue(ref _findProjectedBlocksSlowdown, value);
+        } 
+
+        [DisplayTab(Name = "Physics ms to alert", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Physics ms to alert")]
+        public float PhysicsMsToAlert
+        {
+            get => _physicsMsToAlert;
+            set => SetValue(ref _physicsMsToAlert, value);
+        }
+        
+        [DisplayTab(Name = "Thruster magnitude multiplier", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Thruster magnitude multiplier")]
+        public float ThrustPowerMultiplier
+        {
+            get => _thrustPowerMultiplier;
+            set => SetValue(ref _thrustPowerMultiplier, value);
+        }
+        [DisplayTab(Name = "Physics ms to punish", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Physics ms to punish")]
+        public float PhysicsMsToPunish
+        {
+            get => _physicsMsToPunish;
+            set => SetValue(ref _physicsMsToPunish, value);
+        }
+        
+        [DisplayTab(Name = "Physics ms to punish immediately", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Physics ms to punish immediately")]
+        public float PhysicsMsToPunishImmediately
+        {
+            get => _physicsMsToPunishImmediately;
+            set => SetValue(ref _physicsMsToPunishImmediately, value);
+        }
+        
+        [DisplayTab(Name = "Physics checks before punish", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Physics checks before punish")]
+        public int PhysicsChecksBeforePunish
+        {
+            get => _physicsChecksBeforePunish;
+            set => SetValue(ref _physicsChecksBeforePunish, value);
         }
         
         [DisplayTab(Name = "Cluster1 build delay", GroupName = "Clusters", Tab = "Clusters", Order = 0, Description = "Cluster1 build delay")]

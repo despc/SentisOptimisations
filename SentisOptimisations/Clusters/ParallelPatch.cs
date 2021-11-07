@@ -138,6 +138,10 @@ namespace SentisOptimisationsPlugin
         {
             try
             {
+                if (r.NextDouble() > 0.4)
+                {
+                    return false;
+                }
                 ListReader<MyThrustFlameAnimator.FlameInfo> m_flames =
                     (ListReader<MyThrustFlameAnimator.FlameInfo>) ReflectionUtils.GetInstanceField(typeof(MyThrust),
                         __instance, "m_flames");

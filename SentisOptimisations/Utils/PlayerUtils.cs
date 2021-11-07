@@ -28,7 +28,7 @@ namespace SentisOptimisations
             return (MyIdentity) null;
         }
 
-        public static long GetOwner(MyCubeGrid grid)
+        public static long GetOwner(IMyCubeGrid grid)
         {
             List<long> bigOwners = grid.BigOwners;
             int count = bigOwners.Count;

@@ -69,7 +69,7 @@ namespace SentisOptimisationsPlugin.ShipTool
 
             if (!__instance.CubeGrid.IsStatic)
             {
-                SetRadius(__instance, (float) (r.NextDouble() * SentisOptimisationsPlugin.Config.ShipWelderRadius));
+                SetRadius(__instance, SentisOptimisationsPlugin.Config.ShipWelderRadius);
                 return;
             }
 
@@ -78,13 +78,13 @@ namespace SentisOptimisationsPlugin.ShipTool
             var playerFaction = MySession.Static.Factions.GetPlayerFaction(ownerId);
             if (playerFaction == null)
             {
-                SetRadius(__instance, (float) (r.NextDouble() * SentisOptimisationsPlugin.Config.ShipWelderRadius));
+                SetRadius(__instance, SentisOptimisationsPlugin.Config.ShipWelderRadius);
                 return;
             }
 
             if (!myShipWelder.CustomData.Contains("[AZ_REWARD]"))
             {
-                SetRadius(__instance, (float) (r.NextDouble() * SentisOptimisationsPlugin.Config.ShipWelderRadius));
+                SetRadius(__instance, SentisOptimisationsPlugin.Config.ShipWelderRadius);
                 return;
             }
 
@@ -92,11 +92,11 @@ namespace SentisOptimisationsPlugin.ShipTool
 
             if (!SentisOptimisationsPlugin.Config.AzWinners.Contains(factionTag))
             {
-                SetRadius(__instance, (float) (r.NextDouble() * SentisOptimisationsPlugin.Config.ShipWelderRadius));
+                SetRadius(__instance, SentisOptimisationsPlugin.Config.ShipWelderRadius);
                 return;
             }
 
-            SetRadius(__instance, (float) (r.NextDouble() * SentisOptimisationsPlugin.Config.ShipSuperWelderRadius));
+            SetRadius(__instance,  SentisOptimisationsPlugin.Config.ShipSuperWelderRadius);
         }
 
         private static void SetRadius(MyShipToolBase __instance, float radius)

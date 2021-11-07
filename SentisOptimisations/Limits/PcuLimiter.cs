@@ -12,6 +12,7 @@ using Sandbox.ModAPI;
 using SentisOptimisations;
 using SpaceEngineers.Game.Entities.Blocks;
 using SpaceEngineers.Game.Entities.Blocks.SafeZone;
+using TorchMonitor.ProfilerMonitors;
 using VRage.Game;
 using VRage.Game.ModAPI;
 using VRageMath;
@@ -42,7 +43,7 @@ namespace SentisOptimisationsPlugin
                 {
                     try
                     {
-                        await Task.Delay(30000);
+                        await Task.Delay(15000);
                         var myCubeGrids = MyEntities.GetEntities().OfType<MyCubeGrid>();
                         await Task.Run(() => { CheckAllGrids(myCubeGrids); });
                     }
@@ -53,7 +54,7 @@ namespace SentisOptimisationsPlugin
                     
                     try
                     {
-                        await Task.Delay(30000);
+                        await Task.Delay(15000);
                         var myCubeGrids = MyEntities.GetEntities().OfType<MyCubeGrid>();
                         await Task.Run(() => { CheckNobodyOwner(myCubeGrids); });
                     }
@@ -61,6 +62,8 @@ namespace SentisOptimisationsPlugin
                     {
                         Log.Error("Nobody check", e);
                     }
+                    
+                    await PhysicsProfilerMonitor.__instance.Profile();
                 }
             }
             catch (Exception e)
