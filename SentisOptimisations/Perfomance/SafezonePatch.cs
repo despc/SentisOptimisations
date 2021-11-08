@@ -145,10 +145,6 @@ namespace SentisOptimisationsPlugin
                     MySessionComponentSafeZones.IsRecentlyAddedOrRemoved(topEntity) || !entity.InScene;
                 Tuple<HkRigidBody, IMyEntity> p = new Tuple<HkRigidBody, IMyEntity>(body, entity);
                 HashSet<Tuple<HkRigidBody, IMyEntity>> m_RemoveEntityPhantomTaskList = new HashSet<Tuple<HkRigidBody, IMyEntity>>();
-                // HashSet<Tuple<HkRigidBody, IMyEntity>> m_RemoveEntityPhantomTaskList =
-                //     (HashSet<Tuple<HkRigidBody, IMyEntity>>) ReflectionUtils.GetInstanceField(typeof(MySafeZone),
-                //         __instance, "m_RemoveEntityPhantomTaskList");
-
                 if (m_RemoveEntityPhantomTaskList.Contains(p))
                     return false;
                 m_RemoveEntityPhantomTaskList.Add(p);
@@ -228,14 +224,6 @@ namespace SentisOptimisationsPlugin
                                     }
                                 }
                             }
-
-                            // BindingFlags bindFlags = BindingFlags.Instance | BindingFlags.Public |
-                            //                          BindingFlags.NonPublic
-                            //                          | BindingFlags.Static;
-                            // var method = typeof(MySafeZone).GetMethod("entity_OnClose", bindFlags);
-                            // var @delegate = Delegate.CreateDelegate(typeof(Action<MyEntity>), entityOnClose, typeof(MySafeZone).GetMethod("entity_OnClose", bindFlags))
-                            // Action<MyEntity> entityOnClose = (Action<MyEntity>) @delegate;
-                            // topEntity.OnClose -= new Action<MyEntity>(entityOnClose);
                         }
                     }
                     catch (Exception e)

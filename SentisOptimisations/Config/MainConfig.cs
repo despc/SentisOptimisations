@@ -58,6 +58,7 @@ namespace SentisOptimisationsPlugin
         private float _findProjectedBlocksSlowdown = 1;
         
         private float _thrustPowerMultiplier = 10f;
+        private float _gasTankCapacityMultiplier = 2f;
         private float _missileInitialSpeed = 500f;
         private float _missileAcceleration = 0f;
         private float _missileDamage = 1500f;
@@ -290,6 +291,13 @@ namespace SentisOptimisationsPlugin
         {
             get => _missileInitialSpeed;
             set => SetValue(ref _missileInitialSpeed, value);
+        }
+        
+        [DisplayTab(Name = "Gas tank capacity", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Gas tank capacity")]
+        public float GasTankCapacityMultiplier
+        {
+            get => _gasTankCapacityMultiplier;
+            set => SetValue(ref _gasTankCapacityMultiplier, value);
         }
         
         [DisplayTab(Name = "Missile Acceleration", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Missile Acceleration")]
