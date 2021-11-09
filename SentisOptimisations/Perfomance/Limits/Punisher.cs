@@ -19,6 +19,7 @@ namespace TorchMonitor.ProfilerMonitors
         public static Punisher __instance = new Punisher();
 
         private Dictionary<long, int> timeToFixDictionary = new Dictionary<long, int>();
+        private Dictionary<long, int> timeToAlarmDictionary = new Dictionary<long, int>();
         public void AlertPlayerGrid(IMyCubeGrid grid)
         {
             if (grid.DisplayName.Contains("@"))
@@ -29,14 +30,30 @@ namespace TorchMonitor.ProfilerMonitors
             {
                 ConvertToStatic((MyCubeGrid) grid);
             }
-            ChatUtils.SendTo(grid.BigOwners[0],
-                "Предупреждение. Структура " + grid.DisplayName + " оказывает повышенное влияние на производительность сервера,\n" +
-                " при увеличении нагрузки структура будет конвертирована в станцию");
-            MyVisualScriptLogicProvider.ShowNotification(
-                "Предупреждение. Структура " + grid.DisplayName + " оказывает повышенное влияние на производительность сервера,\n" +
-                " при увеличении нагрузки структура будет конвертирована в станцию", 10000,
-                "Red",
-                grid.BigOwners[0]);
+            
+            if (timeToAlarmDictionary.ContainsKey(grid.EntityId))
+            {
+                timeToAlarmDictionary[grid.EntityId] = timeToAlarmDictionary[grid.EntityId] + 1;
+            }
+            else
+            {
+                timeToAlarmDictionary[grid.EntityId] = 1;
+            }
+            
+            if (timeToAlarmDictionary[grid.EntityId] > SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.PhysicsChecksBeforePunish / 2)
+            {
+                ChatUtils.SendTo(grid.BigOwners[0],
+                    "Предупреждение. Структура " + grid.DisplayName + " оказывает повышенное влияние на производительность сервера,\n" +
+                    " при увеличении нагрузки структура будет конвертирована в станцию");
+                MyVisualScriptLogicProvider.ShowNotification(
+                    "Предупреждение. Структура " + grid.DisplayName + " оказывает повышенное влияние на производительность сервера,\n" +
+                    " при увеличении нагрузки структура будет конвертирована в станцию", 5000,
+                    "Red",
+                    grid.BigOwners[0]);
+                timeToAlarmDictionary.Remove(grid.EntityId);
+            }
+            
+            
             
             Log.Warn("Grid " + grid.DisplayName + " of player " + PlayerUtils.GetOwner(grid) +
                      " make some physics problems");

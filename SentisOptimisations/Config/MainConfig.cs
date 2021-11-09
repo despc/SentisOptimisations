@@ -59,6 +59,7 @@ namespace SentisOptimisationsPlugin
         
         private float _thrustPowerMultiplier = 10f;
         private float _gasTankCapacityMultiplier = 2f;
+        private float _h2GenMultiplier = 10f;
         private float _missileInitialSpeed = 500f;
         private float _missileAcceleration = 0f;
         private float _missileDamage = 1500f;
@@ -298,6 +299,13 @@ namespace SentisOptimisationsPlugin
         {
             get => _gasTankCapacityMultiplier;
             set => SetValue(ref _gasTankCapacityMultiplier, value);
+        }
+        
+        [DisplayTab(Name = "H2/O2 generator multiplier", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "H2/O2 generator multiplier")]
+        public float H2GenMultiplier
+        {
+            get => _h2GenMultiplier;
+            set => SetValue(ref _h2GenMultiplier, value);
         }
         
         [DisplayTab(Name = "Missile Acceleration", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Missile Acceleration")]
