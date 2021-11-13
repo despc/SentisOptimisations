@@ -37,6 +37,9 @@
       <Compile Include="AnomalyZone\AZCommands.cs" />
       <Compile Include="AnomalyZone\AZCore.cs" />
       <Compile Include="AnomalyZone\AZReward.cs" />
+      <Compile Include="AnomalyZone\Communication\Communication.cs" />
+      <Compile Include="AnomalyZone\Communication\DrawSphereRequest.cs" />
+      <Compile Include="AnomalyZone\Communication\MessageType.cs" />
       <Compile Include="AnomalyZone\ScoreDescription.cs" />
       <Compile Include="Anticheat\HydrogenPatch.cs" />
       <Compile Include="Balance\GasTankPatch.cs" />

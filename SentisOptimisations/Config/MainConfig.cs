@@ -24,6 +24,13 @@ namespace SentisOptimisationsPlugin
         private int _azMessageTime = 960;
         private int _maxDinamycGridPCU = 30000;
         private int _noDamageFromVoxelsBeforeSpeed = 30;
+        private bool _clusterParallelProduction = true;
+        private bool _clusterParallelWelders = true;
+        private bool _clusterParallelGrinders = true;
+        private bool _clusterParallelDrill = true;
+        private bool _clusterParallelWeapons = true;
+        private bool _clusterParallelGas = true;
+        private bool _randomUpdate = false;
         private int _cluster1BuildDelay = 30;
         private int _cluster10BuildDelay = 250;
         private int _cluster100BuildDelay = 1000;
@@ -72,6 +79,7 @@ namespace SentisOptimisationsPlugin
         private int _minimumMassForKineticDamage = 5000;
         
         private bool _safeZoneSubGridOptimisation = true;
+        private int _safeZonePhysicsThreshold = 10;
         
         private ObservableCollection<ConfigShipInMarket> configShipsInMarket = new ObservableCollection<ConfigShipInMarket>();
 
@@ -161,6 +169,13 @@ namespace SentisOptimisationsPlugin
         {
             get => _safeZoneSubGridOptimisation;
             set => SetValue(ref _safeZoneSubGridOptimisation, value);
+        }
+        
+        [DisplayTab(Name = "Safe zone Physics Threshold", GroupName = "Safe zone", Tab = "Safe zone", Order = 0, Description = "Safe zone Physics Threshold")]
+        public int SafeZonePhysicsThreshold
+        {
+            get => _safeZonePhysicsThreshold;
+            set => SetValue(ref _safeZonePhysicsThreshold, value);
         }
         
         [DisplayTab(Name = "Max static grid PCU", GroupName = "PCU limiter", Tab = "PCU limiter", Order = 0, Description = "Max static grid PCU")]
@@ -423,6 +438,55 @@ namespace SentisOptimisationsPlugin
         {
             get => _clustersEnabled;
             set => SetValue(ref _clustersEnabled, value);
+        }
+
+        [DisplayTab(Name = "Parallel Production", GroupName = "Clusters", Tab = "Clusters", Order = 0, Description = "Parallel Production")]
+        public bool ClustersParallelProduction
+        {
+            get => _clusterParallelProduction;
+            set => SetValue(ref _clusterParallelProduction, value);
+        }
+        
+        [DisplayTab(Name = "Parallel Welders", GroupName = "Clusters", Tab = "Clusters", Order = 0, Description = "Parallel Welders")]
+        public bool ClustersParallelWelders
+        {
+            get => _clusterParallelWelders;
+            set => SetValue(ref _clusterParallelWelders, value);
+        }
+        
+        [DisplayTab(Name = "Parallel Grinders", GroupName = "Clusters", Tab = "Clusters", Order = 0, Description = "Parallel Grinders")]
+        public bool ClustersParallelGrinders
+        {
+            get => _clusterParallelGrinders;
+            set => SetValue(ref _clusterParallelGrinders, value);
+        }
+        
+        [DisplayTab(Name = "Parallel Drill", GroupName = "Clusters", Tab = "Clusters", Order = 0, Description = "Parallel Drill")]
+        public bool ClustersParallelDrill
+        {
+            get => _clusterParallelDrill;
+            set => SetValue(ref _clusterParallelDrill, value);
+        }
+        
+        [DisplayTab(Name = "Parallel Weapons", GroupName = "Clusters", Tab = "Clusters", Order = 0, Description = "Parallel Weapons")]
+        public bool ClustersParallelWeapons
+        {
+            get => _clusterParallelWeapons;
+            set => SetValue(ref _clusterParallelWeapons, value);
+        }
+        
+        [DisplayTab(Name = "Parallel Gas", GroupName = "Clusters", Tab = "Clusters", Order = 0, Description = "Parallel Gas")]
+        public bool ClustersParallelGas
+        {
+            get => _clusterParallelGas;
+            set => SetValue(ref _clusterParallelGas, value);
+        }
+        
+        [DisplayTab(Name = "Random update", GroupName = "Clusters", Tab = "Clusters", Order = 0, Description = "Random update))))")]
+        public bool RandomUpdate
+        {
+            get => _randomUpdate;
+            set => SetValue(ref _randomUpdate, value);
         }
         
         [DisplayTab(Name = "Points by online enemies", GroupName = "Anomaly Zone", Tab = "Anomaly Zone", Order = 0, Description = "Points by online enemies")]

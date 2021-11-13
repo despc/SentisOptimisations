@@ -43,7 +43,6 @@ namespace SentisOptimisationsPlugin
         public static ClusterBuilder _cb = new ClusterBuilder();
         public static Dictionary<long,long> stuckGrids = new Dictionary<long, long>();
         public static Dictionary<long,long> gridsInSZ = new Dictionary<long, long>();
-        public static MethodInfo m_myProgrammableBlockKillProgramm;
         private static TorchSessionManager SessionManager;
         private static Persistent<MainConfig> _config;
         public static MainConfig Config => _config.Data;
@@ -61,7 +60,6 @@ namespace SentisOptimisationsPlugin
             if (SessionManager == null)
                 return;
             SessionManager.SessionStateChanged += SessionManager_SessionStateChanged;
-            m_myProgrammableBlockKillProgramm = typeof (MyProgrammableBlock).GetMethod("OnProgramTermination", BindingFlags.Instance | BindingFlags.NonPublic);
         }
 
         private void SessionManager_SessionStateChanged(
@@ -166,7 +164,7 @@ namespace SentisOptimisationsPlugin
                     }
 
                     var time = keyValuePair.Value;
-                    if (time > 5)
+                    if (time > 10)
                     {
                         Log.Error("Entity in sz " + entityId + "   " + displayName + " time - " + time);
                         if (gridsInSZ.ContainsKey(entityId))

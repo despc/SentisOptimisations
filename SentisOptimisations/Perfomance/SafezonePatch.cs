@@ -82,7 +82,7 @@ namespace SentisOptimisationsPlugin
                     new object[] {body, entity});
                 stopwatch.Stop();
                 var stopwatchElapsedMilliseconds = stopwatch.ElapsedMilliseconds;
-                if (stopwatchElapsedMilliseconds < 4)
+                if (stopwatchElapsedMilliseconds < SentisOptimisationsPlugin.Config.SafeZonePhysicsThreshold)
                 {
                     return false;
                 }

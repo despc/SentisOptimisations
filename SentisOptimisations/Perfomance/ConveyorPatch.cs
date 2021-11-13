@@ -12,6 +12,7 @@ using Sandbox.Game.GameSystems.Conveyors;
 using SentisOptimisations;
 using Torch.Managers.PatchManager;
 using VRage;
+using VRage.Algorithms;
 using VRage.Game;
 
 namespace SentisOptimisationsPlugin
@@ -25,8 +26,33 @@ namespace SentisOptimisationsPlugin
         public static ConcurrentDictionary<long, ConcurrentDictionary<Key, bool>> ConveyourCache =
             new ConcurrentDictionary<long, ConcurrentDictionary<Key, bool>>();
 
+        private static bool IsConveyorLarge(IMyPathEdge<IMyConveyorEndpoint> conveyorLine) => !(conveyorLine is MyConveyorLine) || (conveyorLine as MyConveyorLine).Type == MyObjectBuilder_ConveyorLine.LineType.LARGE_LINE;
+
+
+        private static Predicate<IMyPathEdge<IMyConveyorEndpoint>> IsConveyorLargePredicate = new Predicate<IMyPathEdge<IMyConveyorEndpoint>>(IsConveyorLarge);
+        private static Predicate<IMyConveyorEndpoint> IsAccessAllowedPredicate = new Predicate<IMyConveyorEndpoint>(
+            delegate(IMyConveyorEndpoint endpoint)
+            {
+                return (bool) ReflectionUtils.InvokeStaticMethod(typeof(MyGridConveyorSystem), "IsAccessAllowed",
+                    new object[] {endpoint});});
+        
         public static long UncachedCalls = 0;
         public static Random r = new Random();
+        
+        
+        private static MyPathFindingSystem<IMyConveyorEndpoint> Pathfinding
+        {
+            get
+            {
+                if (ReflectionUtils.GetPrivateStaticField(typeof(MyGridConveyorSystem), "m_pathfinding") == null)
+                {
+                    ReflectionUtils.SetPrivateStaticField(typeof(MyGridConveyorSystem), "m_pathfinding",
+                        new MyPathFindingSystem<IMyConveyorEndpoint>());
+                }
+                return (MyPathFindingSystem<IMyConveyorEndpoint>) ReflectionUtils.GetPrivateStaticField(typeof(MyGridConveyorSystem), "m_pathfinding");
+            }
+        }
+        
         public static void Patch(PatchContext ctx)
         {
             var MethodOnBlockAdded = typeof(MyCubeGridSystems).GetMethod
@@ -136,7 +162,50 @@ namespace SentisOptimisationsPlugin
                 Log.Error(e);
             }
 
-            return true;
+            __result = ComputeCanTransferNative(start, end, itemId);
+            return false;
+        }
+        
+        public static bool ComputeCanTransferNative(
+            IMyConveyorEndpointBlock start,
+            IMyConveyorEndpointBlock end,
+            MyDefinitionId? itemId)
+        {
+            List<IMyConveyorEndpoint> m_reachableBuffer = new List<IMyConveyorEndpoint>();
+            lock (Pathfinding)
+            {
+                ReflectionUtils.InvokeStaticMethod(typeof(MyGridConveyorSystem), "SetTraversalPlayerId",
+                    new object[] {start.ConveyorEndpoint.CubeBlock.OwnerId});
+                // MyGridConveyorSystem.SetTraversalPlayerId(start.ConveyorEndpoint.CubeBlock.OwnerId);
+                if (itemId.HasValue)
+                {
+                    ReflectionUtils.InvokeStaticMethod(typeof(MyGridConveyorSystem),
+                        "SetTraversalInventoryItemDefinitionId",
+                        new object[] {itemId.Value});
+                    // MyGridConveyorSystem.SetTraversalInventoryItemDefinitionId(itemId.Value);
+                }
+
+                else
+                {
+                    // MyGridConveyorSystem.SetTraversalInventoryItemDefinitionId();
+                    MyDefinitionId item = default(MyDefinitionId);
+                    ReflectionUtils.InvokeStaticMethod(typeof(MyGridConveyorSystem),
+                        "SetTraversalInventoryItemDefinitionId",
+                        new object[] {item});
+                }
+
+                Predicate<IMyPathEdge<IMyConveyorEndpoint>> edgeTraversable =
+                    (Predicate<IMyPathEdge<IMyConveyorEndpoint>>) null;
+                if (itemId.HasValue && (bool) ReflectionUtils.InvokeStaticMethod(typeof(MyGridConveyorSystem),
+                    "NeedsLargeTube",
+                    new object[] {itemId.Value}))
+                    edgeTraversable = IsConveyorLargePredicate;
+                Pathfinding.FindReachable(start.ConveyorEndpoint, m_reachableBuffer,
+                    (Predicate<IMyConveyorEndpoint>) (b => b != null && b.CubeBlock == end),
+                    IsAccessAllowedPredicate, edgeTraversable);
+            }
+
+            return (uint) m_reachableBuffer.Count > 0U;
         }
 
         private static void ComputeCanTransferPatchedPost(IMyConveyorEndpointBlock start,

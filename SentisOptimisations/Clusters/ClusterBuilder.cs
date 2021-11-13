@@ -255,14 +255,36 @@ namespace SentisOptimisationsPlugin.Clusters
 
         private bool ToSerialUpdate(MyEntity myEntity)
         {
-            if (myEntity is MyGasGenerator ||
-                 myEntity is MyAdvancedDoor ||
-                 myEntity is MyLargeTurretBase ||
-                 myEntity is MyWelder ||
-                 myEntity is MyShipWelder ||
-                 myEntity is MyGasTank ||
-                 myEntity is MyShipToolBase ||
-                 myEntity is MyShipDrill)
+            if (myEntity is MySurvivalKit)
+            {
+                tmpforSerialUpdate.Add(myEntity);
+                return true;
+            }
+            if (SentisOptimisationsPlugin.Config.ClustersParallelGas && (myEntity is MyGasGenerator || myEntity is MyGasTank))
+            {
+                return false;
+            } 
+            
+            if (SentisOptimisationsPlugin.Config.ClustersParallelWeapons && myEntity is MyLargeTurretBase)
+            {
+                return false;
+            } 
+            
+            if (SentisOptimisationsPlugin.Config.ClustersParallelDrill && myEntity is MyShipDrill)
+            {
+                return false;
+            } 
+            
+            if (SentisOptimisationsPlugin.Config.ClustersParallelWelders && myEntity is MyShipWelder)
+            {
+                return false;
+            } 
+            
+            if (SentisOptimisationsPlugin.Config.ClustersParallelGrinders && myEntity is MyShipGrinder)
+            {
+                return false;
+            } 
+            if (SentisOptimisationsPlugin.Config.ClustersParallelProduction && (myEntity is MyAssembler || myEntity is MyRefinery))
             {
                 return false;
             }
@@ -345,17 +367,31 @@ namespace SentisOptimisationsPlugin.Clusters
                 tmpforSerialUpdate10.Add(myEntity);
                 return true;
             }
-            if (myEntity is MyGasGenerator ||
-                myEntity is MyBatteryBlock ||
-                myEntity is MyAdvancedDoor ||
-                myEntity is MyLargeTurretBase ||
-                myEntity is MyShipToolBase ||
-                myEntity is MyShipDrill ||
-                myEntity is MyGasTank ||
-                myEntity is MyAirVent ||
-                myEntity is MyAssembler ||
-                myEntity is MyRefinery ||
-                myEntity is MyShipConnector)
+            if (SentisOptimisationsPlugin.Config.ClustersParallelGas && (myEntity is MyGasGenerator || myEntity is MyGasTank))
+            {
+                return false;
+            } 
+            
+            if (SentisOptimisationsPlugin.Config.ClustersParallelWeapons && myEntity is MyLargeTurretBase)
+            {
+                return false;
+            } 
+            
+            if (SentisOptimisationsPlugin.Config.ClustersParallelDrill && myEntity is MyShipDrill)
+            {
+                return false;
+            } 
+            
+            if (SentisOptimisationsPlugin.Config.ClustersParallelWelders && myEntity is MyShipWelder)
+            {
+                return false;
+            } 
+            
+            if (SentisOptimisationsPlugin.Config.ClustersParallelGrinders && myEntity is MyShipGrinder)
+            {
+                return false;
+            } 
+            if (SentisOptimisationsPlugin.Config.ClustersParallelProduction && (myEntity is MyAssembler || myEntity is MyRefinery))
             {
                 return false;
             }
@@ -443,13 +479,36 @@ namespace SentisOptimisationsPlugin.Clusters
 
         private bool ToSerialUpdate100(MyEntity myEntity)
         {
-            if (myEntity is MyGasGenerator ||
-                myEntity is MyBatteryBlock ||
-                myEntity is MyAdvancedDoor ||
-                myEntity is MyLargeTurretBase ||
-                myEntity is MyShipDrill ||
-                myEntity is MyGasTank ||
-                myEntity is MyAirVent)
+            if (myEntity is MySurvivalKit)
+            {
+                tmpforSerialUpdate100.Add(myEntity);
+                return true;
+            }
+            if (SentisOptimisationsPlugin.Config.ClustersParallelGas && (myEntity is MyGasGenerator || myEntity is MyGasTank))
+            {
+                return false;
+            } 
+            
+            if (SentisOptimisationsPlugin.Config.ClustersParallelWeapons && myEntity is MyLargeTurretBase)
+            {
+                return false;
+            } 
+            
+            if (SentisOptimisationsPlugin.Config.ClustersParallelDrill && myEntity is MyShipDrill)
+            {
+                return false;
+            } 
+            
+            if (SentisOptimisationsPlugin.Config.ClustersParallelWelders && myEntity is MyShipWelder)
+            {
+                return false;
+            } 
+            
+            if (SentisOptimisationsPlugin.Config.ClustersParallelGrinders && myEntity is MyShipGrinder)
+            {
+                return false;
+            } 
+            if (SentisOptimisationsPlugin.Config.ClustersParallelProduction && (myEntity is MyAssembler || myEntity is MyRefinery))
             {
                 return false;
             }

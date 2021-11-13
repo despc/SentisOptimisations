@@ -98,7 +98,7 @@ namespace SentisOptimisationsPlugin.AnomalyZone
         {
             try
             {
-                var radius = mySafeZone.Radius;
+                var radius = 3000;
                 // if (!IsInitialized)
                 // {
                 //     CreateControls();
@@ -373,8 +373,21 @@ namespace SentisOptimisationsPlugin.AnomalyZone
                 {
                     try
                     {
+                        var drawSphereRequest = new DrawSphereRequest();
+                        drawSphereRequest.blockId = mySafeZoneBlock.EntityId;
+                        switch (State)
+                        {
+                            case ZoneStates.Contested:
+                                drawSphereRequest.color = "Red";
+                                break;
+                            case ZoneStates.Active:
+                                drawSphereRequest.color = "Blue";
+                                break;
+                        }
+                        Communication.BroadcastToClients(MessageType.DrawSphere, MyAPIGateway.Utilities.SerializeToBinary(drawSphereRequest));
                         ReflectionUtils.InvokeInstanceMethod(typeof(MySafeZoneComponent), component, "SetColor",
                             new object[] {color});
+                        
                     }
                     catch (Exception e)
                     {
@@ -394,15 +407,18 @@ namespace SentisOptimisationsPlugin.AnomalyZone
                 Log.Error(e);
             }
         }
+
         private void PlayerDied(IMyPlayer player, IMyFaction faction)
         {
-            if (SentisOptimisationsPlugin.Config.AzPointsRemovedOnDeath == 0) return;
-
+            if (SentisOptimisationsPlugin.Config.AzPointsRemovedOnDeath <= 0) return;
+            MyAPIGateway.Utilities.InvokeOnGameThread(() =>
+            {
+                string message =
+                    $"[{faction.Tag}] {player.DisplayName} Died: -{SentisOptimisationsPlugin.Config.AzPointsRemovedOnDeath} point";
+                Log.Warn(message);
+                MyVisualScriptLogicProvider.ShowNotification(message, 5000, "Red");
+            });
             AZReward.ChangePoints(mySafeZoneBlock, faction, -SentisOptimisationsPlugin.Config.AzPointsRemovedOnDeath);
-
-            string message = $"[{faction.Tag}] {player.DisplayName} Died: -{SentisOptimisationsPlugin.Config.AzPointsRemovedOnDeath} point";
-            Log.Warn(message);
-            MyVisualScriptLogicProvider.ShowNotification(message, 5000, "Red");
         }
 
         public static event Action<IMyPlayer, IMyFaction> OnPlayerDied = delegate { };
@@ -431,14 +447,6 @@ namespace SentisOptimisationsPlugin.AnomalyZone
         {
             return (((float) progressModifier * (float) progressModifier - 1) /
                     ((float) progressModifier * (float) progressModifier + (3 * (float) progressModifier) + 1)) + 1;
-        }
-
-        private float GetRadius(long safeZoneEntityId)
-        {
-            MySafeZone entity;
-            MyEntities.TryGetEntityById<MySafeZone>(safeZoneEntityId, out entity);
-            var szRadius = entity.Radius;
-            return szRadius;
         }
 
         private void ResetActiveEnemies()
