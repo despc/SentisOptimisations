@@ -54,6 +54,8 @@ namespace SentisOptimisationsPlugin
             //         BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
 
 
+
+            
             var UpdateAfterSimulation = typeof(MyParallelEntityUpdateOrchestrator).GetMethod
                 ("UpdateAfterSimulation", BindingFlags.Instance | BindingFlags.NonPublic);
 
@@ -440,7 +442,7 @@ namespace SentisOptimisationsPlugin
             }
         }
 
-        private static bool UpdateAfterSimulationPatched()
+        private static bool UpdateAfterSimulationPatched(MyParallelEntityUpdateOrchestrator __instance)
         {
             if (!SentisOptimisationsPlugin.Config.ClustersEnabled)
             {
@@ -459,10 +461,18 @@ namespace SentisOptimisationsPlugin
                     return true;
                 }
 
-                UpdateAfterSimulationInThread(SentisOptimisationsPlugin._cb.Clusters);
+                // UpdateAfterSimulationInThread(SentisOptimisationsPlugin._cb.Clusters);
+                HashSet<MyEntity> m_entitiesForUpdate = (HashSet<MyEntity>) ReflectionUtils.GetInstanceField(__instance, "m_entitiesForUpdate");
+                foreach (MyEntity myEntity in m_entitiesForUpdate)
+                {
+                    if (myEntity != null && !ClusterBuilder.m_entitiesForUpdateId.Contains(myEntity.EntityId) && !myEntity.MarkedForClose &&(myEntity.Flags & EntityFlags.NeedsUpdate) != (EntityFlags) 0 && myEntity.InScene)
+                    {
+                        myEntity.UpdateAfterSimulation();
+                    }
+                }
                 lock (ClusterBuilder.buildClustersLock)
                 {
-                    UpdateSetAfterSimulation(SentisOptimisationsPlugin._cb.ForSerialUpdate);
+                    UpdateAfterSimulationInThread(SentisOptimisationsPlugin._cb.Clusters);
                 }
             }
             catch (Exception e)
@@ -473,7 +483,7 @@ namespace SentisOptimisationsPlugin
             return false;
         }
 
-        private static bool UpdateAfterSimulation10Patched()
+        private static bool UpdateAfterSimulation10Patched(MyParallelEntityUpdateOrchestrator __instance)
         {
             if (!SentisOptimisationsPlugin.Config.ClustersEnabled)
             {
@@ -493,10 +503,21 @@ namespace SentisOptimisationsPlugin
                     return true;
                 }
 
-                UpdateAfterSimulation10InThread(SentisOptimisationsPlugin._cb.Clusters10);
+                MyDistributedUpdater<List<MyEntity>, MyEntity> m_entitiesForUpdate10 = 
+                    (MyDistributedUpdater<List<MyEntity>, MyEntity>) ReflectionUtils.GetInstanceField(__instance, "m_entitiesForUpdate10");
+                foreach (MyEntity myEntity in m_entitiesForUpdate10)
+                {
+                    if (myEntity != null && !ClusterBuilder.m_entitiesForUpdate10Id.Contains
+                            (myEntity.EntityId) && !myEntity.MarkedForClose &&
+                        (myEntity.Flags & EntityFlags.NeedsUpdate10) != (EntityFlags) 0 && myEntity.InScene)
+                    {
+                        myEntity.UpdateAfterSimulation10();
+                    }
+                        
+                }
                 lock (ClusterBuilder.buildClustersLock10)
                 {
-                    UpdateSetAfterSimulation10(SentisOptimisationsPlugin._cb.ForSerialUpdate10);
+                    UpdateAfterSimulation10InThread(SentisOptimisationsPlugin._cb.Clusters10);
                 }
             }
             catch (Exception e)
@@ -507,7 +528,7 @@ namespace SentisOptimisationsPlugin
             return false;
         }
 
-        private static bool UpdateAfterSimulation100Patched()
+        private static bool UpdateAfterSimulation100Patched(MyParallelEntityUpdateOrchestrator __instance)
         {
             if (!SentisOptimisationsPlugin.Config.ClustersEnabled)
             {
@@ -525,11 +546,22 @@ namespace SentisOptimisationsPlugin
 
                     return true;
                 }
-
-                UpdateAfterSimulation100InThread(SentisOptimisationsPlugin._cb.Clusters100);
+                MyDistributedUpdater<List<MyEntity>, MyEntity> m_entitiesForUpdate100 = 
+                    (MyDistributedUpdater<List<MyEntity>, MyEntity>) ReflectionUtils.GetInstanceField(__instance, "m_entitiesForUpdate100");
+                foreach (MyEntity myEntity in m_entitiesForUpdate100)
+                {
+                    if (myEntity != null && !ClusterBuilder.m_entitiesForUpdate100Id.Contains
+                            (myEntity.EntityId) && !myEntity.MarkedForClose &&
+                        (myEntity.Flags & EntityFlags.NeedsUpdate100) != (EntityFlags) 0 && myEntity.InScene)
+                    {
+                        myEntity.UpdateAfterSimulation10();
+                    }
+                        
+                }
+                
                 lock (ClusterBuilder.buildClustersLock100)
                 {
-                    UpdateSetAfterSimulation100(SentisOptimisationsPlugin._cb.ForSerialUpdate100);
+                    UpdateAfterSimulation100InThread(SentisOptimisationsPlugin._cb.Clusters100);
                 }
             }
             catch (Exception e)

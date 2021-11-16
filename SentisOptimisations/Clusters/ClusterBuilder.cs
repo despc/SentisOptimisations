@@ -70,6 +70,15 @@ namespace SentisOptimisationsPlugin.Clusters
 
         public List<MyEntity> ForSerialUpdate100 => forSerialUpdate100;
 
+        
+        public static HashSet<MyEntity> m_entitiesForUpdate = new HashSet<MyEntity>();
+        public static MyDistributedUpdater<List<MyEntity>, MyEntity> m_entitiesForUpdate10 = new MyDistributedUpdater<List<MyEntity>, MyEntity>(10);
+        public static MyDistributedUpdater<List<MyEntity>, MyEntity> m_entitiesForUpdate100 = new MyDistributedUpdater<List<MyEntity>, MyEntity>(100);
+        
+        public static HashSet<long> m_entitiesForUpdateId = new HashSet<long>();
+        public static HashSet<long> m_entitiesForUpdate10Id = new HashSet<long>();
+        public static HashSet<long> m_entitiesForUpdate100Id = new HashSet<long>();
+        
         public void OnLoaded()
         {
             CancellationTokenSource = new CancellationTokenSource();
@@ -189,19 +198,19 @@ namespace SentisOptimisationsPlugin.Clusters
             tmpClusters = new Dictionary<long, List<MyEntity>>();
             tmpforSerialUpdate = new List<MyEntity>();
             clustersByGrid = new Dictionary<long, int>();
-            HashSet<MyEntity> m_entitiesForUpdate =
-                (HashSet<MyEntity>) ReflectionUtils.GetInstanceField(typeof(MyParallelEntityUpdateOrchestrator),
-                    MyEntities.Orchestrator,
-                    "m_entitiesForUpdate");
+            // HashSet<MyEntity> m_entitiesForUpdate =
+            //     (HashSet<MyEntity>) ReflectionUtils.GetInstanceField(typeof(MyParallelEntityUpdateOrchestrator),
+            //         MyEntities.Orchestrator,
+            //         "m_entitiesForUpdate");
             var startNew = Stopwatch.StartNew();
             try
             {
                 foreach (var myEntity in new List<MyEntity>(m_entitiesForUpdate))
                 {
-                    if (ToSerialUpdate(myEntity))
-                    {
-                        continue;
-                    }
+                    // if (ToSerialUpdate(myEntity))
+                    // {
+                    //     continue;
+                    // }
 
                     MyEntity topEntity;
                     if (myEntity is MyCubeBlock)
@@ -257,20 +266,20 @@ namespace SentisOptimisationsPlugin.Clusters
             }
         }
 
-        private bool ToSerialUpdate(MyEntity myEntity)
-        {
-            if (myEntity is MySurvivalKit)
-            {
-                tmpforSerialUpdate.Add(myEntity);
-                return true;
-            }
-            if (!IsForSerialUpdate(myEntity)) return false;
+        // private bool ToSerialUpdate(MyEntity myEntity)
+        // {
+        //     if (myEntity is MySurvivalKit)
+        //     {
+        //         tmpforSerialUpdate.Add(myEntity);
+        //         return true;
+        //     }
+        //     if (!IsForSerialUpdate(myEntity)) return false;
+        //
+        //     tmpforSerialUpdate.Add(myEntity);
+        //     return true;
+        // }
 
-            tmpforSerialUpdate.Add(myEntity);
-            return true;
-        }
-
-        private static bool IsForSerialUpdate(MyEntity myEntity)
+        public static bool IsForSerialUpdate(MyEntity myEntity)
         {
             if (SentisOptimisationsPlugin.Config.ClustersParallelGas && (myEntity is MyGasGenerator || myEntity is MyGasTank))
             {
@@ -311,10 +320,10 @@ namespace SentisOptimisationsPlugin.Clusters
             tmpClusters10 = new Dictionary<long, List<MyEntity>>();
             tmpforSerialUpdate10 = new List<MyEntity>();
             clustersByGrid10 = new Dictionary<long, int>();
-            MyDistributedUpdater<List<MyEntity>, MyEntity> m_entitiesForUpdate10 =
-                (MyDistributedUpdater<List<MyEntity>, MyEntity>) ReflectionUtils.GetInstanceField(
-                    typeof(MyParallelEntityUpdateOrchestrator), MyEntities.Orchestrator,
-                    "m_entitiesForUpdate10");
+            // MyDistributedUpdater<List<MyEntity>, MyEntity> m_entitiesForUpdate10 =
+            //     (MyDistributedUpdater<List<MyEntity>, MyEntity>) ReflectionUtils.GetInstanceField(
+            //         typeof(MyParallelEntityUpdateOrchestrator), MyEntities.Orchestrator,
+            //         "m_entitiesForUpdate10");
             var sw = Stopwatch.StartNew();
 
             try
@@ -336,10 +345,10 @@ namespace SentisOptimisationsPlugin.Clusters
                 {
                     MyEntity topEntity;
 
-                    if (ToSerialUpdate10(myEntity))
-                    {
-                        continue;
-                    }
+                    // if (ToSerialUpdate10(myEntity))
+                    // {
+                    //     continue;
+                    // }
 
                     if (myEntity is MyCubeBlock)
                     {
@@ -390,18 +399,18 @@ namespace SentisOptimisationsPlugin.Clusters
             }
         }
 
-        private bool ToSerialUpdate10(MyEntity myEntity)
-        {
-            if (myEntity is MySurvivalKit)
-            {
-                tmpforSerialUpdate10.Add(myEntity);
-                return true;
-            }
-            if (!IsForSerialUpdate(myEntity)) return false;
-
-            tmpforSerialUpdate10.Add(myEntity);
-            return true;
-        }
+        // private bool ToSerialUpdate10(MyEntity myEntity)
+        // {
+        //     if (myEntity is MySurvivalKit)
+        //     {
+        //         tmpforSerialUpdate10.Add(myEntity);
+        //         return true;
+        //     }
+        //     if (!IsForSerialUpdate(myEntity)) return false;
+        //
+        //     tmpforSerialUpdate10.Add(myEntity);
+        //     return true;
+        // }
 
 
         private void BuildClusters100()
@@ -409,10 +418,10 @@ namespace SentisOptimisationsPlugin.Clusters
             tmpClusters100 = new Dictionary<long, List<MyEntity>>();
             clustersByGrid100 = new Dictionary<long, int>();
             tmpforSerialUpdate100 = new List<MyEntity>();
-            MyDistributedUpdater<List<MyEntity>, MyEntity> m_entitiesForUpdate100 =
-                (MyDistributedUpdater<List<MyEntity>, MyEntity>) ReflectionUtils.GetInstanceField(
-                    typeof(MyParallelEntityUpdateOrchestrator), MyEntities.Orchestrator,
-                    "m_entitiesForUpdate100");
+            // MyDistributedUpdater<List<MyEntity>, MyEntity> m_entitiesForUpdate100 =
+            //     (MyDistributedUpdater<List<MyEntity>, MyEntity>) ReflectionUtils.GetInstanceField(
+            //         typeof(MyParallelEntityUpdateOrchestrator), MyEntities.Orchestrator,
+            //         "m_entitiesForUpdate100");
             var sw = Stopwatch.StartNew();
 
             var thrusterClusterId = r.Next(-2000000000, 2000000000);
@@ -444,10 +453,10 @@ namespace SentisOptimisationsPlugin.Clusters
                         continue;
                     }
 
-                    if (ToSerialUpdate100(myEntity))
-                    {
-                        continue;
-                    }
+                    // if (ToSerialUpdate100(myEntity))
+                    // {
+                    //     continue;
+                    // }
 
                     if (myEntity is MyCubeBlock)
                     {
@@ -498,18 +507,18 @@ namespace SentisOptimisationsPlugin.Clusters
             }
         }
 
-        private bool ToSerialUpdate100(MyEntity myEntity)
-        {
-            if (myEntity is MySurvivalKit)
-            {
-                tmpforSerialUpdate100.Add(myEntity);
-                return true;
-            }
-            if (!IsForSerialUpdate(myEntity)) return false;
-
-            tmpforSerialUpdate100.Add(myEntity);
-            return true;
-        }
+        // private bool ToSerialUpdate100(MyEntity myEntity)
+        // {
+        //     if (myEntity is MySurvivalKit)
+        //     {
+        //         tmpforSerialUpdate100.Add(myEntity);
+        //         return true;
+        //     }
+        //     if (!IsForSerialUpdate(myEntity)) return false;
+        //
+        //     tmpforSerialUpdate100.Add(myEntity);
+        //     return true;
+        // }
 
         private void CollectGridsInCluster(int clusterId, MyEntity e, ref Dictionary<long, int> clustersByGridfc,
             HashSet<long> toUpdate)
