@@ -51,7 +51,7 @@ namespace SentisOptimisationsPlugin
             try
             {
                 __instance.GeneralDamageMultiplier = __instance.GeneralDamageMultiplier * SentisOptimisationsPlugin.Config.TurretsDamageMultiplier;
-                __instance.InventoryMaxVolume = __instance.InventoryMaxVolume * 20;
+                __instance.InventoryMaxVolume = __instance.InventoryMaxVolume * 10;
                 __instance.InventoryFillFactorMin = 0.8f;
                 __instance.InventoryFillFactorMin = 1;
             }

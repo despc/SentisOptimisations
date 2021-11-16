@@ -375,22 +375,6 @@ namespace SentisOptimisationsPlugin
                     continue;
                 }
 
-                if (SentisOptimisationsPlugin.Config.RandomUpdate)
-                {
-                    if (!(new Random().NextDouble() > 0.91))
-                    {
-                        continue;
-                    }
-                }
-                else
-                {
-                    if ((ulong) myEntity.EntityId % 10 != MySandboxGame.Static.SimulationFrameCounter % 10)
-                    {
-                        continue;
-                    }
-                }
-
-
                 if (!myEntity.MarkedForClose && (myEntity.Flags & EntityFlags.NeedsUpdate10) != (EntityFlags) 0 &&
                     myEntity.InScene)
                 {
@@ -419,21 +403,6 @@ namespace SentisOptimisationsPlugin
                 if (myEntity == null)
                 {
                     continue;
-                }
-                
-                if (SentisOptimisationsPlugin.Config.RandomUpdate)
-                {
-                    if (!(new Random().NextDouble() > 0.99))
-                    {
-                        continue;
-                    }
-                }
-                else
-                {
-                    if ((ulong) myEntity.EntityId % 100 != MySandboxGame.Static.SimulationFrameCounter % 100)
-                    {
-                        continue;
-                    }
                 }
 
                 if (!myEntity.MarkedForClose && (myEntity.Flags & EntityFlags.NeedsUpdate100) != (EntityFlags) 0 &&

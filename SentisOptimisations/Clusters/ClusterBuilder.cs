@@ -95,7 +95,7 @@ namespace SentisOptimisationsPlugin.Clusters
                 {
                     try
                     {
-                        await Task.Delay(SentisOptimisationsPlugin.Config.Cluster1BuildDelay);
+                        // await Task.Delay(SentisOptimisationsPlugin.Config.Cluster1BuildDelay);
                         if (!SentisOptimisationsPlugin.Config.ClustersEnabled)
                         {
                             continue;
@@ -128,7 +128,7 @@ namespace SentisOptimisationsPlugin.Clusters
                 {
                     try
                     {
-                        await Task.Delay(SentisOptimisationsPlugin.Config.Cluster10BuildDelay);
+                        // await Task.Delay(SentisOptimisationsPlugin.Config.Cluster10BuildDelay);
                         if (!SentisOptimisationsPlugin.Config.ClustersEnabled)
                         {
                             continue;
@@ -161,7 +161,7 @@ namespace SentisOptimisationsPlugin.Clusters
                 {
                     try
                     {
-                        await Task.Delay(SentisOptimisationsPlugin.Config.Cluster100BuildDelay);
+                        // await Task.Delay(SentisOptimisationsPlugin.Config.Cluster100BuildDelay);
                         if (!SentisOptimisationsPlugin.Config.ClustersEnabled)
                         {
                             continue;
@@ -236,7 +236,7 @@ namespace SentisOptimisationsPlugin.Clusters
 
                     var newClusterId = r.Next(-2000000000, 2000000000);
                     clustersByGrid[entityId] = newClusterId;
-                    CollectGridsInCluster(newClusterId, topEntity, ref clustersByGrid);
+                    CollectGridsInCluster(newClusterId, topEntity, ref clustersByGrid, new HashSet<long>());
                     tmpClusters[newClusterId] = new List<MyEntity>();
                     tmpClusters[newClusterId].Add(myEntity);
                 }
@@ -246,10 +246,14 @@ namespace SentisOptimisationsPlugin.Clusters
                     forSerialUpdate = new List<MyEntity>(tmpforSerialUpdate);
                 }
                 ClusterTime = startNew.ElapsedMilliseconds;
+                if (ClusterTime < 16.6)
+                {
+                    Thread.Sleep((int) (16.6 - ClusterTime));
+                }
             }
             catch (InvalidOperationException e)
             {
-                //Log.Error("Collection is Modified");
+               // Log.Error("Collection is Modified");
             }
         }
 
@@ -260,36 +264,45 @@ namespace SentisOptimisationsPlugin.Clusters
                 tmpforSerialUpdate.Add(myEntity);
                 return true;
             }
+            if (!IsForSerialUpdate(myEntity)) return false;
+
+            tmpforSerialUpdate.Add(myEntity);
+            return true;
+        }
+
+        private static bool IsForSerialUpdate(MyEntity myEntity)
+        {
             if (SentisOptimisationsPlugin.Config.ClustersParallelGas && (myEntity is MyGasGenerator || myEntity is MyGasTank))
-            {
-                return false;
-            } 
-            
-            if (SentisOptimisationsPlugin.Config.ClustersParallelWeapons && myEntity is MyLargeTurretBase)
-            {
-                return false;
-            } 
-            
-            if (SentisOptimisationsPlugin.Config.ClustersParallelDrill && myEntity is MyShipDrill)
-            {
-                return false;
-            } 
-            
-            if (SentisOptimisationsPlugin.Config.ClustersParallelWelders && myEntity is MyShipWelder)
-            {
-                return false;
-            } 
-            
-            if (SentisOptimisationsPlugin.Config.ClustersParallelGrinders && myEntity is MyShipGrinder)
-            {
-                return false;
-            } 
-            if (SentisOptimisationsPlugin.Config.ClustersParallelProduction && (myEntity is MyAssembler || myEntity is MyRefinery))
             {
                 return false;
             }
 
-            tmpforSerialUpdate.Add(myEntity);
+            if (SentisOptimisationsPlugin.Config.ClustersParallelWeapons && myEntity is MyLargeTurretBase)
+            {
+                return false;
+            }
+
+            if (SentisOptimisationsPlugin.Config.ClustersParallelDrill && (myEntity is MyShipDrill || myEntity is MyShipConnector))
+            {
+                return false;
+            }
+
+            if (SentisOptimisationsPlugin.Config.ClustersParallelWelders && myEntity is MyShipWelder)
+            {
+                return false;
+            }
+
+            if (SentisOptimisationsPlugin.Config.ClustersParallelGrinders && myEntity is MyShipGrinder)
+            {
+                return false;
+            }
+
+            if (SentisOptimisationsPlugin.Config.ClustersParallelProduction &&
+                (myEntity is MyAssembler || myEntity is MyRefinery))
+            {
+                return false;
+            }
+
             return true;
         }
 
@@ -306,7 +319,20 @@ namespace SentisOptimisationsPlugin.Clusters
 
             try
             {
-                foreach (var myEntity in new List<MyEntity>(m_entitiesForUpdate10.List))
+                m_entitiesForUpdate10.Update();
+                HashSet<long> toExclude = new HashSet<long>();
+                HashSet<MyEntity> toUpdate = new HashSet<MyEntity>();
+                foreach (var myEntity in m_entitiesForUpdate10)
+                {
+                    if (myEntity is MyCubeBlock)
+                    {
+                        var grid = ((MyCubeBlock) myEntity).CubeGrid;
+                        toExclude.Add(grid.EntityId);
+                        toUpdate.Add(myEntity);
+                    }
+                }
+
+                foreach (var myEntity in toUpdate)
                 {
                     MyEntity topEntity;
 
@@ -342,7 +368,7 @@ namespace SentisOptimisationsPlugin.Clusters
 
                     var newClusterId = r.Next(-2000000000, 2000000000);
                     clustersByGrid10[entityId] = newClusterId;
-                    CollectGridsInCluster(newClusterId, topEntity, ref clustersByGrid10);
+                    CollectGridsInCluster(newClusterId, topEntity, ref clustersByGrid10, toExclude);
                     tmpClusters10[newClusterId] = new List<MyEntity>();
                     tmpClusters10[newClusterId].Add(myEntity);
                 }
@@ -353,6 +379,10 @@ namespace SentisOptimisationsPlugin.Clusters
                     forSerialUpdate10 = new List<MyEntity>(tmpforSerialUpdate10);
                 }
                 ClusterTime10 = sw.ElapsedMilliseconds;
+                if (ClusterTime10 < 16.6)
+                {
+                    Thread.Sleep((int) (16.6 - ClusterTime100));
+                }
             }
             catch (InvalidOperationException e)
             {
@@ -367,34 +397,7 @@ namespace SentisOptimisationsPlugin.Clusters
                 tmpforSerialUpdate10.Add(myEntity);
                 return true;
             }
-            if (SentisOptimisationsPlugin.Config.ClustersParallelGas && (myEntity is MyGasGenerator || myEntity is MyGasTank))
-            {
-                return false;
-            } 
-            
-            if (SentisOptimisationsPlugin.Config.ClustersParallelWeapons && myEntity is MyLargeTurretBase)
-            {
-                return false;
-            } 
-            
-            if (SentisOptimisationsPlugin.Config.ClustersParallelDrill && myEntity is MyShipDrill)
-            {
-                return false;
-            } 
-            
-            if (SentisOptimisationsPlugin.Config.ClustersParallelWelders && myEntity is MyShipWelder)
-            {
-                return false;
-            } 
-            
-            if (SentisOptimisationsPlugin.Config.ClustersParallelGrinders && myEntity is MyShipGrinder)
-            {
-                return false;
-            } 
-            if (SentisOptimisationsPlugin.Config.ClustersParallelProduction && (myEntity is MyAssembler || myEntity is MyRefinery))
-            {
-                return false;
-            }
+            if (!IsForSerialUpdate(myEntity)) return false;
 
             tmpforSerialUpdate10.Add(myEntity);
             return true;
@@ -417,7 +420,21 @@ namespace SentisOptimisationsPlugin.Clusters
 
             try
             {
-                foreach (var myEntity in new List<MyEntity>(m_entitiesForUpdate100.List))
+                m_entitiesForUpdate100.Update();
+                
+                HashSet<long> toExclude = new HashSet<long>();
+                HashSet<MyEntity> toUpdate = new HashSet<MyEntity>();
+                foreach (var myEntity in m_entitiesForUpdate100)
+                {
+                    if (myEntity is MyCubeBlock)
+                    {
+                        toUpdate.Add(myEntity);
+                        var grid = ((MyCubeBlock) myEntity).CubeGrid;
+                        toExclude.Add(grid.EntityId);
+                    }
+                }
+
+                foreach (var myEntity in toUpdate)
                 {
                     MyEntity topEntity;
                     if (myEntity is MyThrust)
@@ -459,7 +476,7 @@ namespace SentisOptimisationsPlugin.Clusters
 
                     var newClusterId = r.Next(-2000000000, 2000000000);
                     clustersByGrid100[entityId] = newClusterId;
-                    CollectGridsInCluster(newClusterId, topEntity, ref clustersByGrid100);
+                    CollectGridsInCluster(newClusterId, topEntity, ref clustersByGrid100, toExclude);
                     tmpClusters100[newClusterId] = new List<MyEntity>();
                     tmpClusters100[newClusterId].Add(myEntity);
                 }
@@ -470,6 +487,10 @@ namespace SentisOptimisationsPlugin.Clusters
                     forSerialUpdate100 = new List<MyEntity>(tmpforSerialUpdate100);
                 }
                 ClusterTime100 = sw.ElapsedMilliseconds;
+                if (ClusterTime100 < 16.6)
+                {
+                    Thread.Sleep((int) (16.6 - ClusterTime100));
+                }
             }
             catch (InvalidOperationException e)
             {
@@ -484,40 +505,14 @@ namespace SentisOptimisationsPlugin.Clusters
                 tmpforSerialUpdate100.Add(myEntity);
                 return true;
             }
-            if (SentisOptimisationsPlugin.Config.ClustersParallelGas && (myEntity is MyGasGenerator || myEntity is MyGasTank))
-            {
-                return false;
-            } 
-            
-            if (SentisOptimisationsPlugin.Config.ClustersParallelWeapons && myEntity is MyLargeTurretBase)
-            {
-                return false;
-            } 
-            
-            if (SentisOptimisationsPlugin.Config.ClustersParallelDrill && myEntity is MyShipDrill)
-            {
-                return false;
-            } 
-            
-            if (SentisOptimisationsPlugin.Config.ClustersParallelWelders && myEntity is MyShipWelder)
-            {
-                return false;
-            } 
-            
-            if (SentisOptimisationsPlugin.Config.ClustersParallelGrinders && myEntity is MyShipGrinder)
-            {
-                return false;
-            } 
-            if (SentisOptimisationsPlugin.Config.ClustersParallelProduction && (myEntity is MyAssembler || myEntity is MyRefinery))
-            {
-                return false;
-            }
+            if (!IsForSerialUpdate(myEntity)) return false;
 
             tmpforSerialUpdate100.Add(myEntity);
             return true;
         }
 
-        private void CollectGridsInCluster(int clusterId, MyEntity e, ref Dictionary<long, int> clustersByGridfc)
+        private void CollectGridsInCluster(int clusterId, MyEntity e, ref Dictionary<long, int> clustersByGridfc,
+            HashSet<long> toUpdate)
         {
             var thisEntityPosition = e.PositionComp.GetPosition();
             var radius = SentisOptimisationsPlugin.Config.ClusterRadius;
@@ -540,6 +535,10 @@ namespace SentisOptimisationsPlugin.Clusters
             foreach (var entity in new List<MyEntity>(result))
             {
                 MyEntity topEntity;
+                if (toUpdate.Count > 0 && !toUpdate.Contains(entity.EntityId))
+                {
+                    continue;
+                }
                 if (entity.EntityId == e.EntityId)
                 {
                     continue;
@@ -562,7 +561,7 @@ namespace SentisOptimisationsPlugin.Clusters
                 }
 
                 clustersByGridfc[entityId] = clusterId;
-                CollectGridsInCluster(clusterId, entity, ref clustersByGridfc);
+                CollectGridsInCluster(clusterId, entity, ref clustersByGridfc, toUpdate);
             }
         }
     }

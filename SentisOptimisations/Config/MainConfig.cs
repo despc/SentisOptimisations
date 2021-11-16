@@ -28,12 +28,8 @@ namespace SentisOptimisationsPlugin
         private bool _clusterParallelWelders = true;
         private bool _clusterParallelGrinders = true;
         private bool _clusterParallelDrill = true;
-        private bool _clusterParallelWeapons = true;
+        private bool _clusterParallelWeapons = false;
         private bool _clusterParallelGas = true;
-        private bool _randomUpdate = false;
-        private int _cluster1BuildDelay = 30;
-        private int _cluster10BuildDelay = 250;
-        private int _cluster100BuildDelay = 1000;
         private int _oldGridProcessorDays = 10;
         private bool _allowProjection = true;
         private bool _azPointsForOnlineEnemies = false;
@@ -364,28 +360,6 @@ namespace SentisOptimisationsPlugin
             get => _physicsChecksBeforePunish;
             set => SetValue(ref _physicsChecksBeforePunish, value);
         }
-        
-        [DisplayTab(Name = "Cluster1 build delay", GroupName = "Clusters", Tab = "Clusters", Order = 0, Description = "Cluster1 build delay")]
-        public int Cluster1BuildDelay
-        {
-            get => _cluster1BuildDelay;
-            set => SetValue(ref _cluster1BuildDelay, value);
-        }
-        
-        [DisplayTab(Name = "Cluster10 build delay", GroupName = "Clusters", Tab = "Clusters", Order = 0, Description = "Cluster10 build delay")]
-        public int Cluster10BuildDelay
-        {
-            get => _cluster10BuildDelay;
-            set => SetValue(ref _cluster10BuildDelay, value);
-        }
-        
-        [DisplayTab(Name = "Cluster100 build delay", GroupName = "Clusters", Tab = "Clusters", Order = 0, Description = "Cluster100 build delay")]
-        public int Cluster100BuildDelay
-        {
-            get => _cluster100BuildDelay;
-            set => SetValue(ref _cluster100BuildDelay, value);
-        }
-        
         [DisplayTab(Name = "Minimum mass for kinetic damage", GroupName = "Damage Tweaks", Tab = "Damage Tweaks", Order = 0, Description = "Minimum mass for kinetic damage")]
         public int MinimumMassForKineticDamage
         {
@@ -480,13 +454,6 @@ namespace SentisOptimisationsPlugin
         {
             get => _clusterParallelGas;
             set => SetValue(ref _clusterParallelGas, value);
-        }
-        
-        [DisplayTab(Name = "Random update", GroupName = "Clusters", Tab = "Clusters", Order = 0, Description = "Random update))))")]
-        public bool RandomUpdate
-        {
-            get => _randomUpdate;
-            set => SetValue(ref _randomUpdate, value);
         }
         
         [DisplayTab(Name = "Points by online enemies", GroupName = "Anomaly Zone", Tab = "Anomaly Zone", Order = 0, Description = "Points by online enemies")]
