@@ -554,7 +554,7 @@ namespace SentisOptimisationsPlugin
                             (myEntity.EntityId) && !myEntity.MarkedForClose &&
                         (myEntity.Flags & EntityFlags.NeedsUpdate100) != (EntityFlags) 0 && myEntity.InScene)
                     {
-                        myEntity.UpdateAfterSimulation10();
+                        myEntity.UpdateAfterSimulation100();
                     }
                         
                 }
