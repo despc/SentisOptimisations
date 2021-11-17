@@ -29,8 +29,6 @@ namespace SentisOptimisationsPlugin.Clusters
         //         <ид кластера, список сущностей>
         Dictionary<long, List<MyEntity>> clusters = new Dictionary<long, List<MyEntity>>();
         Dictionary<long, List<MyEntity>> tmpClusters = new Dictionary<long, List<MyEntity>>();
-        List<MyEntity> forSerialUpdate = new List<MyEntity>();
-        List<MyEntity> tmpforSerialUpdate = new List<MyEntity>();
 
         //         <ид грида, ид кластера>
         Dictionary<long, int> clustersByGrid10 = new Dictionary<long, int>();
@@ -38,9 +36,7 @@ namespace SentisOptimisationsPlugin.Clusters
         //         <ид кластера, список сущностей>
         Dictionary<long, List<MyEntity>> clusters10 = new Dictionary<long, List<MyEntity>>();
         Dictionary<long, List<MyEntity>> tmpClusters10 = new Dictionary<long, List<MyEntity>>();
-        List<MyEntity> forSerialUpdate10 = new List<MyEntity>();
 
-        List<MyEntity> tmpforSerialUpdate10 = new List<MyEntity>();
 
         //         <ид грида, ид кластера>
         Dictionary<long, int> clustersByGrid100 = new Dictionary<long, int>();
@@ -48,8 +44,7 @@ namespace SentisOptimisationsPlugin.Clusters
         //         <ид кластера, список сущностей>
         Dictionary<long, List<MyEntity>> clusters100 = new Dictionary<long, List<MyEntity>>();
         Dictionary<long, List<MyEntity>> tmpClusters100 = new Dictionary<long, List<MyEntity>>();
-        List<MyEntity> forSerialUpdate100 = new List<MyEntity>();
-        List<MyEntity> tmpforSerialUpdate100 = new List<MyEntity>();
+
 
         public static readonly object buildClustersLock = new object();
         public static readonly object buildClustersLock10 = new object();
@@ -64,11 +59,6 @@ namespace SentisOptimisationsPlugin.Clusters
         public long ClusterTime = 0;
         public long ClusterTime10 = 0;
         public long ClusterTime100 = 0;
-        public List<MyEntity> ForSerialUpdate => forSerialUpdate;
-
-        public List<MyEntity> ForSerialUpdate10 => forSerialUpdate10;
-
-        public List<MyEntity> ForSerialUpdate100 => forSerialUpdate100;
 
         
         public static HashSet<MyEntity> m_entitiesForUpdate = new HashSet<MyEntity>();
@@ -196,12 +186,8 @@ namespace SentisOptimisationsPlugin.Clusters
         private void BuildClusters()
         {
             tmpClusters = new Dictionary<long, List<MyEntity>>();
-            tmpforSerialUpdate = new List<MyEntity>();
             clustersByGrid = new Dictionary<long, int>();
-            // HashSet<MyEntity> m_entitiesForUpdate =
-            //     (HashSet<MyEntity>) ReflectionUtils.GetInstanceField(typeof(MyParallelEntityUpdateOrchestrator),
-            //         MyEntities.Orchestrator,
-            //         "m_entitiesForUpdate");
+            
             var startNew = Stopwatch.StartNew();
             try
             {
@@ -252,7 +238,6 @@ namespace SentisOptimisationsPlugin.Clusters
                 lock (buildClustersLock)
                 {
                     clusters = new Dictionary<long, List<MyEntity>>(tmpClusters);
-                    forSerialUpdate = new List<MyEntity>(tmpforSerialUpdate);
                 }
                 ClusterTime = startNew.ElapsedMilliseconds;
                 if (ClusterTime < 16.6)
@@ -266,18 +251,6 @@ namespace SentisOptimisationsPlugin.Clusters
             }
         }
 
-        // private bool ToSerialUpdate(MyEntity myEntity)
-        // {
-        //     if (myEntity is MySurvivalKit)
-        //     {
-        //         tmpforSerialUpdate.Add(myEntity);
-        //         return true;
-        //     }
-        //     if (!IsForSerialUpdate(myEntity)) return false;
-        //
-        //     tmpforSerialUpdate.Add(myEntity);
-        //     return true;
-        // }
 
         public static bool IsForSerialUpdate(MyEntity myEntity)
         {
@@ -318,12 +291,7 @@ namespace SentisOptimisationsPlugin.Clusters
         private void BuildClusters10()
         {
             tmpClusters10 = new Dictionary<long, List<MyEntity>>();
-            tmpforSerialUpdate10 = new List<MyEntity>();
             clustersByGrid10 = new Dictionary<long, int>();
-            // MyDistributedUpdater<List<MyEntity>, MyEntity> m_entitiesForUpdate10 =
-            //     (MyDistributedUpdater<List<MyEntity>, MyEntity>) ReflectionUtils.GetInstanceField(
-            //         typeof(MyParallelEntityUpdateOrchestrator), MyEntities.Orchestrator,
-            //         "m_entitiesForUpdate10");
             var sw = Stopwatch.StartNew();
 
             try
@@ -344,11 +312,6 @@ namespace SentisOptimisationsPlugin.Clusters
                 foreach (var myEntity in toUpdate)
                 {
                     MyEntity topEntity;
-
-                    // if (ToSerialUpdate10(myEntity))
-                    // {
-                    //     continue;
-                    // }
 
                     if (myEntity is MyCubeBlock)
                     {
@@ -385,7 +348,6 @@ namespace SentisOptimisationsPlugin.Clusters
                 lock (buildClustersLock10)
                 {
                     clusters10 = new Dictionary<long, List<MyEntity>>(tmpClusters10);
-                    forSerialUpdate10 = new List<MyEntity>(tmpforSerialUpdate10);
                 }
                 ClusterTime10 = sw.ElapsedMilliseconds;
                 if (ClusterTime10 < 16.6)
@@ -399,29 +361,11 @@ namespace SentisOptimisationsPlugin.Clusters
             }
         }
 
-        // private bool ToSerialUpdate10(MyEntity myEntity)
-        // {
-        //     if (myEntity is MySurvivalKit)
-        //     {
-        //         tmpforSerialUpdate10.Add(myEntity);
-        //         return true;
-        //     }
-        //     if (!IsForSerialUpdate(myEntity)) return false;
-        //
-        //     tmpforSerialUpdate10.Add(myEntity);
-        //     return true;
-        // }
-
 
         private void BuildClusters100()
         {
             tmpClusters100 = new Dictionary<long, List<MyEntity>>();
             clustersByGrid100 = new Dictionary<long, int>();
-            tmpforSerialUpdate100 = new List<MyEntity>();
-            // MyDistributedUpdater<List<MyEntity>, MyEntity> m_entitiesForUpdate100 =
-            //     (MyDistributedUpdater<List<MyEntity>, MyEntity>) ReflectionUtils.GetInstanceField(
-            //         typeof(MyParallelEntityUpdateOrchestrator), MyEntities.Orchestrator,
-            //         "m_entitiesForUpdate100");
             var sw = Stopwatch.StartNew();
 
             var thrusterClusterId = r.Next(-2000000000, 2000000000);
@@ -452,11 +396,6 @@ namespace SentisOptimisationsPlugin.Clusters
                         clustersByGrid100[myEntity.EntityId] = thrusterClusterId;
                         continue;
                     }
-
-                    // if (ToSerialUpdate100(myEntity))
-                    // {
-                    //     continue;
-                    // }
 
                     if (myEntity is MyCubeBlock)
                     {
@@ -493,7 +432,6 @@ namespace SentisOptimisationsPlugin.Clusters
                 lock (buildClustersLock100)
                 {
                     clusters100 = new Dictionary<long, List<MyEntity>>(tmpClusters100);
-                    forSerialUpdate100 = new List<MyEntity>(tmpforSerialUpdate100);
                 }
                 ClusterTime100 = sw.ElapsedMilliseconds;
                 if (ClusterTime100 < 16.6)
@@ -506,19 +444,6 @@ namespace SentisOptimisationsPlugin.Clusters
                 //Log.Error("Collection is Modified");
             }
         }
-
-        // private bool ToSerialUpdate100(MyEntity myEntity)
-        // {
-        //     if (myEntity is MySurvivalKit)
-        //     {
-        //         tmpforSerialUpdate100.Add(myEntity);
-        //         return true;
-        //     }
-        //     if (!IsForSerialUpdate(myEntity)) return false;
-        //
-        //     tmpforSerialUpdate100.Add(myEntity);
-        //     return true;
-        // }
 
         private void CollectGridsInCluster(int clusterId, MyEntity e, ref Dictionary<long, int> clustersByGridfc,
             HashSet<long> toUpdate)

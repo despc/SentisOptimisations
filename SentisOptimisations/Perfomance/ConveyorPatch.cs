@@ -140,6 +140,10 @@ namespace SentisOptimisationsPlugin
         {
             try
             {
+                if (!SentisOptimisationsPlugin.Config.ConveyorCacheEnabled)
+                {
+                    return true;
+                }
                 if (start is MyCubeBlock && end is MyCubeBlock)
                 {
                     var startEntityId = ((MyCubeBlock) start).EntityId;
@@ -213,6 +217,11 @@ namespace SentisOptimisationsPlugin
         {
             try
             {
+                if (!SentisOptimisationsPlugin.Config.ConveyorCacheEnabled)
+                {
+                    return;
+                }
+
                 if (start is MyCubeBlock && end is MyCubeBlock)
                 {
                     var startEntityId = ((MyCubeBlock) start).EntityId;
@@ -254,7 +263,10 @@ namespace SentisOptimisationsPlugin
                 __instance.ConveyorSystem.UpdateLines();
                 try
                 {
-                    ConveyourCache.Remove(m_cubeGrid.EntityId);
+                    if (SentisOptimisationsPlugin.Config.ConveyorCacheEnabled)
+                    {
+                        ConveyourCache.Remove(m_cubeGrid.EntityId);
+                    }
                 }
                 catch (Exception e)
                 {
@@ -269,6 +281,10 @@ namespace SentisOptimisationsPlugin
         {
             try
             {
+                if (!SentisOptimisationsPlugin.Config.ConveyorCacheEnabled)
+                {
+                    return;
+                }
                 MyCubeGrid Grid = (MyCubeGrid) ReflectionUtils.GetInstanceField(typeof(MyUpdateableGridSystem),
                     __instance, "<Grid>k__BackingField");
                 ConveyourCache.Remove(Grid.EntityId);
@@ -296,7 +312,10 @@ namespace SentisOptimisationsPlugin
                 __instance.ConveyorSystem.UpdateLines();
                 try
                 {
-                    ConveyourCache.Remove(m_cubeGrid.EntityId);
+                    if (SentisOptimisationsPlugin.Config.ConveyorCacheEnabled)
+                    {
+                        ConveyourCache.Remove(m_cubeGrid.EntityId);
+                    }
                 }
                 catch (Exception e)
                 {

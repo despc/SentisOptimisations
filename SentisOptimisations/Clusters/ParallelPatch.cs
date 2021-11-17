@@ -465,9 +465,20 @@ namespace SentisOptimisationsPlugin
                 HashSet<MyEntity> m_entitiesForUpdate = (HashSet<MyEntity>) ReflectionUtils.GetInstanceField(__instance, "m_entitiesForUpdate");
                 foreach (MyEntity myEntity in m_entitiesForUpdate)
                 {
-                    if (myEntity != null && !ClusterBuilder.m_entitiesForUpdateId.Contains(myEntity.EntityId) && !myEntity.MarkedForClose &&(myEntity.Flags & EntityFlags.NeedsUpdate) != (EntityFlags) 0 && myEntity.InScene)
+                    if (myEntity != null && !myEntity.MarkedForClose &&(myEntity.Flags & EntityFlags.NeedsUpdate) != (EntityFlags) 0 && myEntity.InScene)
                     {
-                        myEntity.UpdateAfterSimulation();
+                        if (ClusterBuilder.IsForSerialUpdate(myEntity))
+                        {
+                            myEntity.UpdateAfterSimulation();
+                            continue;
+                        }
+                        if (!ClusterBuilder.m_entitiesForUpdateId.Contains(myEntity.EntityId))
+                        {
+                            Log.Error("Not for Serial Update but not in clusters  " + myEntity.GetType() + " " +
+                                      myEntity.DisplayName);
+                            myEntity.UpdateAfterSimulation();
+                        }
+                       
                     }
                 }
                 lock (ClusterBuilder.buildClustersLock)
@@ -507,11 +518,20 @@ namespace SentisOptimisationsPlugin
                     (MyDistributedUpdater<List<MyEntity>, MyEntity>) ReflectionUtils.GetInstanceField(__instance, "m_entitiesForUpdate10");
                 foreach (MyEntity myEntity in m_entitiesForUpdate10)
                 {
-                    if (myEntity != null && !ClusterBuilder.m_entitiesForUpdate10Id.Contains
-                            (myEntity.EntityId) && !myEntity.MarkedForClose &&
+                    if (myEntity != null && !myEntity.MarkedForClose &&
                         (myEntity.Flags & EntityFlags.NeedsUpdate10) != (EntityFlags) 0 && myEntity.InScene)
                     {
-                        myEntity.UpdateAfterSimulation10();
+                        if (ClusterBuilder.IsForSerialUpdate(myEntity))
+                        {
+                            myEntity.UpdateAfterSimulation10();
+                            continue;
+                        }
+                        if (!ClusterBuilder.m_entitiesForUpdate10Id.Contains(myEntity.EntityId))
+                        {
+                            Log.Error("Not for Serial Update but not in clusters 10 " + myEntity.GetType() + " " +
+                                      myEntity.DisplayName);
+                            myEntity.UpdateAfterSimulation10();
+                        }
                     }
                         
                 }
@@ -550,11 +570,20 @@ namespace SentisOptimisationsPlugin
                     (MyDistributedUpdater<List<MyEntity>, MyEntity>) ReflectionUtils.GetInstanceField(__instance, "m_entitiesForUpdate100");
                 foreach (MyEntity myEntity in m_entitiesForUpdate100)
                 {
-                    if (myEntity != null && !ClusterBuilder.m_entitiesForUpdate100Id.Contains
-                            (myEntity.EntityId) && !myEntity.MarkedForClose &&
+                    if (myEntity != null && !myEntity.MarkedForClose &&
                         (myEntity.Flags & EntityFlags.NeedsUpdate100) != (EntityFlags) 0 && myEntity.InScene)
                     {
-                        myEntity.UpdateAfterSimulation100();
+                        if (ClusterBuilder.IsForSerialUpdate(myEntity))
+                        {
+                            myEntity.UpdateAfterSimulation100();
+                            continue;
+                        }
+                        if (!ClusterBuilder.m_entitiesForUpdate100Id.Contains(myEntity.EntityId))
+                        {
+                            Log.Error("Not for Serial Update but not in clusters 100 " + myEntity.GetType() + " " +
+                                      myEntity.DisplayName);
+                            myEntity.UpdateAfterSimulation100();
+                        }
                     }
                         
                 }

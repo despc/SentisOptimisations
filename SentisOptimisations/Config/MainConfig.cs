@@ -75,6 +75,7 @@ namespace SentisOptimisationsPlugin
         private int _minimumMassForKineticDamage = 5000;
         
         private bool _safeZoneSubGridOptimisation = true;
+        private bool _conveyorCacheEnabled = false;
         private int _safeZonePhysicsThreshold = 10;
         
         private ObservableCollection<ConfigShipInMarket> configShipsInMarket = new ObservableCollection<ConfigShipInMarket>();
@@ -481,6 +482,13 @@ namespace SentisOptimisationsPlugin
         {
             get => _removeEntityPhantomPatch;
             set => SetValue(ref _removeEntityPhantomPatch, value);
+        }
+        
+        [DisplayTab(Name = "Conveyor cache enabled", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Conveyor cache enabled")]
+        public bool ConveyorCacheEnabled
+        {
+            get => _conveyorCacheEnabled;
+            set => SetValue(ref _conveyorCacheEnabled, value);
         }
     }
 }
