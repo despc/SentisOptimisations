@@ -46,11 +46,6 @@
       <Compile Include="Balance\MergePatch.cs" />
       <Compile Include="Balance\ThrustPatch.cs" />
       <Compile Include="Balance\WeaponsPatch.cs" />
-      <Compile Include="Clusters\AssemblersConcurrencyFix.cs" />
-      <Compile Include="Clusters\ClusterBuilder.cs" />
-      <Compile Include="Clusters\CollectEntityPatch.cs" />
-      <Compile Include="Clusters\ParallelPatch.cs" />
-      <Compile Include="Clusters\StockpileConcurrencyFix.cs" />
       <Compile Include="Config\ConfigAnomalyZone.cs" />
       <Compile Include="Config\ConfigShipInMarket.cs" />
       <Compile Include="Config\MainConfig.cs" />

@@ -18,7 +18,6 @@ using Sandbox.Game.World;
 using Sandbox.ModAPI;
 using SentisOptimisations;
 using SentisOptimisationsPlugin.AnomalyZone;
-using SentisOptimisationsPlugin.Clusters;
 using SOPlugin.GUI;
 using Torch;
 using Torch.API;
@@ -40,7 +39,6 @@ namespace SentisOptimisationsPlugin
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
         public static PcuLimiter _limiter = new PcuLimiter();
         public static AZCore AzCore = new AZCore();
-        public static ClusterBuilder _cb = new ClusterBuilder();
         public static Dictionary<long,long> stuckGrids = new Dictionary<long, long>();
         public static Dictionary<long,long> gridsInSZ = new Dictionary<long, long>();
         private static TorchSessionManager SessionManager;
@@ -69,7 +67,6 @@ namespace SentisOptimisationsPlugin
             if (newState == TorchSessionState.Unloading)
             {
                 _limiter.OnUnloading();
-                _cb.OnUnloading();
                 AzCore.OnUnloading();
                 ConveyorPatch.OnUnloading();
             }
@@ -80,7 +77,6 @@ namespace SentisOptimisationsPlugin
                 AzCore.Init();
                 DamagePatch.Init();
                 _limiter.OnLoaded();
-                _cb.OnLoaded();
                 ConveyorPatch.OnLoaded();
                 Communication.RegisterHandlers();
             }
@@ -90,12 +86,7 @@ namespace SentisOptimisationsPlugin
         {
             try
             {
-                var clusters = _cb.Clusters.Count;
-                var clustersTime = _cb.ClusterTime;
-                var clusters10 = _cb.Clusters10.Count;
-                var clustersTime10 = _cb.ClusterTime10;
-                var clusters100 = _cb.Clusters100.Count;
-                var clustersTime100 = _cb.ClusterTime100;
+
 
                 var conveyourCache = ConveyorPatch.ConveyourCache;
                 var cachedGrids = conveyourCache.Count;
@@ -109,8 +100,7 @@ namespace SentisOptimisationsPlugin
                 Instance.UpdateUI((x) =>
                 {
                     var gui = x as ConfigGUI;
-                    gui.ClustersStatistic.Text =
-                        $"Tick1: {clusters} - {clustersTime}ms || Tick10: {clusters10} - {clustersTime10}ms || Tick100: {clusters100} - {clustersTime100}ms";
+
                     gui.CacheStatistic.Text =
                         $"Cached grids: {cachedGrids} ||  Total cache size: {totalCacheCount} ||  Uncached calls: {uncachedCalls}";
                 });
@@ -240,7 +230,7 @@ namespace SentisOptimisationsPlugin
                     }
 
                     var contactCount = keyValuePair.Value;
-                    if (contactCount > 150)
+                    if (contactCount > Config.ContactCountAlert)
                     {
                         Log.Error("Entity  " + entityById.DisplayName + " position " +
                                   entityById.PositionComp.GetPosition() + " contact count - " + contactCount);
@@ -376,7 +366,6 @@ namespace SentisOptimisationsPlugin
         {
             _config.Save(Path.Combine(StoragePath, "SentisOptimisations.cfg"));
             _limiter.CancellationTokenSource.Cancel();
-            _cb.CancellationTokenSource.Cancel();
             AzCore.CancellationTokenSource.Cancel();
             base.Dispose();
         }

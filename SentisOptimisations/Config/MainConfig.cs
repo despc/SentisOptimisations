@@ -18,22 +18,14 @@ namespace SentisOptimisationsPlugin
         private double _contractHaulingtMultiplier = 10; //Перевозка
         private double _contractRepairMultiplier = 10;
         private double _contractFindMultiplier = 25;
-        private float _clusterRadius = 16000;
         private bool _enabledPcuLimiter = true;
         private int _maxStaticGridPCU = 200000;
         private int _azMessageTime = 960;
         private int _maxDinamycGridPCU = 30000;
         private int _noDamageFromVoxelsBeforeSpeed = 30;
-        private bool _clusterParallelProduction = true;
-        private bool _clusterParallelWelders = true;
-        private bool _clusterParallelGrinders = true;
-        private bool _clusterParallelDrill = true;
-        private bool _clusterParallelWeapons = false;
-        private bool _clusterParallelGas = true;
         private int _oldGridProcessorDays = 10;
         private bool _allowProjection = true;
         private bool _azPointsForOnlineEnemies = false;
-        private bool _clustersEnabled = false;
         private bool _allowMerge = false;
         private bool _includeConnectedGrids = false;
         private bool _removeEntityPhantomPatch = false;
@@ -45,6 +37,7 @@ namespace SentisOptimisationsPlugin
         private String _azWinners = "";
         private int _azPointsRemovedOnDeath = 1;
         private int _azPointsAddOnCaptured = 1;
+        private int _contactCountAlert = 150;
         private int _azProgressWhenComplete = 300;
         private int _azMinLargeGridBlockCount = 300;
         private int _azMinSmallGridBlockCount = 300;
@@ -257,13 +250,6 @@ namespace SentisOptimisationsPlugin
         }
         
         
-        [DisplayTab(Name = "Cluster radius", GroupName = "Clusters", Tab = "Clusters", Order = 0, Description = "Cluster radius")]
-        public float ClusterRadius
-        {
-            get => _clusterRadius;
-            set => SetValue(ref _clusterRadius, value);
-        }
-        
         [DisplayTab(Name = "Pull Items Slowdown", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Pull Items Slowdown")]
         public float PullItemsSlowdown
         {
@@ -375,6 +361,13 @@ namespace SentisOptimisationsPlugin
             set => SetValue(ref _noDamageFromVoxelsBeforeSpeed, value);
         }
         
+        [DisplayTab(Name = "Contact Count to Alert", GroupName = "Damage Tweaks", Tab = "Damage Tweaks", Order = 0, Description = "Contact Count to Alert")]
+        public int ContactCountAlert
+        {
+            get => _contactCountAlert;
+            set => SetValue(ref _contactCountAlert, value);
+        }
+        
         [DisplayTab(Name = "Ship drill radius multiplier", GroupName = "Ship tool", Tab = "Ship tool", Order = 0, Description = "Ship drill radius multiplier")]
         public float ShipDrillRadiusMultiplier
         {
@@ -407,54 +400,6 @@ namespace SentisOptimisationsPlugin
         {
             get => _allowProjection;
             set => SetValue(ref _allowProjection, value);
-        }
-        [DisplayTab(Name = "Clusters enabled", GroupName = "Clusters", Tab = "Clusters", Order = 0, Description = "Clusters enabled")]
-        public bool ClustersEnabled
-        {
-            get => _clustersEnabled;
-            set => SetValue(ref _clustersEnabled, value);
-        }
-
-        [DisplayTab(Name = "Parallel Production", GroupName = "Clusters", Tab = "Clusters", Order = 0, Description = "Parallel Production")]
-        public bool ClustersParallelProduction
-        {
-            get => _clusterParallelProduction;
-            set => SetValue(ref _clusterParallelProduction, value);
-        }
-        
-        [DisplayTab(Name = "Parallel Welders", GroupName = "Clusters", Tab = "Clusters", Order = 0, Description = "Parallel Welders")]
-        public bool ClustersParallelWelders
-        {
-            get => _clusterParallelWelders;
-            set => SetValue(ref _clusterParallelWelders, value);
-        }
-        
-        [DisplayTab(Name = "Parallel Grinders", GroupName = "Clusters", Tab = "Clusters", Order = 0, Description = "Parallel Grinders")]
-        public bool ClustersParallelGrinders
-        {
-            get => _clusterParallelGrinders;
-            set => SetValue(ref _clusterParallelGrinders, value);
-        }
-        
-        [DisplayTab(Name = "Parallel Drill", GroupName = "Clusters", Tab = "Clusters", Order = 0, Description = "Parallel Drill")]
-        public bool ClustersParallelDrill
-        {
-            get => _clusterParallelDrill;
-            set => SetValue(ref _clusterParallelDrill, value);
-        }
-        
-        [DisplayTab(Name = "Parallel Weapons", GroupName = "Clusters", Tab = "Clusters", Order = 0, Description = "Parallel Weapons")]
-        public bool ClustersParallelWeapons
-        {
-            get => _clusterParallelWeapons;
-            set => SetValue(ref _clusterParallelWeapons, value);
-        }
-        
-        [DisplayTab(Name = "Parallel Gas", GroupName = "Clusters", Tab = "Clusters", Order = 0, Description = "Parallel Gas")]
-        public bool ClustersParallelGas
-        {
-            get => _clusterParallelGas;
-            set => SetValue(ref _clusterParallelGas, value);
         }
         
         [DisplayTab(Name = "Points by online enemies", GroupName = "Anomaly Zone", Tab = "Anomaly Zone", Order = 0, Description = "Points by online enemies")]
