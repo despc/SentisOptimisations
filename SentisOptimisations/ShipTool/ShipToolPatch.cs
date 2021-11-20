@@ -15,7 +15,7 @@ namespace SentisOptimisationsPlugin.ShipTool
     public static class ShipToolPatch
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
-        
+
         public static Random r = new Random();
 
         public static void Patch(PatchContext ctx)
@@ -67,36 +67,36 @@ namespace SentisOptimisationsPlugin.ShipTool
                 return;
             }
 
-            if (!__instance.CubeGrid.IsStatic)
+            SetRadius(__instance, GetWelderRadius((MyShipWelder) __instance));
+        }
+
+        public static float GetWelderRadius(MyShipWelder welder)
+        {
+            if (!welder.CubeGrid.IsStatic)
             {
-                SetRadius(__instance, SentisOptimisationsPlugin.Config.ShipWelderRadius);
-                return;
+                return SentisOptimisationsPlugin.Config.ShipWelderRadius;
             }
 
-            var myShipWelder = ((MyShipWelder) __instance);
-            var ownerId = myShipWelder.OwnerId;
+            var ownerId = welder.OwnerId;
             var playerFaction = MySession.Static.Factions.GetPlayerFaction(ownerId);
             if (playerFaction == null)
             {
-                SetRadius(__instance, SentisOptimisationsPlugin.Config.ShipWelderRadius);
-                return;
+                return SentisOptimisationsPlugin.Config.ShipWelderRadius;
             }
 
-            if (!myShipWelder.CustomData.Contains("[AZ_REWARD]"))
+            if (!welder.CustomData.Contains("[AZ_REWARD]"))
             {
-                SetRadius(__instance, SentisOptimisationsPlugin.Config.ShipWelderRadius);
-                return;
+                return SentisOptimisationsPlugin.Config.ShipWelderRadius;
             }
 
             var factionTag = playerFaction.Tag;
 
             if (!SentisOptimisationsPlugin.Config.AzWinners.Contains(factionTag))
             {
-                SetRadius(__instance, SentisOptimisationsPlugin.Config.ShipWelderRadius);
-                return;
+                return SentisOptimisationsPlugin.Config.ShipWelderRadius;
             }
 
-            SetRadius(__instance,  SentisOptimisationsPlugin.Config.ShipSuperWelderRadius);
+            return SentisOptimisationsPlugin.Config.ShipSuperWelderRadius;
         }
 
         private static void SetRadius(MyShipToolBase __instance, float radius)

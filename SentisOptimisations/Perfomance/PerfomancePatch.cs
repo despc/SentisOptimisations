@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Reflection;
-using Havok;
 using NLog;
-using ParallelTasks;
-using Sandbox.Engine.Physics;
+using Sandbox;
+using Sandbox.Game.Entities.Blocks;
+using Sandbox.Game.Entities.Cube;
 using Sandbox.Game.Weapons;
-using SentisOptimisations;
+using SpaceEngineers.Game.Weapons.Guns;
 using Torch.Managers.PatchManager;
 
 namespace SentisOptimisationsPlugin
@@ -14,14 +14,9 @@ namespace SentisOptimisationsPlugin
     public static class PerfomancePatch
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
+        private static readonly Random Random = new Random();
         public static void Patch(PatchContext ctx)
         {
-            var MyPhysicsLoadData = typeof(MyPhysics).GetMethod
-                (nameof(MyPhysics.LoadData), BindingFlags.Instance | BindingFlags.Public);
-
-            ctx.GetPattern(MyPhysicsLoadData).Suffixes.Add(
-                typeof(PerfomancePatch).GetMethod(nameof(MyPhysicsLoadDataPatched),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
 
             var MethodIsTargetInSz = typeof(MyLargeTurretBase).GetMethod
                 (nameof(MyLargeTurretBase.IsTargetInSafeZone), BindingFlags.Instance | BindingFlags.Public);
@@ -29,40 +24,74 @@ namespace SentisOptimisationsPlugin
             ctx.GetPattern(MethodIsTargetInSz).Prefixes.Add(
                 typeof(PerfomancePatch).GetMethod(nameof(MethodIsTargetInSzPatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
+            var MethodUpdateAfterSimulation10 = typeof(MyFunctionalBlock).GetMethod
+                ("UpdateAfterSimulation10", BindingFlags.Instance | BindingFlags.Public);
 
+            ctx.GetPattern(MethodUpdateAfterSimulation10).Prefixes.Add(
+                typeof(PerfomancePatch).GetMethod(nameof(MethodUpdateAfterSimulation10Patched),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+          
+            
+            var MethodUpdateAfterSimulation100 = typeof(MyFunctionalBlock).GetMethod
+                ("UpdateAfterSimulation100", BindingFlags.Instance | BindingFlags.Public);
 
-            var MethodInitializeWorkerArrays = typeof(PrioritizedScheduler).GetMethod
-                ("InitializeWorkerArrays", BindingFlags.Instance | BindingFlags.NonPublic);
-
-            ctx.GetPattern(MethodInitializeWorkerArrays).Prefixes.Add(
-                typeof(PerfomancePatch).GetMethod(nameof(InitializeWorkerArraysPatched),
+            ctx.GetPattern(MethodUpdateAfterSimulation100).Prefixes.Add(
+                typeof(PerfomancePatch).GetMethod(nameof(MethodUpdateAfterSimulation100Patched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
             
         }
 
-        private static void InitializeWorkerArraysPatched(ref int threadCount, ref bool amd)
+
+        private static bool MethodUpdateAfterSimulation10Patched(MyFunctionalBlock __instance)
         {
-            amd = false;
-            threadCount = 10;
+            return DoAdaptiveSlowdown(__instance);
+        }
+        private static bool MethodUpdateAfterSimulation100Patched(MyFunctionalBlock __instance)
+        {
+            return DoAdaptiveSlowdown(__instance);
+        }
+
+        private static bool DoAdaptiveSlowdown(MyFunctionalBlock __instance)
+        {
+            if (!SentisOptimisationsPlugin.Config.Adaptiveblockslowdown)
+            {
+                return true;
+            }
+
+            if (!(__instance is MyShipToolBase ||
+                  __instance is MyShipDrill ||
+                  __instance is MyGasTank ||
+                  __instance is MyGasGenerator ||
+                  __instance is MyAssembler ||
+                  __instance is MyLargeMissileTurret ||
+                  __instance is MyLargeGatlingTurret ||
+                  __instance is MyLargeInteriorTurret ||
+                  __instance is MyRefinery))
+            {
+                return true;
+            }
+
+            var staticCpuLoad = MySandboxGame.Static.CPULoad;
+            if (staticCpuLoad < 60)
+            {
+                return true;
+            }
+
+            var next = Random.Next(60, SentisOptimisationsPlugin.Config.AdaptiveBlockSlowdownThreshold);
+
+            if (next > staticCpuLoad)
+            {
+                return true;
+            }
+
+            return false;
         }
         
         private static bool MethodIsTargetInSzPatched(ref bool __result)
         {
             __result = false;
             return false;
-        }
-
-        private static void MyPhysicsLoadDataPatched()
-        {
-            try
-            {
-                ReflectionUtils.SetPrivateStaticField(typeof(MyPhysics), "m_threadPool", new HkJobThreadPool(11));
-                ReflectionUtils.SetPrivateStaticField(typeof(MyPhysics), "m_jobQueue", new HkJobQueue(12));
-            }
-            catch (Exception e)
-            {
-                SentisOptimisationsPlugin.Log.Warn("MyPhysicsLoadDataPatched Exception ", e);
-            }
         }
     }
 }

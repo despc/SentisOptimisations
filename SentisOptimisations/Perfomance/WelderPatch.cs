@@ -1,11 +1,7 @@
 ﻿using System;
 using System.Reflection;
-using Havok;
 using NLog;
-using ParallelTasks;
-using Sandbox.Engine.Physics;
 using Sandbox.Game.Weapons;
-using SentisOptimisations;
 using SpaceEngineers.Game.Entities.Blocks;
 using Torch.Managers.PatchManager;
 

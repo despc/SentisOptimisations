@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using System.Windows.Controls;
+using NAPI;
 using NLog;
 using Sandbox;
 using Sandbox.Engine.Multiplayer;
@@ -139,7 +140,7 @@ namespace SentisOptimisationsPlugin
         
         public override void Update()
         {
-
+            FrameExecutor.Update();
             if (MySandboxGame.Static.SimulationFrameCounter % 500 == 0)
             {
                 Task.Run(UpdateGui);
@@ -236,7 +237,7 @@ namespace SentisOptimisationsPlugin
                                   entityById.PositionComp.GetPosition() + " contact count - " + contactCount);
                     }
 
-                    if (contactCount < 2000)
+                    if (contactCount < 800)
                     {
                         continue;
                     }

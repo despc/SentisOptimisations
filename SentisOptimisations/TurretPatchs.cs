@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using NLog;
@@ -18,6 +19,7 @@ namespace SentisOptimisationsPlugin
         [ReflectedMethod(Name = "RotateModels")]
         private static Action<MyLargeTurretBase> RotateModels;
 
+        private static Dictionary<long, int> _checkTargetsSlowdown = new Dictionary<long, int>();
 
         private static void OnPositionChanged(MyPositionComponentBase myPositionComponentBase,
             MyLargeTurretBase __instance)
@@ -40,12 +42,12 @@ namespace SentisOptimisationsPlugin
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
 
 
-            // var methodInfo = typeof(MyLargeTurretBase).GetMethod("CheckAndSelectNearTargetsParallel",
-            //     BindingFlags.Instance | BindingFlags.NonPublic);
-            //
-            // ctx.GetPattern(methodInfo).Prefixes.Add(
-            //     typeof(FixTurretsPatch).GetMethod(nameof(DisableCheckAndSelectNearTargetsParallel),
-            //         BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            var methodInfo = typeof(MyLargeTurretBase).GetMethod("CheckAndSelectNearTargetsParallel",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            
+            ctx.GetPattern(methodInfo).Prefixes.Add(
+                typeof(FixTurretsPatch).GetMethod(nameof(DisableCheckAndSelectNearTargetsParallel),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
         }
 
 
@@ -58,11 +60,19 @@ namespace SentisOptimisationsPlugin
 
         private static bool DisableCheckAndSelectNearTargetsParallel(MyLargeTurretBase __instance)
         {
-            if (MySandboxGame.Static.SimulationFrameCounter % 3 == 0)
+            int count;
+            var instanceEntityId = __instance.EntityId;
+            if (_checkTargetsSlowdown.TryGetValue(instanceEntityId, out count))
             {
-                return true;
-            }
+                if (count > SentisOptimisationsPlugin.Config.CheckAndSelectNearTargetsSlowdown)
+                {
+                    return true;
+                }
 
+                _checkTargetsSlowdown[instanceEntityId] = count + 1;
+                return false;
+            }
+            _checkTargetsSlowdown[instanceEntityId] = 1;
             return false;
         }
     }

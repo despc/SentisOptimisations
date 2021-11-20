@@ -28,6 +28,7 @@ namespace SentisOptimisationsPlugin
         private bool _azPointsForOnlineEnemies = false;
         private bool _allowMerge = false;
         private bool _includeConnectedGrids = false;
+        private bool _adaptiveblockslowdown = false;
         private bool _removeEntityPhantomPatch = false;
         private String _pathToAsters = "C:\\Asteroids";
         private bool _garageEnabled = true;
@@ -38,9 +39,11 @@ namespace SentisOptimisationsPlugin
         private int _azPointsRemovedOnDeath = 1;
         private int _azPointsAddOnCaptured = 1;
         private int _contactCountAlert = 150;
+        private int _checkAndSelectNearTargetsSlowdown = 3;
         private int _azProgressWhenComplete = 300;
         private int _azMinLargeGridBlockCount = 300;
         private int _azMinSmallGridBlockCount = 300;
+        private int _adaptiveBlockSlowdownThreshold = 150;
         
         private float _shipDrillRadiusMultiplier = 2;
         private float _shipGrinderWelderRadiusMultiplier = 2;
@@ -70,6 +73,17 @@ namespace SentisOptimisationsPlugin
         private bool _safeZoneSubGridOptimisation = true;
         private bool _conveyorCacheEnabled = false;
         private int _safeZonePhysicsThreshold = 10;
+        
+        
+        private bool _welderTweaksEnabled = false;
+        private bool _welderNoLimitsCheck = false;
+        private bool _welderWeldProjectionsNextFrame = true;
+        private bool _welderWeldNextFrames = true;
+        private bool _welderCanWeldProjectionsIfWeldedOtherBlocks = false;
+        private bool _welderSelfWelding = false;
+        private bool _welderExcludeNanobot = true;
+        private bool _welderFasterSearch = true;
+        private bool _welderSkipCreativeWelding = true;
         
         private ObservableCollection<ConfigShipInMarket> configShipsInMarket = new ObservableCollection<ConfigShipInMarket>();
 
@@ -347,6 +361,13 @@ namespace SentisOptimisationsPlugin
             get => _physicsChecksBeforePunish;
             set => SetValue(ref _physicsChecksBeforePunish, value);
         }
+        
+        [DisplayTab(Name = "Check near targets slowdown", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Check near targets slowdown")]
+        public int CheckAndSelectNearTargetsSlowdown
+        {
+            get => _checkAndSelectNearTargetsSlowdown;
+            set => SetValue(ref _checkAndSelectNearTargetsSlowdown, value);
+        }
         [DisplayTab(Name = "Minimum mass for kinetic damage", GroupName = "Damage Tweaks", Tab = "Damage Tweaks", Order = 0, Description = "Minimum mass for kinetic damage")]
         public int MinimumMassForKineticDamage
         {
@@ -429,11 +450,56 @@ namespace SentisOptimisationsPlugin
             set => SetValue(ref _removeEntityPhantomPatch, value);
         }
         
+                
+        [DisplayTab(Name = "Adaptive block slowdown", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Adaptive block slowdown")]
+        public bool Adaptiveblockslowdown
+        {
+            get => _adaptiveblockslowdown;
+            set => SetValue(ref _adaptiveblockslowdown, value);
+        }
+        
+        [DisplayTab(Name = "Adaptive block slowdown threshold", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Adaptive block slowdown threshold")]
+        public int AdaptiveBlockSlowdownThreshold
+        {
+            get => _adaptiveBlockSlowdownThreshold;
+            set => SetValue(ref _adaptiveBlockSlowdownThreshold, value);
+        }
+        
         [DisplayTab(Name = "Conveyor cache enabled", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Conveyor cache enabled")]
         public bool ConveyorCacheEnabled
         {
             get => _conveyorCacheEnabled;
             set => SetValue(ref _conveyorCacheEnabled, value);
         }
+        
+        
+         //=================================================================================================
+
+        [DisplayTab(Name = "Enabled", GroupName = "Welder Tweaks (WIP)", Tab = "Welder Optimizations", Order = 0, Description = "If disabled all off theese features not working. Optimization MyCubeGrid-GetBlocksInsideSphere - also highly recommended")]
+        public bool WelderTweaksEnabled { get => _welderTweaksEnabled; set => SetValue(ref _welderTweaksEnabled, value); }
+
+        [DisplayTab(Name = "No Limits Check", GroupName = "Welder Tweaks (WIP)", Tab = "Welder Optimizations", Order = 1, Description = "Welder doesn't check limits, which making welding faster (not recommended)")]
+        public bool WelderTweaksNoLimitsCheck { get => _welderNoLimitsCheck; set => SetValue(ref _welderNoLimitsCheck, value); }
+
+        [DisplayTab(Name = "Weld Next Frames", GroupName = "Welder Tweaks (WIP)", Tab = "Welder Optimizations", Order = 2, Description = "Welder block search is in 1 frame, but welding in random next 5 frames (will remove high simulation drops because 100 welders were enabled in 1 frame)")]
+        public bool WelderTweaksWeldNextFrames { get => _welderWeldNextFrames; set => SetValue(ref _welderWeldNextFrames, value); }
+
+        [DisplayTab(Name = "Weld Projections Next Frame", GroupName = "Welder Tweaks (WIP)", Tab = "Welder Optimizations", Order = 3, Description = "Welder can weld it self")]
+        public bool WelderTweaksWeldProjectionsNextFrame { get => _welderWeldProjectionsNextFrame; set => SetValue(ref _welderWeldProjectionsNextFrame, value); }
+
+        [DisplayTab(Name = "Weld Projections if welded other blocks", GroupName = "Welder Tweaks (WIP)", Tab = "Welder Optimizations", Order = 4, Description = "Welder can weld projections and non projected blocks on same frame (faster welding, less optimization)")]
+        public bool WelderTweaksCanWeldProjectionsIfWeldedOtherBlocks { get => _welderCanWeldProjectionsIfWeldedOtherBlocks; set => SetValue(ref _welderCanWeldProjectionsIfWeldedOtherBlocks, value); }
+
+        [DisplayTab(Name = "Self Welding", GroupName = "Welder Tweaks (WIP)", Tab = "Welder Optimizations", Order = 5, Description = "Welder can weld it self")]
+        public bool WelderTweaksSelfWelding { get => _welderSelfWelding; set => SetValue(ref _welderSelfWelding, value); }
+
+        [DisplayTab(Name = "Exclude Nanobot", GroupName = "Welder Tweaks (WIP)", Tab = "Welder Optimizations", Order = 6, Description = "Nanobot can't weld as regular welder (and shouldn't)")]
+        public bool WelderTweaksExcludeNanobot { get => _welderExcludeNanobot; set => SetValue(ref _welderExcludeNanobot, value); }
+
+        [DisplayTab(Name = "Faster block search", GroupName = "Welder Tweaks (WIP)", Tab = "Welder Optimizations", Order = 7, Description = "Inaccurate block search")]
+        public bool WelderTweaksFasterSearch { get => _welderFasterSearch; set => SetValue(ref _welderFasterSearch, value); }
+
+        [DisplayTab(Name = "Skip creative welding", GroupName = "Welder Tweaks (WIP)", Tab = "Welder Optimizations", Order = 8, Description = "Skip creative welding")]
+        public bool WelderSkipCreativeWelding { get => _welderFasterSearch; set => SetValue(ref _welderFasterSearch, value); }
     }
 }
