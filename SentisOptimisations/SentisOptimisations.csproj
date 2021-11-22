@@ -75,6 +75,7 @@
       <Compile Include="Perfomance\WelderPatch.cs" />
       <Compile Include="RemovePluginPatch.cs" />
       <Compile Include="Shared\Action2.cs" />
+      <Compile Include="Shared\Ext2.cs" />
       <Compile Include="Shared\FrameExecutor.cs" />
       <Compile Include="Shared\SharpUtils.cs" />
       <Compile Include="ShipTool\ShipToolPatch.cs" />

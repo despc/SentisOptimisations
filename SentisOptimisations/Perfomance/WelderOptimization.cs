@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Reflection;
 using NAPI;
+using ParallelTasks;
 using Sandbox;
 using Sandbox.Definitions;
 using Sandbox.Game;
@@ -24,9 +25,8 @@ namespace Optimizer.Optimizations
     [PatchShim]
     public class WelderOptimization
     {
-        const string ActionNAME ="ShipWelder BuildProjection";
-        private static Dictionary<string, int> m_missingComponents = new Dictionary<string, int>();
-        private static HashSet<MySlimBlock> m_projectedBlock = new HashSet<MySlimBlock>();
+        const string ActionNAME = "ShipWelder BuildProjection";
+
 
         public static Random random = new Random();
 
@@ -50,7 +50,7 @@ namespace Optimizer.Optimizations
 
             if (SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.WelderTweaksExcludeNanobot)
             {
-                var def = (MyShipWelderDefinition)__instance.BlockDefinition;
+                var def = (MyShipWelderDefinition) __instance.BlockDefinition;
                 if (def.SensorRadius < 0.01f) //NanobotOptimiztion
                 {
                     return false;
@@ -65,16 +65,13 @@ namespace Optimizer.Optimizations
             if (SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.WelderTweaksWeldNextFrames)
             {
                 var ntargets = new HashSet<MySlimBlock>(targets.Count);
-                foreach(var x in targets)
+                foreach (var x in targets)
                 {
                     ntargets.Add(x);
                 }
 
-                FrameExecutor.addDelayedLogic(random.Next(4)+1, (x) =>
-                {
-                    ActivateInternal(__instance, ntargets);
-                });
-            } 
+                FrameExecutor.addDelayedLogic(random.Next(4) + 1, (x) => { ActivateInternal(__instance, ntargets); });
+            }
             else
             {
                 ActivateInternal(__instance, targets);
@@ -83,10 +80,11 @@ namespace Optimizer.Optimizations
             //we dont need any checks now;
             return false;
         }
-        
 
-        public static void ActivateInternal (MyShipWelder welder, HashSet<MySlimBlock> targets)
+
+        public static void ActivateInternal(MyShipWelder welder, HashSet<MySlimBlock> targets)
         {
+            Dictionary<string, int> m_missingComponents = new Dictionary<string, int>();
             if (welder.MarkedForClose || welder.Closed)
             {
                 return;
@@ -106,28 +104,48 @@ namespace Optimizer.Optimizations
                     mySlimBlock.GetMissingComponents(m_missingComponents);
                 }
             }
+
             MyInventory inventory = welder.GetInventory(0);
             foreach (KeyValuePair<string, int> keyValuePair in m_missingComponents)
             {
                 MyDefinitionId myDefinitionId = new MyDefinitionId(typeof(MyObjectBuilder_Component), keyValuePair.Key);
-                if (Math.Max(keyValuePair.Value - (int)inventory.GetItemAmount(myDefinitionId, MyItemFlags.None, false), 0) != 0 && welder.UseConveyorSystem)
+                if (Math.Max(
+                        keyValuePair.Value - (int) inventory.GetItemAmount(myDefinitionId, MyItemFlags.None, false),
+                        0) !=
+                    0 && welder.UseConveyorSystem)
                 {
-                    welder.CubeGrid.GridSystems.ConveyorSystem.PullItem(myDefinitionId, new MyFixedPoint?(keyValuePair.Value), welder, inventory, false, false);
+                    welder.CubeGrid.GridSystems.ConveyorSystem.PullItem(myDefinitionId,
+                        new MyFixedPoint?(keyValuePair.Value), welder, inventory, false, false);
                 }
             }
 
             m_missingComponents.Clear();
-
-            var welded = Weld (welder, targets, inventory, num);
-
-            if (!welded || SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.WelderTweaksCanWeldProjectionsIfWeldedOtherBlocks)
+            
+            if (SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.AsyncWeld)
             {
+                var targetsToThread = new HashSet<MySlimBlock>(targets);
+                Parallel.StartBackground(() => Weld(welder, targetsToThread, inventory, num, WeldProjectionsWithWelding));
+                return;
+            }
+
+            var welded = Weld(welder, targets, inventory, num);
+
+            WeldProjectionsWithWelding(welder, welded);
+        }
+
+        private static void WeldProjectionsWithWelding(MyShipWelder welder, bool welded)
+        {
+            if (!welded || SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config
+                .WelderTweaksCanWeldProjectionsIfWeldedOtherBlocks)
+            {
+                if (random.Next(0, 10) > 1)
+                {
+                    return;
+                }
+
                 if (SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.WelderTweaksWeldProjectionsNextFrame)
                 {
-                    FrameExecutor.addDelayedLogic(1, (x) =>
-                    {
-                        WeldProjections(welder);
-                    });
+                    FrameExecutor.addDelayedLogic(random.Next(4), (x) => { WeldProjections(welder); });
                 }
                 else
                 {
@@ -136,13 +154,15 @@ namespace Optimizer.Optimizations
             }
         }
 
-        
 
-        public static bool Weld (MyShipWelder welder, HashSet<MySlimBlock> targets, MyInventory inventory, int foundBlocks)
+        public static bool Weld(MyShipWelder welder, HashSet<MySlimBlock> targets, MyInventory inventory,
+            int foundBlocks, Action<MyShipWelder, bool> callback = null)
         {
             float blocksToWeld = Math.Min(4, (foundBlocks > 0) ? foundBlocks : 1);
-            float weldAmount = MySession.Static.WelderSpeedMultiplier * MyShipWelder.WELDER_AMOUNT_PER_SECOND * (MyShipGrinderConstants.GRINDER_COOLDOWN_IN_MILISECONDS * 0.001f) / blocksToWeld;
-            float maxAllowedBoneMovement = MyShipWelder.WELDER_MAX_REPAIR_BONE_MOVEMENT_SPEED * (MyShipGrinderConstants.GRINDER_COOLDOWN_IN_MILISECONDS * 0.001f);
+            float weldAmount = 10 * MySession.Static.WelderSpeedMultiplier * MyShipWelder.WELDER_AMOUNT_PER_SECOND *
+                (MyShipGrinderConstants.GRINDER_COOLDOWN_IN_MILISECONDS * 0.001f) / blocksToWeld;
+            float maxAllowedBoneMovement = MyShipWelder.WELDER_MAX_REPAIR_BONE_MOVEMENT_SPEED *
+                                           (MyShipGrinderConstants.GRINDER_COOLDOWN_IN_MILISECONDS * 0.001f);
 
 
             bool weldedAnyThing = false;
@@ -154,10 +174,13 @@ namespace Optimizer.Optimizations
                     if (!SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.WelderTweaksNoLimitsCheck)
                     {
                         canWeld = true;
-                    } else
+                    }
+                    else
                     {
                         bool? flag2 = block.ComponentStack.WillFunctionalityRise(weldAmount);
-                        if (flag2 == null || !flag2.Value || MySession.Static.CheckLimitsAndNotify(MySession.Static.LocalPlayerId, block.BlockDefinition.BlockPairName, block.BlockDefinition.PCU - MyCubeBlockDefinition.PCU_CONSTRUCTION_STAGE_COST, 0, 0, null))
+                        if (flag2 == null || !flag2.Value || MySession.Static.CheckLimitsAndNotify(
+                            MySession.Static.LocalPlayerId, block.BlockDefinition.BlockPairName,
+                            block.BlockDefinition.PCU - MyCubeBlockDefinition.PCU_CONSTRUCTION_STAGE_COST, 0, 0, null))
                         {
                             canWeld = true;
                         }
@@ -165,32 +188,64 @@ namespace Optimizer.Optimizations
 
                     if (canWeld)
                     {
-                        block.MoveItemsToConstructionStockpile(inventory);
-                        block.MoveUnneededItemsFromConstructionStockpile(inventory);
-                        if (block.HasDeformation || block.MaxDeformation > 0.0001f || !block.IsFullIntegrity)
+                        MyAPIGateway.Utilities.InvokeOnGameThread(() => Action(block));
+                        void Action(MySlimBlock blockToWeld)
                         {
-                            block.IncreaseMountLevel(weldAmount, welder.OwnerId, inventory, maxAllowedBoneMovement, welder.HelpOthers, welder.IDModule.ShareMode, false, false);
-                            weldedAnyThing = true;
+                            try
+                            {
+                                blockToWeld.MoveItemsToConstructionStockpile(inventory);
+                                blockToWeld.MoveUnneededItemsFromConstructionStockpile(inventory);
+                                if (blockToWeld.HasDeformation || blockToWeld.MaxDeformation > 0.0001f || !blockToWeld.IsFullIntegrity)
+                                {
+                                    blockToWeld.IncreaseMountLevel(weldAmount, welder.OwnerId, inventory, maxAllowedBoneMovement, welder.HelpOthers, welder.IDModule.ShareMode, false, false);
+
+                                    weldedAnyThing = true;
+                                }
+                            }
+                            catch (Exception e)
+                            {
+                                SentisOptimisationsPlugin.SentisOptimisationsPlugin.Log.Error(e);
+                            }
                         }
+
+                       
                     }
                 }
             }
 
+            if (SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.AsyncWeld)
+            {
+                callback?.Invoke(welder, weldedAnyThing);
+            }
+
+
             return weldedAnyThing;
         }
 
-        public static void WeldProjections (MyShipWelder welder)
+        public static void WeldProjections(MyShipWelder welder)
         {
             if (welder.MarkedForClose || welder.Closed)
             {
                 return;
             }
 
-            MyInventory inventory = welder.GetInventory(0);
+
+            if (SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.AsyncWeld)
+            {
+                Parallel.StartBackground(() => FindProjectedBlocks(welder, DoWeldProjections));
+                return;
+            }
+
             var array = FindProjectedBlocks(welder);
+            DoWeldProjections(welder, array);
+        }
+
+        private static void DoWeldProjections(MyShipWelder welder, List<MyWelder.ProjectionRaycastData> array)
+        {
+            MyInventory inventory = welder.GetInventory(0);
             if (welder.UseConveyorSystem)
             {
-                Dictionary<MyDefinitionId, int> componentsToPull = new Dictionary<MyDefinitionId, int>(); 
+                Dictionary<MyDefinitionId, int> componentsToPull = new Dictionary<MyDefinitionId, int>();
                 for (int i = 0; i < array.Count; i++)
                 {
                     MyCubeBlockDefinition.Component[] components = array[i].hitCube.BlockDefinition.Components;
@@ -203,51 +258,71 @@ namespace Optimizer.Optimizations
 
                 foreach (var x in componentsToPull)
                 {
-                    welder.CubeGrid.GridSystems.ConveyorSystem.PullItem(x.Key, new MyFixedPoint?(x.Value), welder, inventory, false, false);
+                    welder.CubeGrid.GridSystems.ConveyorSystem.PullItem(x.Key, new MyFixedPoint?(x.Value), welder,
+                        inventory,
+                        false, false);
                 }
             }
 
-            bool flag3 = false; 
+            bool flag3 = false;
             if (!SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.WelderSkipCreativeWelding)
             {
                 flag3 = MySession.Static.CreativeMode;
                 MyPlayer.PlayerId id2;
                 MyPlayer myPlayer;
-                if (MySession.Static.Players.TryGetPlayerId(welder.BuiltBy, out id2) && MySession.Static.Players.TryGetPlayerById(id2, out myPlayer))
+                if (MySession.Static.Players.TryGetPlayerId(welder.BuiltBy, out id2) &&
+                    MySession.Static.Players.TryGetPlayerById(id2, out myPlayer))
                 {
                     flag3 |= MySession.Static.CreativeToolsEnabled(Sync.MyId);
                 }
             }
-            
+
             foreach (MyWelder.ProjectionRaycastData projectionRaycastData in array)
             {
-                if (welder.IsWithinWorldLimits(projectionRaycastData.cubeProjector, projectionRaycastData.hitCube.BlockDefinition.BlockPairName, flag3 ? projectionRaycastData.hitCube.BlockDefinition.PCU : MyCubeBlockDefinition.PCU_CONSTRUCTION_STAGE_COST) && (MySession.Static.CreativeMode || inventory.ContainItems(new MyFixedPoint?(1), projectionRaycastData.hitCube.BlockDefinition.Components[0].Definition.Id, MyItemFlags.None)))
+                if (welder.IsWithinWorldLimits(projectionRaycastData.cubeProjector,
+                    projectionRaycastData.hitCube.BlockDefinition.BlockPairName,
+                    flag3
+                        ? projectionRaycastData.hitCube.BlockDefinition.PCU
+                        : MyCubeBlockDefinition.PCU_CONSTRUCTION_STAGE_COST) && (MySession.Static.CreativeMode ||
+                    inventory.ContainItems(new MyFixedPoint?(1),
+                        projectionRaycastData.hitCube
+                            .BlockDefinition.Components[0]
+                            .Definition.Id, MyItemFlags.None)))
                 {
                     MyWelder.ProjectionRaycastData invokedBlock = projectionRaycastData;
-                    try
-                    {
-                        MySandboxGame.Static.Invoke((Action) (() =>
-                        {
-                            if (invokedBlock.cubeProjector.Closed || invokedBlock.cubeProjector.CubeGrid.Closed || invokedBlock.hitCube.FatBlock != null && invokedBlock.hitCube.FatBlock.Closed)
-                                return;
-                            invokedBlock.cubeProjector.Build(invokedBlock.hitCube, welder.OwnerId, welder.EntityId, builtBy: welder.BuiltBy);
-                        }), "ShipWelder BuildProjection");
-                    }
-                    catch (Exception e)
-                    {
-                        SentisOptimisationsPlugin.SentisOptimisationsPlugin.Log.Error(e);
-                    }
 
+                    MyAPIGateway.Utilities.InvokeOnGameThread(() =>
+                    {
+                        try
+                        {
+                            MySandboxGame.Static.Invoke((Action) (() =>
+                            {
+                                if (invokedBlock.cubeProjector.Closed || invokedBlock.cubeProjector.CubeGrid.Closed ||
+                                    invokedBlock.hitCube.FatBlock != null && invokedBlock.hitCube.FatBlock.Closed)
+                                    return;
+                                invokedBlock.cubeProjector.Build(invokedBlock.hitCube, welder.OwnerId, welder.EntityId,
+                                    builtBy: welder.BuiltBy);
+                            }), "ShipWelder BuildProjection");
+                        }
+                        catch (Exception e)
+                        {
+                            SentisOptimisationsPlugin.SentisOptimisationsPlugin.Log.Error(e);
+                        }
+                    });
                 }
             }
         }
 
         // Token: 0x060019BA RID: 6586 RVA: 0x0007BD0C File Offset: 0x00079F0C
-        private static List<MyWelder.ProjectionRaycastData> FindProjectedBlocks(MyShipWelder welder)
+        private static List<MyWelder.ProjectionRaycastData> FindProjectedBlocks(MyShipWelder welder,
+            Action<MyShipWelder, List<MyWelder.ProjectionRaycastData>> callback = null)
         {
+            HashSet<MySlimBlock> m_projectedBlock = new HashSet<MySlimBlock>();
             var w = welder.WorldMatrix;
-            var d = (MyShipWelderDefinition)(welder.BlockDefinition);
-            BoundingSphereD boundingSphereD = new BoundingSphereD(w.Translation + w.Forward * (welder.CubeGrid.GridSize * 1.5f + d.SensorOffset), ShipToolPatch.GetWelderRadius(welder));
+            var d = (MyShipWelderDefinition) (welder.BlockDefinition);
+            BoundingSphereD boundingSphereD = new BoundingSphereD(
+                w.Translation + w.Forward * (welder.CubeGrid.GridSize * 1.5f + d.SensorOffset),
+                ShipToolPatch.GetWelderRadius(welder));
             List<MyWelder.ProjectionRaycastData> list = new List<MyWelder.ProjectionRaycastData>();
             List<MyEntity> entitiesInSphere = MyEntities.GetEntitiesInSphere(ref boundingSphereD);
 
@@ -257,23 +332,52 @@ namespace Optimizer.Optimizations
                 if (myCubeGrid != null && myCubeGrid.Projector != null)
                 {
                     myCubeGrid.GetBlocksInsideSphere(ref boundingSphereD, m_projectedBlock, false);
-                    foreach (MySlimBlock mySlimBlock in m_projectedBlock)
+                    if (!SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.AsyncWeld)
                     {
-                        if (myCubeGrid.Projector.CanBuild(mySlimBlock, true) == BuildCheckResult.OK)
+                        foreach (MySlimBlock mySlimBlock in m_projectedBlock)
                         {
-                            MySlimBlock cubeBlock = myCubeGrid.GetCubeBlock(mySlimBlock.Position);
-                            if (cubeBlock != null)
+                            if (myCubeGrid.Projector.CanBuild(mySlimBlock, true) == BuildCheckResult.OK)
                             {
-                                list.Add(new MyWelder.ProjectionRaycastData(BuildCheckResult.OK, cubeBlock, myCubeGrid.Projector));
+                                MySlimBlock cubeBlock = myCubeGrid.GetCubeBlock(mySlimBlock.Position);
+                                if (cubeBlock != null)
+                                {
+                                    list.Add(new MyWelder.ProjectionRaycastData(BuildCheckResult.OK, cubeBlock,
+                                        myCubeGrid.Projector));
+                                }
                             }
                         }
                     }
+                    else
+                    {
+                        HashSet<MySlimBlock> m_projectedBlockForThread = new HashSet<MySlimBlock>(m_projectedBlock);
+                        MyAPIGateway.Utilities.InvokeOnGameThread(() => Action(m_projectedBlockForThread));
+
+                        void Action(HashSet<MySlimBlock> blocksInThread)
+                        {
+                            foreach (MySlimBlock mySlimBlock in blocksInThread)
+                            {
+                                if (myCubeGrid.Projector.CanBuild(mySlimBlock, true) == BuildCheckResult.OK)
+                                {
+                                    MySlimBlock cubeBlock = myCubeGrid.GetCubeBlock(mySlimBlock.Position);
+                                    if (cubeBlock != null)
+                                    {
+                                        list.Add(new MyWelder.ProjectionRaycastData(BuildCheckResult.OK, cubeBlock,
+                                            myCubeGrid.Projector));
+                                    }
+                                }
+                            }
+
+                            callback?.Invoke(welder, list);
+                        }
+                    }
+
                     m_projectedBlock.Clear();
                 }
             }
 
             m_projectedBlock.Clear();
             entitiesInSphere.Clear();
+
             return list;
         }
     }

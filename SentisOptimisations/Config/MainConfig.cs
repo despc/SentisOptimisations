@@ -83,6 +83,7 @@ namespace SentisOptimisationsPlugin
         private bool _welderSelfWelding = false;
         private bool _welderExcludeNanobot = true;
         private bool _welderFasterSearch = true;
+        private bool _asyncWeld = false;
         private bool _welderSkipCreativeWelding = true;
         
         private ObservableCollection<ConfigShipInMarket> configShipsInMarket = new ObservableCollection<ConfigShipInMarket>();
@@ -501,5 +502,8 @@ namespace SentisOptimisationsPlugin
 
         [DisplayTab(Name = "Skip creative welding", GroupName = "Welder Tweaks (WIP)", Tab = "Welder Optimizations", Order = 8, Description = "Skip creative welding")]
         public bool WelderSkipCreativeWelding { get => _welderFasterSearch; set => SetValue(ref _welderFasterSearch, value); }
+        
+        [DisplayTab(Name = "Async weld", GroupName = "Welder Tweaks (WIP)", Tab = "Welder Optimizations", Order = 8, Description = "Async weld")]
+        public bool AsyncWeld { get => _asyncWeld; set => SetValue(ref _asyncWeld, value); }
     }
 }
