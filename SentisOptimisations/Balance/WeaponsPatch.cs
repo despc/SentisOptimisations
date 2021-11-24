@@ -27,6 +27,20 @@ namespace SentisOptimisationsPlugin
             ctx.GetPattern(LargeTurretBaseInit).Suffixes.Add(
                 typeof(WeaponsPatch).GetMethod(nameof(LargeTurretBaseInitPatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
+            // var WeaponDefinitionInit = typeof(MyWeaponDefinition).GetMethod
+            //     ("Init", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+            //
+            // ctx.GetPattern(WeaponDefinitionInit).Suffixes.Add(
+            //     typeof(WeaponsPatch).GetMethod(nameof(WeaponDefinitionInitPatched),
+            //         BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            //
+            // var ProjectileAmmoDefinitionInit = typeof(MyProjectileAmmoDefinition).GetMethod
+            //     ("Init", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+            //
+            // ctx.GetPattern(ProjectileAmmoDefinitionInit).Suffixes.Add(
+            //     typeof(WeaponsPatch).GetMethod(nameof(ProjectileAmmoDefinitionInitPatched),
+            //         BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
 
         }
 
@@ -60,6 +74,38 @@ namespace SentisOptimisationsPlugin
                 SentisOptimisationsPlugin.Log.Warn("InitPatched Exception ", e);
             }
         }
+        
+        // private static void WeaponDefinitionInitPatched(MyWeaponDefinition __instance)
+        // {
+        //     try
+        //     {
+        //         if (__instance.Id.SubtypeName.Contains("Gatling"))
+        //         {
+        //             foreach (var weaponAmmoData in __instance.WeaponAmmoDatas)
+        //             {
+        //                 weaponAmmoData.RateOfFire = 60;
+        //                 weaponAmmoData.ShootIntervalInMiliseconds = 800;
+        //             }
+        //         }
+        //         
+        //     }
+        //     catch (Exception e)
+        //     {
+        //         SentisOptimisationsPlugin.Log.Warn("WeaponDefinitionInitPatched Exception ", e);
+        //     }
+        // }
+        //
+        // private static void ProjectileAmmoDefinitionInitPatched(MyProjectileAmmoDefinition __instance)
+        // {
+        //     try
+        //     {
+        //         __instance.ProjectileMassDamage = 500;
+        //     }
+        //     catch (Exception e)
+        //     {
+        //         SentisOptimisationsPlugin.Log.Warn("ProjectileAmmoDefinitionInitPatched Exception ", e);
+        //     }
+        // }
 
     }
 }

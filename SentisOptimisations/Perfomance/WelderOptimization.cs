@@ -215,7 +215,14 @@ namespace Optimizer.Optimizations
 
             if (SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.AsyncWeld)
             {
-                callback?.Invoke(welder, weldedAnyThing);
+                try
+                {
+                    callback?.Invoke(welder, weldedAnyThing);
+                }
+                catch (Exception e)
+                {
+                    //...
+                }
             }
 
 
@@ -367,7 +374,15 @@ namespace Optimizer.Optimizations
                                 }
                             }
 
-                            callback?.Invoke(welder, list);
+                            try
+                            {
+                                callback?.Invoke(welder, list);
+                            }
+                            catch (Exception e)
+                            {
+                                //...
+                            }
+                            
                         }
                     }
 
