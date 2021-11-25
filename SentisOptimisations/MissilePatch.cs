@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using NLog;
+using ParallelTasks;
 using Sandbox;
 using Sandbox.Definitions;
 using Sandbox.Engine.Physics;
@@ -137,13 +138,17 @@ namespace SentisOptimisationsPlugin
                         InvokeInstanceMethod(typeof(MyMissile), __instance, "MarkForExplosion", new Object[0]);
                     }
 
+                    if (__instance.EntityId % 5 != (long) (MySandboxGame.Static.SimulationFrameCounter % 5))
+                    {
+                        return false;
+                    }
                     MyEntity entity;
                     MyHitInfo hitInfoRet;
                     Vector3D position = __instance.PositionComp.GetPosition();
 
                     MatrixD matrixD = __instance.PositionComp.WorldMatrixRef;
                     Vector3D to = matrixD.Translation +
-                                  matrixD.Forward * (mMissileAmmoDefinition.MissileInitialSpeed / 15);
+                                  matrixD.Forward * (mMissileAmmoDefinition.MissileInitialSpeed / 10);
 
                     LineD line = new LineD(position, to);
                     var hitEntityIsNotNull = GetHitEntityAndPosition(line, out entity, out hitInfoRet);
@@ -213,11 +218,10 @@ namespace SentisOptimisationsPlugin
             BoundingSphereD explosionSphere = new BoundingSphereD(explosionPosition, explosionRadius);
             var topMostEntitiesInSphere =
                 new HashSet<MyEntity>(MyEntities.GetTopMostEntitiesInSphere(ref explosionSphere));
-            MyGridExplosion m_gridExplosion = ApplyVolumetricExplosionOnGrid(
+           ApplyVolumetricExplosionOnGrid(
                 explosionDamage, ref explosionSphere, originEntity,
-                new List<MyEntity>(topMostEntitiesInSphere), isWarhead);
-            ComputeDamagedBlocks(m_gridExplosion, isPearcingDamage);
-            ApplyVolumetricDamageToGrid(m_gridExplosion, attackerId);
+                new List<MyEntity>(topMostEntitiesInSphere), attackerId, isWarhead, isPearcingDamage);
+
         }
 
 
@@ -419,11 +423,10 @@ namespace SentisOptimisationsPlugin
             return new MyGridExplosion.MyRaycastDamageInfo(0.0f, distanceToExplosion);
         }
 
-        private static MyGridExplosion ApplyVolumetricExplosionOnGrid(
-            float MissileExplosionDamage,
+        private static void ApplyVolumetricExplosionOnGrid(float MissileExplosionDamage,
             ref BoundingSphereD sphere,
             long OriginEntity,
-            List<MyEntity> entities, bool isWarhead = false)
+            List<MyEntity> entities, long attackerId, bool isWarhead = false, bool isPearcingDamage = false)
         {
             MyGridExplosion m_gridExplosion = new MyGridExplosion();
             m_gridExplosion.Init(sphere, MissileExplosionDamage);
@@ -443,6 +446,48 @@ namespace SentisOptimisationsPlugin
                 }
             }
 
+            if (SentisOptimisationsPlugin.Config.AsyncExplosion)
+            {
+                var d = sphere;
+                Parallel.StartBackground(() => CollectBlocksAsync(d, new List<MyEntity>(entities), isWarhead, Node2,
+                    group, m_gridExplosion, attackerId, isPearcingDamage));
+
+                void CollectBlocksAsync(BoundingSphereD sphere_t, List<MyEntity> entities_t, bool isWarhead_t,
+                    MyCubeGrid Node2_t, MyGroups<MyCubeGrid, MyGridLogicalGroupData>.Group group_t,
+                    MyGridExplosion m_gridExplosion_t,
+                    long attackerId_t, bool isPearcingDamage_t)
+                {
+                    try
+                    {
+                        CollectBlocks(sphere_t, entities_t, isWarhead_t, Node2_t, group_t, m_gridExplosion_t);
+                        MyAPIGateway.Utilities.InvokeOnGameThread(() =>
+                        {
+                            try
+                            {
+                                ComputeDamagedBlocks(m_gridExplosion_t, isPearcingDamage_t);
+                                ApplyVolumetricDamageToGrid(m_gridExplosion_t, attackerId_t);
+                            }
+                            catch (Exception e)
+                            {
+                            }
+                        });
+                    }
+                    catch (Exception e)
+                    {
+                    }
+                }
+
+                return;
+            }
+            
+            CollectBlocks(sphere, entities, isWarhead, Node2, group, m_gridExplosion);
+            ComputeDamagedBlocks(m_gridExplosion, isPearcingDamage);
+            ApplyVolumetricDamageToGrid(m_gridExplosion, attackerId);
+        }
+
+        private static void CollectBlocks(BoundingSphereD sphere, List<MyEntity> entities, bool isWarhead, MyCubeGrid Node2, MyGroups<MyCubeGrid, MyGridLogicalGroupData>.Group group,
+            MyGridExplosion m_gridExplosion)
+        {
             foreach (MyEntity entity in entities)
             {
                 var Node = entity as MyCubeGrid;
@@ -450,9 +495,8 @@ namespace SentisOptimisationsPlugin
                 {
                     continue;
                 }
-                // Log.Error("Process Entity " + entity.DisplayName);
+
                 if (isWarhead || (
-                    // entity != explosionInfo.ExcludedEntity &&
                     (Node.CreatePhysics && Node != Node2) &&
                     (group == null || MyCubeGridGroups.Static.Logical.GetGroup(Node) != group)))
                 {
@@ -464,10 +508,6 @@ namespace SentisOptimisationsPlugin
                     BoundingSphereD sphere2 = new BoundingSphereD(sphere.Center, sphere.Radius);
                     BoundingSphereD sphere3 = new BoundingSphereD(sphere.Center,
                         sphere.Radius + (double) Node.GridSize * 0.5 * Math.Sqrt(3.0));
-                    // AddGps("Center ", sphere.Center);
-                    // AddGps("1 sphere ", sphere.Center - Direction * sphere1.Radius);
-                    // AddGps("2 sphere ", sphere.Center - Direction * sphere2.Radius);
-                    // AddGps("3 sphere ", sphere.Center - Direction * sphere3.Radius);
                     HashSet<MySlimBlock> m_explodedBlocksInner = new HashSet<MySlimBlock>();
                     HashSet<MySlimBlock> m_explodedBlocksExact = new HashSet<MySlimBlock>();
                     HashSet<MySlimBlock> m_explodedBlocksOuter = new HashSet<MySlimBlock>();
@@ -484,8 +524,6 @@ namespace SentisOptimisationsPlugin
                     m_explodedBlocksOuter.Clear();
                 }
             }
-
-            return m_gridExplosion;
         }
 
         private static void AddGps(string message, Vector3D? asteroidPosition)

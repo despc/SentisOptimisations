@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Reflection;
 using NAPI;
@@ -56,8 +57,132 @@ namespace SentisOptimisationsPlugin.ShipTool
             ctx.GetPattern(MethodActivateCommon).Prefixes.Add(
                 typeof(ShipToolPatch).GetMethod(nameof(ActivateCommonPatch),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
+            ctx.GetPattern(typeof(MyCubeGrid).GetMethod(nameof(MyCubeGrid.GetBlocksInsideSpheres)))
+                .Prefixes.Add(typeof(ShipToolPatch).GetMethod(nameof(GetBlocksInsideSpheresPatch),
+                    BindingFlags.Static | BindingFlags.NonPublic));
         }
 
+
+        private static void GetBlocksInsideSpheresPatch(MyCubeGrid __instance, ref BoundingSphereD sphere1,
+            ref BoundingSphereD sphere2,
+            ref BoundingSphereD sphere3,
+            HashSet<MySlimBlock> blocks1,
+            HashSet<MySlimBlock> blocks2,
+            HashSet<MySlimBlock> blocks3,
+            bool respectDeformationRatio,
+            float detectionBlockHalfSize,
+            ref MatrixD invWorldGrid)
+        {
+            try
+            {
+                blocks1.Clear();
+                blocks2.Clear();
+                blocks3.Clear();
+                HashSet<MyCubeBlock> m_processedBlocks = new HashSet<MyCubeBlock>();
+                Vector3D result;
+                Vector3D.Transform(ref sphere3.Center, ref invWorldGrid, out result);
+                Vector3I vector3I1 = Vector3I.Round((result - sphere3.Radius) * (double) __instance.GridSizeR);
+                Vector3I vector3I2 = Vector3I.Round((result + sphere3.Radius) * (double) __instance.GridSizeR);
+                Vector3 vector3 = new Vector3(detectionBlockHalfSize);
+                BoundingSphereD boundingSphereD1 = new BoundingSphereD(result, sphere1.Radius);
+                BoundingSphereD boundingSphereD2 = new BoundingSphereD(result, sphere2.Radius);
+                BoundingSphereD boundingSphereD3 = new BoundingSphereD(result, sphere3.Radius);
+                ConcurrentDictionary<Vector3I, MyCube> instanceMCubes = (ConcurrentDictionary<Vector3I, MyCube>) __instance.easyGetField("m_cubes");
+                if ((vector3I2.X - vector3I1.X) * (vector3I2.Y - vector3I1.Y) * (vector3I2.Z - vector3I1.Z) <
+                    instanceMCubes.Count)
+                {
+                    Vector3I key = new Vector3I();
+                    for (key.X = vector3I1.X; key.X <= vector3I2.X; ++key.X)
+                    {
+                        for (key.Y = vector3I1.Y; key.Y <= vector3I2.Y; ++key.Y)
+                        {
+                            for (key.Z = vector3I1.Z; key.Z <= vector3I2.Z; ++key.Z)
+                            {
+                                MyCube myCube;
+                                if (instanceMCubes.TryGetValue(key, out myCube))
+                                {
+                                    MySlimBlock cubeBlock = myCube.CubeBlock;
+                                    if (cubeBlock.FatBlock == null ||
+                                        !m_processedBlocks.Contains(cubeBlock.FatBlock))
+                                    {
+                                        m_processedBlocks.Add(cubeBlock.FatBlock);
+                                        if (respectDeformationRatio)
+                                        {
+                                            boundingSphereD1.Radius =
+                                                sphere1.Radius * (double) cubeBlock.DeformationRatio;
+                                            boundingSphereD2.Radius =
+                                                sphere2.Radius * (double) cubeBlock.DeformationRatio;
+                                            boundingSphereD3.Radius =
+                                                sphere3.Radius * (double) cubeBlock.DeformationRatio;
+                                        }
+
+                                        BoundingBox boundingBox = cubeBlock.FatBlock == null
+                                            ? new BoundingBox(cubeBlock.Position * __instance.GridSize - vector3,
+                                                cubeBlock.Position * __instance.GridSize + vector3)
+                                            : new BoundingBox(cubeBlock.Min * __instance.GridSize - __instance.GridSizeHalf,
+                                                cubeBlock.Max * __instance.GridSize + __instance.GridSizeHalf);
+                                        if (boundingBox.Intersects((BoundingSphere) boundingSphereD3))
+                                        {
+                                            if (boundingBox.Intersects((BoundingSphere) boundingSphereD2))
+                                            {
+                                                if (boundingBox.Intersects((BoundingSphere) boundingSphereD1))
+                                                    blocks1.Add(cubeBlock);
+                                                else
+                                                    blocks2.Add(cubeBlock);
+                                            }
+                                            else
+                                                blocks3.Add(cubeBlock);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    foreach (MyCube myCube in (IEnumerable<MyCube>) instanceMCubes.Values)
+                    {
+                        MySlimBlock cubeBlock = myCube.CubeBlock;
+                        if (cubeBlock.FatBlock == null || !m_processedBlocks.Contains(cubeBlock.FatBlock))
+                        {
+                            m_processedBlocks.Add(cubeBlock.FatBlock);
+                            if (respectDeformationRatio)
+                            {
+                                boundingSphereD1.Radius = sphere1.Radius * (double) cubeBlock.DeformationRatio;
+                                boundingSphereD2.Radius = sphere2.Radius * (double) cubeBlock.DeformationRatio;
+                                boundingSphereD3.Radius = sphere3.Radius * (double) cubeBlock.DeformationRatio;
+                            }
+
+                            BoundingBox boundingBox = cubeBlock.FatBlock == null
+                                ? new BoundingBox(cubeBlock.Position * __instance.GridSize - vector3,
+                                    cubeBlock.Position * __instance.GridSize + vector3)
+                                : new BoundingBox(cubeBlock.Min * __instance.GridSize - __instance.GridSizeHalf,
+                                    cubeBlock.Max * __instance.GridSize + __instance.GridSizeHalf);
+                            if (boundingBox.Intersects((BoundingSphere) boundingSphereD3))
+                            {
+                                if (boundingBox.Intersects((BoundingSphere) boundingSphereD2))
+                                {
+                                    if (boundingBox.Intersects((BoundingSphere) boundingSphereD1))
+                                        blocks1.Add(cubeBlock);
+                                    else
+                                        blocks2.Add(cubeBlock);
+                                }
+                                else
+                                    blocks3.Add(cubeBlock);
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Log.Error("Exception during GetBlocksInsideSpheresPatch", e);
+            }
+        }
+        
+        
         private static void LoadDummiesPatch(MyShipToolBase __instance)
         {
             try
@@ -72,7 +197,7 @@ namespace SentisOptimisationsPlugin.ShipTool
             }
             catch (Exception e)
             {
-                Log.Error("Exception in during LoadDummiesPatch", e);
+                Log.Error("Exception during LoadDummiesPatch", e);
             }
         }
 

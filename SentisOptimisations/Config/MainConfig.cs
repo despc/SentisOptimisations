@@ -86,6 +86,8 @@ namespace SentisOptimisationsPlugin
         private bool _asyncWeld = false;
         private bool _welderSkipCreativeWelding = true;
         
+        private bool _asyncExplosion = true;
+        
         private ObservableCollection<ConfigShipInMarket> configShipsInMarket = new ObservableCollection<ConfigShipInMarket>();
 
         public ObservableCollection<ConfigShipInMarket> ConfigShipsInMarket
@@ -505,5 +507,9 @@ namespace SentisOptimisationsPlugin
         
         [DisplayTab(Name = "Async weld", GroupName = "Welder Tweaks (WIP)", Tab = "Welder Optimizations", Order = 8, Description = "Async weld")]
         public bool AsyncWeld { get => _asyncWeld; set => SetValue(ref _asyncWeld, value); }
+        
+        
+        [DisplayTab(Name = "Async explosion", GroupName = "Performance", Tab = "Performance", Order = 8, Description = "Async explosion")]
+        public bool AsyncExplosion { get => _asyncExplosion; set => SetValue(ref _asyncExplosion, value); }
     }
 }

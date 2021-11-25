@@ -416,6 +416,7 @@ namespace SentisOptimisationsPlugin.AnomalyZone
                 string message =
                     $"[{faction.Tag}] {player.DisplayName} Died: -{SentisOptimisationsPlugin.Config.AzPointsRemovedOnDeath} point";
                 Log.Warn(message);
+                ChatUtils.SendToAll(message);
                 MyVisualScriptLogicProvider.ShowNotification(message, 5000, "Red");
             });
             AZReward.ChangePoints(mySafeZoneBlock, faction, -SentisOptimisationsPlugin.Config.AzPointsRemovedOnDeath);
