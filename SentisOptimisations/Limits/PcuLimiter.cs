@@ -145,7 +145,6 @@ namespace SentisOptimisationsPlugin
                     continue;
                 }
 
-                ((IMyFunctionalBlock) mySlimBlock.FatBlock).EnabledChanged -= OnEnabledChanged();
                 try
                 {
                     ((IMyFunctionalBlock) mySlimBlock.FatBlock).Enabled = true;
@@ -174,8 +173,6 @@ namespace SentisOptimisationsPlugin
                         continue;
                     }
 
-                    ((IMyFunctionalBlock) mySlimBlock.FatBlock).EnabledChanged -= OnEnabledChanged();
-                    ((IMyFunctionalBlock) mySlimBlock.FatBlock).Enabled = true;
                 }
             }
         }
@@ -233,7 +230,7 @@ namespace SentisOptimisationsPlugin
                 }
 
                 ((IMyFunctionalBlock) mySlimBlock.FatBlock).Enabled = false;
-                ((IMyFunctionalBlock) mySlimBlock.FatBlock).EnabledChanged += OnEnabledChanged();
+
             }
 
             var subGrids = GridUtils.GetSubGrids(cube);
@@ -249,7 +246,6 @@ namespace SentisOptimisationsPlugin
                     }
 
                     ((IMyFunctionalBlock) mySlimBlock.FatBlock).Enabled = false;
-                    ((IMyFunctionalBlock) mySlimBlock.FatBlock).EnabledChanged += OnEnabledChanged();
                 }
             }
 
@@ -265,17 +261,6 @@ namespace SentisOptimisationsPlugin
                    mySlimBlock.FatBlock is MyShipConnector ||
                    mySlimBlock.FatBlock is MyMedicalRoom ||
                    mySlimBlock.FatBlock is MySafeZoneBlock;
-        }
-
-        private static Action<IMyTerminalBlock> OnEnabledChanged()
-        {
-            return terminalBlock =>
-            {
-                if (!IsLimitNotReached(((MyFunctionalBlock) terminalBlock).CubeGrid))
-                {
-                    ((MyFunctionalBlock) terminalBlock).Enabled = false;
-                }
-            };
         }
 
         public static void SendLimitMessage(long identityId, int pcu, int maxPcu, String gridName)

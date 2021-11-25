@@ -28,12 +28,12 @@ namespace SentisOptimisationsPlugin
                 typeof(WeaponsPatch).GetMethod(nameof(LargeTurretBaseInitPatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
             
-            // var WeaponDefinitionInit = typeof(MyWeaponDefinition).GetMethod
-            //     ("Init", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
-            //
-            // ctx.GetPattern(WeaponDefinitionInit).Suffixes.Add(
-            //     typeof(WeaponsPatch).GetMethod(nameof(WeaponDefinitionInitPatched),
-            //         BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            var MyWeaponBlockDefinitionInit = typeof(MyWeaponBlockDefinition).GetMethod
+                ("Init", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+            
+            ctx.GetPattern(MyWeaponBlockDefinitionInit).Suffixes.Add(
+                typeof(WeaponsPatch).GetMethod(nameof(WeaponDefinitionInitPatched),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
             //
             // var ProjectileAmmoDefinitionInit = typeof(MyProjectileAmmoDefinition).GetMethod
             //     ("Init", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
@@ -75,25 +75,24 @@ namespace SentisOptimisationsPlugin
             }
         }
         
-        // private static void WeaponDefinitionInitPatched(MyWeaponDefinition __instance)
-        // {
-        //     try
-        //     {
-        //         if (__instance.Id.SubtypeName.Contains("Gatling"))
-        //         {
-        //             foreach (var weaponAmmoData in __instance.WeaponAmmoDatas)
-        //             {
-        //                 weaponAmmoData.RateOfFire = 60;
-        //                 weaponAmmoData.ShootIntervalInMiliseconds = 800;
-        //             }
-        //         }
-        //         
-        //     }
-        //     catch (Exception e)
-        //     {
-        //         SentisOptimisationsPlugin.Log.Warn("WeaponDefinitionInitPatched Exception ", e);
-        //     }
-        // }
+        private static void WeaponDefinitionInitPatched(MyWeaponBlockDefinition __instance)
+        {
+            try
+            {
+                if (__instance.Id.SubtypeName.Contains("LargeMissileLauncher"))
+                {
+                    __instance.GeneralDamageMultiplier = __instance.GeneralDamageMultiplier * (SentisOptimisationsPlugin.Config.TurretsDamageMultiplier / 2);
+                    __instance.InventoryMaxVolume = __instance.InventoryMaxVolume * 10;
+                    __instance.InventoryFillFactorMin = 0.8f;
+                    __instance.InventoryFillFactorMin = 1;
+                }
+                
+            }
+            catch (Exception e)
+            {
+                SentisOptimisationsPlugin.Log.Warn("WeaponDefinitionInitPatched Exception ", e);
+            }
+        }
         //
         // private static void ProjectileAmmoDefinitionInitPatched(MyProjectileAmmoDefinition __instance)
         // {
