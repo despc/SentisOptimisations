@@ -65,6 +65,10 @@ namespace SentisOptimisationsPlugin
             try
             {
                 __instance.GeneralDamageMultiplier = __instance.GeneralDamageMultiplier * SentisOptimisationsPlugin.Config.TurretsDamageMultiplier;
+                if (__instance.BlockPairName.Contains("Gatling"))
+                {
+                    return;
+                }
                 __instance.InventoryMaxVolume = __instance.InventoryMaxVolume * 10;
                 __instance.InventoryFillFactorMin = 0.8f;
                 __instance.InventoryFillFactorMin = 1;

@@ -138,7 +138,7 @@ namespace SentisOptimisationsPlugin
                         InvokeInstanceMethod(typeof(MyMissile), __instance, "MarkForExplosion", new Object[0]);
                     }
 
-                    if (__instance.EntityId % 5 != (long) (MySandboxGame.Static.SimulationFrameCounter % 5))
+                    if (__instance.EntityId % 3 != (long) (MySandboxGame.Static.SimulationFrameCounter % 3))
                     {
                         return false;
                     }

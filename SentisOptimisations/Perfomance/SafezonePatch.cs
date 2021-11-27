@@ -104,26 +104,6 @@ namespace SentisOptimisationsPlugin
             return false;
         }
 
-        private static bool MySafeZoneUpdateBeforeSimulationPatched(MySafeZone __instance)
-        {
-            try
-            {
-                if ((ulong) __instance.EntityId % 10 != MySandboxGame.Static.SimulationFrameCounter % 10)
-                {
-                    return true;
-                }
-
-                return false;
-            }
-            catch (Exception e)
-            {
-                SentisOptimisationsPlugin.Log.Warn("MySafeZoneUpdateBeforeSimulationPatched Exception ", e);
-            }
-
-            return true;
-        }
-
-
         private static bool MyRemoveEntityPhantomPatched(MySafeZone __instance, HkRigidBody body, IMyEntity entity)
         {
             if (!SentisOptimisationsPlugin.Config.RemoveEntityPhantomPatch)
@@ -190,14 +170,20 @@ namespace SentisOptimisationsPlugin
                                     shape1 = physics.CharacterProxy.GetHitRigidBody().GetShape();
                             }
 
-                            if ((flag
-                                ? 1
-                                : (shape1.IsValid
-                                    ? (!MyPhysics.IsPenetratingShapeShape(shape1, ref position1, ref rotation1,
-                                        __instance.Physics.RigidBody.GetShape(), ref position, ref fromRotationMatrix)
-                                        ? 1
-                                        : 0)
-                                    : 1)) == 0)
+                            bool isPenetratingShapeShape;
+                            if (entity is MyCubeGrid && SentisOptimisationsPlugin.Config.SafeWeldOptimisation)
+                            {
+                                var distance = Vector3D.Distance(entity.PositionComp.GetPosition(), __instance.PositionComp.GetPosition());
+                                isPenetratingShapeShape = distance < __instance.Radius + entity.PositionComp.WorldVolume.Radius;
+                            }
+                            else
+                            {
+                                isPenetratingShapeShape = MyPhysics.IsPenetratingShapeShape(shape1, ref position1, ref rotation1,
+                                    __instance.Physics.RigidBody.GetShape(), ref position, ref fromRotationMatrix);
+                            }
+                            
+                            
+                            if ((flag ? 1 : (shape1.IsValid ? (!isPenetratingShapeShape ? 1 : 0) : 1)) == 0)
                                 return;
                             bool RemoveEntityInternalResult = (bool) ReflectionUtils.InvokeInstanceMethod(
                                 typeof(MySafeZone), __instance, "RemoveEntityInternal",

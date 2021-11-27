@@ -32,7 +32,6 @@
         <WarningLevel>4</WarningLevel>
     </PropertyGroup>
     <ItemGroup>
-      <Compile Include="AdminCommands.cs" />
       <Compile Include="AnomalyZone\AZBlockProcessor.cs" />
       <Compile Include="AnomalyZone\AZCommands.cs" />
       <Compile Include="AnomalyZone\AZCore.cs" />
@@ -46,6 +45,8 @@
       <Compile Include="Balance\MergePatch.cs" />
       <Compile Include="Balance\ThrustPatch.cs" />
       <Compile Include="Balance\WeaponsPatch.cs" />
+      <Compile Include="Commands\AdminCommands.cs" />
+      <Compile Include="Commands\PlayerCommands.cs" />
       <Compile Include="Config\ConfigAnomalyZone.cs" />
       <Compile Include="Config\ConfigShipInMarket.cs" />
       <Compile Include="Config\MainConfig.cs" />

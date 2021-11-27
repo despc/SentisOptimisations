@@ -71,6 +71,7 @@ namespace SentisOptimisationsPlugin
         private int _minimumMassForKineticDamage = 5000;
         
         private bool _safeZoneSubGridOptimisation = true;
+        private bool _safeZoneWeldOptimisation = false;
         private bool _conveyorCacheEnabled = false;
         private int _safeZonePhysicsThreshold = 10;
         
@@ -176,6 +177,13 @@ namespace SentisOptimisationsPlugin
         {
             get => _safeZoneSubGridOptimisation;
             set => SetValue(ref _safeZoneSubGridOptimisation, value);
+        }
+        
+        [DisplayTab(Name = "Safe zone weld optimisation", GroupName = "Safe zone", Tab = "Safe zone", Order = 0, Description = "Safe zone weld optimisation")]
+        public bool SafeWeldOptimisation
+        {
+            get => _safeZoneWeldOptimisation;
+            set => SetValue(ref _safeZoneWeldOptimisation, value);
         }
         
         [DisplayTab(Name = "Safe zone Physics Threshold", GroupName = "Safe zone", Tab = "Safe zone", Order = 0, Description = "Safe zone Physics Threshold")]
