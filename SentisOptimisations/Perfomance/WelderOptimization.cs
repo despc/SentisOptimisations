@@ -138,7 +138,7 @@ namespace Optimizer.Optimizations
             if (!welded || SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config
                 .WelderTweaksCanWeldProjectionsIfWeldedOtherBlocks)
             {
-                if (random.Next(0, 10) > 1)
+                if (ShipToolPatch.IsSuperWelder(welder) && random.Next(0, 10) > 1)
                 {
                     return;
                 }

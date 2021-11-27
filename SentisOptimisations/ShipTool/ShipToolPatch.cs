@@ -359,31 +359,46 @@ namespace SentisOptimisationsPlugin.ShipTool
 
         public static float GetWelderRadius(MyShipWelder welder)
         {
+            if (!IsSuperWelder(welder)) return SentisOptimisationsPlugin.Config.ShipWelderRadius;
+
+            return SentisOptimisationsPlugin.Config.ShipSuperWelderRadius;
+        }
+
+        public static bool IsSuperWelder(MyShipWelder welder)
+        {
             if (!welder.CubeGrid.IsStatic)
             {
-                return SentisOptimisationsPlugin.Config.ShipWelderRadius;
+                {
+                    return false;
+                }
             }
 
             var ownerId = welder.OwnerId;
             var playerFaction = MySession.Static.Factions.GetPlayerFaction(ownerId);
             if (playerFaction == null)
             {
-                return SentisOptimisationsPlugin.Config.ShipWelderRadius;
+                {
+                    return false;
+                }
             }
 
             if (!welder.CustomData.Contains("[AZ_REWARD]"))
             {
-                return SentisOptimisationsPlugin.Config.ShipWelderRadius;
+                {
+                    return false;
+                }
             }
 
             var factionTag = playerFaction.Tag;
 
             if (!SentisOptimisationsPlugin.Config.AzWinners.Contains(factionTag))
             {
-                return SentisOptimisationsPlugin.Config.ShipWelderRadius;
+                {
+                    return false;
+                }
             }
 
-            return SentisOptimisationsPlugin.Config.ShipSuperWelderRadius;
+            return true;
         }
 
         private static void SetRadius(MyShipToolBase __instance, float radius)
