@@ -31,7 +31,6 @@ namespace SentisOptimisationsPlugin
         private bool _adaptiveblockslowdown = false;
         private bool _removeEntityPhantomPatch = false;
         private String _pathToAsters = "C:\\Asteroids";
-        private bool _garageEnabled = true;
         private String _pathToGarage = "D:\\torch-server\\GARAGE";
         private long _azOwner = 144115188075855912;
         private String _azReward = "PhysicalObject_SpaceCredit=120000;Component_ZoneChip=1";
@@ -132,14 +131,7 @@ namespace SentisOptimisationsPlugin
         
         [DisplayTab(Name = "Path to asteroids", GroupName = "Asteroids", Tab = "Asteroids", Order = 0, Description = "Path to asteroids to restore")]
         public String PathToAsters { get => _pathToAsters; set => SetValue(ref _pathToAsters, value); }
-        
-        [DisplayTab(Name = "Garage enabled", GroupName = "Garage", Tab = "Garage", Order = 0, Description = "Garage enabled")]
-        public bool GarageEnabled
-        {
-            get => _garageEnabled;
-            set => SetValue(ref _garageEnabled, value);
-        }
-        
+
         [DisplayTab(Name = "Path to Garage", GroupName = "Garage", Tab = "Garage", Order = 0, Description = "Path to Garage")]
         public String PathToGarage { get => _pathToGarage; set => SetValue(ref _pathToGarage, value); }
         
@@ -207,13 +199,6 @@ namespace SentisOptimisationsPlugin
         {
             get => _maxStaticGridPCU;
             set => SetValue(ref _maxStaticGridPCU, value);
-        }
-        
-        [DisplayTab(Name = "Move grids to garage after player offline days", GroupName = "Garage", Tab = "Garage", Order = 0, Description = "Move grids to garage after player offline days")]
-        public int OldGridProcessorDays
-        {
-            get => _oldGridProcessorDays;
-            set => SetValue(ref _oldGridProcessorDays, value);
         }
         
         [DisplayTab(Name = "Anomaly Zone Message Time", GroupName = "Anomaly Zone", Tab = "Anomaly Zone", Order = 0, Description = "Anomaly Zone Message Time")]

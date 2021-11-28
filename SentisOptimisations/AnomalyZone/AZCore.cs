@@ -9,8 +9,10 @@ using Sandbox.Game.World;
 using Sandbox.ModAPI;
 using SentisOptimisations;
 using SpaceEngineers.Game.Entities.Blocks.SafeZone;
+using VRage.Game;
 using VRage.Game.ModAPI;
 using VRage.Game.ObjectBuilders.Components;
+using VRage.ObjectBuilders;
 using VRageMath;
 
 namespace SentisOptimisationsPlugin.AnomalyZone
@@ -176,13 +178,23 @@ namespace SentisOptimisationsPlugin.AnomalyZone
                         }
 
                         var customData = mySafeZoneBlock.CustomData;
+
                         if (customData.Contains("AnomalyZoneBlock"))
                         {
                             if (azBlocks.Contains(mySafeZoneBlock))
                             {
                                 return;
                             }
-
+                            
+                            var definitionId = AZReward.GetItemDefenition("Component", "ZoneChip");
+                            var content =
+                                (MyObjectBuilder_PhysicalObject) MyObjectBuilderSerializer.CreateNewObject(definitionId);
+                            MyObjectBuilder_InventoryItem inventoryItem = new MyObjectBuilder_InventoryItem
+                                {Amount = 5, Content = content};
+                            if (mySafeZoneBlock.GetInventory().CanItemsBeAdded(5, definitionId))
+                            {
+                                mySafeZoneBlock.GetInventory().AddItems(5, inventoryItem.Content);
+                            }
                             sz.Enabled = true;
                             sz.AccessTypeFactions = MySafeZoneAccess.Blacklist;
                             sz.AccessTypeGrids = MySafeZoneAccess.Blacklist;
