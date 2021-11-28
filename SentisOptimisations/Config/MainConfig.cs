@@ -36,6 +36,7 @@ namespace SentisOptimisationsPlugin
         private long _azOwner = 144115188075855912;
         private String _azReward = "PhysicalObject_SpaceCredit=120000;Component_ZoneChip=1";
         private String _azWinners = "";
+        private String _donations = "";
         private int _azPointsRemovedOnDeath = 1;
         private int _azPointsAddOnCaptured = 1;
         private int _contactCountAlert = 150;
@@ -119,6 +120,14 @@ namespace SentisOptimisationsPlugin
                     configAnomalyZone.Add(shipInMarket);
                 }
             }
+        }
+        
+        
+        [DisplayTab(Name = "Donations list", GroupName = "Donations", Tab = "Donations", Order = 0, Description = "Donations list")]
+        public string Donations
+        {
+            get => _donations;
+            set => SetValue(ref _donations, value);
         }
         
         [DisplayTab(Name = "Path to asteroids", GroupName = "Asteroids", Tab = "Asteroids", Order = 0, Description = "Path to asteroids to restore")]

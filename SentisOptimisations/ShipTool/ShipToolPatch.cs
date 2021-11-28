@@ -374,6 +374,24 @@ namespace SentisOptimisationsPlugin.ShipTool
             }
 
             var ownerId = welder.OwnerId;
+            
+            if (!welder.CustomData.Contains("[AZ_REWARD]"))
+            {
+                {
+                    return false;
+                }
+            }
+            
+            foreach (var donation in SentisOptimisationsPlugin.Donations)
+            {
+                
+                var steamId = MySession.Static.Players.TryGetSteamId(ownerId);
+                if (donation.SteamId == (long) steamId && donation.Type == Donation.DonationType.WELDER)
+                {
+                    return true;
+                }
+            }
+            
             var playerFaction = MySession.Static.Factions.GetPlayerFaction(ownerId);
             if (playerFaction == null)
             {
@@ -381,16 +399,8 @@ namespace SentisOptimisationsPlugin.ShipTool
                     return false;
                 }
             }
-
-            if (!welder.CustomData.Contains("[AZ_REWARD]"))
-            {
-                {
-                    return false;
-                }
-            }
-
             var factionTag = playerFaction.Tag;
-
+            
             if (!SentisOptimisationsPlugin.Config.AzWinners.Contains(factionTag))
             {
                 {
