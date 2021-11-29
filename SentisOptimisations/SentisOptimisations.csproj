@@ -73,6 +73,7 @@
       <Compile Include="Perfomance\PBFix.cs" />
       <Compile Include="Perfomance\PerfomancePatch.cs" />
       <Compile Include="Perfomance\SafezonePatch.cs" />
+      <Compile Include="Perfomance\StreamingPatch.cs" />
       <Compile Include="Perfomance\WelderOptimization.cs" />
       <Compile Include="Perfomance\WelderPatch.cs" />
       <Compile Include="RemovePluginPatch.cs" />

@@ -73,6 +73,7 @@ namespace SentisOptimisationsPlugin
         private bool _safeZoneSubGridOptimisation = true;
         private bool _safeZoneWeldOptimisation = false;
         private bool _conveyorCacheEnabled = false;
+        private bool _streamingWithoutZip = true;
         private int _safeZonePhysicsThreshold = 10;
         
         
@@ -453,6 +454,13 @@ namespace SentisOptimisationsPlugin
         {
             get => _removeEntityPhantomPatch;
             set => SetValue(ref _removeEntityPhantomPatch, value);
+        }
+        
+        [DisplayTab(Name = "Fix freeze by voxel streaming", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Fix freeze by voxel streaming")]
+        public bool StreamingWithoutZip
+        {
+            get => _streamingWithoutZip;
+            set => SetValue(ref _streamingWithoutZip, value);
         }
         
                 
