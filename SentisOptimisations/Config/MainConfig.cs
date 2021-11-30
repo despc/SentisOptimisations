@@ -29,6 +29,7 @@ namespace SentisOptimisationsPlugin
         private bool _allowMerge = false;
         private bool _includeConnectedGrids = false;
         private bool _adaptiveblockslowdown = false;
+        private bool _gasTankOptimisation = true;
         private bool _removeEntityPhantomPatch = false;
         private String _pathToAsters = "C:\\Asteroids";
         private String _pathToGarage = "D:\\torch-server\\GARAGE";
@@ -469,6 +470,13 @@ namespace SentisOptimisationsPlugin
         {
             get => _adaptiveblockslowdown;
             set => SetValue(ref _adaptiveblockslowdown, value);
+        }
+        
+        [DisplayTab(Name = "Gas Tank Optimisation", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Gas Tank Optimisation")]
+        public bool GasTankOptimisation
+        {
+            get => _gasTankOptimisation;
+            set => SetValue(ref _gasTankOptimisation, value);
         }
         
         [DisplayTab(Name = "Adaptive block slowdown threshold", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Adaptive block slowdown threshold")]
