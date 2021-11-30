@@ -92,6 +92,8 @@ namespace Optimizer.Optimizations
 
             int num = targets.Count;
             m_missingComponents.Clear();
+            HashSet<MySlimBlock> targetsToWeld = new HashSet<MySlimBlock>();
+            int i = 0;
             foreach (MySlimBlock mySlimBlock in targets)
             {
                 if (mySlimBlock.IsFullIntegrity)
@@ -102,9 +104,13 @@ namespace Optimizer.Optimizations
                 {
                     MyCubeBlockDefinition.PreloadConstructionModels(mySlimBlock.BlockDefinition);
                     mySlimBlock.GetMissingComponents(m_missingComponents);
+                    targetsToWeld.Add(mySlimBlock);
+                    i++;
+                    if (i > 10) break;
                 }
             }
 
+            targets = targetsToWeld;
             MyInventory inventory = welder.GetInventory(0);
             foreach (KeyValuePair<string, int> keyValuePair in m_missingComponents)
             {
