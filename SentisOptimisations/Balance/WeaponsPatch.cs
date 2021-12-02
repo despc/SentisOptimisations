@@ -49,10 +49,18 @@ namespace SentisOptimisationsPlugin
         {
             try
             {
-                __instance.MissileInitialSpeed = SentisOptimisationsPlugin.Config.MissileInitialSpeed;
-                __instance.DesiredSpeed = SentisOptimisationsPlugin.Config.MissileInitialSpeed;
-                __instance.MissileAcceleration = SentisOptimisationsPlugin.Config.MissileAcceleration;
-                __instance.MissileExplosionDamage = SentisOptimisationsPlugin.Config.MissileDamage;
+                __instance.MissileInitialSpeed = SentisOptimisationsPlugin.Config.MissileInitialSpeed == 0
+                    ? __instance.MissileInitialSpeed
+                    : SentisOptimisationsPlugin.Config.MissileInitialSpeed;
+                __instance.DesiredSpeed = SentisOptimisationsPlugin.Config.MissileInitialSpeed == 0
+                    ? __instance.DesiredSpeed
+                    : SentisOptimisationsPlugin.Config.MissileInitialSpeed;
+                __instance.MissileAcceleration = SentisOptimisationsPlugin.Config.MissileAcceleration == 0
+                    ? __instance.MissileAcceleration
+                    : SentisOptimisationsPlugin.Config.MissileAcceleration;
+                __instance.MissileExplosionDamage = SentisOptimisationsPlugin.Config.MissileDamage == 0
+                    ? __instance.MissileExplosionDamage
+                    : SentisOptimisationsPlugin.Config.MissileDamage;
             }
             catch (Exception e)
             {
@@ -97,18 +105,5 @@ namespace SentisOptimisationsPlugin
                 SentisOptimisationsPlugin.Log.Warn("WeaponDefinitionInitPatched Exception ", e);
             }
         }
-        //
-        // private static void ProjectileAmmoDefinitionInitPatched(MyProjectileAmmoDefinition __instance)
-        // {
-        //     try
-        //     {
-        //         __instance.ProjectileMassDamage = 500;
-        //     }
-        //     catch (Exception e)
-        //     {
-        //         SentisOptimisationsPlugin.Log.Warn("ProjectileAmmoDefinitionInitPatched Exception ", e);
-        //     }
-        // }
-
     }
 }

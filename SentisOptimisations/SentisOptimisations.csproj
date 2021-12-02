@@ -42,7 +42,6 @@
       <Compile Include="AnomalyZone\ScoreDescription.cs" />
       <Compile Include="Anticheat\HydrogenPatch.cs" />
       <Compile Include="Balance\GasTankPatch.cs" />
-      <Compile Include="Balance\MergePatch.cs" />
       <Compile Include="Balance\ThrustPatch.cs" />
       <Compile Include="Balance\WeaponsPatch.cs" />
       <Compile Include="Commands\AdminCommands.cs" />
