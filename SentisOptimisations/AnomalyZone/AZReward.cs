@@ -126,9 +126,11 @@ namespace SentisOptimisationsPlugin.AnomalyZone
                 }
             }
 
+            var message = $"The {faction.Name} faction earned points for exploring the anomaly zone";
             MyVisualScriptLogicProvider.ShowNotificationToAll(
-                $"The {faction.Name} faction earned points for exploring the anomaly zone",
+                message,
                 5000, "Green");
+            ChatUtils.SendToAll(message);
         }
         
         public class RewardHolder
