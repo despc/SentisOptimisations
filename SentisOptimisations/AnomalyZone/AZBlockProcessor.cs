@@ -385,8 +385,8 @@ namespace SentisOptimisationsPlugin.AnomalyZone
                                 break;
                         }
                         Communication.BroadcastToClients(MessageType.DrawSphere, MyAPIGateway.Utilities.SerializeToBinary(drawSphereRequest));
-                        ReflectionUtils.InvokeInstanceMethod(typeof(MySafeZoneComponent), component, "SetColor",
-                            new object[] {color});
+                        // ReflectionUtils.InvokeInstanceMethod(typeof(MySafeZoneComponent), component, "SetColor",
+                        //     new object[] {color});
                         
                     }
                     catch (Exception e)

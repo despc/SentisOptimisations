@@ -57,32 +57,25 @@ namespace SentisOptimisationsPlugin
             }
             
             if (ProtectAZGrids(ref damage, damagedGrid)) return;
-            // if (info.Type != MyDamageType.Deformation)
-            // {
-            //     return;
-            // }
-            //
-            // IMySlimBlock damagedBlock = target as IMySlimBlock;
-            //
-            // if (damagedBlock == null)
-            // {
-            //     return;
-            // }
-            //
-            // if (damagedBlock.FatBlock != null)
-            // {
-            //     return;
-            // }
-            //
-            // if (damagedBlock.BlockDefinition.Id.SubtypeName.Contains("Titanium"))
-            // {
-            //     info.Amount = info.Amount / 20;
-            // }
-            //
-            // if (damagedBlock.BlockDefinition.Id.SubtypeName.Contains("Aluminum"))
-            // {
-            //     info.Amount = info.Amount / 5;
-            // }
+            if (damage.Type != MyDamageType.Deformation)
+            {
+                return;
+            }
+
+            if (damagedBlock.FatBlock != null)
+            {
+                return;
+            }
+            
+            if (damagedBlock.BlockDefinition.Id.SubtypeName.Contains("Titanium"))
+            {
+                damage.Amount = damage.Amount / 20;
+            }
+            
+            if (damagedBlock.BlockDefinition.Id.SubtypeName.Contains("Aluminum"))
+            {
+                damage.Amount = damage.Amount / 5;
+            }
         }
         
         private static bool ProtectAZGrids(ref MyDamageInformation damage, IMyCubeGrid damagedGrid)

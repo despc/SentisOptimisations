@@ -202,8 +202,8 @@ namespace SentisOptimisationsPlugin.AnomalyZone
                             sz.Shape = MySafeZoneShape.Sphere;
                             sz.AllowedActions = MySafeZoneAction.Damage | MySafeZoneAction.Grinding | MySafeZoneAction.Welding | MySafeZoneAction.Shooting;
                             MySafeZoneComponent component = mySafeZoneBlock.Components.Get<MySafeZoneComponent>();
-                            ReflectionUtils.InvokeInstanceMethod(typeof(MySafeZoneComponent), component, "SetColor", new object []{Color.Blue});
-                            ReflectionUtils.InvokeInstanceMethod(typeof(MySafeZoneComponent), component, "SetRadius", new object []{30f});
+                            // ReflectionUtils.InvokeInstanceMethod(typeof(MySafeZoneComponent), component, "SetColor", new object []{Color.Blue});
+                            // ReflectionUtils.InvokeInstanceMethod(typeof(MySafeZoneComponent), component, "SetRadius", new object []{30f});
 
 
                             ImmortalGrids.Add(mySafeZoneBlock.CubeGrid.EntityId);
