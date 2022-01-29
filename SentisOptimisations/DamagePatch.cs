@@ -20,6 +20,7 @@ namespace SentisOptimisationsPlugin
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
         public static Dictionary<long,long> contactInfo = new Dictionary<long, long>();
+        public static HashSet<long> protectedChars = new HashSet<long>();
         private static bool _init;
         
         public static void Init()
@@ -44,6 +45,17 @@ namespace SentisOptimisationsPlugin
 
         private static void DoProcessDamage(object target, ref MyDamageInformation damage)
         {
+
+            IMyCharacter character = target as IMyCharacter;
+            if (character != null)
+            {
+                if (protectedChars.Contains(character.EntityId))
+                {
+                    damage.Amount = 0;
+                    return;
+                }
+            }
+            
             IMySlimBlock damagedBlock = target as IMySlimBlock;
             if (damagedBlock == null)
             {

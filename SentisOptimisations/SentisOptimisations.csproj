@@ -54,6 +54,7 @@
       <Compile Include="ContractPricePatch.cs" />
       <Compile Include="DamagePatch.cs" />
       <Compile Include="Donation.cs" />
+      <Compile Include="FixShip\FixShipLogic.cs" />
       <Compile Include="GUI\ConfigGUI.cs">
         <DependentUpon>ConfigGUI.xaml</DependentUpon>
       </Compile>
@@ -86,6 +87,7 @@
       <Compile Include="Shipyard\Dto\ClientBuyRequest.cs" />
       <Compile Include="Shipyard\Dto\FillListRequest.cs" />
       <Compile Include="Shipyard\Dto\FillListResponse.cs" />
+      <Compile Include="Shipyard\Dto\FixShipRequest.cs" />
       <Compile Include="Shipyard\Dto\GridForList.cs" />
       <Compile Include="Shipyard\Dto\MessageType.cs" />
       <Compile Include="Shipyard\Dto\StartSellRequest.cs" />
