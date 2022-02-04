@@ -56,7 +56,7 @@ namespace SentisOptimisations
             GridLinkTypeEnum type = GridLinkTypeEnum.Mechanical;
             if (includeConnectorDocked)
                 type = GridLinkTypeEnum.Physical;
-            MyAPIGateway.GridGroups.GetGroup(grid, type, (ICollection<IMyCubeGrid>) source);
+            MyAPIGateway.GridGroups.GetGroup(((IMyCubeGrid)grid), type, (ICollection<IMyCubeGrid>) source);
             if (source != null && source.Count > 0)
             {
                 IMyCubeGrid myCubeGrid = source

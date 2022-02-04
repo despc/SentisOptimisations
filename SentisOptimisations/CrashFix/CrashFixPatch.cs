@@ -5,6 +5,11 @@ using Sandbox.Game.World;
 using Torch.Managers.PatchManager;
 using VRage.Sync;
 using HarmonyLib;
+using Sandbox.Game.Entities;
+using Sandbox.Game.SessionComponents;
+using VRage.Game;
+using VRage.ObjectBuilders;
+using VRageMath;
 
 namespace SentisOptimisationsPlugin.CrashFix
 {
@@ -30,6 +35,14 @@ namespace SentisOptimisationsPlugin.CrashFix
                 typeof(CrashFixPatch).GetMethod(nameof(MethodPistonInitPatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
             
+            var MethodCreateLightning = typeof(MySectorWeatherComponent).GetMethod
+                (nameof(MySectorWeatherComponent.CreateLightning), BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
+
+            
+            ctx.GetPattern(MethodCreateLightning).Prefixes.Add(
+                typeof(CrashFixPatch).GetMethod(nameof(CreateLightningPatched),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
             
             var MethodLoadWorld = typeof(MySession).GetMethod
                 ("LoadWorld", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
@@ -52,6 +65,16 @@ namespace SentisOptimisationsPlugin.CrashFix
         private static void MethodPistonInitPatched(MyPistonBase __instance)
         {
             __instance.Velocity.ValueChanged += VelocityOnValueChanged;
+        }
+        
+        private static bool CreateLightningPatched()
+        {
+            if (SentisOptimisationsPlugin.Config.DisableLightnings)
+            {
+                return false;
+            }
+
+            return true;
         }
         
         private static void LoadWorldPatched()

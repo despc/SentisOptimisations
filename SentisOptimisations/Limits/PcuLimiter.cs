@@ -132,7 +132,7 @@ namespace SentisOptimisationsPlugin
                 gridsOverlimit.Remove(cube.EntityId);
             }
 
-            List<IMySlimBlock> blocks = GridUtils.GetBlocks<IMyFunctionalBlock>(cube);
+            List<IMySlimBlock> blocks = GridUtils.GetBlocks<IMyFunctionalBlock>((IMyCubeGrid)cube);
             foreach (var mySlimBlock in blocks)
             {
                 if (mySlimBlock.FatBlock is MyReactor ||
@@ -157,7 +157,7 @@ namespace SentisOptimisationsPlugin
             }
 
 
-            var subGrids = GridUtils.GetSubGrids(cube);
+            var subGrids = GridUtils.GetSubGrids((IMyCubeGrid)cube);
             foreach (var myCubeGrid in subGrids)
             {
                 if (gridsOverlimit.Contains(myCubeGrid.EntityId))
@@ -221,7 +221,7 @@ namespace SentisOptimisationsPlugin
         {
             //Log.Error("Grid " + cube.DisplayName + " is over limit");
             gridsOverlimit.Add(cube.EntityId);
-            List<IMySlimBlock> blocks = GridUtils.GetBlocks<IMyFunctionalBlock>(cube);
+            List<IMySlimBlock> blocks = GridUtils.GetBlocks<IMyFunctionalBlock>((IMyCubeGrid)cube);
             foreach (var mySlimBlock in blocks)
             {
                 if (noDisableBlock(mySlimBlock))
@@ -233,7 +233,7 @@ namespace SentisOptimisationsPlugin
 
             }
 
-            var subGrids = GridUtils.GetSubGrids(cube);
+            var subGrids = GridUtils.GetSubGrids((IMyCubeGrid)cube);
             foreach (var myCubeGrid in subGrids)
             {
                 gridsOverlimit.Add(myCubeGrid.EntityId);
@@ -280,11 +280,11 @@ namespace SentisOptimisationsPlugin
 
         private static bool IsLimitNotReached(MyCubeGrid cube)
         {
-            var gridPcu = GridUtils.GetPCU(cube, true);
+            var gridPcu = GridUtils.GetPCU((IMyCubeGrid)cube, true);
             var maxPcu = cube.IsStatic
                 ? SentisOptimisationsPlugin.Config.MaxStaticGridPCU
                 : SentisOptimisationsPlugin.Config.MaxDinamycGridPCU;
-            var subGrids = GridUtils.GetSubGrids(cube);
+            var subGrids = GridUtils.GetSubGrids((IMyCubeGrid)cube);
             foreach (var myCubeGrid in subGrids)
             {
                 if (myCubeGrid.IsStatic)
@@ -294,7 +294,7 @@ namespace SentisOptimisationsPlugin
             }
 
             bool enemyAround = false;
-            var owner = PlayerUtils.GetOwner(cube);
+            var owner = PlayerUtils.GetOwner((IMyCubeGrid)cube);
             foreach (var player in PlayerUtils.GetAllPlayers())
             {
                 if (player.GetRelationTo(owner) != MyRelationsBetweenPlayerAndBlock.Enemies)

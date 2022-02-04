@@ -3,6 +3,7 @@ using System.Reflection;
 using SentisOptimisations;
 using SpaceEngineers.Game.Entities.Blocks;
 using Torch.Managers.PatchManager;
+using VRage.Game.ModAPI;
 
 namespace SentisOptimisationsPlugin
 {
@@ -27,14 +28,14 @@ namespace SentisOptimisationsPlugin
                 }
 
 
-                var pcu = GridUtils.GetPCU(__instance.CubeGrid, true,
+                var pcu = GridUtils.GetPCU((IMyCubeGrid)__instance.CubeGrid, true,
                               SentisOptimisationsPlugin.Config.IncludeConnectedGrids)
-                          + GridUtils.GetPCU(__instance.Other.CubeGrid, true,
+                          + GridUtils.GetPCU((IMyCubeGrid)__instance.Other.CubeGrid, true,
                               SentisOptimisationsPlugin.Config.IncludeConnectedGrids);
                 var maxPcu = __instance.CubeGrid.IsStatic
                     ? SentisOptimisationsPlugin.Config.MaxStaticGridPCU
                     : SentisOptimisationsPlugin.Config.MaxDinamycGridPCU;
-                var subGrids = GridUtils.GetSubGrids(__instance.CubeGrid);
+                var subGrids = GridUtils.GetSubGrids((IMyCubeGrid)__instance.CubeGrid);
                 foreach (var myCubeGrid in subGrids)
                 {
                     if (myCubeGrid.IsStatic)
@@ -54,7 +55,7 @@ namespace SentisOptimisationsPlugin
                     || pcu <= maxPcu)
                     return true;
                 __instance.Enabled = false;
-                var owner = PlayerUtils.GetOwner(__instance.CubeGrid);
+                var owner = PlayerUtils.GetOwner((IMyCubeGrid)__instance.CubeGrid);
                 PcuLimiter.SendLimitMessage(owner, pcu, maxPcu, __instance.CubeGrid.DisplayName);
                 return true;
             }

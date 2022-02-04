@@ -20,7 +20,15 @@ namespace SentisOptimisationsPlugin.FixShip
         {
             MyAPIGateway.Utilities.InvokeOnGameThread(() =>
             {
-                FixGroup(groups);
+                try
+                {
+                    FixGroup(groups);
+                }
+                catch (Exception e)
+                {
+                    Log.Error("Fixship from COCK failed ", e);
+                }
+                
             });
 
         }
@@ -95,7 +103,7 @@ namespace SentisOptimisationsPlugin.FixShip
 
                                 MyAPIGateway.Parallel.StartBackground(() =>
                                 {
-                                    MyAPIGateway.Parallel.Sleep(100); 
+                                    MyAPIGateway.Parallel.Sleep(2000); 
                                     MyAPIGateway.Utilities.InvokeOnGameThread(() =>
                                     {
                                         ((IMyCockpit)cockpit).AttachPilot(myCharacter);

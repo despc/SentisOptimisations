@@ -94,14 +94,6 @@ namespace SentisOptimisationsPlugin
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
 
             // Замедление конвеерки
-            var MethodPullItem = typeof(MyGridConveyorSystem).GetMethod
-                (nameof(MyGridConveyorSystem.PullItem), BindingFlags.Instance | BindingFlags.Public);
-
-
-            ctx.GetPattern(MethodPullItem).Prefixes.Add(
-                typeof(ConveyorPatch).GetMethod(nameof(PullItemPatched),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-            
             var MethodPullItems = typeof(MyGridConveyorSystem).GetMethod
                 (nameof(MyGridConveyorSystem.PullItems), BindingFlags.Instance | BindingFlags.Public);
 
@@ -109,18 +101,6 @@ namespace SentisOptimisationsPlugin
             ctx.GetPattern(MethodPullItems).Prefixes.Add(
                 typeof(ConveyorPatch).GetMethod(nameof(PullItemsPatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-        }
-
-        private static bool PullItemPatched(ref MyFixedPoint __result)
-        {
-            var pullItemsSlowdown = SentisOptimisationsPlugin.Config.PullItemsSlowdown;
-            var chance = 1 / pullItemsSlowdown;
-            var run = r.NextDouble() <= chance;
-            if (!run)
-            {
-                __result = (MyFixedPoint) 0;
-            }
-            return run;
         }
         
         private static bool PullItemsPatched(ref MyFixedPoint __result)

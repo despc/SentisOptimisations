@@ -41,9 +41,6 @@
       <Compile Include="AnomalyZone\Communication\MessageType.cs" />
       <Compile Include="AnomalyZone\ScoreDescription.cs" />
       <Compile Include="Anticheat\HydrogenPatch.cs" />
-      <Compile Include="Balance\GasTankPatch.cs" />
-      <Compile Include="Balance\ThrustPatch.cs" />
-      <Compile Include="Balance\WeaponsPatch.cs" />
       <Compile Include="Commands\AdminCommands.cs" />
       <Compile Include="Commands\PlayerCommands.cs" />
       <Compile Include="Config\ConfigAnomalyZone.cs" />
@@ -92,7 +89,6 @@
       <Compile Include="Shipyard\Dto\MessageType.cs" />
       <Compile Include="Shipyard\Dto\StartSellRequest.cs" />
       <Compile Include="Shipyard\ShipyardLogic\Shipyard.cs" />
-      <Compile Include="TurretPatchs.cs" />
       <Compile Include="SentisOptimisationsPlugin.cs" />
       <Compile Include="Utils\BlockUtils.cs" />
       <Compile Include="Utils\ChatUtils.cs" />
@@ -134,7 +130,7 @@
         <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\ProtoBuf.Net.Core.dll</HintPath>
       </Reference>
       <Reference Include="Sandbox.Common, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>D:\torch-server\DedicatedServer64\Sandbox.Common.dll</HintPath>
+        <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\Sandbox.Common.dll</HintPath>
       </Reference>
       <Reference Include="Sandbox.Game, Version=0.1.1.0, Culture=neutral, PublicKeyToken=null">
         <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\Sandbox.Game.dll</HintPath>
@@ -143,10 +139,10 @@
         <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\Sandbox.RenderDirect.dll</HintPath>
       </Reference>
       <Reference Include="SpaceEngineers.Game, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>D:\torch-server\DedicatedServer64\SpaceEngineers.Game.dll</HintPath>
+        <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\SpaceEngineers.Game.dll</HintPath>
       </Reference>
       <Reference Include="SpaceEngineers.ObjectBuilders, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>D:\torch-server\DedicatedServer64\SpaceEngineers.ObjectBuilders.dll</HintPath>
+        <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\SpaceEngineers.ObjectBuilders.dll</HintPath>
       </Reference>
       <Reference Include="System" />
       <Reference Include="System.Core" />
@@ -168,7 +164,7 @@
         <HintPath>D:\torch-server\Torch.Server.exe</HintPath>
       </Reference>
       <Reference Include="VRage, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>D:\torch-server\DedicatedServer64\VRage.dll</HintPath>
+        <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\VRage.dll</HintPath>
       </Reference>
       <Reference Include="VRage.Game, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
         <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\VRage.Game.dll</HintPath>

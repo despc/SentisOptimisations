@@ -74,6 +74,7 @@ namespace SentisOptimisationsPlugin
         private bool _safeZoneSubGridOptimisation = true;
         private bool _safeZoneWeldOptimisation = false;
         private bool _conveyorCacheEnabled = false;
+        private bool _disableLightnings = true;
         private bool _streamingWithoutZip = true;
         private int _safeZonePhysicsThreshold = 10;
         
@@ -491,6 +492,13 @@ namespace SentisOptimisationsPlugin
         {
             get => _conveyorCacheEnabled;
             set => SetValue(ref _conveyorCacheEnabled, value);
+        }
+        
+        [DisplayTab(Name = "Disable Lightnings", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Disable Lightnings")]
+        public bool DisableLightnings
+        {
+            get => _disableLightnings;
+            set => SetValue(ref _disableLightnings, value);
         }
         
         

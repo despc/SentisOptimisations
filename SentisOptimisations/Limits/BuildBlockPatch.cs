@@ -8,6 +8,7 @@ using Sandbox.Game.Entities.Cube;
 using SentisOptimisations;
 using Torch.Managers.PatchManager;
 using VRage.Game;
+using VRage.Game.ModAPI;
 using VRage.Network;
 using VRageMath;
 
@@ -22,25 +23,7 @@ namespace SentisOptimisationsPlugin
                 BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
             ctx.GetPattern(method).Prefixes.Add(typeof(BuildBlockPatch).GetMethod("BuildBlocksRequest",
                 BindingFlags.Instance | BindingFlags.Static | BindingFlags.NonPublic));
-            // MethodInfo methodGridChanged = typeof(MyCubeGrid).GetMethod("RaiseGridChanged",
-            //     BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-            // ctx.GetPattern(methodGridChanged).Prefixes.Add(typeof(BuildBlockPatch).GetMethod("PatchRaiseGridChanged",
-            //     BindingFlags.Instance | BindingFlags.Static | BindingFlags.NonPublic));
         }
-
-        // private static void PatchRaiseGridChanged(MyCubeGrid __instance)
-        // {
-        //     SentisOptimisationsPlugin.Log.Error("PatchRaiseGridChanged " + __instance.DisplayName);
-        //     if (GridUtils.GetPCU(__instance, true,
-        //             SentisOptimisationsPlugin.Config.IncludeConnectedGrids) <
-        //         (__instance.IsStatic
-        //             ? SentisOptimisationsPlugin.Config.MaxStaticGridPCU
-        //             : SentisOptimisationsPlugin.Config.MaxDinamycGridPCU))
-        //     {
-        //         SentisOptimisationsPlugin._limiter.LimitNotReached(__instance);
-        //     }
-        // }
-
 
         private static bool BuildBlocksRequest(
             MyCubeGrid __instance,
@@ -63,7 +46,7 @@ namespace SentisOptimisationsPlugin
 
             long identityId = PlayerUtils.GetIdentityByNameOrId(MyEventContext.Current.Sender.Value.ToString())
                 .IdentityId;
-            var pcu = GridUtils.GetPCU(__instance, true,
+            var pcu = GridUtils.GetPCU((IMyCubeGrid)__instance, true,
                 SentisOptimisationsPlugin.Config.IncludeConnectedGrids);
             var instanceIsStatic = __instance.IsStatic;
             var maxPcu = instanceIsStatic
