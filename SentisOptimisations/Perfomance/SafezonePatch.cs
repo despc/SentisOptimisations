@@ -47,10 +47,10 @@ namespace SentisOptimisationsPlugin
                 typeof(SafezonePatch).GetMethod(nameof(MySafeZoneIsSafePatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
 
-            enumStringMapping["NOT_SAFE"] = SubgridCheckResult.NOT_SAFE;
-            enumStringMapping["NEED_EXTRA_CHECK"] = SubgridCheckResult.NEED_EXTRA_CHECK;
-            enumStringMapping["SAFE"] = SubgridCheckResult.SAFE;
-            enumStringMapping["ADMIN"] = SubgridCheckResult.ADMIN;
+            enumStringMapping["NotSafe"] = SubgridCheckResult.NOT_SAFE;
+            enumStringMapping["NeedExtraCheck"] = SubgridCheckResult.NEED_EXTRA_CHECK;
+            enumStringMapping["Safe"] = SubgridCheckResult.SAFE;
+            enumStringMapping["Admin"] = SubgridCheckResult.ADMIN;
         }
 
 
