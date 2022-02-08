@@ -79,7 +79,7 @@ namespace SentisOptimisationsPlugin.CrashFix
         
         private static void LoadWorldPatched()
         {
-            MySession.Static.Settings.PiratePCU = 300000;
+            MySession.Static.Settings.PiratePCU = 100000;
 
         }
 

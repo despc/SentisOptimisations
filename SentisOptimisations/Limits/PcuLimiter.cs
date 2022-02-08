@@ -99,9 +99,16 @@ namespace SentisOptimisationsPlugin
                     {
                         MyAPIGateway.Utilities.InvokeOnGameThread(() =>
                         {
-                            if (myCubeBlock is IMyFunctionalBlock)
+                            try
                             {
-                                ((IMyFunctionalBlock) myCubeBlock).Enabled = false;
+                                if (myCubeBlock is IMyFunctionalBlock)
+                                {
+                                    ((IMyFunctionalBlock) myCubeBlock).Enabled = false;
+                                }
+                            }
+                            catch (Exception e)
+                            {
+                                Log.Warn("Prevent crash", e);
                             }
                         });
                         

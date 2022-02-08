@@ -99,8 +99,12 @@ namespace SentisOptimisationsPlugin.FixShip
                             if (myCubeBlock is MyCockpit)
                             {
                                 var cockpit = (MyCockpit) myCubeBlock;
-                                MyCharacter myCharacter = characters[cockpit.Position];
-
+                                MyCharacter myCharacter;
+                                if (!characters.TryGetValue(cockpit.Position, out myCharacter))
+                                {
+                                    continue;
+                                }
+                                
                                 MyAPIGateway.Parallel.StartBackground(() =>
                                 {
                                     MyAPIGateway.Parallel.Sleep(2000); 

@@ -90,6 +90,7 @@
       <Compile Include="Shipyard\Dto\StartSellRequest.cs" />
       <Compile Include="Shipyard\ShipyardLogic\Shipyard.cs" />
       <Compile Include="SentisOptimisationsPlugin.cs" />
+      <Compile Include="TurretPatchs.cs" />
       <Compile Include="Utils\BlockUtils.cs" />
       <Compile Include="Utils\ChatUtils.cs" />
       <Compile Include="Utils\ConfigUtils.cs" />
