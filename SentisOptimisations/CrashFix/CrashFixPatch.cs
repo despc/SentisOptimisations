@@ -42,17 +42,8 @@ namespace SentisOptimisationsPlugin.CrashFix
             ctx.GetPattern(MethodCreateLightning).Prefixes.Add(
                 typeof(CrashFixPatch).GetMethod(nameof(CreateLightningPatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-            
-            
-            var MethodLoadWorld = typeof(MySession).GetMethod
-                ("LoadWorld", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
-
-            
-            ctx.GetPattern(MethodLoadWorld).Prefixes.Add(
-                typeof(CrashFixPatch).GetMethod(nameof(LoadWorldPatched),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-            
-                harmony.Patch(original, new HarmonyMethod(prefix));
+ 
+            harmony.Patch(original, new HarmonyMethod(prefix));
 
         }
         
@@ -76,12 +67,7 @@ namespace SentisOptimisationsPlugin.CrashFix
 
             return true;
         }
-        
-        private static void LoadWorldPatched()
-        {
-            MySession.Static.Settings.PiratePCU = 100000;
 
-        }
 
         private static void VelocityOnValueChanged(SyncBase obj)
         {

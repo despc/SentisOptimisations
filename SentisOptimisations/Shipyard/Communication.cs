@@ -45,6 +45,9 @@ namespace SentisOptimisationsPlugin
           case MessageType.SetGridListReq:
             Shipyard.OnListRequest(data);
             break;
+          case MessageType.ListForGuiReq:
+            Shipyard.OnListRequestForGui(data);
+            break;
           case MessageType.SetGridListResp:
             //OnClearGridReq(data);
             break;

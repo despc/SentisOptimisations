@@ -72,6 +72,7 @@ namespace SentisOptimisationsPlugin
         private int _minimumMassForKineticDamage = 5000;
         
         private bool _safeZoneSubGridOptimisation = true;
+        private bool _enableRammingForStatic = true;
         private bool _safeZoneWeldOptimisation = false;
         private bool _conveyorCacheEnabled = false;
         private bool _disableLightnings = true;
@@ -181,6 +182,13 @@ namespace SentisOptimisationsPlugin
         {
             get => _safeZoneSubGridOptimisation;
             set => SetValue(ref _safeZoneSubGridOptimisation, value);
+        }
+        
+        [DisplayTab(Name = "Static structures receive damage from ramming", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Static structures receive damage from ramming")]
+        public bool StaticRamming
+        {
+            get => _enableRammingForStatic;
+            set => SetValue(ref _enableRammingForStatic, value);
         }
         
         [DisplayTab(Name = "Safe zone weld optimisation", GroupName = "Safe zone", Tab = "Safe zone", Order = 0, Description = "Safe zone weld optimisation")]

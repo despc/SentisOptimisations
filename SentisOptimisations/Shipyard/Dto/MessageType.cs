@@ -10,6 +10,8 @@ namespace SentisOptimisationsPlugin
     SetGridListReq,
     SelectGridReq,
     SetGridListResp,
-    FixShip
+    FixShip,
+    ListForGuiReq,
+    ListForGuiResp
   }
 }

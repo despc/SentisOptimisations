@@ -154,9 +154,17 @@ namespace SentisOptimisationsPlugin
                 }
                 return false;
             }
-            
+
+            if (((MyCubeGrid) __instance.Entity).IsStatic)
+            {
+                return SentisOptimisationsPlugin.Config.StaticRamming;
+            }
             if (otherEntity is MyCubeGrid)
             {
+                if (((MyCubeGrid) otherEntity).IsStatic)
+                {
+                    return true;   
+                }
                 if (((MyCubeGrid) otherEntity).Mass < SentisOptimisationsPlugin.Config.MinimumMassForKineticDamage)
                 {
                     return false;

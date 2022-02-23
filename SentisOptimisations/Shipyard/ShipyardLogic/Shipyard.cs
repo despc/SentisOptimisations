@@ -168,7 +168,48 @@ namespace SentisOptimisationsPlugin.ShipyardLogic
             var listRequestSteamId = listRequest.SteamId;
             SendGridListToClient(listRequestSteamId, listRequestShipyardId);
         }
+        
+        public static void OnListRequestForGui(byte[] data)
+        {
+            GuiGridsRequest listRequest = MyAPIGateway.Utilities.SerializeFromBinary<GuiGridsRequest>(data);
+            var listRequestSteamId = listRequest.SteamId;
+            SendGridListToGuiClient(listRequestSteamId);
+        }
 
+        private static void SendGridListToGuiClient(ulong SteamId)
+        {
+            if (SteamId == 0)
+            {
+                return;
+            }
+            var playerGaragePath = Path.Combine(SentisOptimisationsPlugin.Config.PathToGarage,
+                SteamId.ToString());
+            var files = Directory.GetFiles(playerGaragePath, "*.sbc");
+            var listFiles = new List<string>(files).FindAll(s => s.EndsWith(".sbc"));
+            listFiles.SortNoAlloc((s, s1) => String.Compare(s, s1, StringComparison.Ordinal));
+            //var resultListFiles = new List<string>();
+            //listFiles.ForEach(s => resultListFiles.Add(s.Replace(".sbc", "")));
+            // listFiles
+            
+            
+            var resultListFiles = new List<string>();
+
+            listFiles.SortNoAlloc((s, s1) => string.Compare(s, s1, StringComparison.Ordinal));
+            listFiles.ForEach(s => resultListFiles.Add(s.Replace(".sbc", "")));
+
+            var resultListGrids = new List<string>();
+            for (var i = 1; i < resultListFiles.Count + 1; i++)
+            {
+                resultListGrids.Add(i + "." + Path.GetFileName(resultListFiles[i - 1]));
+            }
+            
+            GuiGridsResponse response = new GuiGridsResponse();
+            response.Grids = resultListGrids;
+            response.SteamId = SteamId;
+            Communication.SendToClient(MessageType.ListForGuiResp,
+                MyAPIGateway.Utilities.SerializeToBinary(response), SteamId);
+        }
+                
         private static void SendGridListToClient(ulong listRequestSteamId, long listRequestShipyardId)
         {
             if (listRequestSteamId == 0)

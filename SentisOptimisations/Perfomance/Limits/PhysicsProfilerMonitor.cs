@@ -7,6 +7,7 @@ using Profiler.Utils;
 using Sandbox.Game.World;
 using SentisOptimisations;
 using SentisOptimisations.Utils;
+using Utils.Torch;
 using VRage.Game.Entity;
 using VRage.Game.ModAPI;
 

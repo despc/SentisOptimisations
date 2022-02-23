@@ -43,11 +43,11 @@ namespace TorchMonitor.ProfilerMonitors
             if (timeToAlarmDictionary[grid.EntityId] > SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.PhysicsChecksBeforePunish / 2)
             {
                 ChatUtils.SendTo(grid.BigOwners[0],
-                    "Предупреждение. Структура " + grid.DisplayName + " оказывает повышенное влияние на производительность сервера,\n" +
-                    " при увеличении нагрузки структура будет конвертирована в станцию");
+                    "Warning. Grid " + grid.DisplayName + " has an increased impact on server performance,\n" +
+                    " when the load increases, the structure will be converted into a station");
                 MyVisualScriptLogicProvider.ShowNotification(
-                    "Предупреждение. Структура " + grid.DisplayName + " оказывает повышенное влияние на производительность сервера,\n" +
-                    " при увеличении нагрузки структура будет конвертирована в станцию", 5000,
+                    "Warning. Grid " + grid.DisplayName + " has an increased impact on server performance,\n" +
+                    " when the load increases, the structure will be converted into a station", 5000,
                     "Red",
                     grid.BigOwners[0]);
                 timeToAlarmDictionary.Remove(grid.EntityId);
@@ -71,9 +71,9 @@ namespace TorchMonitor.ProfilerMonitors
             }
             
             ChatUtils.SendTo(grid.BigOwners[0],
-                "Предупреждение. Структура " + grid.DisplayName + " оказывает КРАЙНЕ высокое влияние на производительность сервера");
+                "Attention. Grid " + grid.DisplayName + " has a HUGE impact on server performance");
             MyVisualScriptLogicProvider.ShowNotification(
-                "Предупреждение. Структура " + grid.DisplayName + " оказывает КРАЙНЕ высокое влияние на производительность сервера", 10000,
+                "Attention. Grid " + grid.DisplayName + " has a HUGE impact on server performance", 10000,
                 "Red",
                 grid.BigOwners[0]);
             
@@ -127,9 +127,9 @@ namespace TorchMonitor.ProfilerMonitors
                 if (myCubeGrid.BigOwners.Count > 0)
                 {
                     ChatUtils.SendTo(myCubeGrid.BigOwners[0],
-                        "Структура " + myCubeGrid.DisplayName + " конвертирована в статику в связи с дудосом");
+                        "Grid " + myCubeGrid.DisplayName + " converted to station cause high performance issue");
                     MyVisualScriptLogicProvider.ShowNotification(
-                        "Структура " + myCubeGrid.DisplayName + " конвертирована в статику в связи с дудосом", 10000,
+                        "Grid " + myCubeGrid.DisplayName + " converted to station cause high performance issue", 10000,
                         "Red",
                         myCubeGrid.BigOwners[0]);
                 }

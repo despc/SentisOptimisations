@@ -16,6 +16,7 @@ using Torch.Commands.Permissions;
 using VRage.Game;
 using VRage.Game.ModAPI;
 using VRage.Game.Voxels;
+using VRage.ModAPI;
 using VRage.Network;
 using VRageMath;
 
@@ -29,86 +30,132 @@ namespace SentisOptimisationsPlugin
 
         [Command("static", ".", null)]
         [Permission(MyPromoteLevel.None)]
-        public void ConvertToStatic()
+        public void ConvertToStatic(string gridName = "")
         {
             var player = Context.Player;
             if (player?.Character == null)
                 return;
             
+            if (gridName != string.Empty)
+            {
+                HashSet<IMyEntity> GridSets = new HashSet<IMyEntity>();
+                MyAPIGateway.Entities.GetEntities(GridSets,
+                    (IMyEntity Entity) => Entity is IMyCubeGrid &&
+                                          Entity.DisplayName.Equals(gridName,
+                                              StringComparison.InvariantCultureIgnoreCase));
+                foreach (var IEntity in GridSets)
+                {
+                    if (IEntity is null)
+                        continue;
+                    DoConvertStatic((MyCubeGrid) IEntity, player);
+                    return;
+                }
+            }
             var entitiesInView = GetEntitiesInView(player);
             foreach (var hitInfo in new HashSet<MyPhysics.HitInfo>(entitiesInView))
             {
                 if (hitInfo.HkHitInfo.GetHitEntity() is MyCubeGrid grid)
                 {
-                    if (grid.IsPreview)
-                        continue;
-                    
-                    if (!CheckPermissions(grid, player.IdentityId))
-                    {
-                        Context?.Respond("You have no permission to convert " + grid.DisplayName);
-                        return;
-                    }
-                    
-                    // reset velocity
-                    if (grid.Physics != null)
-                    {
-                        grid.Physics.AngularVelocity = new Vector3();
-                        grid.Physics.LinearVelocity = new Vector3();
-                    }
-
-                    if (grid.IsStatic)
-                    {
-                        Context?.Respond("Grid " + grid.DisplayName + " static");
-                        return;
-                    }
-                    if (!ConvertToStatic(grid))
-                    {
-                        Context?.Respond("Something went wrong");
-                        return;
-                    }
-                    Context?.Respond("Grid " + grid.DisplayName + " converted to static");
+                    DoConvertStatic(grid, player);
                     return;
                 }
             }
         }
-        
+
+        private void DoConvertStatic(MyCubeGrid grid, IMyPlayer player)
+        {
+            if (grid.IsPreview)
+                return;
+                    
+            if (!CheckPermissions(grid, player.IdentityId))
+            {
+                Context?.Respond("You have no permission to convert " + grid.DisplayName);
+                return;
+            }
+            // reset velocity
+            if (grid.Physics != null)
+            {
+                grid.Physics.AngularVelocity = new Vector3();
+                grid.Physics.LinearVelocity = new Vector3();
+            }
+
+            if (grid.IsStatic)
+            {
+                Context?.Respond("Grid " + grid.DisplayName + " static");
+                return;
+            }
+
+            if (!ConvertToStatic(grid))
+            {
+                Context?.Respond("Something went wrong");
+                return;
+            }
+
+            Context?.Respond("Grid " + grid.DisplayName + " converted to static");
+        }
+
         [Command("dynamic", ".", null)]
         [Permission(MyPromoteLevel.None)]
-        public void ConvertToDynamic()
+        public void ConvertToDynamic(string gridName = "")
         {
             var player = Context.Player;
             if (player?.Character == null)
                 return;
             
+            if (gridName != string.Empty)
+            {
+                HashSet<IMyEntity> GridSets = new HashSet<IMyEntity>();
+                MyAPIGateway.Entities.GetEntities(GridSets,
+                    (IMyEntity Entity) => Entity is IMyCubeGrid &&
+                                          Entity.DisplayName.Equals(gridName,
+                                              StringComparison.InvariantCultureIgnoreCase));
+                foreach (var IEntity in GridSets)
+                {
+                    if (IEntity is null)
+                        continue;
+                    DoConvertDynamic((MyCubeGrid) IEntity, player);
+                    return;
+                }
+            }
+            
+
             var entitiesInView = GetEntitiesInView(player);
             foreach (var hitInfo in new HashSet<MyPhysics.HitInfo>(entitiesInView))
             {
                 if (hitInfo.HkHitInfo.GetHitEntity() is MyCubeGrid grid)
                 {
-                    if (grid.IsPreview)
-                        continue;
-
-                    if (!CheckPermissions(grid, player.IdentityId))
-                    {
-                        Context?.Respond("You have no permission to convert " + grid.DisplayName);
-                        return;
-                    }
-                    if (!grid.IsStatic)
-                    {
-                        Context?.Respond("Grid " + grid.DisplayName + " already dynamic");
-                        return;
-                    }
-                    if (!ConvertToDynamic(grid))
-                    {
-                        Context?.Respond("Something went wrong");
-                        return;
-                    }
-                    Context?.Respond("Grid " + grid.DisplayName + " converted to dynamic");
+                    DoConvertDynamic(grid, player);
                     return;
                 }
             }
         }
-        
+
+        private void DoConvertDynamic(MyCubeGrid grid, IMyPlayer player)
+        {
+            if (grid.IsPreview)
+                return; // continue;
+
+            if (!CheckPermissions(grid, player.IdentityId))
+            {
+                Context?.Respond("You have no permission to convert " + grid.DisplayName);
+                return; // return;
+            }
+
+            if (!grid.IsStatic)
+            {
+                Context?.Respond("Grid " + grid.DisplayName + " already dynamic");
+                return; // return;
+            }
+
+            if (!ConvertToDynamic(grid))
+            {
+                Context?.Respond("Something went wrong");
+                return; // return;
+            }
+
+            Context?.Respond("Grid " + grid.DisplayName + " converted to dynamic");
+        }
+
 
         private static List<MyPhysics.HitInfo> GetEntitiesInView(IMyPlayer player)
         {
