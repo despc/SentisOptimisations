@@ -2,14 +2,17 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using NLog;
 using Sandbox.Engine.Voxels;
 using Sandbox.Game.Entities;
+using Sandbox.Game.Multiplayer;
 using Sandbox.Game.World;
 using Sandbox.ModAPI;
 using Torch.Commands;
 using Torch.Commands.Permissions;
+using Torch.Managers;
 using VRage.Game.ModAPI;
 using VRage.Game.Voxels;
 using VRageMath;
@@ -21,6 +24,39 @@ namespace SentisOptimisationsPlugin
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
+        private static MethodInfo _factionChangeSuccessInfo = typeof(MyFactionCollection).GetMethod("FactionStateChangeSuccess", BindingFlags.NonPublic | BindingFlags.Static);
+
+        
+
+        [Command("cf", ".", null)]
+        [Permission(MyPromoteLevel.Moderator)]
+        public void CleanFactions()
+        {
+            
+            foreach (var faction in MySession.Static.Factions.ToList())
+            {
+                Log.Error("init clean faction " + faction.Value.Tag);
+                if (faction.Value.Tag.Length < 7)
+                {
+                    continue;
+                }
+
+                if (faction.Value.Members.Count > 1)
+                {
+                    continue;
+                }
+                Log.Error("DELETE faction " + faction.Value.Tag);
+                cleanFaction(faction);
+            }
+        }
+
+        private static void cleanFaction(KeyValuePair<long, MyFaction> faction)
+        {
+            NetworkManager.RaiseStaticEvent(_factionChangeSuccessInfo, MyFactionStateChange.RemoveFaction,
+                faction.Value.FactionId, faction.Value.FactionId, 0L, 0L);
+            if (!MyAPIGateway.Session.Factions.FactionTagExists(faction.Value.Tag)) return;
+            MyAPIGateway.Session.Factions.RemoveFaction(faction.Value.FactionId);
+        }
 
         [Command("refresh_asters", ".", null)]
         [Permission(MyPromoteLevel.Moderator)]

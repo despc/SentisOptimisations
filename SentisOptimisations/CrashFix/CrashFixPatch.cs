@@ -16,13 +16,13 @@ namespace SentisOptimisationsPlugin.CrashFix
     [PatchShim]
     public static class CrashFixPatch
     {
-        private static Harmony harmony = new Harmony("SentisOptimisationsPlugin.CrashFix");
+        // private static Harmony harmony = new Harmony("SentisOptimisationsPlugin.CrashFix");
 
-        private static MethodInfo original = typeof(Sync<MyTurretTargetFlags, SyncDirection.BothWays>).GetMethod
-            ("IsValid", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+        // private static MethodInfo original = typeof(Sync<MyTurretTargetFlags, SyncDirection.BothWays>).GetMethod
+        //     ("IsValid", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
 
-        private static MethodInfo prefix = typeof(CrashFixPatch).GetMethod(nameof(MethodIsValidPatched),
-            BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic);
+        // private static MethodInfo prefix = typeof(CrashFixPatch).GetMethod(nameof(MethodIsValidPatched),
+        //     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic);
         public static void Patch(PatchContext ctx)
         {
             
@@ -43,7 +43,7 @@ namespace SentisOptimisationsPlugin.CrashFix
                 typeof(CrashFixPatch).GetMethod(nameof(CreateLightningPatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
  
-            harmony.Patch(original, new HarmonyMethod(prefix));
+            // harmony.Patch(original, new HarmonyMethod(prefix));
 
         }
         

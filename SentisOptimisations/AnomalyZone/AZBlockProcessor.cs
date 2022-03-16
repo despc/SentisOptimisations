@@ -288,9 +288,10 @@ namespace SentisOptimisationsPlugin.AnomalyZone
                     foreach (IMyFaction zoneFaction in factionsInZone)
                     {
                         int enemyCount = 0;
-                        foreach (IMyPlayer p in players)
+                        List<NexusAPI.Player> allOnlinePlayers = NexusAPI.GetAllOnlinePlayers();
+                        foreach (NexusAPI.Player p in allOnlinePlayers)
                         {
-                            IMyFaction f = MyAPIGateway.Session.Factions.TryGetPlayerFaction(p.IdentityId);
+                            IMyFaction f = MyAPIGateway.Session.Factions.TryGetPlayerFaction(p.IdentityID);
 
                             if (f == null || f.FactionId == zoneFaction.FactionId) continue;
 

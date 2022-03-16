@@ -8,6 +8,7 @@ using SpaceEngineers.Game.Entities.Blocks.SafeZone;
 using VRage.Game;
 using VRage.Game.ModAPI;
 using VRage.ObjectBuilders;
+using VRageMath;
 
 namespace SentisOptimisationsPlugin.AnomalyZone
 {
@@ -15,12 +16,11 @@ namespace SentisOptimisationsPlugin.AnomalyZone
     {
         public static void AwardPointsAndRewards(MySafeZoneBlock szBlock, IMyFaction faction)
         {
-            List<IMyPlayer> players = new List<IMyPlayer>();
-            MyAPIGateway.Players.GetPlayers(players);
+            List<NexusAPI.Player> allOnlinePlayers = NexusAPI.GetAllOnlinePlayers();
             int enemies = 0;
-            foreach (var myPlayer in players)
+            foreach (var myPlayer in allOnlinePlayers)
             {
-                var factionOfPlayer = FactionUtils.GetFactionOfPlayer(myPlayer.IdentityId);
+                var factionOfPlayer = FactionUtils.GetFactionOfPlayer(myPlayer.IdentityID);
                 if (factionOfPlayer == null)
                 {
                     continue;
@@ -131,6 +131,24 @@ namespace SentisOptimisationsPlugin.AnomalyZone
                 message,
                 5000, "Green");
             ChatUtils.SendToAll(message);
+            NexusMessage chatMessage = new NexusMessage()
+            {
+                Type = NexusMessageType.Chat,
+                Response = message,
+                Sender = "AnomalyZone",
+                Color = Color.Indigo,
+                ChatIdentityID = 0
+            };
+            NexusSupport.API.SendMessageToAllServers(MyAPIGateway.Utilities.SerializeToBinary<NexusMessage>(chatMessage));
+            NexusMessage hudMessage = new NexusMessage()
+            {
+                Type = NexusMessageType.Hud,
+                Response = message,
+                Sender = "AnomalyZone",
+                Color = Color.Indigo,
+                ChatIdentityID = 0
+            };
+            NexusSupport.API.SendMessageToAllServers(MyAPIGateway.Utilities.SerializeToBinary<NexusMessage>(hudMessage));
         }
         
         public class RewardHolder

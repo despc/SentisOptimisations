@@ -43,6 +43,7 @@
       <Compile Include="Anticheat\HydrogenPatch.cs" />
       <Compile Include="Commands\AdminCommands.cs" />
       <Compile Include="Commands\PlayerCommands.cs" />
+      <Compile Include="Commands\Spawn.EarthLike.cs" />
       <Compile Include="Config\ConfigAnomalyZone.cs" />
       <Compile Include="Config\ConfigShipInMarket.cs" />
       <Compile Include="Config\MainConfig.cs" />
@@ -62,6 +63,12 @@
       <Compile Include="Limits\MergePatch.cs" />
       <Compile Include="Limits\PcuLimiter.cs" />
       <Compile Include="MissilePatch.cs" />
+      <Compile Include="Nexus\CharacterUtilities.cs" />
+      <Compile Include="Nexus\Chat.cs" />
+      <Compile Include="Nexus\NexusAPI.cs" />
+      <Compile Include="Nexus\NexusMessage.cs" />
+      <Compile Include="Nexus\NexusMessageType.cs" />
+      <Compile Include="Nexus\NexusSupport.cs" />
       <Compile Include="NoScrapPatch.cs" />
       <Compile Include="NpcStorePatch.cs" />
       <Compile Include="Perfomance\ConveyorPatch.cs" />
