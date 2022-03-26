@@ -1,7 +1,11 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using NLog.Fluent;
+using Sandbox.Definitions;
+using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Blocks;
+using SpaceEngineers.Game.World;
 using Torch.Managers.PatchManager;
 
 namespace SentisOptimisationsPlugin
@@ -19,9 +23,27 @@ namespace SentisOptimisationsPlugin
             ctx.GetPattern(MethodExecuteGasTransfer).Prefixes.Add(
                 typeof(GasTankOptimisations).GetMethod(nameof(MethodExecuteGasTransferPatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
+            var MethodGetAvailableRespawnPoints = typeof(MySpaceRespawnComponent).GetMethod
+                (nameof(MySpaceRespawnComponent.GetRespawnShips), BindingFlags.Static | BindingFlags.Public);
+
+
+            ctx.GetPattern(MethodGetAvailableRespawnPoints).Suffixes.Add(
+                typeof(GasTankOptimisations).GetMethod(nameof(GetAvailableRespawnPointsPatched),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
 
         }
-        
+
+
+        private static void GetAvailableRespawnPointsPatched(MyPlanet planet, ref ClearToken<MyRespawnShipDefinition> __result)
+        {
+            if (!planet.Name.Contains("Earth"))
+            {
+                __result.List.Clear();
+            }
+        }
+
         private static bool MethodExecuteGasTransferPatched(MyGasTank __instance, ref double totalTransfer)
         {
             if (!SentisOptimisationsPlugin.Config.GasTankOptimisation)

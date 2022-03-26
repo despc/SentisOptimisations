@@ -28,6 +28,7 @@ using Torch.API.Plugins;
 using Torch.API.Session;
 using Torch.Commands;
 using Torch.Commands.Permissions;
+using Torch.Managers;
 using Torch.Session;
 using VRage.Game.ModAPI;
 using VRage.Game.Voxels;
@@ -38,6 +39,7 @@ namespace SentisOptimisationsPlugin
 {
     public class SentisOptimisationsPlugin : TorchPluginBase, IWpfPlugin
     {
+        private static Guid NexusGUID = new Guid("28a12184-0422-43ba-a6e6-2e228611cca5");
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
         public static PcuLimiter _limiter = new PcuLimiter();
         public static AZCore AzCore = new AZCore();
@@ -114,9 +116,30 @@ namespace SentisOptimisationsPlugin
                 _limiter.OnLoaded();
                 ConveyorPatch.OnLoaded();
                 Communication.RegisterHandlers();
+                ITorchPlugin Plugin;
+                if (DependencyProviderExtensions
+                    .GetManager<PluginManager>((IDependencyProvider) this.Torch.CurrentSession.Managers).Plugins
+                    .TryGetValue(NexusGUID, out Plugin))
+                {
+                    AquireNexus(Plugin);
+                }
+                    
             }
         }
 
+        private static void AquireNexus(ITorchPlugin Plugin)
+        {
+            Type type = ((object) Plugin).GetType()?.Assembly.GetType("Nexus.API.PluginAPISync");
+            if (type == (Type) null)
+                return;
+            type.GetMethod("ApplyPatching", BindingFlags.Static | BindingFlags.NonPublic).Invoke((object) null, new object[2]
+            {
+                (object) typeof (NexusAPI),
+                (object) "SentisOptimisations"
+            });
+            NexusSupport.Init();
+        }
+        
         public void UpdateGui()
         {
             try
