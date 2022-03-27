@@ -5,11 +5,13 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using NAPI;
 using NLog;
 using Sandbox.Engine.Multiplayer;
 using Sandbox.Engine.Voxels;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Multiplayer;
+using Sandbox.Game.SessionComponents;
 using Sandbox.Game.World;
 using Sandbox.Game.World.Generator;
 using Sandbox.ModAPI;
@@ -18,6 +20,7 @@ using Torch.Commands.Permissions;
 using Torch.Managers;
 using VRage;
 using VRage.Game;
+using VRage.Game.Definitions.SessionComponents;
 using VRage.Game.Entity;
 using VRage.Game.ModAPI;
 using VRage.Game.Voxels;
@@ -72,6 +75,41 @@ namespace SentisOptimisationsPlugin
         public void RefreshAsters()
         {
             Task.Run(() => { DoRefreshAsters(); });
+        }
+        
+        [Command("gs", ".", null)]
+        [Permission(MyPromoteLevel.Moderator)]
+        public void GenerateStations()
+        {
+            MySessionComponentEconomy mySessionComponentEconomy = MySession.Static.GetComponent<MySessionComponentEconomy>();
+
+            Assembly ass = typeof(MySessionComponentEconomy).Assembly;
+            Type MyStationGeneratorType = ass.GetType("Sandbox.Game.World.Generator.MyStationGenerator");
+            // var CreateAsteroidShapeMethod = MyCompositeShapeProvider.GetMethod
+            //     ("CreateAsteroidShape", BindingFlags.Static | BindingFlags.Public | BindingFlags.DeclaredOnly);
+
+            PropertyInfo propertyEconomyDefinition = null;
+            foreach (PropertyInfo property in typeof(MySessionComponentEconomy)
+                         .GetProperties(BindingFlags.Instance | 
+                                        BindingFlags.NonPublic |
+                                        BindingFlags.Public))
+            {
+                if (property.Name.Contains("EconomyDefinition"))
+                {
+                    propertyEconomyDefinition = property;
+                }
+            }
+
+            object EconomyDefinition = propertyEconomyDefinition.GetValue(mySessionComponentEconomy);
+            object instance = Activator.CreateInstance(MyStationGeneratorType, new object[]{(MySessionComponentEconomyDefinition) EconomyDefinition});
+            instance.easyCallMethod("GenerateStations", new object[] {MySession.Static.Factions});
+            // new MyStationGenerator().GenerateStations(MySession.Static.Factions);
+            // new MyFactionRelationGenerator((MySessionComponentEconomyDefinition) EconomyDefinition).GenerateFactionRelations(MySession.Static.Factions);
+            
+            mySessionComponentEconomy.easySetField("m_stationStoreItemsFirstGeneration", true);
+            mySessionComponentEconomy.easyCallMethod("UpdateStations", new object[0]);
+            mySessionComponentEconomy.easySetField("m_stationStoreItemsFirstGeneration", false);
+
         }
         
         [Command("spawnfield", ".", null)]
@@ -129,28 +167,8 @@ namespace SentisOptimisationsPlugin
                             voxelMap.RangeChanged -= OnStorageRangeChanged;
                         });
                         voxelMap.RangeChanged += OnStorageRangeChanged;
-                        // MyObjectSeedParams voxelParams = objects.Params;
-                        // if (Sync.IsServer)
-                        // {
-                        //     MyVoxelMap myVoxelMap = voxelMap;
-                        //     myVoxelMap.OnEntityCloseRequest = myVoxelMap.OnEntityCloseRequest + (Action<MyEntity>) (voxel =>
-                        //     {
-                        //         if (this.m_isClosingEntities)
-                        //             return;
-                        //         MyMultiplayer.RaiseStaticEvent<MyObjectSeedParams>((Func<IMyEventOwner, Action<MyObjectSeedParams>>) (x => new Action<MyObjectSeedParams>(MyProceduralWorldGenerator.AddExistingObjectsSeed)), voxelParams);
-                        //     });
-                        // }
+
                     }
-                    
-                   // MyStorageBase proceduralAsteroidStorage = CreateProceduralAsteroidStorage(seed, radius);
-            
-
-                    
-                    // var addVoxelMap = MyWorldGenerator.AddVoxelMap(storageName, (MyStorageBase) proceduralAsteroidStorage, randomToUniformPointInSphere);
-                    // addVoxelMap.Name = storageName;
-                    // addVoxelMap.AsteroidName = storageName;
-                    // addVoxelMap.PositionComp.SetPosition(randomToUniformPointInSphere);
-
                     
                 }
                 catch (Exception e)

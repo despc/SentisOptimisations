@@ -52,6 +52,7 @@
       <Compile Include="ContractPricePatch.cs" />
       <Compile Include="DamagePatch.cs" />
       <Compile Include="Donation.cs" />
+      <Compile Include="Eco\EcoPatch.cs" />
       <Compile Include="FixShip\FixShipLogic.cs" />
       <Compile Include="GUI\ConfigGUI.cs">
         <DependentUpon>ConfigGUI.xaml</DependentUpon>

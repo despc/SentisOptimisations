@@ -35,6 +35,7 @@ namespace SentisOptimisationsPlugin
         private String _pathToGarage = "D:\\torch-server\\GARAGE";
         private long _azOwner = 144115188075855912;
         private String _azReward = "PhysicalObject_SpaceCredit=120000;Component_ZoneChip=1";
+        private String _planetsWithEco = "Earth,Moon";
         private String _azWinners = "";
         private String _donations = "";
         private int _azPointsRemovedOnDeath = 1;
@@ -135,6 +136,9 @@ namespace SentisOptimisationsPlugin
         
         [DisplayTab(Name = "Path to asteroids", GroupName = "Asteroids", Tab = "Asteroids", Order = 0, Description = "Path to asteroids to restore")]
         public String PathToAsters { get => _pathToAsters; set => SetValue(ref _pathToAsters, value); }
+        
+        [DisplayTab(Name = "Planets With Economic", GroupName = "Contracts", Tab = "Contracts", Order = 0, Description = "Planets With Economic")]
+        public String PlanetsWithEco { get => _planetsWithEco; set => SetValue(ref _planetsWithEco, value); }
 
         [DisplayTab(Name = "Path to Garage", GroupName = "Garage", Tab = "Garage", Order = 0, Description = "Path to Garage")]
         public String PathToGarage { get => _pathToGarage; set => SetValue(ref _pathToGarage, value); }
