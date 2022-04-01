@@ -50,7 +50,7 @@ namespace SentisOptimisationsPlugin
             var MethodGetItemMinimalPrice = typeof(MyMinimalPriceCalculator).GetMethod(
                 nameof(MyMinimalPriceCalculator.TryGetItemMinimalPrice), BindingFlags.Instance | BindingFlags.Public);
 
-            ctx.GetPattern(MethodGetItemMinimalPrice).Suffixes.Add(
+            ctx.GetPattern(MethodGetItemMinimalPrice).Prefixes.Add(
                 typeof(NpcStorePatch).GetMethod(nameof(PatchGetItemMinimalPrice),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
             
@@ -104,23 +104,29 @@ namespace SentisOptimisationsPlugin
             return false;
         }
 
-        private static void PatchGetItemMinimalPrice(MyDefinitionId itemId, ref int minimalPrice, ref bool __result)
+        private static bool PatchGetItemMinimalPrice(MyDefinitionId itemId, ref int minimalPrice, ref bool __result)
         {
             try
             {
                 if (itemId.SubtypeName.Equals("ZoneChip"))
                 {
                     minimalPrice = 220000;
+                    __result = true;
+                    return false;
                 }
                 if (prohibitedStoreItems.Contains(itemId.SubtypeName))
                 {
                     __result = false;
+                    minimalPrice = -1;
+                    return false;
                 }
             }
             catch (Exception e)
             {
                 Log.Error("Exception in time PatchGetItemMinimalPrice", e);
             }
+
+            return true;
         }
     }
 }
