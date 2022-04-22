@@ -7,5 +7,8 @@ namespace SentisOptimisationsPlugin
   {
     [ProtoMember(1)]
     public long gridId;
+    
+    [ProtoMember(2)]
+    public long owner;
   }
 }

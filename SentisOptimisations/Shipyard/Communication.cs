@@ -71,7 +71,12 @@ namespace SentisOptimisationsPlugin
     {
       FixShipRequest request = MyAPIGateway.Utilities.SerializeFromBinary<FixShipRequest>(data);
       var requestGridId = request.gridId;
-      FixShipLogic.DoFixShip(requestGridId);
+      var owner = request.owner;
+      if (owner == 0)
+      {
+        return;
+      }
+      FixShipLogic.DoFixShip(requestGridId, owner);
 
     }
     

@@ -106,7 +106,7 @@ namespace Optimizer.Optimizations
                     mySlimBlock.GetMissingComponents(m_missingComponents);
                     targetsToWeld.Add(mySlimBlock);
                     i++;
-                    if (i > 10) break;
+                    if (i > 15) break;
                 }
             }
 
@@ -144,10 +144,6 @@ namespace Optimizer.Optimizations
             if (!welded || SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config
                 .WelderTweaksCanWeldProjectionsIfWeldedOtherBlocks)
             {
-                if (ShipToolPatch.IsSuperWelder(welder) && random.Next(0, 10) > 1)
-                {
-                    return;
-                }
 
                 if (SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.WelderTweaksWeldProjectionsNextFrame)
                 {
@@ -367,8 +363,14 @@ namespace Optimizer.Optimizations
 
                         void Action(HashSet<MySlimBlock> blocksInThread)
                         {
+                            
+                            list.Clear();
                             foreach (MySlimBlock mySlimBlock in blocksInThread)
                             {
+                                if (list.Count > 4)
+                                {
+                                    break;
+                                }
                                 if (myCubeGrid.Projector.CanBuild(mySlimBlock, true) == BuildCheckResult.OK)
                                 {
                                     MySlimBlock cubeBlock = myCubeGrid.GetCubeBlock(mySlimBlock.Position);

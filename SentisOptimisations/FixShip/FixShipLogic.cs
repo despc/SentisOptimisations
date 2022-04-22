@@ -14,7 +14,7 @@ namespace SentisOptimisationsPlugin.FixShip
     public class FixShipLogic
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
-        public static void DoFixShip(long gridId) => FixGroups(FindLookAtGridGroup(gridId));
+        public static void DoFixShip(long gridId, long owner) => FixGroups(FindLookAtGridGroup(gridId, owner));
 
         private static void FixGroups(List<MyCubeGrid> groups)
         {
@@ -33,9 +33,13 @@ namespace SentisOptimisationsPlugin.FixShip
 
         }
 
-        public static List<MyCubeGrid> FindLookAtGridGroup(long gridId)
+        public static List<MyCubeGrid> FindLookAtGridGroup(long gridId, long owner)
         {
             MyCubeGrid grid = (MyCubeGrid) MyAPIGateway.Entities.GetEntityById(gridId);
+            if (!grid.BigOwners.Contains(owner))
+            {
+                return new List<MyCubeGrid>();
+            }
             List<MyCubeGrid> groupNodes =
                 MyCubeGridGroups.Static.GetGroups(GridLinkTypeEnum.Logical).GetGroupNodes(grid);
             return groupNodes;

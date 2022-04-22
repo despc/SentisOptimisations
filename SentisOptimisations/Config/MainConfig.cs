@@ -36,6 +36,7 @@ namespace SentisOptimisationsPlugin
         private long _azOwner = 144115188075855912;
         private String _azReward = "PhysicalObject_SpaceCredit=120000;Component_ZoneChip=1";
         private String _planetsWithEco = "Earth,Moon";
+        private String _planetsWithSpawn = "";
         private String _azWinners = "";
         private String _donations = "";
         private int _azPointsRemovedOnDeath = 1;
@@ -133,6 +134,9 @@ namespace SentisOptimisationsPlugin
             get => _donations;
             set => SetValue(ref _donations, value);
         }
+        
+        [DisplayTab(Name = "Planets With Spawn", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Planets With Spawn")]
+        public String PlanetsWithSpawn { get => _planetsWithSpawn; set => SetValue(ref _planetsWithSpawn, value); }
         
         [DisplayTab(Name = "Path to asteroids", GroupName = "Asteroids", Tab = "Asteroids", Order = 0, Description = "Path to asteroids to restore")]
         public String PathToAsters { get => _pathToAsters; set => SetValue(ref _pathToAsters, value); }
@@ -311,56 +315,7 @@ namespace SentisOptimisationsPlugin
             get => _physicsMsToAlert;
             set => SetValue(ref _physicsMsToAlert, value);
         }
-        
-        [DisplayTab(Name = "Thruster magnitude multiplier", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Thruster magnitude multiplier")]
-        public float ThrustPowerMultiplier
-        {
-            get => _thrustPowerMultiplier;
-            set => SetValue(ref _thrustPowerMultiplier, value);
-        }
-        
-        [DisplayTab(Name = "Missile initial Speed", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Missile initial Speed")]
-        public float MissileInitialSpeed
-        {
-            get => _missileInitialSpeed;
-            set => SetValue(ref _missileInitialSpeed, value);
-        }
-        
-        [DisplayTab(Name = "Gas tank capacity", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Gas tank capacity")]
-        public float GasTankCapacityMultiplier
-        {
-            get => _gasTankCapacityMultiplier;
-            set => SetValue(ref _gasTankCapacityMultiplier, value);
-        }
-        
-        [DisplayTab(Name = "H2/O2 generator multiplier", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "H2/O2 generator multiplier")]
-        public float H2GenMultiplier
-        {
-            get => _h2GenMultiplier;
-            set => SetValue(ref _h2GenMultiplier, value);
-        }
-        
-        [DisplayTab(Name = "Missile Acceleration", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Missile Acceleration")]
-        public float MissileAcceleration
-        {
-            get => _missileAcceleration;
-            set => SetValue(ref _missileAcceleration, value);
-        }
-        
-        [DisplayTab(Name = "Missile Damage", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Missile Damage")]
-        public float MissileDamage
-        {
-            get => _missileDamage;
-            set => SetValue(ref _missileDamage, value);
-        }
-        
-        [DisplayTab(Name = "Damage to turrets multiplier", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Damage to turrets multiplier")]
-        public float TurretsDamageMultiplier
-        {
-            get => _turretsDamageMultiplier;
-            set => SetValue(ref _turretsDamageMultiplier, value);
-        }
-        
+
         [DisplayTab(Name = "Physics ms to punish", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Physics ms to punish")]
         public float PhysicsMsToPunish
         {
@@ -381,13 +336,7 @@ namespace SentisOptimisationsPlugin
             get => _physicsChecksBeforePunish;
             set => SetValue(ref _physicsChecksBeforePunish, value);
         }
-        
-        [DisplayTab(Name = "Check near targets slowdown", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Check near targets slowdown")]
-        public int CheckAndSelectNearTargetsSlowdown
-        {
-            get => _checkAndSelectNearTargetsSlowdown;
-            set => SetValue(ref _checkAndSelectNearTargetsSlowdown, value);
-        }
+
         [DisplayTab(Name = "Minimum mass for kinetic damage", GroupName = "Damage Tweaks", Tab = "Damage Tweaks", Order = 0, Description = "Minimum mass for kinetic damage")]
         public int MinimumMassForKineticDamage
         {
@@ -436,13 +385,7 @@ namespace SentisOptimisationsPlugin
             get => _shipSuperWelderRadius;
             set => SetValue(ref _shipSuperWelderRadius, value);
         }
-        
-        public bool AllowProjection
-        {
-            get => _allowProjection;
-            set => SetValue(ref _allowProjection, value);
-        }
-        
+
         [DisplayTab(Name = "Points by online enemies", GroupName = "Anomaly Zone", Tab = "Anomaly Zone", Order = 0, Description = "Points by online enemies")]
         public bool AzPointsForOnlineEnemies
         {

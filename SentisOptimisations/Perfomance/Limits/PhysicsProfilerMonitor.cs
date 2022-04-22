@@ -1,13 +1,14 @@
-﻿using System.Linq;
+﻿using System;
+using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Havok;
 using Profiler.Basics;
 using Profiler.Core;
-using Profiler.Utils;
 using Sandbox.Game.World;
+using Sandbox.ModAPI;
 using SentisOptimisations;
 using SentisOptimisations.Utils;
-using Utils.Torch;
 using VRage.Game.Entity;
 using VRage.Game.ModAPI;
 
@@ -36,18 +37,37 @@ namespace TorchMonitor.ProfilerMonitors
         //     Profile().Forget(Log);
         // }
 
+        public static Task MoveToGameLoop(CancellationToken cancellationToken = default (CancellationToken))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            TaskCompletionSource<byte> taskSrc = new TaskCompletionSource<byte>();
+            MyAPIGateway.Utilities.InvokeOnGameThread((Action) (() =>
+            {
+                try
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    taskSrc.SetResult((byte) 0);
+                }
+                catch (Exception ex)
+                {
+                    taskSrc.SetException(ex);
+                }
+            }));
+            return (Task) taskSrc.Task;
+        }
+        
         public async Task Profile()
         {
             using (var profiler = new PhysicsProfiler())
             using (ProfilerResultQueue.Profile(profiler))
             {
-                await GameLoopObserver.MoveToGameLoop();
+                await MoveToGameLoop();
 
                 profiler.MarkStart();
 
                 for (var i = 0; i < 10; i++)
                 {
-                    await GameLoopObserver.MoveToGameLoop();
+                    await MoveToGameLoop();
                 }
 
                 profiler.MarkEnd();
