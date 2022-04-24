@@ -9,6 +9,7 @@ using NAPI;
 using NLog;
 using Sandbox.Engine.Multiplayer;
 using Sandbox.Engine.Voxels;
+using Sandbox.Game;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Multiplayer;
 using Sandbox.Game.SessionComponents;
@@ -61,6 +62,22 @@ namespace SentisOptimisationsPlugin
                 cleanFaction(faction);
             }
         }
+        
+        [Command("rename_faction", ".", null)]
+        [Permission(MyPromoteLevel.Moderator)]
+        public void RenameFaction(String oldTag, String newtag)
+        {
+            try
+            {
+                var f = MySession.Static.Factions.TryGetFactionByTag(oldTag);
+                f.Tag = newtag;
+            }
+            catch (Exception e)
+            {
+                Log.Error(e);
+            }
+
+        }
 
         private static void cleanFaction(KeyValuePair<long, MyFaction> faction)
         {
@@ -76,6 +93,8 @@ namespace SentisOptimisationsPlugin
         {
             Task.Run(() => { DoRefreshAsters(); });
         }
+        
+        
         
         [Command("gs", ".", null)]
         [Permission(MyPromoteLevel.Moderator)]
