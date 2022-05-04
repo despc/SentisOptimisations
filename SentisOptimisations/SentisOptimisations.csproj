@@ -41,6 +41,7 @@
       <Compile Include="AnomalyZone\Communication\MessageType.cs" />
       <Compile Include="AnomalyZone\ScoreDescription.cs" />
       <Compile Include="Anticheat\HydrogenPatch.cs" />
+      <Compile Include="Api\ShieldApi.cs" />
       <Compile Include="Commands\AdminCommands.cs" />
       <Compile Include="Commands\PlayerCommands.cs" />
       <Compile Include="Config\ConfigAnomalyZone.cs" />

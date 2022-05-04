@@ -36,7 +36,7 @@ namespace SentisOptimisationsPlugin
         private long _azOwner = 144115188075855912;
         private String _azReward = "PhysicalObject_SpaceCredit=120000;Component_ZoneChip=1";
         private String _planetsWithEco = "Earth,Moon";
-        private String _planetsWithSpawn = "";
+        private float _explosivesDamage = 10;
         private String _azWinners = "";
         private String _donations = "";
         private int _azPointsRemovedOnDeath = 1;
@@ -135,8 +135,8 @@ namespace SentisOptimisationsPlugin
             set => SetValue(ref _donations, value);
         }
         
-        [DisplayTab(Name = "Planets With Spawn", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Planets With Spawn")]
-        public String PlanetsWithSpawn { get => _planetsWithSpawn; set => SetValue(ref _planetsWithSpawn, value); }
+        [DisplayTab(Name = "Explosives damage", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Explosives damage")]
+        public float ExplosivesDamage { get => _explosivesDamage; set => SetValue(ref _explosivesDamage, value); }
         
         [DisplayTab(Name = "Path to asteroids", GroupName = "Asteroids", Tab = "Asteroids", Order = 0, Description = "Path to asteroids to restore")]
         public String PathToAsters { get => _pathToAsters; set => SetValue(ref _pathToAsters, value); }

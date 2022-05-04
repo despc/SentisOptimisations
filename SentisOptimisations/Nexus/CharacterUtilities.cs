@@ -126,7 +126,7 @@ namespace SentisOptimisationsPlugin
           };
           gps.DiscardAt = new TimeSpan?(TimeSpan.FromMinutes(MySession.Static.ElapsedPlayTime.TotalMinutes + 25.0));
           gps.GPSColor = Color.Yellow;
-          MySession.Static.Gpss.SendAddGps(EntityID, ref gps);
+          MySession.Static.Gpss.AddPlayerGps(EntityID, ref gps);
         }
       }
     }

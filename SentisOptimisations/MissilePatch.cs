@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using NAPI;
 using NLog;
 using ParallelTasks;
 using Sandbox.Definitions;
@@ -9,10 +10,12 @@ using Sandbox.Engine.Physics;
 using Sandbox.Engine.Utils;
 using Sandbox.Game;
 using Sandbox.Game.Entities;
+using Sandbox.Game.Entities.Character;
 using Sandbox.Game.Entities.Cube;
 using Sandbox.Game.GameSystems;
 using Sandbox.Game.World;
 using Sandbox.ModAPI;
+using SentisOptimisations;
 using Torch.Managers.PatchManager;
 using VRage.Game;
 using VRage.Game.Components;
@@ -52,8 +55,82 @@ namespace SentisOptimisationsPlugin
             ctx.GetPattern(MyWarheadOnDestroyMethod).Prefixes.Add(
                 typeof(MissilePatch).GetMethod(nameof(MyWarheadOnDestroyPatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
+            
+            var MyExplosionType = typeof(MyVoxelBase).Assembly.GetType("Sandbox.Game.MyExplosion");
+            var MyExplosionApplyVolumetricExplosion = MyExplosionType
+                .GetMethod("ApplyVolumetricExplosion",
+                    BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            ctx.GetPattern(MyExplosionApplyVolumetricExplosion).Prefixes.Add(
+                typeof(MissilePatch).GetMethod(nameof(ApplyVolumetricExplosionPatched),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
         }
 
+        private static bool ApplyVolumetricExplosionPatched(ref MyExplosionInfo m_explosionInfo,
+            List<MyEntity> entities, ref bool __result)
+        {
+            try
+            {
+                var explosionSphere = m_explosionInfo.ExplosionSphere;
+                float damage = m_explosionInfo.Damage;
+                // BoundingSphereD ExplosionSphere = (BoundingSphereD) m_explosionInfo.easyGetField("m_explosionSphere");
+                if (m_explosionInfo.OwnerEntity is MyFloatingObject)
+                {
+                    var myFloatingObject = ((MyFloatingObject) m_explosionInfo.OwnerEntity);
+                    var count = myFloatingObject.Amount.Value.ToIntSafe();
+                    var itemDefinition = myFloatingObject.ItemDefinition;
+                    if ("Explosives".Equals(itemDefinition.DisplayNameText))
+                    {
+                        damage = SentisOptimisationsPlugin.Config.ExplosivesDamage * count;
+                        explosionSphere.Radius = 15;
+                    }
+
+                    if (itemDefinition is MyAmmoMagazineDefinition)
+                    {
+                        var ammoDefinitionId = ((MyAmmoMagazineDefinition) itemDefinition).AmmoDefinitionId;
+                        var myAmmoDefinition = MyDefinitionManager.Static.GetAmmoDefinition(ammoDefinitionId);
+                        if (myAmmoDefinition is MyProjectileAmmoDefinition)
+                        {
+                            if (((MyProjectileAmmoDefinition) myAmmoDefinition).ProjectileExplosionDamage > 0)
+                            {
+                                damage = ((MyProjectileAmmoDefinition) myAmmoDefinition).ProjectileExplosionDamage
+                                         * 0.3f * count;
+                                explosionSphere.Radius = 15;
+                            }
+                            else
+                            {
+                                damage = ((MyProjectileAmmoDefinition) myAmmoDefinition).ProjectileMassDamage
+                                         * 0.1f * count;
+                                explosionSphere.Radius = 15;
+                            }
+                        }
+                        if (myAmmoDefinition is MyMissileAmmoDefinition)
+                        {
+                            if (((MyMissileAmmoDefinition) myAmmoDefinition).MissileExplosionDamage > 0)
+                            {
+                                damage = ((MyMissileAmmoDefinition) myAmmoDefinition).MissileExplosionDamage
+                                         * 0.3f * count;
+                                explosionSphere.Radius = 15;
+                            }
+                        }
+                    }
+                }
+                if (DamageShieldAndObjects(0, entities, explosionSphere, damage))
+                {
+                    __result = true;
+                    return false;
+                }
+                ApplyVolumetricExplosionOnGrid(damage, ref explosionSphere, 0L, entities, 0);
+                __result = true;
+                return false;
+            }
+            catch (Exception e)
+            {
+                Log.Error(e);
+            }
+
+            return true;
+        }
         private static void MakeExplosionAndDamage(long attackerId, Vector3D explosionPosition,
             float explosionRadius, float explosionDamage, long originEntity, bool isPearcingDamage,
             bool isWarhead = false)
@@ -66,6 +143,28 @@ namespace SentisOptimisationsPlugin
                 new List<MyEntity>(topMostEntitiesInSphere), attackerId, isWarhead, isPearcingDamage);
         }
 
+        private static void ApplyExplosionOnVoxel(BoundingSphereD sphere)
+        {
+            if ( !MySession.Static.EnableVoxelDestruction || !MySession.Static.HighSimulationQuality)
+                return;
+            List<MyVoxelBase> voxelsTmp = new List<MyVoxelBase>();
+            List<MyVoxelBase> voxelsToCutTmp = new List<MyVoxelBase>();
+            MySession.Static.VoxelMaps.GetAllOverlappingWithSphere(ref sphere, voxelsTmp);
+            for (int index = voxelsTmp.Count - 1; index >= 0; --index)
+                voxelsToCutTmp.Add(voxelsTmp[index].RootVoxel);
+            voxelsTmp.Clear();
+            foreach (MyVoxelBase voxelMap in voxelsToCutTmp)
+            {
+                bool createDebris = true;
+                var type = typeof(MyVoxelBase).Assembly.GetType("Sandbox.Game.MyExplosion");
+                ReflectionUtils.InvokeStaticMethod(type, "CutOutVoxelMap",
+                    new object[] {(float) sphere.Radius * 0.3f, sphere.Center, voxelMap, createDebris, false});
+                // Sandbox.Game.MyExplosion.CutOutVoxelMap((float) sphere.Radius * 1, sphere.Center, voxelMap, createDebris);
+                voxelMap.RequestVoxelCutoutSphere(sphere.Center, (float) sphere.Radius * 0.3f, createDebris, false);
+            }
+            voxelsToCutTmp.Clear();
+        }
+        
         public static void ComputeDamagedBlocks(MyGridExplosion m_gridExplosion, bool pearcingDamage)
         {
             Dictionary<MySlimBlock, float> m_damagedBlocks = new Dictionary<MySlimBlock, float>();
@@ -295,7 +394,9 @@ namespace SentisOptimisationsPlugin
                         {
                             try
                             {
+                                if (DamageShieldAndObjects(attackerId, entities_t, sphere_t, m_gridExplosion_t.Damage)) return;
                                 ComputeDamagedBlocks(m_gridExplosion_t, isPearcingDamage_t);
+                                ApplyExplosionOnVoxel(sphere_t);
                                 ApplyVolumetricDamageToGrid(m_gridExplosion_t, attackerId_t);
                             }
                             catch (Exception e)
@@ -312,8 +413,45 @@ namespace SentisOptimisationsPlugin
             }
 
             CollectBlocks(sphere, entities, isWarhead, Node2, group, m_gridExplosion);
+            ApplyExplosionOnVoxel(sphere);
+            if (DamageShieldAndObjects(attackerId, entities, sphere, m_gridExplosion.Damage)) return;
             ComputeDamagedBlocks(m_gridExplosion, isPearcingDamage);
             ApplyVolumetricDamageToGrid(m_gridExplosion, attackerId);
+        }
+
+        private static bool DamageShieldAndObjects(long attackerId, List<MyEntity> entities_t, BoundingSphereD sphere_t,
+            float damage)
+        {
+            bool hasShield = false;
+            foreach (var myEntity in entities_t)
+            {
+                if (myEntity is MyCharacter)
+                {
+                    ((MyCharacter) myEntity).DoDamage(99999, MyDamageType.Explosion, true, attackerId: attackerId);
+                }
+
+                if (myEntity is MyFloatingObject)
+                {
+                    ((MyFloatingObject) myEntity).DoDamage(99999, MyDamageType.Explosion, true, attackerId: attackerId);
+                }
+                
+                if ("dShield".Equals(myEntity.DisplayName))
+                {
+                    IMyTerminalBlock shield = null;
+                    var entToShield =
+                        SentisOptimisationsPlugin.SApi.MatchEntToShieldFastExt(myEntity, true);
+                    if (entToShield.HasValue)
+                    {
+                        shield = entToShield.Value.Item1;
+
+                        SentisOptimisationsPlugin.SApi.PointAttackShieldCon(shield, sphere_t.Center,
+                            attackerId, (float) (damage * (sphere_t.Radius / 2.5f)), 0, false, true);
+                    }
+
+                    hasShield = true;
+                }
+            }
+            return hasShield;
         }
 
         private static void CollectBlocks(BoundingSphereD sphere, List<MyEntity> entities, bool isWarhead,
@@ -496,7 +634,7 @@ namespace SentisOptimisationsPlugin
                 MyExplosions.AddExplosion(ref explosionInfo);
                 MakeExplosionAndDamage(instanceOwnerId, m_explosionFullSphere.Center,
                     (float) m_explosionFullSphere.Radius,
-                    m_warheadDefinition.WarheadExplosionDamage, instanceEntityId, false, true);
+                    m_warheadDefinition.WarheadExplosionDamage * 1.5f, instanceEntityId, false, true);
                 //MySyncDamage.DoDamageSynced(__instance, 999999, MyDamageType.Bullet, 0);
                 InvokeInstanceMethod(typeof(MyCubeGrid), __instance.CubeGrid, "RemoveBlockByCubeBuilder",
                     new Object[] {__instance.SlimBlock});

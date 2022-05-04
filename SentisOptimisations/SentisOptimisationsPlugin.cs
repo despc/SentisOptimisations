@@ -53,6 +53,8 @@ namespace SentisOptimisationsPlugin
         public UserControl _control = null;
         public static SentisOptimisationsPlugin Instance { get; private set; }
 
+        public static ShieldApi SApi = new ShieldApi();
+        
         public override void Init(ITorchBase torch)
         {
             Instance = this;
@@ -114,6 +116,7 @@ namespace SentisOptimisationsPlugin
                 AzCore.Init();
                 DamagePatch.Init();
                 _limiter.OnLoaded();
+                InitShieldApi();
                 ConveyorPatch.OnLoaded();
                 Communication.RegisterHandlers();
                 ITorchPlugin Plugin;
@@ -124,6 +127,19 @@ namespace SentisOptimisationsPlugin
                     AquireNexus(Plugin);
                 }
                     
+            }
+        }
+
+        public async void InitShieldApi()
+        {
+            try
+            {
+                await Task.Delay(60000);
+                SApi.Load();
+            }
+            catch (Exception e)
+            {
+                Log.Error(e);
             }
         }
 

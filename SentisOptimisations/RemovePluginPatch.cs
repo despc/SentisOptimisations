@@ -29,10 +29,11 @@ namespace SentisOptimisationsPlugin
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
         }
 
-        private static bool RemoveGridPatched(long gridEntityId, long identityID)
+        private static bool RemoveGridPatched(long gridEntityId)
         {
             try
             {
+                long identityID = MySession.Static.Players.TryGetIdentityId(MyEventContext.Current.Sender.Value, 0);
                 if (!MyEventContext.Current.IsLocallyInvoked &&
                     (long) MySession.Static.Players.TryGetSteamId(identityID) !=
                     (long) MyEventContext.Current.Sender.Value)
