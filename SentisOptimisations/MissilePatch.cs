@@ -71,6 +71,7 @@ namespace SentisOptimisationsPlugin
         {
             try
             {
+                HashSet<MyEntity> entitiesSet = new HashSet<MyEntity>(entities);
                 var explosionSphere = m_explosionInfo.ExplosionSphere;
                 float damage = m_explosionInfo.Damage;
                 // BoundingSphereD ExplosionSphere = (BoundingSphereD) m_explosionInfo.easyGetField("m_explosionSphere");
@@ -115,12 +116,12 @@ namespace SentisOptimisationsPlugin
                         }
                     }
                 }
-                if (DamageShieldAndObjects(0, entities, explosionSphere, damage))
-                {
-                    __result = true;
-                    return false;
-                }
-                ApplyVolumetricExplosionOnGrid(damage, ref explosionSphere, 0L, entities, 0);
+                // if (DamageShieldAndObjects(0, entities, explosionSphere, damage))
+                // {
+                //     __result = true;
+                //     return false;
+                // }
+                ApplyVolumetricExplosionOnGrid(damage, ref explosionSphere, 0L, new List<MyEntity>(entitiesSet), 0);
                 __result = true;
                 return false;
             }
@@ -129,7 +130,7 @@ namespace SentisOptimisationsPlugin
                 Log.Error(e);
             }
 
-            return true;
+            return false;
         }
         private static void MakeExplosionAndDamage(long attackerId, Vector3D explosionPosition,
             float explosionRadius, float explosionDamage, long originEntity, bool isPearcingDamage,

@@ -22,6 +22,7 @@ namespace SentisOptimisationsPlugin
         private int _maxStaticGridPCU = 200000;
         private int _azMessageTime = 960;
         private int _maxDinamycGridPCU = 30000;
+        private int _accelerationToDamage = 1000;
         private int _noDamageFromVoxelsBeforeSpeed = 30;
         private int _oldGridProcessorDays = 10;
         private bool _allowProjection = true;
@@ -42,7 +43,6 @@ namespace SentisOptimisationsPlugin
         private int _azPointsRemovedOnDeath = 1;
         private int _azPointsAddOnCaptured = 1;
         private int _contactCountAlert = 150;
-        private int _checkAndSelectNearTargetsSlowdown = 3;
         private int _azProgressWhenComplete = 300;
         private int _azMinLargeGridBlockCount = 300;
         private int _azMinSmallGridBlockCount = 300;
@@ -137,6 +137,9 @@ namespace SentisOptimisationsPlugin
         
         [DisplayTab(Name = "Explosives damage", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Explosives damage")]
         public float ExplosivesDamage { get => _explosivesDamage; set => SetValue(ref _explosivesDamage, value); }
+        
+        [DisplayTab(Name = "Acceleration to Damage", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Acceleration to Damage")]
+        public int AccelerationToDamage { get => _accelerationToDamage; set => SetValue(ref _accelerationToDamage, value); }
         
         [DisplayTab(Name = "Path to asteroids", GroupName = "Asteroids", Tab = "Asteroids", Order = 0, Description = "Path to asteroids to restore")]
         public String PathToAsters { get => _pathToAsters; set => SetValue(ref _pathToAsters, value); }
