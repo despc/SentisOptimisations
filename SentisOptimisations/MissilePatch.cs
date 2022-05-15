@@ -428,7 +428,13 @@ namespace SentisOptimisationsPlugin
             {
                 if (myEntity is MyCharacter)
                 {
-                    ((MyCharacter) myEntity).DoDamage(99999, MyDamageType.Explosion, true, attackerId: attackerId);
+                    var myCharacter = ((MyCharacter) myEntity);
+                    if (myCharacter.IsUsing is MyCockpit)
+                    {
+                        myCharacter.DoDamage(((MyCharacter) myEntity).Integrity - 3, MyDamageType.Explosion, true, attackerId: attackerId);
+                        continue;
+                    }
+                    myCharacter.DoDamage(99999, MyDamageType.Explosion, true, attackerId: attackerId);
                 }
 
                 if (myEntity is MyFloatingObject)
@@ -461,6 +467,11 @@ namespace SentisOptimisationsPlugin
         {
             foreach (MyEntity entity in entities)
             {
+                if (entity.IsPreview)
+                {
+                    continue;
+                }
+                
                 var Node = entity as MyCubeGrid;
                 if (Node == null)
                 {
