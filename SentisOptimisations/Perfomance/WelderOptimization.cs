@@ -306,11 +306,20 @@ namespace Optimizer.Optimizations
                         {
                             MySandboxGame.Static.Invoke((Action) (() =>
                             {
-                                if (invokedBlock.cubeProjector.Closed || invokedBlock.cubeProjector.CubeGrid.Closed ||
-                                    invokedBlock.hitCube.FatBlock != null && invokedBlock.hitCube.FatBlock.Closed)
-                                    return;
-                                invokedBlock.cubeProjector.Build(invokedBlock.hitCube, welder.OwnerId, welder.EntityId,
-                                    builtBy: welder.BuiltBy);
+                                try
+                                {
+                                    if (invokedBlock.cubeProjector.Closed ||
+                                        invokedBlock.cubeProjector.CubeGrid.Closed ||
+                                        invokedBlock.hitCube.FatBlock != null && invokedBlock.hitCube.FatBlock.Closed)
+                                        return;
+                                    invokedBlock.cubeProjector.Build(invokedBlock.hitCube, welder.OwnerId,
+                                        welder.EntityId,
+                                        builtBy: welder.BuiltBy);
+                                }
+                                catch (Exception e)
+                                {
+                                    SentisOptimisationsPlugin.SentisOptimisationsPlugin.Log.Error(e);
+                                }
                             }), "ShipWelder BuildProjection");
                         }
                         catch (Exception e)
