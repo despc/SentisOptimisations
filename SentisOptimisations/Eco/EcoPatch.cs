@@ -45,6 +45,13 @@ namespace SentisOptimisationsPlugin.EcoPatch
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
 
             
+            var CanRevertCurrentMethod = typeof(MySessionComponentTrash).GetMethod(
+                "VoxelRevertor_CanRevertCurrent", BindingFlags.Instance | BindingFlags.NonPublic);
+            ctx.GetPattern(CanRevertCurrentMethod).Prefixes.Add(
+                typeof(EcoPatch).GetMethod(nameof(VoxelRevertorCanRevertCurrentPatch),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
+            
             // var MethodUpdateBeforeSimulation10 = typeof(MyShipDrill).GetMethod
             //     (nameof(MyShipDrill.UpdateBeforeSimulation10), BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
             //
@@ -56,7 +63,18 @@ namespace SentisOptimisationsPlugin.EcoPatch
             // harmony.Patch(original, new HarmonyMethod(prefix));
 
         }
-        
+
+        private static bool VoxelRevertorCanRevertCurrentPatch(MySessionComponentTrash __instance, ref bool __result)
+        {
+            var voxelBase = __instance.easyGetField("m_voxel_CurrentBase");
+            if (voxelBase is MyVoxelMap && ((MyVoxelMap) voxelBase).Name != null && ((MyVoxelMap) voxelBase).Name.Contains("FieldAster"))
+            {
+                __result = false;
+                return false;
+            }
+            return true;
+        }
+
         private static bool GenerateStationsForFactionPatched(bool required,
             object stationCounts,
             HashSet<Vector3D> usedLocations, object __instance, ref bool __result)
