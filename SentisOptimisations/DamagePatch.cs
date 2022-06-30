@@ -8,6 +8,8 @@ using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Cube;
 using Sandbox.ModAPI;
 using SentisOptimisationsPlugin.AnomalyZone;
+using SentisOptimisationsPlugin.ShipTool;
+using SpaceEngineers.Game.Entities.Blocks;
 using Torch.Managers.PatchManager;
 using VRage.Game;
 using VRage.Game.Entity;
@@ -67,7 +69,8 @@ namespace SentisOptimisationsPlugin
             {
                 return;
             }
-            
+
+            AccumulateDamageHeat(damage, damagedGrid);
             if (ProtectAZGrids(ref damage, damagedGrid)) return;
             if (damage.Type != MyDamageType.Deformation)
             {
@@ -100,6 +103,35 @@ namespace SentisOptimisationsPlugin
             }
             
             return false;
+        }
+        
+        private static void AccumulateDamageHeat(MyDamageInformation damage, IMyCubeGrid damagedGrid)
+        {
+            var gridDamageAccumulator = FuckWelderProcessor.WelderDamageAccumulator;
+            if (gridDamageAccumulator.TryGetValue(damagedGrid.EntityId, out var weldersData))
+            {
+                foreach (var welderData in new  Dictionary<long, int>(weldersData))
+                {
+                    MyShipWelder welder = (MyShipWelder) MyEntities.GetEntityById(welderData.Key);
+                    if (welder == null || !welder.Enabled)
+                    {
+                        continue;
+                    }
+
+                    var currentHeat = welderData.Value;
+                    
+                    if (welderData.Value > SentisOptimisationsPlugin.Config.MaxHeat)
+                    {
+                        return;
+                    }
+                    weldersData[welderData.Key] = currentHeat + (int) damage.Amount;
+                }
+                
+            }
+            else
+            {
+                gridDamageAccumulator.Add(damagedGrid.EntityId, new Dictionary<long, int>());
+            }
         }
 
         public static void Patch(PatchContext ctx)

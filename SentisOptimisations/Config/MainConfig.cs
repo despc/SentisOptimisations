@@ -47,10 +47,6 @@ namespace SentisOptimisationsPlugin
         private int _azMinLargeGridBlockCount = 300;
         private int _azMinSmallGridBlockCount = 300;
         private int _adaptiveBlockSlowdownThreshold = 150;
-        
-        private float _shipDrillRadiusMultiplier = 2;
-        private float _shipGrinderWelderRadiusMultiplier = 2;
-        private float _shipWelderRadius = 8;
         private float _shipSuperWelderRadius = 150;
         
         private float _pullItemsSlowdown = 1;
@@ -81,6 +77,11 @@ namespace SentisOptimisationsPlugin
         private bool _streamingWithoutZip = true;
         private int _safeZonePhysicsThreshold = 10;
         
+        //WelderFuck
+        private int _coolingSpeed = 30000;
+        private int _maxHeat = 2000000;
+        private int _weldersOverheatThreshold = 1000000;
+        private int _weldersMessageTime = 325;
         
         private bool _welderTweaksEnabled = false;
         private bool _welderNoLimitsCheck = false;
@@ -140,6 +141,18 @@ namespace SentisOptimisationsPlugin
         
         [DisplayTab(Name = "Acceleration to Damage", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Acceleration to Damage")]
         public int AccelerationToDamage { get => _accelerationToDamage; set => SetValue(ref _accelerationToDamage, value); }
+        
+        [DisplayTab(Name = "Welders Cooling Speed", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Welders Cooling Speed")]
+        public int CoolingSpeed { get => _coolingSpeed; set => SetValue(ref _coolingSpeed, value); }
+        
+        [DisplayTab(Name = "Welders Max Heat", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Welders Max Heat")]
+        public int MaxHeat { get => _maxHeat; set => SetValue(ref _maxHeat, value); }
+        
+        [DisplayTab(Name = "Welders Overheat Threshold", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Welders Overheat Threshold")]
+        public int WeldersOverheatThreshold { get => _weldersOverheatThreshold; set => SetValue(ref _weldersOverheatThreshold, value); }
+        
+        [DisplayTab(Name = "Welder Message time in ms", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Welder Message time in ms")]
+        public int WeldersMessageTime { get => _weldersMessageTime; set => SetValue(ref _weldersMessageTime, value); }
         
         [DisplayTab(Name = "Path to asteroids", GroupName = "Asteroids", Tab = "Asteroids", Order = 0, Description = "Path to asteroids to restore")]
         public String PathToAsters { get => _pathToAsters; set => SetValue(ref _pathToAsters, value); }
@@ -359,27 +372,6 @@ namespace SentisOptimisationsPlugin
         {
             get => _contactCountAlert;
             set => SetValue(ref _contactCountAlert, value);
-        }
-        
-        [DisplayTab(Name = "Ship drill radius multiplier", GroupName = "Ship tool", Tab = "Ship tool", Order = 0, Description = "Ship drill radius multiplier")]
-        public float ShipDrillRadiusMultiplier
-        {
-            get => _shipDrillRadiusMultiplier;
-            set => SetValue(ref _shipDrillRadiusMultiplier, value);
-        }
-        
-        [DisplayTab(Name = "Ship grinder/welder radius multiplier", GroupName = "Ship tool", Tab = "Ship tool", Order = 0, Description = "Ship grinder/welder radius multiplier")]
-        public float ShipGrinderWelderRadiusMultiplier
-        {
-            get => _shipGrinderWelderRadiusMultiplier;
-            set => SetValue(ref _shipGrinderWelderRadiusMultiplier, value);
-        }
-        
-        [DisplayTab(Name = "Ship welder radius" , GroupName = "Ship tool", Tab = "Ship tool", Order = 0, Description = "Ship welder radius")]
-        public float ShipWelderRadius
-        {
-            get => _shipWelderRadius;
-            set => SetValue(ref _shipWelderRadius, value);
         }
         
         [DisplayTab(Name = "Ship SUPER welder radius" , GroupName = "Ship tool", Tab = "Ship tool", Order = 0, Description = "Ship SUPER welder radius")]

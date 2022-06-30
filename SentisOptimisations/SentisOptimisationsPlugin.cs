@@ -20,6 +20,7 @@ using Sandbox.Game.World;
 using Sandbox.ModAPI;
 using SentisOptimisations;
 using SentisOptimisationsPlugin.AnomalyZone;
+using SentisOptimisationsPlugin.ShipTool;
 using SOPlugin.GUI;
 using Torch;
 using Torch.API;
@@ -53,6 +54,7 @@ namespace SentisOptimisationsPlugin
         public UserControl _control = null;
         public static SentisOptimisationsPlugin Instance { get; private set; }
 
+        private FuckWelderProcessor _welderProcessor = new FuckWelderProcessor();
         public static ShieldApi SApi = new ShieldApi();
         
         public override void Init(ITorchBase torch)
@@ -290,7 +292,11 @@ namespace SentisOptimisationsPlugin
                 }
                 SafezonePatch.entitiesInSZ.Clear();
             }
-            
+
+            if (MySandboxGame.Static.SimulationFrameCounter % 60 == 0)
+            {
+                _welderProcessor.Process();
+            }
 
             if (MySandboxGame.Static.SimulationFrameCounter % 120 == 0)
             {

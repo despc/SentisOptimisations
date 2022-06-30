@@ -43,6 +43,27 @@ namespace Optimizer.Optimizations
         private static bool Activate(MyShipWelder __instance, ref bool __result, HashSet<MySlimBlock> targets)
         {
             __result = false; //it affects only sound;
+            
+            var weldersOverheatThreshold = SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.WeldersOverheatThreshold;
+
+            var cubeGridEntityId = __instance.CubeGrid.EntityId;
+            if (FuckWelderProcessor.WelderDamageAccumulator.TryGetValue(cubeGridEntityId, out var gridData))
+            {
+                if (gridData.TryGetValue(__instance.EntityId, out var heat))
+                {
+                    if (heat > weldersOverheatThreshold)
+                    {
+                        var overheat = heat - weldersOverheatThreshold;
+                        var overheatPercent = overheat / (weldersOverheatThreshold / 100);
+                        MyVisualScriptLogicProvider.ShowNotification(
+                            $"Repair system overheat!  {overheatPercent}%",
+                            SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.WeldersMessageTime, "Red", __instance.OwnerId);
+                        return false;
+                    }
+                }
+                
+            }
+            
             if (!SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.WelderTweaksEnabled)
             {
                 return true;

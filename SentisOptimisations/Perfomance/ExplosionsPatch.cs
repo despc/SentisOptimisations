@@ -42,6 +42,13 @@ namespace SentisOptimisationsPlugin
             
             ctx.GetPattern(RegisterFloatingObject).Prefixes.Add(
                 typeof(ExplosionsPatch).GetMethod(nameof(RegisterFloatingObjectPatched),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic)); 
+            
+            var UnRegisterFloatingObject = typeof(MyFloatingObjects).GetMethod
+                ("UnregisterFloatingObject", BindingFlags.Static | BindingFlags.NonPublic);
+            
+            ctx.GetPattern(UnRegisterFloatingObject).Prefixes.Add(
+                typeof(ExplosionsPatch).GetMethod(nameof(UnRegisterFloatingObjectPatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
             
             var ReduceFloatingObjects = typeof(MyFloatingObjects).GetMethod
@@ -80,6 +87,40 @@ namespace SentisOptimisationsPlugin
             return false;
         }
 
+        private static bool UnRegisterFloatingObjectPatched(MyFloatingObject obj)
+        {
+            try
+            {
+                if (obj.VoxelMaterial != null)
+                {
+                    var ores = ((SortedSet<MyFloatingObject>) ReflectionUtils.GetPrivateStaticField(typeof(MyFloatingObjects),
+                        "m_floatingOres"));
+                    lock (ores)
+                    {
+                        ores.Remove(obj);
+                    }
+                }
+                else
+                {
+                    var items = ((SortedSet<MyFloatingObject>) ReflectionUtils.GetPrivateStaticField(typeof(MyFloatingObjects),
+                        "m_floatingItems"));
+                    lock (items)
+                    {
+                        items.Remove(obj);
+                    }
+                }
+
+                ReflectionUtils.InvokeStaticMethod(typeof(MyFloatingObjects), "RemoveFromSynchronization",
+                    new object[] {obj});
+                obj.WasRemovedFromWorld = true;
+            }
+            catch (Exception e)
+            {
+                
+            }
+            return false;
+        }
+        
         private static bool RegisterFloatingObjectPatched(MyFloatingObject obj)
         {
             try
@@ -88,10 +129,26 @@ namespace SentisOptimisationsPlugin
                     return false;
                 obj.CreationTime = Stopwatch.GetTimestamp();
                 if (obj.VoxelMaterial != null)
-                    ((SortedSet<MyFloatingObject>)ReflectionUtils.GetPrivateStaticField(typeof(MyFloatingObjects), "m_floatingOres")).Add(obj);
+                {
+                    var ores = ((SortedSet<MyFloatingObject>) ReflectionUtils.GetPrivateStaticField(
+                        typeof(MyFloatingObjects), "m_floatingOres"));
+                    lock (ores)
+                    {
+                        ores.Add(obj);
+                    }
+                }
                 else
-                    ((SortedSet<MyFloatingObject>)ReflectionUtils.GetPrivateStaticField(typeof(MyFloatingObjects), "m_floatingItems")).Add(obj);
-                ReflectionUtils.InvokeStaticMethod(typeof(MyFloatingObjects), "AddToSynchronization", new object[] {obj});
+                {
+                    var items = ((SortedSet<MyFloatingObject>) ReflectionUtils.GetPrivateStaticField(
+                        typeof(MyFloatingObjects), "m_floatingItems"));
+                    lock (items)
+                    {
+                        items.Add(obj);
+                    }
+                }
+
+                ReflectionUtils.InvokeStaticMethod(typeof(MyFloatingObjects), "AddToSynchronization",
+                    new object[] {obj});
             }
             catch (Exception e)
             {

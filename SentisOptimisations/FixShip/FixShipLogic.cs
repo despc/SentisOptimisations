@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using NLog;
+using Sandbox.Game;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Character;
 using Sandbox.ModAPI;
+using SentisOptimisationsPlugin.ShipTool;
 using VRage.Game.ModAPI;
 using VRage.ModAPI;
 using VRage.ObjectBuilders;
@@ -40,6 +42,31 @@ namespace SentisOptimisationsPlugin.FixShip
             {
                 return new List<MyCubeGrid>();
             }
+
+            var gridEntityId = grid.EntityId;
+            try
+            {
+                if (FuckWelderProcessor.WelderDamageAccumulator.TryGetValue(gridEntityId, out Dictionary<long, int> welders))
+                {
+                    foreach (var welder in welders)
+                    {
+                        if (welder.Value > SentisOptimisationsPlugin.Config.WeldersOverheatThreshold / 2)
+                        {
+                            MyVisualScriptLogicProvider.ShowNotification(
+                                "Repair system so hot, pls cool them before fist ship",
+                                5000, "Red", grid.BigOwners[0]);
+                            return new List<MyCubeGrid>();
+                        }
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Log.Error("Fix Ship exception", e);
+            }
+
+            
+                
             List<MyCubeGrid> groupNodes =
                 MyCubeGridGroups.Static.GetGroups(GridLinkTypeEnum.Logical).GetGroupNodes(grid);
             return groupNodes;

@@ -1,11 +1,9 @@
-﻿using System.Reflection;
-using Havok;
+﻿using System.Collections.Generic;
+using System.Reflection;
 using NLog;
 using ParallelTasks;
-using Sandbox.Game.Entities;
-using Sandbox.Game.Entities.Cube;
+using Sandbox.Game.World;
 using Torch.Managers.PatchManager;
-using VRage.Game.Entity;
 
 namespace SentisOptimisationsPlugin
 {
@@ -16,19 +14,29 @@ namespace SentisOptimisationsPlugin
 
         public static void Patch(PatchContext ctx)
         {
-            var MethodSpinOnce = typeof(MySpinWait).GetMethod
-                (nameof(MySpinWait.SpinOnce), BindingFlags.Instance | BindingFlags.Public);
+            var MethodCheckLimitsAndNotify = typeof(MySession).GetMethod
+                (nameof(MySession.CheckLimitsAndNotify), BindingFlags.Instance | BindingFlags.Public);
 
-            ctx.GetPattern(MethodSpinOnce).Prefixes.Add(
-                typeof(DamagePatch).GetMethod(nameof(SpinOnce),
+            ctx.GetPattern(MethodCheckLimitsAndNotify).Prefixes.Add(
+                typeof(NpcPatches).GetMethod(nameof(CheckLimitsAndNotifyPatch),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
         }
 
 
-        private static bool SpinOnce()
+        private static bool CheckLimitsAndNotifyPatch(long ownerID,
+            string blockName,
+            int pcuToBuild,
+            int blocksToBuild,
+            int blocksCount,
+            Dictionary<string, int> blocksPerType, ref bool __result)
         {
-            return false;
+            if (MySession.Static.Players.IdentityIsNpc(ownerID))
+            {
+                __result = true;
+                return false;
+            }
+            return true;
         }
-
     }
 }

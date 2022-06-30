@@ -89,6 +89,7 @@
       <Compile Include="Shared\Ext2.cs" />
       <Compile Include="Shared\FrameExecutor.cs" />
       <Compile Include="Shared\SharpUtils.cs" />
+      <Compile Include="ShipTool\FuckWelderProcessor.cs" />
       <Compile Include="ShipTool\ShipToolPatch.cs" />
       <Compile Include="Shipyard\Communication.cs" />
       <Compile Include="Shipyard\Dto\ClientBuyRequest.cs" />
