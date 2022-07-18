@@ -19,6 +19,8 @@ namespace SentisOptimisationsPlugin
         private double _contractRepairMultiplier = 10;
         private double _contractFindMultiplier = 25;
         private bool _enabledPcuLimiter = true;
+        private bool _enableCheckBeacon = true;
+        private bool _enableOnlyEarthSpawn = true;
         private int _maxStaticGridPCU = 200000;
         private int _azMessageTime = 960;
         private int _maxDinamycGridPCU = 30000;
@@ -199,6 +201,20 @@ namespace SentisOptimisationsPlugin
         {
             get => _enabledPcuLimiter;
             set => SetValue(ref _enabledPcuLimiter, value);
+        }
+        
+        [DisplayTab(Name = "Enabled check Beacon", GroupName = "PCU limiter", Tab = "PCU limiter", Order = 0, Description = "Enabled check Beacon")]
+        public bool EnableCheckBeacon
+        {
+            get => _enableCheckBeacon;
+            set => SetValue(ref _enableCheckBeacon, value);
+        }
+        
+        [DisplayTab(Name = "Enabled Only Earth Spawn", GroupName = "PCU limiter", Tab = "PCU limiter", Order = 0, Description = "Enabled Only Earth Spawn")]
+        public bool EnableOnlyEarthSpawn
+        {
+            get => _enableOnlyEarthSpawn;
+            set => SetValue(ref _enableOnlyEarthSpawn, value);
         }
         
         [DisplayTab(Name = "Safe zone subgrid optimisation", GroupName = "Safe zone", Tab = "Safe zone", Order = 0, Description = "Safe zone subgrid optimisation")]

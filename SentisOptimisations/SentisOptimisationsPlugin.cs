@@ -22,6 +22,7 @@ using SentisOptimisations;
 using SentisOptimisationsPlugin.AnomalyZone;
 using SentisOptimisationsPlugin.ShipTool;
 using SOPlugin.GUI;
+using SpaceEngineers.Game.Entities.Blocks;
 using Torch;
 using Torch.API;
 using Torch.API.Managers;
@@ -31,9 +32,11 @@ using Torch.Commands;
 using Torch.Commands.Permissions;
 using Torch.Managers;
 using Torch.Session;
+using VRage.Game;
 using VRage.Game.ModAPI;
 using VRage.Game.Voxels;
 using VRage.Network;
+using VRage.ObjectBuilders;
 using VRageMath;
 
 namespace SentisOptimisationsPlugin
@@ -392,6 +395,19 @@ namespace SentisOptimisationsPlugin
                                 {
                                     var myBatteryBlock = block;
                                     myBatteryBlock.CurrentStoredPower = myBatteryBlock.MaxStoredPower;
+                                }
+                                if (mySlimBlock.FatBlock is MyReactor reactor)
+                                {
+                                    var myInventory = reactor.GetInventory();
+                                    var definitionId = new MyDefinitionId(typeof(MyObjectBuilder_Ingot), "Uranium");
+                                    var content = (MyObjectBuilder_PhysicalObject) MyObjectBuilderSerializer.CreateNewObject(definitionId);
+                                    MyObjectBuilder_InventoryItem inventoryItem = new MyObjectBuilder_InventoryItem
+                                        {Amount = 1000, Content = content};
+                                    myInventory.AddItems(100, inventoryItem);
+                                }
+                                if (mySlimBlock.FatBlock is MyGasTank tank)
+                                {
+                                    tank.ChangeFillRatioAmount(1);
                                 }
                             }
                         }

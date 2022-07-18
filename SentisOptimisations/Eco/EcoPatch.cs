@@ -69,6 +69,7 @@ namespace SentisOptimisationsPlugin.EcoPatch
             var voxelBase = __instance.easyGetField("m_voxel_CurrentBase");
             if (voxelBase is MyVoxelMap && ((MyVoxelMap) voxelBase).Name != null && ((MyVoxelMap) voxelBase).Name.Contains("FieldAster"))
             {
+                SentisOptimisationsPlugin.Log.Error("skip FieldAster" + ((MyVoxelMap) voxelBase).Name);
                 __result = false;
                 return false;
             }

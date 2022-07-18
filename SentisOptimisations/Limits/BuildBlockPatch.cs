@@ -101,6 +101,11 @@ namespace SentisOptimisationsPlugin
 
         private static void CheckBeacon(MyCubeGrid grid)
         {
+
+            if (!SentisOptimisationsPlugin.Config.EnableCheckBeacon)
+            {
+                return;
+            }
             var myCubeGrids = GridUtils.GetSubGrids(grid);
             foreach (var myCubeGrid in myCubeGrids)
             {

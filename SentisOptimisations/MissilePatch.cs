@@ -646,7 +646,7 @@ namespace SentisOptimisationsPlugin
                 MyExplosions.AddExplosion(ref explosionInfo);
                 MakeExplosionAndDamage(instanceOwnerId, m_explosionFullSphere.Center,
                     (float) m_explosionFullSphere.Radius,
-                    m_warheadDefinition.WarheadExplosionDamage * 1.5f, instanceEntityId, false, true);
+                    m_warheadDefinition.WarheadExplosionDamage * 2.5f, instanceEntityId, false, true);
                 //MySyncDamage.DoDamageSynced(__instance, 999999, MyDamageType.Bullet, 0);
                 InvokeInstanceMethod(typeof(MyCubeGrid), __instance.CubeGrid, "RemoveBlockByCubeBuilder",
                     new Object[] {__instance.SlimBlock});

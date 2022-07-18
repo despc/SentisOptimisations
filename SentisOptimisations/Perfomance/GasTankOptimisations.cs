@@ -38,6 +38,11 @@ namespace SentisOptimisationsPlugin
 
         private static void GetAvailableRespawnPointsPatched(MyPlanet planet, ref ClearToken<MyRespawnShipDefinition> __result)
         {
+            if (!SentisOptimisationsPlugin.Config.EnableOnlyEarthSpawn)
+            {
+                return;
+            }
+
             if (!planet.Name.Contains("Earth"))
             {
                 __result.List.Clear();
