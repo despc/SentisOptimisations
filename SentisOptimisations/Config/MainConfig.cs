@@ -66,6 +66,7 @@ namespace SentisOptimisationsPlugin
         private float _turretsDamageMultiplier = 0.1f;
         private float _physicsMsToAlert = 1.5f;
         private float _physicsMsToPunish = 2f;
+        private float _warheadDamageMultiplier = 2.5f;
         private float _physicsMsToPunishImmediately = 5f;
         private int _physicsChecksBeforePunish = 5;
         
@@ -140,6 +141,9 @@ namespace SentisOptimisationsPlugin
         
         [DisplayTab(Name = "Explosives damage", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Explosives damage")]
         public float ExplosivesDamage { get => _explosivesDamage; set => SetValue(ref _explosivesDamage, value); }
+        
+        [DisplayTab(Name = "Warhead damage multiplier", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Warhead damage multiplier")]
+        public float WarheadDamageMultiplier { get => _warheadDamageMultiplier; set => SetValue(ref _warheadDamageMultiplier, value); }
         
         [DisplayTab(Name = "Acceleration to Damage", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Acceleration to Damage")]
         public int AccelerationToDamage { get => _accelerationToDamage; set => SetValue(ref _accelerationToDamage, value); }

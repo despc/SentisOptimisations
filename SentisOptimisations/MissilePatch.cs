@@ -452,7 +452,7 @@ namespace SentisOptimisationsPlugin
                         shield = entToShield.Value.Item1;
 
                         SentisOptimisationsPlugin.SApi.PointAttackShieldCon(shield, sphere_t.Center,
-                            attackerId, (float) (damage * (sphere_t.Radius / 2.5f)), 0, false, true);
+                            attackerId, (float) (damage * (sphere_t.Radius / SentisOptimisationsPlugin.Config.WarheadDamageMultiplier)), 0, false, true);
                     }
 
                     hasShield = true;
@@ -646,7 +646,7 @@ namespace SentisOptimisationsPlugin
                 MyExplosions.AddExplosion(ref explosionInfo);
                 MakeExplosionAndDamage(instanceOwnerId, m_explosionFullSphere.Center,
                     (float) m_explosionFullSphere.Radius,
-                    m_warheadDefinition.WarheadExplosionDamage * 2.5f, instanceEntityId, false, true);
+                    m_warheadDefinition.WarheadExplosionDamage * SentisOptimisationsPlugin.Config.WarheadDamageMultiplier, instanceEntityId, false, true);
                 //MySyncDamage.DoDamageSynced(__instance, 999999, MyDamageType.Bullet, 0);
                 InvokeInstanceMethod(typeof(MyCubeGrid), __instance.CubeGrid, "RemoveBlockByCubeBuilder",
                     new Object[] {__instance.SlimBlock});
