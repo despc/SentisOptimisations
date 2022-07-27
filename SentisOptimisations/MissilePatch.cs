@@ -95,14 +95,14 @@ namespace SentisOptimisationsPlugin
                             if (((MyProjectileAmmoDefinition) myAmmoDefinition).ProjectileExplosionDamage > 0)
                             {
                                 damage = ((MyProjectileAmmoDefinition) myAmmoDefinition).ProjectileExplosionDamage
-                                         * 0.3f * count;
-                                explosionSphere.Radius = 15;
+                                         * SentisOptimisationsPlugin.Config.ProjectileAmmoExplosionMultiplier * count;
+                                explosionSphere.Radius = SentisOptimisationsPlugin.Config.AmmoExplosionRadius;
                             }
                             else
                             {
                                 damage = ((MyProjectileAmmoDefinition) myAmmoDefinition).ProjectileMassDamage
-                                         * 0.1f * count;
-                                explosionSphere.Radius = 15;
+                                         * SentisOptimisationsPlugin.Config.ProjectileAmmoExplosionMultiplier * count;
+                                explosionSphere.Radius = SentisOptimisationsPlugin.Config.AmmoExplosionRadius;
                             }
                         }
                         if (myAmmoDefinition is MyMissileAmmoDefinition)
@@ -110,8 +110,8 @@ namespace SentisOptimisationsPlugin
                             if (((MyMissileAmmoDefinition) myAmmoDefinition).MissileExplosionDamage > 0)
                             {
                                 damage = ((MyMissileAmmoDefinition) myAmmoDefinition).MissileExplosionDamage
-                                         * 0.3f * count;
-                                explosionSphere.Radius = 15;
+                                         * SentisOptimisationsPlugin.Config.MissileAmmoExplosionMultiplier * count;
+                                explosionSphere.Radius = SentisOptimisationsPlugin.Config.AmmoExplosionRadius;
                             }
                         }
                     }

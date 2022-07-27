@@ -5,6 +5,7 @@ using Sandbox.Game.Entities;
 using Sandbox.Game.World;
 using Sandbox.ModAPI;
 using VRage.Game.ModAPI;
+using VRageMath;
 
 namespace SentisOptimisations
 {
@@ -100,6 +101,24 @@ namespace SentisOptimisations
             List<IMyPlayer> players = new List<IMyPlayer>();
             MyAPIGateway.Players.GetPlayers(players);
             return players;
+        }
+        
+        public static List<IMyPlayer> GetAllPlayersInRadius(Vector3D point, float radius)
+        {
+            if (MySession.Static == null)
+                return new List<IMyPlayer>();
+            List<IMyPlayer> players = new List<IMyPlayer>();
+            MyAPIGateway.Players.GetPlayers(players);
+            List<IMyPlayer> result = new List<IMyPlayer>();
+            foreach (IMyPlayer p in players)
+            {
+                if (Vector3D.Distance(p.GetPosition(), point) < radius)
+                {
+                    result.Add(p);
+                }
+            }
+
+            return result;
         }
 
         public static bool IsAdmin(IMyPlayer player) => player != null &&

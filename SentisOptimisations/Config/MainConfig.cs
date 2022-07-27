@@ -57,13 +57,10 @@ namespace SentisOptimisationsPlugin
         
         private float _findProjectedBlocksSlowdown = 1;
         
-        private float _thrustPowerMultiplier = 10f;
-        private float _gasTankCapacityMultiplier = 2f;
-        private float _h2GenMultiplier = 10f;
-        private float _missileInitialSpeed = 500f;
-        private float _missileAcceleration = 0f;
-        private float _missileDamage = 1500f;
-        private float _turretsDamageMultiplier = 0.1f;
+        private float _projectileAmmoExplosionMultiplier = 0.1f;
+        private float _missileAmmoExplosionMultiplier = 0.3f;
+        private float _ammoExplosionRadius = 15f;
+
         private float _physicsMsToAlert = 1.5f;
         private float _physicsMsToPunish = 2f;
         private float _warheadDamageMultiplier = 2.5f;
@@ -141,6 +138,14 @@ namespace SentisOptimisationsPlugin
         
         [DisplayTab(Name = "Explosives damage", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Explosives damage")]
         public float ExplosivesDamage { get => _explosivesDamage; set => SetValue(ref _explosivesDamage, value); }
+        
+        [DisplayTab(Name = "Projectile Ammo Explosion Multiplier", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Projectile Ammo Explosion Multiplier")]
+        public float ProjectileAmmoExplosionMultiplier { get => _projectileAmmoExplosionMultiplier; set => SetValue(ref _projectileAmmoExplosionMultiplier, value); }
+        
+        [DisplayTab(Name = "Missile Ammo Explosion Multiplier", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Missile Ammo Explosion Multiplier")]
+        public float MissileAmmoExplosionMultiplier { get => _missileAmmoExplosionMultiplier; set => SetValue(ref _missileAmmoExplosionMultiplier, value); }
+        [DisplayTab(Name = "Ammo Explosion Radius", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Ammo Explosion Radius")]
+        public float AmmoExplosionRadius { get => _ammoExplosionRadius; set => SetValue(ref _ammoExplosionRadius, value); }
         
         [DisplayTab(Name = "Warhead damage multiplier", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Warhead damage multiplier")]
         public float WarheadDamageMultiplier { get => _warheadDamageMultiplier; set => SetValue(ref _warheadDamageMultiplier, value); }

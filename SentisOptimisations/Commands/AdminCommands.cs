@@ -7,14 +7,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using NAPI;
 using NLog;
-using Sandbox.Engine.Multiplayer;
 using Sandbox.Engine.Voxels;
-using Sandbox.Game;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Multiplayer;
 using Sandbox.Game.SessionComponents;
 using Sandbox.Game.World;
-using Sandbox.Game.World.Generator;
 using Sandbox.ModAPI;
 using Torch.Commands;
 using Torch.Commands.Permissions;
@@ -22,11 +19,8 @@ using Torch.Managers;
 using VRage;
 using VRage.Game;
 using VRage.Game.Definitions.SessionComponents;
-using VRage.Game.Entity;
 using VRage.Game.ModAPI;
 using VRage.Game.Voxels;
-using VRage.Library.Utils;
-using VRage.Network;
 using VRage.ObjectBuilders;
 using VRage.Voxels;
 using VRageMath;
@@ -61,6 +55,36 @@ namespace SentisOptimisationsPlugin
                 Log.Error("DELETE faction " + faction.Value.Tag);
                 cleanFaction(faction);
             }
+        }
+        
+        [Command("ga add", ".", null)]
+        [Permission(MyPromoteLevel.Moderator)]
+        public void AddGravityPoint(String cords, float gravity, float radius)
+        {
+            var cordsSplitted = cords.Split(':');
+            var point = new Vector3D(double.Parse(cordsSplitted[0]), double.Parse(cordsSplitted[1]),
+                double.Parse(cordsSplitted[2]));
+            GravityPatch.gravityPoints.Add(new GravityPatch.GravityPoint(point, gravity, radius));
+        }
+        
+        [Command("ga del", ".", null)]
+        [Permission(MyPromoteLevel.Moderator)]
+        public void DelGravityPoint(int index)
+        {
+            GravityPatch.gravityPoints.RemoveAt(index - 1);
+        }
+        
+        [Command("ga list", ".", null)]
+        [Permission(MyPromoteLevel.Moderator)]
+        public void GravityPointList()
+        {
+            
+            string str = "Существующие гравитационные аномалии " + " \n";
+            
+            for (int index = 1; index < GravityPatch.gravityPoints.Count + 1; ++index)
+                str = string.Format("{0}{1}. {2}\n", str, index,
+                    GravityPatch.gravityPoints[index - 1]);
+            Context.Respond(str);
         }
         
         [Command("rename_faction", ".", null)]
