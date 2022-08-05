@@ -64,6 +64,37 @@ namespace SentisOptimisationsPlugin
             ctx.GetPattern(MyExplosionApplyVolumetricExplosion).Prefixes.Add(
                 typeof(MissilePatch).GetMethod(nameof(ApplyVolumetricExplosionPatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
+            
+            
+            var CalculateStoredExplosiveDamageMethod = typeof(MyCubeBlock)
+                .GetMethod("CalculateStoredExplosiveDamage",
+                    BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            ctx.GetPattern(CalculateStoredExplosiveDamageMethod).Prefixes.Add(
+                typeof(MissilePatch).GetMethod(nameof(CalculateStoredExplosiveDamageMethodPatched),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+        }
+
+        private static bool CalculateStoredExplosiveDamageMethodPatched(MyCubeBlock __instance, 
+            List<MyCubeBlock.StoredExplosive> storedExplosives, ref float __result)
+        {
+            try
+            {
+                var m_detonationData = __instance.easyGetField("m_detonationData", typeof(MyCubeBlock));
+                float ExplosionDamagePerLiter = (float) m_detonationData.easyGetField("ExplosionDamagePerLiter");
+                float ExplosionDamageMax = 50000;
+                float val2 = 0.0f;
+                foreach (MyCubeBlock.StoredExplosive storedExplosive in storedExplosives)
+                {
+                    val2 += storedExplosive.Volume * 1000f * ExplosionDamagePerLiter;
+                }
+                __result = Math.Min(ExplosionDamageMax, val2);
+            }
+            catch (Exception e)
+            {
+                Log.Error(e);
+            }
+            return false;
         }
 
         private static bool ApplyVolumetricExplosionPatched(ref MyExplosionInfo m_explosionInfo,
@@ -92,27 +123,28 @@ namespace SentisOptimisationsPlugin
                         var myAmmoDefinition = MyDefinitionManager.Static.GetAmmoDefinition(ammoDefinitionId);
                         if (myAmmoDefinition is MyProjectileAmmoDefinition)
                         {
-                            if (((MyProjectileAmmoDefinition) myAmmoDefinition).ProjectileExplosionDamage > 0)
+                            var ProjectileMassDamage = ((MyProjectileAmmoDefinition) myAmmoDefinition).ProjectileMassDamage;
+                            if (ProjectileMassDamage == 0)
                             {
-                                damage = ((MyProjectileAmmoDefinition) myAmmoDefinition).ProjectileExplosionDamage
-                                         * SentisOptimisationsPlugin.Config.ProjectileAmmoExplosionMultiplier * count;
-                                explosionSphere.Radius = SentisOptimisationsPlugin.Config.AmmoExplosionRadius;
+                                ProjectileMassDamage = 30;
                             }
-                            else
-                            {
-                                damage = ((MyProjectileAmmoDefinition) myAmmoDefinition).ProjectileMassDamage
-                                         * SentisOptimisationsPlugin.Config.ProjectileAmmoExplosionMultiplier * count;
+                            damage = ProjectileMassDamage
+                                     * SentisOptimisationsPlugin.Config.ProjectileAmmoExplosionMultiplier * count;
                                 explosionSphere.Radius = SentisOptimisationsPlugin.Config.AmmoExplosionRadius;
-                            }
+                            
                         }
                         if (myAmmoDefinition is MyMissileAmmoDefinition)
                         {
-                            if (((MyMissileAmmoDefinition) myAmmoDefinition).MissileExplosionDamage > 0)
+                            var missileExplosionDamage = ((MyMissileAmmoDefinition) myAmmoDefinition).MissileExplosionDamage;
+                            if (missileExplosionDamage == 0)
                             {
-                                damage = ((MyMissileAmmoDefinition) myAmmoDefinition).MissileExplosionDamage
-                                         * SentisOptimisationsPlugin.Config.MissileAmmoExplosionMultiplier * count;
-                                explosionSphere.Radius = SentisOptimisationsPlugin.Config.AmmoExplosionRadius;
+                                missileExplosionDamage = 5000;
                             }
+
+                            damage = missileExplosionDamage
+                                     * SentisOptimisationsPlugin.Config.MissileAmmoExplosionMultiplier * count;
+                                explosionSphere.Radius = SentisOptimisationsPlugin.Config.AmmoExplosionRadius;
+                            
                         }
                     }
                 }

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using NAPI;
 using NLog;
@@ -8,9 +9,12 @@ using ParallelTasks;
 using Sandbox;
 using Sandbox.Definitions;
 using Sandbox.Engine.Physics;
+using Sandbox.Engine.Utils;
+using Sandbox.Game;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Character;
 using Sandbox.Game.Entities.Cube;
+using Sandbox.Game.Entities.Inventory;
 using Sandbox.Game.Multiplayer;
 using Sandbox.Game.Weapons;
 using Sandbox.Game.World;
@@ -20,9 +24,11 @@ using Sandbox.ModAPI;
 using SentisOptimisations;
 using SpaceEngineers.Game.Entities.Blocks;
 using Torch.Managers.PatchManager;
+using VRage;
 using VRage.Game;
 using VRage.Game.Entity;
 using VRage.ModAPI;
+using VRage.ObjectBuilders;
 using VRage.Utils;
 using VRageMath;
 
@@ -44,16 +50,30 @@ namespace SentisOptimisationsPlugin.ShipTool
             //     typeof(ShipToolPatch).GetMethod(nameof(LoadDummiesPatch),
             //         BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
 
-            // var MethodMyShipDrillInit = typeof(MyShipDrill).GetMethod(
-            //     nameof(MyShipDrill.Init), BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
-            //
-            // ctx.GetPattern(MethodMyShipDrillInit).Suffixes.Add(
-            //     typeof(ShipToolPatch).GetMethod(nameof(MyShipDrillInitPatch),
-            //         BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            var MethodMyShipDrillInit = typeof(MyShipDrill).GetMethod(
+                nameof(MyShipDrill.Init), BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
+            
+            ctx.GetPattern(MethodMyShipDrillInit).Suffixes.Add(
+                typeof(ShipToolPatch).GetMethod(nameof(MyShipDrillInitPatch),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
 
+            var MethodMyInventoryAddItems = typeof(MyInventory).GetMethods(
+                BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly).Where(info => info.Name.Equals("AddItems")).ToList()[0];
+            
+            ctx.GetPattern(MethodMyInventoryAddItems).Prefixes.Add(
+                typeof(ShipToolPatch).GetMethod(nameof(MyInventoryAddItemsPatch),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
+            var MethodAddItemsInternal = typeof(MyInventory).GetMethods(
+                BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly).Where(info => info.Name.Equals("AddItemsInternal")).ToList()[0];
+            
+            ctx.GetPattern(MethodAddItemsInternal).Prefixes.Add(
+                typeof(ShipToolPatch).GetMethod(nameof(MyInventoryMethodAddItemsInternalPatch),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+                
             var MethodActivateCommon = typeof(MyShipToolBase).GetMethod(
                 "ActivateCommon", BindingFlags.Instance | BindingFlags.NonPublic);
-
+            
             ctx.GetPattern(MethodActivateCommon).Prefixes.Add(
                 typeof(ShipToolPatch).GetMethod(nameof(ActivateCommonPatch),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
@@ -420,21 +440,146 @@ namespace SentisOptimisationsPlugin.ShipTool
             ReflectionUtils.SetInstanceField(typeof(MyShipToolBase), __instance, "m_detectorSphere", bs);
         }
 
-        // private static void MyShipDrillInitPatch(MyShipDrill __instance)
-        // {
-        //     try
-        //     {
-        //         MyDrillBase drillBase =
-        //             (MyDrillBase) ReflectionUtils.GetInstanceField(typeof(MyShipDrill), __instance, "m_drillBase");
-        //         var myDrillCutOut = new MyDrillCutOut(((MyShipDrillDefinition) __instance.BlockDefinition).CutOutOffset,
-        //             ((MyShipDrillDefinition) __instance.BlockDefinition).CutOutRadius *
-        //             SentisOptimisationsPlugin.Config.ShipDrillRadiusMultiplier);
-        //         ReflectionUtils.SetInstanceField(typeof(MyDrillBase), drillBase, "m_cutOut", myDrillCutOut);
-        //     }
-        //     catch (Exception e)
-        //     {
-        //         Log.Error("Exception in during MyShipDrillInitPatch", e);
-        //     }
-        // }
+        private static void MyShipDrillInitPatch(MyShipDrill __instance)
+        {
+            try
+            {
+                MyInventoryBase inventoryBase = __instance.Components.Get<MyInventoryBase>();
+                ((MyInventory) inventoryBase).FixInventoryVolume(500000);
+                Log.Warn("DrillInit Set Inventory");
+            }
+            catch (Exception e)
+            {
+                Log.Error("Exception in during MyShipDrillInitPatch", e);
+            }
+        }
+        
+        private static bool MyInventoryAddItemsPatch(MyInventory __instance, ref bool __result, MyFixedPoint amount,
+            MyObjectBuilder_Base objectBuilder,
+            uint? itemId,
+            int index = -1)
+        {
+            try
+            {
+                if (!(__instance.Entity is MyShipDrill))
+                {
+                    return true;
+                }
+                
+                if (amount == (MyFixedPoint) 0)
+                    __result = false;
+                MyObjectBuilder_PhysicalObject objectBuilder1 = objectBuilder as MyObjectBuilder_PhysicalObject;
+                MyDefinitionId id = objectBuilder.GetId();
+                if (MyFakes.ENABLE_COMPONENT_BLOCKS)
+                {
+                    if (objectBuilder1 == null)
+                    {
+                        objectBuilder1 = (MyObjectBuilder_PhysicalObject) new MyObjectBuilder_BlockItem();
+                        (objectBuilder1 as MyObjectBuilder_BlockItem).BlockDefId = (SerializableDefinitionId) id;
+                    }
+                    else
+                    {
+                        MyCubeBlockDefinition componentBlockDefinition = MyDefinitionManager.Static.TryGetComponentBlockDefinition(id);
+                        if (componentBlockDefinition != null)
+                        {
+                            objectBuilder1 = (MyObjectBuilder_PhysicalObject) new MyObjectBuilder_BlockItem();
+                            (objectBuilder1 as MyObjectBuilder_BlockItem).BlockDefId = (SerializableDefinitionId) componentBlockDefinition.Id;
+                        }
+                    }
+                }
+                if (objectBuilder1 == null || __instance.ComputeAmountThatFits(objectBuilder1.GetObjectId(), 0.0f, 0.0f) < amount)
+                    __result =  false;
+                if (Sandbox.Game.Multiplayer.Sync.IsServer)
+                {
+                    if (__instance.IsConstrained)
+                        __instance.easyCallMethod("AffectAddBySurvival", new Object[]{amount, objectBuilder1});
+                    if (amount == (MyFixedPoint) 0)
+                        __result =  false;
+                    __instance.easyCallMethod("AddItemsInternal", new Object[]{amount, objectBuilder1, itemId, index});
+                }
+                __result =  true;
+            }
+            catch (Exception e)
+            {
+                Log.Error("Exception in during MyShipDrillShootPatch", e);
+            }
+
+            return false;
+        }
+        
+        private static bool MyInventoryMethodAddItemsInternalPatch(MyInventory __instance, MyFixedPoint amount,
+            MyObjectBuilder_PhysicalObject objectBuilder,
+            uint? itemId = null,
+            int index = -1)
+        {
+            try
+            {
+                if (!(__instance.Entity is MyShipDrill))
+                {
+                    return true;
+                }
+                
+                __instance.OnBeforeContentsChanged();
+                MyFixedPoint maxValue = MyFixedPoint.MaxValue;
+                MyInventoryItemAdapter inventoryItemAdapter = MyInventoryItemAdapter.Static;
+                inventoryItemAdapter.Adapt(objectBuilder.GetObjectId());
+                MyFixedPoint maxStack = inventoryItemAdapter.MaxStackAmount;
+                if (!objectBuilder.CanStack(objectBuilder))
+                    maxStack = (MyFixedPoint) 1;
+                if (MyFakes.ENABLE_DURABILITY_COMPONENT)
+                    __instance.easyCallMethod("FixDurabilityForInventoryItem", new Object[]{objectBuilder});
+                bool flag = false;
+                if (index >= 0)
+                {
+                    if (index >= ((List<MyPhysicalInventoryItem>)__instance.easyGetField("m_items")).Count && index < __instance.MaxItemCount)
+                    {
+                        amount = (MyFixedPoint)__instance.easyCallMethod("AddItemsToNewStack", new Object[]{amount, maxStack, objectBuilder, itemId, index});
+                        flag = true;
+                    }
+                    else if (index < ((List<MyPhysicalInventoryItem>)__instance.easyGetField("m_items")).Count)
+                    {
+                        if (((List<MyPhysicalInventoryItem>)__instance.easyGetField("m_items"))[index].Content.CanStack(objectBuilder))
+                            amount = (MyFixedPoint) __instance.easyCallMethod("AddItemsToExistingStack", new Object[]{index, amount, maxStack});
+                        else if (((List<MyPhysicalInventoryItem>)__instance.easyGetField("m_items")).Count < __instance.MaxItemCount)
+                        {
+                            amount = (MyFixedPoint)__instance.easyCallMethod("AddItemsToNewStack", new Object[]{amount, maxStack, objectBuilder, itemId, index});
+                            flag = true;
+                        }
+                    }
+                }
+        
+                for (int index1 = 0; index1 < __instance.MaxItemCount; ++index1)
+                {
+                    if (index1 < ((List<MyPhysicalInventoryItem>)__instance.easyGetField("m_items")).Count)
+                    {
+                        MyPhysicalInventoryItem physicalInventoryItem = ((List<MyPhysicalInventoryItem>)__instance.easyGetField("m_items"))[index1];
+                        if (physicalInventoryItem.Content.CanStack(objectBuilder))
+                        {
+                            __instance.RaiseContentsAdded(physicalInventoryItem, amount);
+                            amount = (MyFixedPoint) __instance.easyCallMethod("AddItemsToExistingStack", new Object[]{index1, amount, maxStack});
+                            __instance.RaiseInventoryContentChanged(physicalInventoryItem, amount);
+                        }
+                    }
+                    else
+                    {
+                        amount = (MyFixedPoint)__instance.easyCallMethod("AddItemsToNewStack", new Object[]{amount, maxStack,
+                            flag ? (MyObjectBuilder_PhysicalObject) objectBuilder.Clone() : objectBuilder, itemId, index});
+                        flag = true;
+                    }
+        
+                    if (amount == (MyFixedPoint) 0)
+                        break;
+                }
+        
+                __instance.easyCallMethod("RefreshVolumeAndMass", new object[0]);
+                __instance.OnContentsChanged();
+            }
+            catch (Exception e)
+            {
+                Log.Error("Exception in during MyShipDrillShootPatch", e);
+            }
+
+            return false;
+        }
     }
 }
