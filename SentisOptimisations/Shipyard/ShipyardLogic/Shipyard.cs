@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -27,25 +28,25 @@ namespace SentisOptimisationsPlugin.ShipyardLogic
             var gridShipyardIdWithSelection = buyRequest.ShipyardId;
             MyProjectorBase projectorBase = (MyProjectorBase) MyEntities.GetEntityById(gridShipyardIdWithSelection);
             var steamSellerId = MySession.Static.Players.TryGetSteamId(projectorBase.BuiltBy);
-            var playerGaragePath = Path.Combine(SentisOptimisationsPlugin.Config.PathToGarage, steamSellerId.ToString());
-            var gridName = GetFromConfig(gridShipyardIdWithSelection);
-            if (gridName == null)
+            // var playerGaragePath = Path.Combine(SentisOptimisationsPlugin.Config.PathToGarage, steamSellerId.ToString());
+            var gridPath = GetFromConfig(gridShipyardIdWithSelection);
+            if (gridPath == null)
             {
                 SentisOptimisationsPlugin.Log.Error("gridShipyardIdWithSelection " + gridShipyardIdWithSelection + " gridName null");
                 return;
             }
 
             var buyRequestSteamId = buyRequest.SteamId;
-            string gridPath = Path.Combine(playerGaragePath, gridName);
+            // string gridPath = Path.Combine(playerGaragePath, gridName);
             var clientGaragePath = Path.Combine(SentisOptimisationsPlugin.Config.PathToGarage, buyRequestSteamId.ToString());
             if (!Directory.Exists(clientGaragePath))
             {
                 Directory.CreateDirectory(clientGaragePath);
             }
-            string gridNewPath = Path.Combine(clientGaragePath, "NEW_" + Path.GetFileName(gridName));
+            string gridNewPath = Path.Combine(clientGaragePath, "NEW_" + Path.GetFileName(gridPath));
             File.Move(gridPath, gridNewPath);
             var identityId = Sync.Players.TryGetIdentityId(buyRequestSteamId, 0);
-            Log.Info("Продаём структуру " + Path.GetFileName(gridName) + " за " + buyRequest.Price);
+            Log.Info("Продаём структуру " + Path.GetFileName(Path.GetFileNameWithoutExtension(gridPath)) + " за " + buyRequest.Price);
             MyBankingSystem.ChangeBalance(identityId, -buyRequest.Price);
             var sellerIdentityId = projectorBase.BuiltBy;
             Log.Info("Продавец " + sellerIdentityId + " ( " + steamSellerId + ")");
@@ -71,28 +72,38 @@ namespace SentisOptimisationsPlugin.ShipyardLogic
 
         private static void AddToConfig(string gridPath, long gridShipyardIdWithSelection)
         {
+            CleanConfig(gridPath, gridShipyardIdWithSelection);
             var configConfigShipsInMarket = SentisOptimisationsPlugin.Config.ConfigShipsInMarket;
+            ConfigShipInMarket shipInMarket = new ConfigShipInMarket();
+            shipInMarket.ShipName = gridPath;
+            shipInMarket.ShipyardId = gridShipyardIdWithSelection;
+            configConfigShipsInMarket.Add(shipInMarket);
+            ConfigUtils.Save(SentisOptimisationsPlugin.Instance, SentisOptimisationsPlugin.Config,
+                "SentisOptimisations.cfg");
+        }
+
+        private static void CleanConfig(string gridPath, long gridShipyardIdWithSelection)
+        {
+            ObservableCollection<ConfigShipInMarket> configConfigShipsInMarket =
+                SentisOptimisationsPlugin.Config.ConfigShipsInMarket;
             foreach (var configShipInMarket in configConfigShipsInMarket)
             {
                 if (configShipInMarket.ShipName.Equals(gridPath))
                 {
-                    configShipInMarket.ShipyardId = gridShipyardIdWithSelection;
+                    RemoveFromConfig(gridShipyardIdWithSelection);
+                    CleanConfig(gridPath, gridShipyardIdWithSelection);
                     return;
                 }
 
                 if (configShipInMarket.ShipyardId == gridShipyardIdWithSelection)
                 {
-                    configShipInMarket.ShipName = gridPath;
+                    RemoveFromConfig(gridShipyardIdWithSelection);
+                    CleanConfig(gridPath, gridShipyardIdWithSelection);
                     return;
                 }
             }
-            ConfigShipInMarket shipInMarket = new ConfigShipInMarket();
-            shipInMarket.ShipName = gridPath;
-            shipInMarket.ShipyardId = gridShipyardIdWithSelection;
-            configConfigShipsInMarket.Add(shipInMarket);
-            ConfigUtils.Save( SentisOptimisationsPlugin.Instance, SentisOptimisationsPlugin.Config, "SentisOptimisations.cfg");
         }
-        
+
         private static void RemoveFromConfig(long gridShipyardIdWithSelection)
         {
             var configConfigShipsInMarket = SentisOptimisationsPlugin.Config.ConfigShipsInMarket;
@@ -167,6 +178,20 @@ namespace SentisOptimisationsPlugin.ShipyardLogic
             var listRequestShipyardId = listRequest.ShipyardId;
             var listRequestSteamId = listRequest.SteamId;
             SendGridListToClient(listRequestSteamId, listRequestShipyardId);
+        }
+        
+        public static void OnCancelSell(byte[] data)
+        {
+            CancelSellRequest cancelSellRequest = MyAPIGateway.Utilities.SerializeFromBinary<CancelSellRequest>(data);
+            OnCancelSell(cancelSellRequest);
+        }
+        
+        public static void OnCancelSell(CancelSellRequest cancelSellRequest)
+        {
+            var gridShipyardIdWithSelection = cancelSellRequest.ShipyardId;
+            MyProjectorBase projectorBase = (MyProjectorBase) MyEntities.GetEntityById(gridShipyardIdWithSelection);
+            projectorBase.Enabled = false;
+            RemoveFromConfig(gridShipyardIdWithSelection);
         }
         
         public static void OnListRequestForGui(byte[] data)

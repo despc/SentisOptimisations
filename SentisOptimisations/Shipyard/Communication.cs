@@ -48,8 +48,8 @@ namespace SentisOptimisationsPlugin
           case MessageType.ListForGuiReq:
             Shipyard.OnListRequestForGui(data);
             break;
-          case MessageType.SetGridListResp:
-            //OnClearGridReq(data);
+          case MessageType.CancelSellReq:
+            Shipyard.OnCancelSell(data);
             break;
         }
       }

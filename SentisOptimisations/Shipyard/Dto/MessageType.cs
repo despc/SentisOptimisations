@@ -12,6 +12,7 @@ namespace SentisOptimisationsPlugin
     SetGridListResp,
     FixShip,
     ListForGuiReq,
-    ListForGuiResp
+    ListForGuiResp,
+    CancelSellReq
   }
 }

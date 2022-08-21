@@ -92,6 +92,7 @@
       <Compile Include="ShipTool\FuckWelderProcessor.cs" />
       <Compile Include="ShipTool\ShipToolPatch.cs" />
       <Compile Include="Shipyard\Communication.cs" />
+      <Compile Include="Shipyard\Dto\CancelSellRequest.cs" />
       <Compile Include="Shipyard\Dto\ClientBuyRequest.cs" />
       <Compile Include="Shipyard\Dto\FillListRequest.cs" />
       <Compile Include="Shipyard\Dto\FillListResponse.cs" />
