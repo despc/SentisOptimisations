@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using NAPI;
 using NLog;
+using Sandbox.Definitions;
 using Sandbox.Engine.Voxels;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Multiplayer;
@@ -157,20 +158,21 @@ namespace SentisOptimisationsPlugin
         
         [Command("spawnfield", ".", null)]
         [Permission(MyPromoteLevel.Moderator)]
-        public void SpawnField(int fieldSize, int count, int radius = 1000, bool clean = false)
+        public void SpawnField(int fieldSize, int count, string materials, int radius = 1000)
         {
             var player = Context.Player;
             if (player?.Character == null)
                 return;
             
-            Task.Run(() => { DoSpawnField(player?.Character, count, fieldSize, radius, clean); });
+            Task.Run(() => { DoSpawnField(player?.Character, count, fieldSize, materials, radius); });
         }
 
-        public void DoSpawnField(IMyCharacter playerCharacter, int count, int fieldSize, int radius, bool clean)
+        public void DoSpawnField(IMyCharacter playerCharacter, int count, int fieldSize, string materials, int radius)
         {
+            var materialsArray = materials.Split(',');
+            
             for (int i = 0; i < count; i++)
             {
-                
                 var _random = new Random();
                 var seed = _random.Next(100, 10000000);
                 string storageName = MakeStorageName("FieldAster-" + (object) seed + "r" + (object) radius);
@@ -180,21 +182,23 @@ namespace SentisOptimisationsPlugin
                 var randomToUniformPointInSphere = boundingSphere.RandomToUniformPointInSphere(_random.NextDouble(),
                     _random.NextDouble(), _random.NextDouble());
                 Thread.Sleep(100);
-                
-            
-            
-            MyAPIGateway.Utilities.InvokeOnGameThread(() =>
-            {
-                try
-                {
-                    var asteroidEntityId = GetAsteroidEntityId(storageName);
-                    var myCompositeShapeProvider = CreateAsteroidShape(seed, radius,
-                        new Random().Next(0,9999999));
-                    
-                    MyStorageBase storage = (MyStorageBase) new MyOctreeStorage((IMyStorageDataProvider) myCompositeShapeProvider,
-                        GetAsteroidVoxelSize((double) radius));
 
-                    
+
+                var asteroidEntityId = GetAsteroidEntityId(storageName);
+                var myCompositeShapeProvider = CreateAsteroidShape(seed, radius,
+                    new Random().Next(0, 9999999));
+
+                MyStorageBase storage1 = (MyStorageBase) new MyOctreeStorage(
+                    (IMyStorageDataProvider) myCompositeShapeProvider,
+                    GetAsteroidVoxelSize((double) radius));
+
+                ReplaceMaterial(materialsArray, storage1);
+
+                MyAPIGateway.Utilities.InvokeOnGameThread(() =>
+                {
+                    try
+                    {
+                    var storage = storage1;
                     var voxelMap = MyWorldGenerator.AddVoxelMap(storageName, storage, randomToUniformPointInSphere, asteroidEntityId);
                     if (voxelMap != null)
                     {
@@ -256,9 +260,50 @@ namespace SentisOptimisationsPlugin
             var CreateAsteroidShapeMethod = MyCompositeShapeProvider.GetMethod
                 ("CreateAsteroidShape", BindingFlags.Static | BindingFlags.Public | BindingFlags.DeclaredOnly);
             var myCompositeShapeProvider = CreateAsteroidShapeMethod.Invoke(null,new object[]{seed, size, generatorSeed, generator});
-
             return (IMyStorageDataProvider) myCompositeShapeProvider;
         }
+        
+        
+        public void ReplaceMaterial(string[] allowedMaterials, IMyStorage m_storage)
+        {
+            var allowedMaterialsIndexes = allowedMaterials.ToList()
+                .ConvertAll(input => MyDefinitionManager.Static.GetVoxelMaterialDefinition(input).Index);
+            var stoneMaterialsIndexes = new string[] {"Stone_01", "Stone_02", "Stone_03", "Stone_04", "Stone_05"}
+                .ToList().ConvertAll(input => MyDefinitionManager.Static.GetVoxelMaterialDefinition(input).Index);
+            Vector3I block;
+            var cacheSize = Vector3I.Min(new Vector3I(64), m_storage.Size);
+
+            // read the asteroid in chunks of 64 to avoid the Arithmetic overflow issue.
+            for (block.Z = 0; block.Z < m_storage.Size.Z; block.Z += 64)
+            for (block.Y = 0; block.Y < m_storage.Size.Y; block.Y += 64)
+            for (block.X = 0; block.X < m_storage.Size.X; block.X += 64)
+            {
+                var cache = new MyStorageData();
+                cache.Resize(cacheSize);
+                // LOD1 is not detailed enough for content information on asteroids.
+                Vector3I maxRange = block + cacheSize - 1;
+                m_storage.ReadRange(cache, MyStorageDataTypeFlags.Material, 0, block, maxRange);
+
+                bool changed = false;
+                Vector3I p;
+                for (p.Z = 0; p.Z < cacheSize.Z; ++p.Z)
+                for (p.Y = 0; p.Y < cacheSize.Y; ++p.Y)
+                for (p.X = 0; p.X < cacheSize.X; ++p.X)
+                {
+                    if (stoneMaterialsIndexes.Contains(cache.Material(ref p))){
+                       continue;
+                    }
+                    if (!allowedMaterialsIndexes.Contains(cache.Material(ref p))){
+                        cache.Material(ref p, allowedMaterialsIndexes[new Random().Next(0, allowedMaterialsIndexes.Count-1)]);
+                        changed = true;
+                    }
+                }
+
+                if (changed)
+                    m_storage.WriteRange(cache, MyStorageDataTypeFlags.Material, block, maxRange);
+            }
+        }
+        
         public static MyStorageBase CreateProceduralAsteroidStorage(int seed, float radius)
         {
             Assembly ass = typeof(MyStorageBase).Assembly;
