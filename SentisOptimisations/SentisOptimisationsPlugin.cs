@@ -22,7 +22,6 @@ using SentisOptimisations;
 using SentisOptimisationsPlugin.AnomalyZone;
 using SentisOptimisationsPlugin.ShipTool;
 using SOPlugin.GUI;
-using SpaceEngineers.Game.Entities.Blocks;
 using Torch;
 using Torch.API;
 using Torch.API.Managers;
@@ -38,6 +37,7 @@ using VRage.Game.Voxels;
 using VRage.Network;
 using VRage.ObjectBuilders;
 using VRageMath;
+using VRageMath.Spatial;
 
 namespace SentisOptimisationsPlugin
 {
@@ -71,6 +71,12 @@ namespace SentisOptimisationsPlugin
                 return;
             SessionManager.SessionStateChanged += SessionManager_SessionStateChanged;
             ParceDonations();
+            MyClusterTree.IdealClusterSize = new Vector3(10000f);
+            MyClusterTree.IdealClusterSizeHalfSqr =
+                MyClusterTree.IdealClusterSize * MyClusterTree.IdealClusterSize / 4f;
+            MyClusterTree.MinimumDistanceFromBorder = MyClusterTree.IdealClusterSize / 100f;
+            MyClusterTree.MaximumForSplit = MyClusterTree.IdealClusterSize * 2f;
+            MyClusterTree.MaximumClusterSize = 15000f;
         }
 
         private void ParceDonations()

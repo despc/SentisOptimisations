@@ -128,39 +128,39 @@
         <HintPath>C:\torch-server\DedicatedServer64\HavokWrapper.dll</HintPath>
       </Reference>
       <Reference Include="Microsoft.CodeAnalysis, Version=2.9.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35">
-        <HintPath>..\..\..\..\..\torch-server\DedicatedServer64\Microsoft.CodeAnalysis.dll</HintPath>
+        <HintPath>C:\torch-server\DedicatedServer64\Microsoft.CodeAnalysis.dll</HintPath>
       </Reference>
       <Reference Include="Microsoft.CodeAnalysis.CSharp, Version=2.9.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35">
-        <HintPath>..\..\..\..\..\torch-server\DedicatedServer64\Microsoft.CodeAnalysis.CSharp.dll</HintPath>
+        <HintPath>C:\torch-server\DedicatedServer64\Microsoft.CodeAnalysis.CSharp.dll</HintPath>
       </Reference>
       <Reference Include="NLog, Version=4.0.0.0, Culture=neutral, PublicKeyToken=5120e14c03d0593c">
-        <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\NLog.dll</HintPath>
+        <HintPath>C:\torch-server\DedicatedServer64\NLog.dll</HintPath>
       </Reference>
       <Reference Include="PresentationCore" />
       <Reference Include="PresentationFramework" />
       <Reference Include="Profiler">
-        <HintPath>..\..\..\..\..\torch-server\Plugins\Profiler\Profiler.dll</HintPath>
+        <HintPath>C:\torch-server\Plugins\Profiler\Profiler.dll</HintPath>
       </Reference>
       <Reference Include="ProtoBuf.Net, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\ProtoBuf.Net.dll</HintPath>
+        <HintPath>C:\torch-server\DedicatedServer64\ProtoBuf.Net.dll</HintPath>
       </Reference>
       <Reference Include="ProtoBuf.Net.Core, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\ProtoBuf.Net.Core.dll</HintPath>
+        <HintPath>C:\torch-server\DedicatedServer64\ProtoBuf.Net.Core.dll</HintPath>
       </Reference>
       <Reference Include="Sandbox.Common, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\Sandbox.Common.dll</HintPath>
+        <HintPath>C:\torch-server\DedicatedServer64\Sandbox.Common.dll</HintPath>
       </Reference>
       <Reference Include="Sandbox.Game, Version=0.1.1.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\Sandbox.Game.dll</HintPath>
+        <HintPath>C:\torch-server\DedicatedServer64\Sandbox.Game.dll</HintPath>
       </Reference>
       <Reference Include="Sandbox.RenderDirect, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\Sandbox.RenderDirect.dll</HintPath>
+        <HintPath>C:\torch-server\DedicatedServer64\Sandbox.RenderDirect.dll</HintPath>
       </Reference>
       <Reference Include="SpaceEngineers.Game, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\SpaceEngineers.Game.dll</HintPath>
+        <HintPath>C:\torch-server\DedicatedServer64\SpaceEngineers.Game.dll</HintPath>
       </Reference>
       <Reference Include="SpaceEngineers.ObjectBuilders, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\SpaceEngineers.ObjectBuilders.dll</HintPath>
+        <HintPath>C:\torch-server\DedicatedServer64\SpaceEngineers.ObjectBuilders.dll</HintPath>
       </Reference>
       <Reference Include="System" />
       <Reference Include="System.Collections.Immutable, Version=1.2.3.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
@@ -176,37 +176,37 @@
       <Reference Include="System.Xml" />
       <Reference Include="System.Xml.Linq" />
       <Reference Include="Torch">
-        <HintPath>..\..\..\..\..\torch-server\Torch.dll</HintPath>
+        <HintPath>C:\torch-server\Torch.dll</HintPath>
       </Reference>
       <Reference Include="Torch.API">
-        <HintPath>..\..\..\..\..\torch-server\Torch.API.dll</HintPath>
+        <HintPath>C:\torch-server\Torch.API.dll</HintPath>
       </Reference>
       <Reference Include="TorchMonitor">
-        <HintPath>..\..\..\..\..\torch-server\Plugins\Torch Monitor\TorchMonitor.dll</HintPath>
+        <HintPath>C:\torch-server\Plugins\Torch Monitor\TorchMonitor.dll</HintPath>
       </Reference>
       <Reference Include="VRage, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\VRage.dll</HintPath>
+        <HintPath>C:\torch-server\DedicatedServer64\VRage.dll</HintPath>
       </Reference>
       <Reference Include="VRage.Game, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\VRage.Game.dll</HintPath>
+        <HintPath>C:\torch-server\DedicatedServer64\VRage.Game.dll</HintPath>
       </Reference>
       <Reference Include="VRage.Library, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\VRage.Library.dll</HintPath>
+        <HintPath>C:\torch-server\DedicatedServer64\VRage.Library.dll</HintPath>
       </Reference>
       <Reference Include="VRage.Math">
-        <HintPath>..\..\..\..\..\torch-server\DedicatedServer64\VRage.Math.dll</HintPath>
+        <HintPath>C:\torch-server\DedicatedServer64\VRage.Math.dll</HintPath>
       </Reference>
       <Reference Include="VRage.Network">
-        <HintPath>..\..\..\..\..\torch-server\DedicatedServer64\VRage.Network.dll</HintPath>
+        <HintPath>C:\torch-server\DedicatedServer64\VRage.Network.dll</HintPath>
       </Reference>
       <Reference Include="VRage.Platform.Windows">
-        <HintPath>..\..\..\..\..\torch-server\DedicatedServer64\VRage.Platform.Windows.dll</HintPath>
+        <HintPath>C:\torch-server\DedicatedServer64\VRage.Platform.Windows.dll</HintPath>
       </Reference>
       <Reference Include="VRage.RemoteClient.Core">
-        <HintPath>..\..\..\..\..\torch-server\DedicatedServer64\VRage.RemoteClient.Core.dll</HintPath>
+        <HintPath>C:\torch-server\DedicatedServer64\VRage.RemoteClient.Core.dll</HintPath>
       </Reference>
       <Reference Include="VRage.Scripting, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\VRage.Scripting.dll</HintPath>
+        <HintPath>C:\torch-server\DedicatedServer64\VRage.Scripting.dll</HintPath>
       </Reference>
       <Reference Include="WindowsBase" />
     </ItemGroup>
