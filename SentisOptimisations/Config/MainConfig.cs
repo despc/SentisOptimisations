@@ -10,7 +10,6 @@ namespace SentisOptimisationsPlugin
         
         public MainConfig()
         {
-            ConfigAnomalyZone.CollectionChanged += (sender, args) => OnPropertyChanged();
             ConfigShipsInMarket.CollectionChanged += (sender, args) => OnPropertyChanged();
         }
         private double _contractEscortMultiplier = 10;
@@ -22,32 +21,21 @@ namespace SentisOptimisationsPlugin
         private bool _enableCheckBeacon = true;
         private bool _enableOnlyEarthSpawn = true;
         private int _maxStaticGridPCU = 200000;
-        private int _azMessageTime = 960;
         private int _maxDinamycGridPCU = 30000;
         private int _accelerationToDamage = 1000;
         private int _noDamageFromVoxelsBeforeSpeed = 30;
-        private int _oldGridProcessorDays = 10;
-        private bool _allowProjection = true;
-        private bool _azPointsForOnlineEnemies = false;
         private bool _allowMerge = false;
         private bool _includeConnectedGrids = false;
         private bool _adaptiveblockslowdown = false;
         private bool _gasTankOptimisation = true;
         private bool _removeEntityPhantomPatch = false;
+        private bool _disableNoOwner = false;
         private String _pathToAsters = "C:\\Asteroids";
         private String _pathToGarage = "D:\\torch-server\\GARAGE";
-        private long _azOwner = 144115188075855912;
-        private String _azReward = "PhysicalObject_SpaceCredit=120000;Component_ZoneChip=1";
         private String _planetsWithEco = "Earth,Moon";
         private float _explosivesDamage = 10;
-        private String _azWinners = "";
         private String _donations = "";
-        private int _azPointsRemovedOnDeath = 1;
-        private int _azPointsAddOnCaptured = 1;
         private int _contactCountAlert = 150;
-        private int _azProgressWhenComplete = 300;
-        private int _azMinLargeGridBlockCount = 300;
-        private int _azMinSmallGridBlockCount = 300;
         private int _adaptiveBlockSlowdownThreshold = 150;
         private float _shipSuperWelderRadius = 150;
         
@@ -83,18 +71,26 @@ namespace SentisOptimisationsPlugin
         private int _weldersOverheatThreshold = 1000000;
         private int _weldersMessageTime = 325;
         
-        private bool _welderTweaksEnabled = false;
-        private bool _welderNoLimitsCheck = false;
-        private bool _welderWeldProjectionsNextFrame = true;
-        private bool _welderWeldNextFrames = true;
+        private bool _welderTweaksEnabled = true;
+        private bool _welderNoLimitsCheck = true;
+        private bool _welderWeldProjectionsNextFrame = false;
+        private bool _welderWeldNextFrames = false;
         private bool _welderCanWeldProjectionsIfWeldedOtherBlocks = false;
-        private bool _welderSelfWelding = false;
+        private bool _welderSelfWelding = true;
         private bool _welderExcludeNanobot = true;
         private bool _welderFasterSearch = true;
-        private bool _asyncWeld = false;
+        private bool _asyncWeld = true;
         private bool _welderSkipCreativeWelding = true;
         
         private bool _asyncExplosion = true;
+        
+        //Physics
+        private float _idealClusterSize = 10000;
+        private float _maximumClusterSize = 15000;
+        
+        //Arrakis
+        private String _engineSubtypeKey = "";
+        private float _engineMultiplier = 5;
         
         private ObservableCollection<ConfigShipInMarket> configShipsInMarket = new ObservableCollection<ConfigShipInMarket>();
 
@@ -112,21 +108,17 @@ namespace SentisOptimisationsPlugin
             }
         }
         
-        private ObservableCollection<ConfigAnomalyZone> configAnomalyZone = new ObservableCollection<ConfigAnomalyZone>();
-
-        public ObservableCollection<ConfigAnomalyZone> ConfigAnomalyZone
-
-        {
-            get { return configAnomalyZone; }
-            set
-            {
-                configShipsInMarket.Clear();
-                foreach (ConfigAnomalyZone shipInMarket in value)
-                {
-                    configAnomalyZone.Add(shipInMarket);
-                }
-            }
-        }
+        [DisplayTab(Name = "Engine Subtype Key", GroupName = "Arrakis", Tab = "Arrakis", Order = 0, Description = "Engine Subtype Key")]
+        public String EngineSubtypeKey { get => _engineSubtypeKey; set => SetValue(ref _engineSubtypeKey, value); }
+        
+        [DisplayTab(Name = "Engine Multiplier", GroupName = "Arrakis", Tab = "Arrakis", Order = 0, Description = "Engine Multiplier")]
+        public float EngineMultiplier { get => _engineMultiplier; set => SetValue(ref _engineMultiplier, value); }
+        
+        [DisplayTab(Name = "Ideal Cluster Size", GroupName = "Physics", Tab = "Physics", Order = 0, Description = "Ideal Cluster Size")]
+        public float IdealClusterSize { get => _idealClusterSize; set => SetValue(ref _idealClusterSize, value); }
+        
+        [DisplayTab(Name = "Maximum Cluster Size", GroupName = "Physics", Tab = "Physics", Order = 0, Description = "Maximum Cluster Size")]
+        public float MaximumClusterSize { get => _maximumClusterSize; set => SetValue(ref _maximumClusterSize, value); }
         
         
         [DisplayTab(Name = "Donations list", GroupName = "Donations", Tab = "Donations", Order = 0, Description = "Donations list")]
@@ -260,67 +252,7 @@ namespace SentisOptimisationsPlugin
             get => _maxStaticGridPCU;
             set => SetValue(ref _maxStaticGridPCU, value);
         }
-        
-        [DisplayTab(Name = "Anomaly Zone Message Time", GroupName = "Anomaly Zone", Tab = "Anomaly Zone", Order = 0, Description = "Anomaly Zone Message Time")]
-        public int AzMessageTime
-        {
-            get => _azMessageTime;
-            set => SetValue(ref _azMessageTime, value);
-        }
-        
-        [DisplayTab(Name = "Anomaly Zone week winners", GroupName = "Anomaly Zone", Tab = "Anomaly Zone", Order = 0, Description = "Anomaly Zone week winners")]
-        public String AzWinners { get => _azWinners; set => SetValue(ref _azWinners, value); }
-        
-        [DisplayTab(Name = "Zone owner", GroupName = "Anomaly Zone", Tab = "Anomaly Zone", Order = 0, Description = "Anomaly Zone owner")]
-        public long AzOwner
-        {
-            get => _azOwner;
-            set => SetValue(ref _azOwner, value);
-        }
-        
-        [DisplayTab(Name = "Zone reward", GroupName = "Anomaly Zone", Tab = "Anomaly Zone", Order = 0, Description = "Zone reward")]
-        public string AzReward
-        {
-            get => _azReward;
-            set => SetValue(ref _azReward, value);
-        }
-        
-        [DisplayTab(Name = "Progress when complete", GroupName = "Anomaly Zone", Tab = "Anomaly Zone", Order = 0, Description = "Progress when complete")]
-        public int AzProgressWhenComplete
-        {
-            get => _azProgressWhenComplete;
-            set => SetValue(ref _azProgressWhenComplete, value);
-        }
-                
-        [DisplayTab(Name = "Min large grid block count", GroupName = "Anomaly Zone", Tab = "Anomaly Zone", Order = 0, Description = "Min large grid block count")]
-        public int AzMinLargeGridBlockCount
-        {
-            get => _azMinLargeGridBlockCount;
-            set => SetValue(ref _azMinLargeGridBlockCount, value);
-        }
-        
-        [DisplayTab(Name = "Min small grid block count", GroupName = "Anomaly Zone", Tab = "Anomaly Zone", Order = 0, Description = "Min small grid block count")]
-        public int AzMinSmallGridBlockCount
-        {
-            get => _azMinSmallGridBlockCount;
-            set => SetValue(ref _azMinSmallGridBlockCount, value);
-        }
-        
-        [DisplayTab(Name = "Points removed on death", GroupName = "Anomaly Zone", Tab = "Anomaly Zone", Order = 0, Description = "Points removed on death")]
-        public int AzPointsRemovedOnDeath
-        {
-            get => _azPointsRemovedOnDeath;
-            set => SetValue(ref _azPointsRemovedOnDeath, value);
-        }
-        
-        [DisplayTab(Name = "Points reward", GroupName = "Anomaly Zone", Tab = "Anomaly Zone", Order = 0, Description = "Points reward")]
-        public int AzPointsAddOnCaptured
-        {
-            get => _azPointsAddOnCaptured;
-            set => SetValue(ref _azPointsAddOnCaptured, value);
-        }
-        
-        
+
         [DisplayTab(Name = "Max dynamic grid PCU", GroupName = "PCU limiter", Tab = "PCU limiter", Order = 0, Description = "Max dynamic grid PCU")]
         public int MaxDinamycGridPCU
         {
@@ -406,13 +338,6 @@ namespace SentisOptimisationsPlugin
             set => SetValue(ref _shipSuperWelderRadius, value);
         }
 
-        [DisplayTab(Name = "Points by online enemies", GroupName = "Anomaly Zone", Tab = "Anomaly Zone", Order = 0, Description = "Points by online enemies")]
-        public bool AzPointsForOnlineEnemies
-        {
-            get => _azPointsForOnlineEnemies;
-            set => SetValue(ref _azPointsForOnlineEnemies, value);
-        }
-
         public bool AllowMerge
         {
             get => _allowMerge;
@@ -431,6 +356,13 @@ namespace SentisOptimisationsPlugin
         {
             get => _removeEntityPhantomPatch;
             set => SetValue(ref _removeEntityPhantomPatch, value);
+        }
+        
+        [DisplayTab(Name = "Disable no owner", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Disable no owner")]
+        public bool DisableNoOwner  
+        {
+            get => _disableNoOwner;
+            set => SetValue(ref _disableNoOwner, value);
         }
         
         [DisplayTab(Name = "Fix freeze by voxel streaming", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Fix freeze by voxel streaming")]
@@ -504,7 +436,7 @@ namespace SentisOptimisationsPlugin
         public bool WelderTweaksFasterSearch { get => _welderFasterSearch; set => SetValue(ref _welderFasterSearch, value); }
 
         [DisplayTab(Name = "Skip creative welding", GroupName = "Welder Tweaks (WIP)", Tab = "Welder Optimizations", Order = 8, Description = "Skip creative welding")]
-        public bool WelderSkipCreativeWelding { get => _welderFasterSearch; set => SetValue(ref _welderFasterSearch, value); }
+        public bool WelderSkipCreativeWelding { get => _welderSkipCreativeWelding; set => SetValue(ref _welderSkipCreativeWelding, value); }
         
         [DisplayTab(Name = "Async weld", GroupName = "Welder Tweaks (WIP)", Tab = "Welder Optimizations", Order = 8, Description = "Async weld")]
         public bool AsyncWeld { get => _asyncWeld; set => SetValue(ref _asyncWeld, value); }

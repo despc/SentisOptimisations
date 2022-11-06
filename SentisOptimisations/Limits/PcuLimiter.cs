@@ -51,17 +51,21 @@ namespace SentisOptimisationsPlugin
                     {
                         Log.Error("CheckLoop Error", e);
                     }
+
+                    if (SentisOptimisationsPlugin.Config.DisableNoOwner)
+                    {
+                        try
+                        {
+                            await Task.Delay(15000);
+                            var myCubeGrids = MyEntities.GetEntities().OfType<MyCubeGrid>();
+                            await Task.Run(() => { CheckNobodyOwner(myCubeGrids); });
+                        }
+                        catch (Exception e)
+                        {
+                            Log.Error("Nobody check", e);
+                        }
+                    }
                     
-                    try
-                    {
-                        await Task.Delay(15000);
-                        var myCubeGrids = MyEntities.GetEntities().OfType<MyCubeGrid>();
-                        await Task.Run(() => { CheckNobodyOwner(myCubeGrids); });
-                    }
-                    catch (Exception e)
-                    {
-                        Log.Error("Nobody check", e);
-                    }
                     
                     await PhysicsProfilerMonitor.__instance.Profile();
                 }

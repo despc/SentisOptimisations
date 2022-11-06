@@ -7,7 +7,6 @@ using ParallelTasks;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Cube;
 using Sandbox.ModAPI;
-using SentisOptimisationsPlugin.AnomalyZone;
 using SentisOptimisationsPlugin.ShipTool;
 using SpaceEngineers.Game.Entities.Blocks;
 using Torch.Managers.PatchManager;
@@ -71,7 +70,6 @@ namespace SentisOptimisationsPlugin
             }
 
             AccumulateDamageHeat(damage, damagedGrid);
-            if (ProtectAZGrids(ref damage, damagedGrid)) return;
             if (damage.Type != MyDamageType.Deformation)
             {
                 return;
@@ -92,19 +90,7 @@ namespace SentisOptimisationsPlugin
                 damage.Amount = damage.Amount / 5;
             }
         }
-        
-        private static bool ProtectAZGrids(ref MyDamageInformation damage, IMyCubeGrid damagedGrid)
-        {
-            if (AZCore.ImmortalGrids.Contains(damagedGrid.EntityId))
-            {
-                damage.Amount = 0;
-                damage.IsDeformation = false;
-                return true;
-            }
-            
-            return false;
-        }
-        
+
         private static void AccumulateDamageHeat(MyDamageInformation damage, IMyCubeGrid damagedGrid)
         {
             var gridDamageAccumulator = FuckWelderProcessor.WelderDamageAccumulator;

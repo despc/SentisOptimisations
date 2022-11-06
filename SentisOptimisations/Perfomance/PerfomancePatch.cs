@@ -1,10 +1,13 @@
 ﻿using System;
 using System.Reflection;
+using Havok;
 using NLog;
 using Sandbox;
+using Sandbox.Engine.Physics;
 using Sandbox.Game.Entities.Blocks;
 using Sandbox.Game.Entities.Cube;
 using Sandbox.Game.Weapons;
+using SentisOptimisations;
 using SpaceEngineers.Game.Weapons.Guns;
 using Torch.Managers.PatchManager;
 
@@ -18,6 +21,13 @@ namespace SentisOptimisationsPlugin
 
         public static void Patch(PatchContext ctx)
         {
+            var MethodLoadData = typeof(MyPhysics).GetMethod
+                ("LoadData", BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
+
+            ctx.GetPattern(MethodLoadData).Suffixes.Add(
+                typeof(PerfomancePatch).GetMethod(nameof(MethodLoadDataPatched),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
             var MethodUpdateAfterSimulation10 = typeof(MyFunctionalBlock).GetMethod
                 ("UpdateAfterSimulation10", BindingFlags.Instance | BindingFlags.Public);
 
@@ -38,6 +48,15 @@ namespace SentisOptimisationsPlugin
         private static bool MethodUpdateAfterSimulation10Patched(MyFunctionalBlock __instance)
         {
             return DoAdaptiveSlowdown(__instance);
+        }
+        
+        private static void MethodLoadDataPatched(MyPhysics __instance)
+        {
+            var processorCount = Environment.ProcessorCount;
+
+            var threadCount = (int)(processorCount * 0.8);
+            ReflectionUtils.SetPrivateStaticField(typeof(MyPhysics), "m_threadPool", new HkJobThreadPool(threadCount));
+            ReflectionUtils.SetPrivateStaticField(typeof(MyPhysics), "m_jobQueue", new HkJobQueue(threadCount + 1));
         }
 
         private static bool MethodUpdateAfterSimulation100Patched(MyFunctionalBlock __instance)

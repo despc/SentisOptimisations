@@ -9,10 +9,10 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Windows.Documents;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Cube;
 using Sandbox.ModAPI;
+using SentisOptimisationsPlugin;
 using VRage.Game.Entity;
 using VRage.Game.ModAPI;
 using VRage.Groups;
@@ -30,8 +30,29 @@ namespace SentisOptimisations
             {
                 List<IMySlimBlock> blocks = new List<IMySlimBlock>();
                 grid.GetBlocks(blocks);
+                bool hasActiveEngine = false;
                 foreach (IMySlimBlock mySlimBlock in blocks)
+                {
                     num += BlockUtils.GetPCU(mySlimBlock as MySlimBlock);
+                    if (mySlimBlock.BlockDefinition.Id.SubtypeName.Contains(SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.EngineSubtypeKey))
+                    {
+                        var myUpgradeModule = ((IMyUpgradeModule)mySlimBlock.FatBlock);
+                        if (myUpgradeModule.IsFunctional && myUpgradeModule.Enabled)
+                        {
+                            hasActiveEngine = true;
+                        }
+                    }
+                }
+
+                if (hasActiveEngine)
+                {
+                    WheelPatch.gridsWithEngine.Add(grid.EntityId);
+                }
+                else
+                {
+                    WheelPatch.gridsWithEngine.Remove(grid.EntityId);
+                }
+                
                 if (includeSubGrids)
                 {
                     List<IMyCubeGrid> subGrids = GetSubGrids(grid, includeConnectorDocked);

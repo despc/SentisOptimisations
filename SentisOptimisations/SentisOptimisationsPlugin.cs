@@ -6,10 +6,12 @@ using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using System.Windows.Controls;
+using Havok;
 using NAPI;
 using NLog;
 using Sandbox;
 using Sandbox.Engine.Multiplayer;
+using Sandbox.Engine.Physics;
 using Sandbox.Engine.Utils;
 using Sandbox.Engine.Voxels;
 using Sandbox.Game;
@@ -19,7 +21,6 @@ using Sandbox.Game.GameSystems;
 using Sandbox.Game.World;
 using Sandbox.ModAPI;
 using SentisOptimisations;
-using SentisOptimisationsPlugin.AnomalyZone;
 using SentisOptimisationsPlugin.ShipTool;
 using SOPlugin.GUI;
 using Torch;
@@ -31,6 +32,7 @@ using Torch.Commands;
 using Torch.Commands.Permissions;
 using Torch.Managers;
 using Torch.Session;
+using VRage.Collections;
 using VRage.Game;
 using VRage.Game.ModAPI;
 using VRage.Game.Voxels;
@@ -46,7 +48,6 @@ namespace SentisOptimisationsPlugin
         private static Guid NexusGUID = new Guid("28a12184-0422-43ba-a6e6-2e228611cca5");
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
         public static PcuLimiter _limiter = new PcuLimiter();
-        public static AZCore AzCore = new AZCore();
         public static Dictionary<long,long> stuckGrids = new Dictionary<long, long>();
         public static Dictionary<long,long> gridsInSZ = new Dictionary<long, long>();
         private static TorchSessionManager SessionManager;
@@ -71,12 +72,12 @@ namespace SentisOptimisationsPlugin
                 return;
             SessionManager.SessionStateChanged += SessionManager_SessionStateChanged;
             ParceDonations();
-            MyClusterTree.IdealClusterSize = new Vector3(10000f);
+            MyClusterTree.IdealClusterSize = new Vector3(Config.IdealClusterSize);
             MyClusterTree.IdealClusterSizeHalfSqr =
                 MyClusterTree.IdealClusterSize * MyClusterTree.IdealClusterSize / 4f;
             MyClusterTree.MinimumDistanceFromBorder = MyClusterTree.IdealClusterSize / 100f;
             MyClusterTree.MaximumForSplit = MyClusterTree.IdealClusterSize * 2f;
-            MyClusterTree.MaximumClusterSize = 15000f;
+            MyClusterTree.MaximumClusterSize = Config.MaximumClusterSize;
         }
 
         private void ParceDonations()
@@ -117,14 +118,12 @@ namespace SentisOptimisationsPlugin
             if (newState == TorchSessionState.Unloading)
             {
                 _limiter.OnUnloading();
-                AzCore.OnUnloading();
                 ConveyorPatch.OnUnloading();
             }
             else
             {
                 if (newState != TorchSessionState.Loaded)
                     return;
-                AzCore.Init();
                 DamagePatch.Init();
                 _limiter.OnLoaded();
                 InitShieldApi();
@@ -172,7 +171,7 @@ namespace SentisOptimisationsPlugin
             try
             {
 
-
+                
                 var conveyourCache = ConveyorPatch.ConveyourCache;
                 var cachedGrids = conveyourCache.Count;
                 var totalCacheCount = 0;
@@ -181,6 +180,9 @@ namespace SentisOptimisationsPlugin
                 {
                     totalCacheCount = totalCacheCount + keyValuePair.Value.Count;
                 }
+
+                ListReader<MyClusterTree.MyCluster> clusters = MyPhysics.Clusters.GetClusters();
+                var clustersCount = clusters.Count;
                 
                 Instance.UpdateUI((x) =>
                 {
@@ -188,6 +190,8 @@ namespace SentisOptimisationsPlugin
 
                     gui.CacheStatistic.Text =
                         $"Cached grids: {cachedGrids} ||  Total cache size: {totalCacheCount} ||  Uncached calls: {uncachedCalls}";
+                    gui.ClustersStatistic.Text =
+                        $"Clusters count: {clustersCount}";
                 });
                 ConveyorPatch.UncachedCalls = 0;
             }
@@ -362,9 +366,9 @@ namespace SentisOptimisationsPlugin
                                     MatrixD worldMatrix = myCubeGrid.WorldMatrix;
                                     var position = myCubeGrid.PositionComp.GetPosition();
 
-                                    var garbageLocation = new Vector3D(position.X + _random.Next(-100000, 100000),
-                                        position.Y + _random.Next(-100000, 100000),
-                                        position.Z + _random.Next(-100000, 100000));
+                                    var garbageLocation = new Vector3D(position.X + _random.Next(-10000, 10000),
+                                        position.Y + _random.Next(-10000, 10000),
+                                        position.Z + _random.Next(-10000, 10000));
                                     worldMatrix.Translation = garbageLocation;
                                     myCubeGrid.Teleport(worldMatrix, (object) null, false);
                                 }
@@ -468,7 +472,6 @@ namespace SentisOptimisationsPlugin
         {
             _config.Save(Path.Combine(StoragePath, "SentisOptimisations.cfg"));
             _limiter.CancellationTokenSource.Cancel();
-            AzCore.CancellationTokenSource.Cancel();
             base.Dispose();
         }
     }

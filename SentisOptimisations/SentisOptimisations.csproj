@@ -32,19 +32,10 @@
         <WarningLevel>4</WarningLevel>
     </PropertyGroup>
     <ItemGroup>
-      <Compile Include="AnomalyZone\AZBlockProcessor.cs" />
-      <Compile Include="AnomalyZone\AZCommands.cs" />
-      <Compile Include="AnomalyZone\AZCore.cs" />
-      <Compile Include="AnomalyZone\AZReward.cs" />
-      <Compile Include="AnomalyZone\Communication\Communication.cs" />
-      <Compile Include="AnomalyZone\Communication\DrawSphereRequest.cs" />
-      <Compile Include="AnomalyZone\Communication\MessageType.cs" />
-      <Compile Include="AnomalyZone\ScoreDescription.cs" />
       <Compile Include="Anticheat\HydrogenPatch.cs" />
       <Compile Include="Api\ShieldApi.cs" />
       <Compile Include="Commands\AdminCommands.cs" />
       <Compile Include="Commands\PlayerCommands.cs" />
-      <Compile Include="Config\ConfigAnomalyZone.cs" />
       <Compile Include="Config\ConfigShipInMarket.cs" />
       <Compile Include="Config\MainConfig.cs" />
       <Compile Include="ConnectorPatch.cs" />
@@ -119,6 +110,7 @@
       <Compile Include="Utils\ProjectorUtils.cs" />
       <Compile Include="Utils\ReflectionUtils.cs" />
       <Compile Include="Utils\SoundUtils.cs" />
+      <Compile Include="Wheels\WheelPatch.cs" />
     </ItemGroup>
     <ItemGroup>
       <Reference Include="0Harmony, Version=2.1.1.0, Culture=neutral, PublicKeyToken=null">

@@ -353,6 +353,7 @@ namespace SentisOptimisationsPlugin.ShipTool
 
         public static bool IsSuperWelder(MyShipWelder welder)
         {
+            return false;
             if (!welder.CubeGrid.IsStatic)
             {
                 {
@@ -389,12 +390,12 @@ namespace SentisOptimisationsPlugin.ShipTool
 
             var factionTag = playerFaction.Tag;
 
-            if (!SentisOptimisationsPlugin.Config.AzWinners.Contains(factionTag))
-            {
-                {
-                    return false;
-                }
-            }
+            //if (!SentisOptimisationsPlugin.Config.AzWinners.Contains(factionTag))
+            //{
+            //    {
+            //        return false;
+            //    }
+            //}
 
             return true;
         }
