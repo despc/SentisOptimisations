@@ -33,6 +33,7 @@
     </PropertyGroup>
     <ItemGroup>
       <Compile Include="Anticheat\HydrogenPatch.cs" />
+      <Compile Include="Anticheat\TorchPatch.cs" />
       <Compile Include="Api\ShieldApi.cs" />
       <Compile Include="Commands\AdminCommands.cs" />
       <Compile Include="Commands\PlayerCommands.cs" />
