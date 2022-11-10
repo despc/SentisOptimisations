@@ -6,7 +6,6 @@ using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using System.Windows.Controls;
-using Havok;
 using NAPI;
 using NLog;
 using Sandbox;
@@ -21,6 +20,7 @@ using Sandbox.Game.GameSystems;
 using Sandbox.Game.World;
 using Sandbox.ModAPI;
 using SentisOptimisations;
+using SentisOptimisationsPlugin.AllGridsActions;
 using SentisOptimisationsPlugin.ShipTool;
 using SOPlugin.GUI;
 using Torch;
@@ -59,6 +59,7 @@ namespace SentisOptimisationsPlugin
         public static SentisOptimisationsPlugin Instance { get; private set; }
 
         private FuckWelderProcessor _welderProcessor = new FuckWelderProcessor();
+        private AllGridsObserver _allGridsObserver = new AllGridsObserver();
         public static ShieldApi SApi = new ShieldApi();
         
         public override void Init(ITorchBase torch)
@@ -118,6 +119,7 @@ namespace SentisOptimisationsPlugin
             if (newState == TorchSessionState.Unloading)
             {
                 _limiter.OnUnloading();
+                _allGridsObserver.OnUnloading();
                 ConveyorPatch.OnUnloading();
             }
             else
@@ -126,6 +128,7 @@ namespace SentisOptimisationsPlugin
                     return;
                 DamagePatch.Init();
                 _limiter.OnLoaded();
+                _allGridsObserver.OnLoaded();
                 InitShieldApi();
                 ConveyorPatch.OnLoaded();
                 Communication.RegisterHandlers();
@@ -471,7 +474,7 @@ namespace SentisOptimisationsPlugin
         public override void Dispose()
         {
             _config.Save(Path.Combine(StoragePath, "SentisOptimisations.cfg"));
-            _limiter.CancellationTokenSource.Cancel();
+            _allGridsObserver.CancellationTokenSource.Cancel();
             base.Dispose();
         }
     }

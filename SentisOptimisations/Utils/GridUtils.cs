@@ -34,6 +34,10 @@ namespace SentisOptimisations
                 foreach (IMySlimBlock mySlimBlock in blocks)
                 {
                     num += BlockUtils.GetPCU(mySlimBlock as MySlimBlock);
+                    if (!(mySlimBlock.FatBlock is IMyUpgradeModule))
+                    {
+                        continue;
+                    }
                     if (mySlimBlock.BlockDefinition.Id.SubtypeName.Contains(SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.EngineSubtypeKey))
                     {
                         var myUpgradeModule = ((IMyUpgradeModule)mySlimBlock.FatBlock);

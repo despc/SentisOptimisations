@@ -1,8 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using NLog;
 using Sandbox.Game;
 using Sandbox.Game.Entities;
@@ -12,7 +9,6 @@ using Sandbox.ModAPI;
 using SentisOptimisations;
 using SpaceEngineers.Game.Entities.Blocks;
 using SpaceEngineers.Game.Entities.Blocks.SafeZone;
-using TorchMonitor.ProfilerMonitors;
 using VRage.Game;
 using VRage.Game.ModAPI;
 using VRageMath;
@@ -23,102 +19,18 @@ namespace SentisOptimisationsPlugin
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
         static HashSet<long> gridsOverlimit = new HashSet<long>();
-        public CancellationTokenSource CancellationTokenSource { get; set; }
 
         public void OnLoaded()
         {
-            CancellationTokenSource = new CancellationTokenSource();
-            CheckLoop();
             MyCubeGrids.BlockBuilt += MyCubeGrids_BlockBuilt;
             MyCubeGrids.BlockFunctional += MyCubeGrids_BlockFunctional;
             MyCubeGrids.BlockDestroyed += MyCubeGridsOnBlockDestroyed;
         }
 
-        public async void CheckLoop()
+        public void CheckGrid(MyCubeGrid grid)
         {
-            try
-            {
-                Log.Info("CheckLoop started");
-                while (!CancellationTokenSource.Token.IsCancellationRequested)
-                {
-                    try
-                    {
-                        await Task.Delay(15000);
-                        var myCubeGrids = MyEntities.GetEntities().OfType<MyCubeGrid>();
-                        await Task.Run(() => { CheckAllGrids(myCubeGrids); });
-                    }
-                    catch (Exception e)
-                    {
-                        Log.Error("CheckLoop Error", e);
-                    }
-
-                    if (SentisOptimisationsPlugin.Config.DisableNoOwner)
-                    {
-                        try
-                        {
-                            await Task.Delay(15000);
-                            var myCubeGrids = MyEntities.GetEntities().OfType<MyCubeGrid>();
-                            await Task.Run(() => { CheckNobodyOwner(myCubeGrids); });
-                        }
-                        catch (Exception e)
-                        {
-                            Log.Error("Nobody check", e);
-                        }
-                    }
-                    
-                    
-                    await PhysicsProfilerMonitor.__instance.Profile();
-                }
-            }
-            catch (Exception e)
-            {
-                Log.Error("CheckLoop start Error", e);
-            }
-        }
-
-        private void CheckAllGrids(IEnumerable<MyCubeGrid> myCubeGrids)
-        {
-            foreach (var grid in myCubeGrids)
-            {
-                if (CancellationTokenSource.Token.IsCancellationRequested)
-                    break;
-                if (grid.IsStatic || IsLimitNotReached(grid)) continue;
-                MyAPIGateway.Utilities.InvokeOnGameThread(() => { LimitReached(grid); });
-            }
-        }
-        
-        private void CheckNobodyOwner(IEnumerable<MyCubeGrid> myCubeGrids)
-        {
-            foreach (var grid in myCubeGrids)
-            {
-                if (CancellationTokenSource.Token.IsCancellationRequested)
-                    break;
-                if (grid.IsStatic)
-                {
-                    continue;
-                }
-                foreach (var myCubeBlock in grid.GetFatBlocks())
-                {
-                    if (myCubeBlock.BlockDefinition.OwnershipIntegrityRatio != 0 && myCubeBlock.OwnerId == 0)
-                    {
-                        MyAPIGateway.Utilities.InvokeOnGameThread(() =>
-                        {
-                            try
-                            {
-                                if (myCubeBlock is IMyFunctionalBlock)
-                                {
-                                    ((IMyFunctionalBlock) myCubeBlock).Enabled = false;
-                                }
-                            }
-                            catch (Exception e)
-                            {
-                                Log.Warn("Prevent crash", e);
-                            }
-                        });
-                        
-                    }
-                }
-            }
+            if (grid.IsStatic || IsLimitNotReached(grid)) return;
+            MyAPIGateway.Utilities.InvokeOnGameThread(() => { LimitReached(grid); });
         }
 
         private void MyCubeGridsOnBlockDestroyed(MyCubeGrid cube, MySlimBlock block)
@@ -158,13 +70,12 @@ namespace SentisOptimisationsPlugin
 
                 try
                 {
-                    ((IMyFunctionalBlock) mySlimBlock.FatBlock).Enabled = true;
+                    ((IMyFunctionalBlock)mySlimBlock.FatBlock).Enabled = true;
                 }
                 catch (Exception e)
                 {
                     Log.Error("Set Enabled exception", e);
                 }
-                
             }
 
 
@@ -183,7 +94,6 @@ namespace SentisOptimisationsPlugin
                     {
                         continue;
                     }
-
                 }
             }
         }
@@ -240,8 +150,7 @@ namespace SentisOptimisationsPlugin
                     continue;
                 }
 
-                ((IMyFunctionalBlock) mySlimBlock.FatBlock).Enabled = false;
-
+                ((IMyFunctionalBlock)mySlimBlock.FatBlock).Enabled = false;
             }
 
             var subGrids = GridUtils.GetSubGrids((IMyCubeGrid)cube);
@@ -256,7 +165,7 @@ namespace SentisOptimisationsPlugin
                         continue;
                     }
 
-                    ((IMyFunctionalBlock) mySlimBlock.FatBlock).Enabled = false;
+                    ((IMyFunctionalBlock)mySlimBlock.FatBlock).Enabled = false;
                 }
             }
 
@@ -280,6 +189,7 @@ namespace SentisOptimisationsPlugin
             {
                 return;
             }
+
             ChatUtils.SendTo(identityId, "Для структуры " + gridName + " достигнут лимит PCU!");
             ChatUtils.SendTo(identityId, "Использовано " + pcu + " PCU из возможных " + maxPcu);
             MyVisualScriptLogicProvider.ShowNotification("Достигнут лимит PCU!", 10000, "Red",
@@ -335,7 +245,6 @@ namespace SentisOptimisationsPlugin
 
         public void OnUnloading()
         {
-            CancellationTokenSource.Cancel();
             MyCubeGrids.BlockBuilt -= MyCubeGrids_BlockBuilt;
             MyCubeGrids.BlockDestroyed -= MyCubeGridsOnBlockDestroyed;
         }
