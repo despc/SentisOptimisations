@@ -30,6 +30,7 @@ namespace SentisOptimisationsPlugin
         private bool _gasTankOptimisation = true;
         private bool _removeEntityPhantomPatch = false;
         private bool _disableNoOwner = false;
+        private bool _autoRestoreFromVoxel = false;
         private String _pathToAsters = "C:\\Asteroids";
         private String _pathToGarage = "D:\\torch-server\\GARAGE";
         private String _planetsWithEco = "Earth,Moon";
@@ -370,6 +371,13 @@ namespace SentisOptimisationsPlugin
         {
             get => _streamingWithoutZip;
             set => SetValue(ref _streamingWithoutZip, value);
+        }
+        
+        [DisplayTab(Name = "Auto Restore From Voxel", GroupName = "Physics", Tab = "Physics", Order = 0, Description = "Grids inside voxels rollback for 15sec")]
+        public bool AutoRestoreFromVoxel
+        {
+            get => _autoRestoreFromVoxel;
+            set => SetValue(ref _autoRestoreFromVoxel, value);
         }
         
                 

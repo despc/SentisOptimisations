@@ -32,6 +32,8 @@
         <WarningLevel>4</WarningLevel>
     </PropertyGroup>
     <ItemGroup>
+      <Compile Include="AllGridsActions\AllGridsObserver.cs" />
+      <Compile Include="AllGridsActions\FallInVoxelDetector.cs" />
       <Compile Include="Anticheat\HydrogenPatch.cs" />
       <Compile Include="Anticheat\TorchPatch.cs" />
       <Compile Include="Api\ShieldApi.cs" />
@@ -81,6 +83,7 @@
       <Compile Include="Shared\Ext2.cs" />
       <Compile Include="Shared\FrameExecutor.cs" />
       <Compile Include="Shared\SharpUtils.cs" />
+      <Compile Include="Shared\Voxels.cs" />
       <Compile Include="ShipTool\FuckWelderProcessor.cs" />
       <Compile Include="ShipTool\ShipToolPatch.cs" />
       <Compile Include="Shipyard\Communication.cs" />
