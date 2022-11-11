@@ -93,26 +93,6 @@ namespace SentisOptimisationsPlugin
                 typeof(ConveyorPatch).GetMethod(nameof(ComputeCanTransferPatchedPost),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
 
-            // Замедление конвеерки
-            var MethodPullItems = typeof(MyGridConveyorSystem).GetMethod
-                (nameof(MyGridConveyorSystem.PullItems), BindingFlags.Instance | BindingFlags.Public);
-
-
-            ctx.GetPattern(MethodPullItems).Prefixes.Add(
-                typeof(ConveyorPatch).GetMethod(nameof(PullItemsPatched),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-        }
-        
-        private static bool PullItemsPatched(ref MyFixedPoint __result)
-        {
-            var pullItemsSlowdown = SentisOptimisationsPlugin.Config.PullItemsSlowdown;
-            var chance = 1 / pullItemsSlowdown;
-            var run = r.NextDouble() <= chance;
-            if (!run)
-            {
-                __result = (MyFixedPoint) 0;
-            }
-            return run;
         }
 
         private static bool ComputeCanTransferPatched(IMyConveyorEndpointBlock start,

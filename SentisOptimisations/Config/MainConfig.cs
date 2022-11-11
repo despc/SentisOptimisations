@@ -24,28 +24,17 @@ namespace SentisOptimisationsPlugin
         private int _maxDinamycGridPCU = 30000;
         private int _accelerationToDamage = 1000;
         private int _noDamageFromVoxelsBeforeSpeed = 30;
-        private bool _allowMerge = false;
         private bool _includeConnectedGrids = false;
         private bool _adaptiveblockslowdown = false;
         private bool _gasTankOptimisation = true;
         private bool _removeEntityPhantomPatch = false;
-        private bool _disableNoOwner = false;
-        private bool _autoRestoreFromVoxel = false;
         private String _pathToAsters = "C:\\Asteroids";
         private String _pathToGarage = "D:\\torch-server\\GARAGE";
         private String _planetsWithEco = "Earth,Moon";
         private float _explosivesDamage = 10;
-        private String _donations = "";
         private int _contactCountAlert = 150;
         private int _adaptiveBlockSlowdownThreshold = 150;
-        private float _shipSuperWelderRadius = 150;
-        
-        private float _pullItemsSlowdown = 1;
-        
-        private float _assemblerPullItemsSlowdown = 1;
-        
-        private float _findProjectedBlocksSlowdown = 1;
-        
+
         private float _projectileAmmoExplosionMultiplier = 0.1f;
         private float _missileAmmoExplosionMultiplier = 0.3f;
         private float _ammoExplosionRadius = 15f;
@@ -60,9 +49,7 @@ namespace SentisOptimisationsPlugin
         
         private bool _safeZoneSubGridOptimisation = true;
         private bool _enableRammingForStatic = true;
-        private bool _safeZoneWeldOptimisation = false;
         private bool _conveyorCacheEnabled = false;
-        private bool _disableLightnings = true;
         private bool _streamingWithoutZip = true;
         private int _safeZonePhysicsThreshold = 10;
         
@@ -89,8 +76,13 @@ namespace SentisOptimisationsPlugin
         private float _idealClusterSize = 10000;
         private float _maximumClusterSize = 15000;
         
+        //Tweaks
+        private bool _autoRenameGrids = false;
+        private bool _autoRestoreFromVoxel = false;
+        private bool _disableNoOwner = false;
+        
         //Arrakis
-        private String _engineSubtypeKey = "";
+        private String _engineSubtypeKey = "test_subtype";
         private float _engineMultiplier = 5;
         
         private ObservableCollection<ConfigShipInMarket> configShipsInMarket = new ObservableCollection<ConfigShipInMarket>();
@@ -120,14 +112,6 @@ namespace SentisOptimisationsPlugin
         
         [DisplayTab(Name = "Maximum Cluster Size", GroupName = "Physics", Tab = "Physics", Order = 0, Description = "Maximum Cluster Size")]
         public float MaximumClusterSize { get => _maximumClusterSize; set => SetValue(ref _maximumClusterSize, value); }
-        
-        
-        [DisplayTab(Name = "Donations list", GroupName = "Donations", Tab = "Donations", Order = 0, Description = "Donations list")]
-        public string Donations
-        {
-            get => _donations;
-            set => SetValue(ref _donations, value);
-        }
         
         [DisplayTab(Name = "Explosives damage", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Explosives damage")]
         public float ExplosivesDamage { get => _explosivesDamage; set => SetValue(ref _explosivesDamage, value); }
@@ -232,14 +216,7 @@ namespace SentisOptimisationsPlugin
             get => _enableRammingForStatic;
             set => SetValue(ref _enableRammingForStatic, value);
         }
-        
-        [DisplayTab(Name = "Safe zone weld optimisation", GroupName = "Safe zone", Tab = "Safe zone", Order = 0, Description = "Safe zone weld optimisation")]
-        public bool SafeWeldOptimisation
-        {
-            get => _safeZoneWeldOptimisation;
-            set => SetValue(ref _safeZoneWeldOptimisation, value);
-        }
-        
+
         [DisplayTab(Name = "Safe zone Physics Threshold", GroupName = "Safe zone", Tab = "Safe zone", Order = 0, Description = "Safe zone Physics Threshold")]
         public int SafeZonePhysicsThreshold
         {
@@ -260,28 +237,6 @@ namespace SentisOptimisationsPlugin
             get => _maxDinamycGridPCU;
             set => SetValue(ref _maxDinamycGridPCU, value);
         }
-        
-        
-        [DisplayTab(Name = "Pull Items Slowdown", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Pull Items Slowdown")]
-        public float PullItemsSlowdown
-        {
-            get => _pullItemsSlowdown;
-            set => SetValue(ref _pullItemsSlowdown, value);
-        }
-        
-        [DisplayTab(Name = "Assembler Pull Items Slowdown", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Assembler Pull Items Slowdown")]
-        public float AssemblerPullItemsSlowdown
-        {
-            get => _assemblerPullItemsSlowdown;
-            set => SetValue(ref _assemblerPullItemsSlowdown, value);
-        }
-        
-        [DisplayTab(Name = "Find Projected Blocks Slowdown", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Find Projected Blocks Slowdown")]
-        public float FindProjectedBlocksSlowdown
-        {
-            get => _findProjectedBlocksSlowdown;
-            set => SetValue(ref _findProjectedBlocksSlowdown, value);
-        } 
 
         [DisplayTab(Name = "Physics ms to alert", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Physics ms to alert")]
         public float PhysicsMsToAlert
@@ -331,19 +286,6 @@ namespace SentisOptimisationsPlugin
             get => _contactCountAlert;
             set => SetValue(ref _contactCountAlert, value);
         }
-        
-        [DisplayTab(Name = "Ship SUPER welder radius" , GroupName = "Ship tool", Tab = "Ship tool", Order = 0, Description = "Ship SUPER welder radius")]
-        public float ShipSuperWelderRadius
-        {
-            get => _shipSuperWelderRadius;
-            set => SetValue(ref _shipSuperWelderRadius, value);
-        }
-
-        public bool AllowMerge
-        {
-            get => _allowMerge;
-            set => SetValue(ref _allowMerge, value);
-        }
 
         [DisplayTab(Name = "Include connected grids", GroupName = "PCU limiter", Tab = "PCU limiter", Order = 0, Description = "Include grinds connected with CONNECTOR")]
         public bool IncludeConnectedGrids
@@ -359,7 +301,7 @@ namespace SentisOptimisationsPlugin
             set => SetValue(ref _removeEntityPhantomPatch, value);
         }
         
-        [DisplayTab(Name = "Disable no owner", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Disable no owner")]
+        [DisplayTab(Name = "Disable no owner", GroupName = "Tweaks", Tab = "Tweaks", Order = 0, Description = "Disable no owner")]
         public bool DisableNoOwner  
         {
             get => _disableNoOwner;
@@ -373,11 +315,18 @@ namespace SentisOptimisationsPlugin
             set => SetValue(ref _streamingWithoutZip, value);
         }
         
-        [DisplayTab(Name = "Auto Restore From Voxel", GroupName = "Physics", Tab = "Physics", Order = 0, Description = "Grids inside voxels rollback for 15sec")]
+        [DisplayTab(Name = "Auto Restore From Voxel", GroupName = "Tweaks", Tab = "Tweaks", Order = 0, Description = "Grids inside voxels rollback for 15sec")]
         public bool AutoRestoreFromVoxel
         {
             get => _autoRestoreFromVoxel;
             set => SetValue(ref _autoRestoreFromVoxel, value);
+        }
+        
+        [DisplayTab(Name = "Auto Rename Grids", GroupName = "Tweaks", Tab = "Tweaks", Order = 0, Description = "Auto Rename Grids")]
+        public bool AutoRenameGrids
+        {
+            get => _autoRenameGrids;
+            set => SetValue(ref _autoRenameGrids, value);
         }
         
                 
@@ -408,14 +357,6 @@ namespace SentisOptimisationsPlugin
             get => _conveyorCacheEnabled;
             set => SetValue(ref _conveyorCacheEnabled, value);
         }
-        
-        [DisplayTab(Name = "Disable Lightnings", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Disable Lightnings")]
-        public bool DisableLightnings
-        {
-            get => _disableLightnings;
-            set => SetValue(ref _disableLightnings, value);
-        }
-        
         
          //=================================================================================================
 

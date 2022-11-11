@@ -7,7 +7,6 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NAPI;
 using Sandbox.Game.Entities.Blocks;
-using Sandbox.Game.SessionComponents;
 using Sandbox.Game.Weapons;
 using SentisOptimisations;
 using Torch.Managers.PatchManager;
@@ -19,13 +18,6 @@ namespace SentisOptimisationsPlugin.CrashFix
     [PatchShim]
     public static class CrashFixPatch
     {
-        // private static Harmony harmony = new Harmony("SentisOptimisationsPlugin.CrashFix");
-
-        // private static MethodInfo original = typeof(Sync<MyTurretTargetFlags, SyncDirection.BothWays>).GetMethod
-        //     ("IsValid", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
-
-        // private static MethodInfo prefix = typeof(CrashFixPatch).GetMethod(nameof(MethodIsValidPatched),
-        //     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic);
         public static void Patch(PatchContext ctx)
         {
             
@@ -38,14 +30,6 @@ namespace SentisOptimisationsPlugin.CrashFix
                 typeof(CrashFixPatch).GetMethod(nameof(MethodPistonInitPatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
             
-            var MethodCreateLightning = typeof(MySectorWeatherComponent).GetMethod
-                (nameof(MySectorWeatherComponent.CreateLightning), BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
-
-            
-            ctx.GetPattern(MethodCreateLightning).Prefixes.Add(
-                typeof(CrashFixPatch).GetMethod(nameof(CreateLightningPatched),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-            
             var MethodCreateCompilation = typeof(MyScriptCompiler).GetMethod
                 ("CreateCompilation", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
 
@@ -53,16 +37,6 @@ namespace SentisOptimisationsPlugin.CrashFix
             ctx.GetPattern(MethodCreateCompilation).Prefixes.Add(
                 typeof(CrashFixPatch).GetMethod(nameof(CreateCompilationPatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-                
-            // var MethodUpdateBeforeSimulation10 = typeof(MyShipDrill).GetMethod
-            //     (nameof(MyShipDrill.UpdateBeforeSimulation10), BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
-            //
-            //
-            // ctx.GetPattern(MethodUpdateBeforeSimulation10).Prefixes.Add(
-            //     typeof(CrashFixPatch).GetMethod(nameof(UpdateBeforeSimulation10Patched),
-            //         BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
- 
-            // harmony.Patch(original, new HarmonyMethod(prefix));
 
         }
         
@@ -103,16 +77,6 @@ namespace SentisOptimisationsPlugin.CrashFix
             }
 
             return false;
-        }
-        
-        private static bool CreateLightningPatched()
-        {
-            if (SentisOptimisationsPlugin.Config.DisableLightnings)
-            {
-                return false;
-            }
-
-            return true;
         }
 
         private static void VelocityOnValueChanged(SyncBase obj)
