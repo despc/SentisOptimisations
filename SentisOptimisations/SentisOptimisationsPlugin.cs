@@ -52,7 +52,6 @@ namespace SentisOptimisationsPlugin
         public static Dictionary<long,long> gridsInSZ = new Dictionary<long, long>();
         private static TorchSessionManager SessionManager;
         private static Persistent<MainConfig> _config;
-        public static List<Donation> Donations = new List<Donation>();
         public static MainConfig Config => _config.Data;
         public static Random _random = new Random();
         public UserControl _control = null;
@@ -72,44 +71,12 @@ namespace SentisOptimisationsPlugin
             if (SessionManager == null)
                 return;
             SessionManager.SessionStateChanged += SessionManager_SessionStateChanged;
-            ParceDonations();
             MyClusterTree.IdealClusterSize = new Vector3(Config.IdealClusterSize);
             MyClusterTree.IdealClusterSizeHalfSqr =
                 MyClusterTree.IdealClusterSize * MyClusterTree.IdealClusterSize / 4f;
             MyClusterTree.MinimumDistanceFromBorder = MyClusterTree.IdealClusterSize / 100f;
             MyClusterTree.MaximumForSplit = MyClusterTree.IdealClusterSize * 2f;
             MyClusterTree.MaximumClusterSize = Config.MaximumClusterSize;
-        }
-
-        private void ParceDonations()
-        {
-            CultureInfo provider = CultureInfo.InvariantCulture;
-            var now = DateTime.Now;
-            var configDonations = Config.Donations;
-            foreach (var donatString in configDonations.Split(';'))
-            {
-                try
-                {
-                    if (donatString.Length == 0)
-                    {
-                        continue;
-                    }
-                    var donatDetails = donatString.Split('=');
-                    Donation.DonationType type;
-                    long identity = Convert.ToInt64(donatDetails[0]);
-                    Donation.DonationType.TryParse(donatDetails[1], out type);
-                    var format = "dd.MM.yyyy";
-                    DateTime before = DateTime.ParseExact(donatDetails[2], format, provider);
-                    int count = donatDetails.Length == 4 ? Convert.ToInt32(donatDetails[3]) : 0;
-                    if (now > before) continue;
-                    Donations.Add(new Donation(identity, type, count, before));
-                }
-                catch (Exception e)
-                {
-                    Log.Error("Ошибка парсинга доната " + donatString, e);
-                }
-                
-            }
         }
 
         private void SessionManager_SessionStateChanged(

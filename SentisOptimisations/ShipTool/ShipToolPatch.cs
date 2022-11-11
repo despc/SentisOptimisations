@@ -14,7 +14,6 @@ using Sandbox.Game.Entities.Character;
 using Sandbox.Game.Entities.Cube;
 using Sandbox.Game.Multiplayer;
 using Sandbox.Game.Weapons;
-using Sandbox.Game.World;
 using Sandbox.Game.WorldEnvironment;
 using Sandbox.Game.WorldEnvironment.Modules;
 using Sandbox.ModAPI;
@@ -346,58 +345,7 @@ namespace SentisOptimisationsPlugin.ShipTool
 
         public static float GetWelderRadius(MyShipWelder welder)
         {
-            if (!IsSuperWelder(welder)) return ((MyShipWelderDefinition)(welder.BlockDefinition)).SensorRadius;
-
-            return SentisOptimisationsPlugin.Config.ShipSuperWelderRadius;
-        }
-
-        public static bool IsSuperWelder(MyShipWelder welder)
-        {
-            return false;
-            if (!welder.CubeGrid.IsStatic)
-            {
-                {
-                    return false;
-                }
-            }
-
-            var ownerId = welder.OwnerId;
-
-            if (!welder.CustomData.Contains("[AZ_REWARD]"))
-            {
-                {
-                    return false;
-                }
-            }
-
-            foreach (var donation in SentisOptimisationsPlugin.Donations)
-            {
-
-                var steamId = MySession.Static.Players.TryGetSteamId(ownerId);
-                if (donation.SteamId == (long)steamId && donation.Type == Donation.DonationType.WELDER)
-                {
-                    return true;
-                }
-            }
-
-            var playerFaction = MySession.Static.Factions.GetPlayerFaction(ownerId);
-            if (playerFaction == null)
-            {
-                {
-                    return false;
-                }
-            }
-
-            var factionTag = playerFaction.Tag;
-
-            //if (!SentisOptimisationsPlugin.Config.AzWinners.Contains(factionTag))
-            //{
-            //    {
-            //        return false;
-            //    }
-            //}
-
-            return true;
+            return ((MyShipWelderDefinition)(welder.BlockDefinition)).SensorRadius;
         }
 
         private static void SetRadius(MyShipToolBase __instance, float radius)

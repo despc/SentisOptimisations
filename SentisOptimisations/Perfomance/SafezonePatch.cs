@@ -164,17 +164,9 @@ namespace SentisOptimisationsPlugin
                             }
 
                             bool isPenetratingShapeShape;
-                            if (entity is MyCubeGrid && SentisOptimisationsPlugin.Config.SafeWeldOptimisation)
-                            {
-                                var distance = Vector3D.Distance(entity.PositionComp.GetPosition(), __instance.PositionComp.GetPosition());
-                                isPenetratingShapeShape = distance < __instance.Radius + entity.PositionComp.WorldVolume.Radius;
-                            }
-                            else
-                            {
+
                                 isPenetratingShapeShape = MyPhysics.IsPenetratingShapeShape(shape1, ref position1, ref rotation1,
                                     __instance.Physics.RigidBody.GetShape(), ref position, ref fromRotationMatrix);
-                            }
-                            
                             
                             if ((flag ? 1 : (shape1.IsValid ? (!isPenetratingShapeShape ? 1 : 0) : 1)) == 0)
                                 return;
