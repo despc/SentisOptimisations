@@ -31,6 +31,7 @@ namespace SentisOptimisationsPlugin
         private String _pathToAsters = "C:\\Asteroids";
         private String _pathToGarage = "D:\\torch-server\\GARAGE";
         private String _planetsWithEco = "Earth,Moon";
+        private String _ignoreCleanupSubtypes = "Cargo";
         private float _explosivesDamage = 10;
         private int _contactCountAlert = 150;
         private int _adaptiveBlockSlowdownThreshold = 150;
@@ -147,6 +148,9 @@ namespace SentisOptimisationsPlugin
         
         [DisplayTab(Name = "Planets With Economic", GroupName = "Contracts", Tab = "Contracts", Order = 0, Description = "Planets With Economic")]
         public String PlanetsWithEco { get => _planetsWithEco; set => SetValue(ref _planetsWithEco, value); }
+        
+        [DisplayTab(Name = "Dont clean with blocks", GroupName = "Tweaks", Tab = "Tweaks", Order = 0, Description = "Dont clean with blocks")]
+        public String IgnoreCleanupSubtypes { get => _ignoreCleanupSubtypes; set => SetValue(ref _ignoreCleanupSubtypes, value); }
 
         [DisplayTab(Name = "Path to Garage", GroupName = "Garage", Tab = "Garage", Order = 0, Description = "Path to Garage")]
         public String PathToGarage { get => _pathToGarage; set => SetValue(ref _pathToGarage, value); }
