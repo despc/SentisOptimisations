@@ -27,10 +27,15 @@ namespace SentisOptimisationsPlugin.AllGridsActions
                     try
                     {
                         
-                        var grids = grid.GetConnectedGrids(GridLinkTypeEnum.Physical);
+                        var grids = grid.GetConnectedGrids(GridLinkTypeEnum.Mechanical);
                         var aabb = new BoundingBoxD(grid.PositionComp.WorldAABB.Min, grid.PositionComp.WorldAABB.Max);
                         foreach (var g in grids)
                         {
+                            if (g.IsStatic)
+                            {
+                                SentisOptimisationsPlugin.Log.Warn("Don't process static grid " + grid.DisplayName);
+                                return;
+                            }
                             aabb.Include(g.PositionComp.WorldAABB);
                         }
 
@@ -86,6 +91,10 @@ namespace SentisOptimisationsPlugin.AllGridsActions
 
             if (Voxels.IsGridInsideVoxel(grid))
             {
+                if (grid.Physics.LinearVelocity.Length() < 30)
+                {
+                    return;
+                }
                 RestorePos(grid);
                 return;
             }
