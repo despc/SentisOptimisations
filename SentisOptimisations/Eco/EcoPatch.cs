@@ -1,22 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
-using Sandbox.Game.Entities.Blocks;
-using Sandbox.Game.Weapons;
-using Sandbox.Game.World;
-using Torch.Managers.PatchManager;
-using VRage.Sync;
-using HarmonyLib;
 using NAPI;
-using NLog.Fluent;
-using Sandbox.Engine.Utils;
 using Sandbox.Game.Entities;
 using Sandbox.Game.SessionComponents;
-using VRage;
-using VRage.Game;
+using Sandbox.Game.World;
+using Torch.Managers.PatchManager;
 using VRage.Game.Entity;
-using VRage.Game.ModAPI;
-using VRage.ObjectBuilders;
 using VRageMath;
 
 namespace SentisOptimisationsPlugin.EcoPatch
@@ -24,13 +14,6 @@ namespace SentisOptimisationsPlugin.EcoPatch
     [PatchShim]
     public static class EcoPatch
     {
-        // private static Harmony harmony = new Harmony("SentisOptimisationsPlugin.CrashFix");
-
-        // private static MethodInfo original = typeof(Sync<MyTurretTargetFlags, SyncDirection.BothWays>).GetMethod
-        //     ("IsValid", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
-
-        // private static MethodInfo prefix = typeof(CrashFixPatch).GetMethod(nameof(MethodIsValidPatched),
-        //     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic);
         public static void Patch(PatchContext ctx)
         {
             
@@ -50,17 +33,6 @@ namespace SentisOptimisationsPlugin.EcoPatch
             ctx.GetPattern(CanRevertCurrentMethod).Prefixes.Add(
                 typeof(EcoPatch).GetMethod(nameof(VoxelRevertorCanRevertCurrentPatch),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-            
-            
-            // var MethodUpdateBeforeSimulation10 = typeof(MyShipDrill).GetMethod
-            //     (nameof(MyShipDrill.UpdateBeforeSimulation10), BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
-            //
-            //
-            // ctx.GetPattern(MethodUpdateBeforeSimulation10).Prefixes.Add(
-            //     typeof(CrashFixPatch).GetMethod(nameof(UpdateBeforeSimulation10Patched),
-            //         BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
- 
-            // harmony.Patch(original, new HarmonyMethod(prefix));
 
         }
 

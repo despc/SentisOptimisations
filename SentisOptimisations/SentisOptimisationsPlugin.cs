@@ -1,11 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using System.Windows.Controls;
+using HarmonyLib;
+using Havok;
 using NAPI;
 using NLog;
 using Sandbox;
@@ -52,6 +53,7 @@ namespace SentisOptimisationsPlugin
         public static Dictionary<long,long> gridsInSZ = new Dictionary<long, long>();
         private static TorchSessionManager SessionManager;
         private static Persistent<MainConfig> _config;
+        public static Harmony harmony = new Harmony("SentisOptimisations.H");
         public static MainConfig Config => _config.Data;
         public static Random _random = new Random();
         public UserControl _control = null;
@@ -67,6 +69,7 @@ namespace SentisOptimisationsPlugin
             Log.Info("Init SentisOptimisationsPlugin");
             MyFakes.ENABLE_SCRAP = false;
             SetupConfig();
+            PerfomancePatch.Patch();
             SessionManager = Torch.Managers.GetManager<TorchSessionManager>();
             if (SessionManager == null)
                 return;
@@ -152,6 +155,16 @@ namespace SentisOptimisationsPlugin
                 }
 
                 ListReader<MyClusterTree.MyCluster> clusters = MyPhysics.Clusters.GetClusters();
+                var myPhysics = MySession.Static.GetComponent<MyPhysics>();
+                int active = 0;
+                foreach (MyClusterTree.MyCluster myCluster in clusters)
+                {
+                    if (myCluster.UserData is HkWorld userData && (bool)myPhysics.easyCallMethod("IsClusterActive", new object[]{myCluster.ClusterId, userData.CharacterRigidBodies.Count}))
+                    {
+                        active++;
+                    }
+                }
+                
                 var clustersCount = clusters.Count;
                 
                 Instance.UpdateUI((x) =>
@@ -161,7 +174,7 @@ namespace SentisOptimisationsPlugin
                     gui.CacheStatistic.Text =
                         $"Cached grids: {cachedGrids} ||  Total cache size: {totalCacheCount} ||  Uncached calls: {uncachedCalls}";
                     gui.ClustersStatistic.Text =
-                        $"Clusters count: {clustersCount}";
+                        $"Count: {clustersCount}, Active: {active}";
                 });
                 ConveyorPatch.UncachedCalls = 0;
             }

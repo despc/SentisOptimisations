@@ -8,7 +8,6 @@ using ParallelTasks;
 using Sandbox;
 using Sandbox.Definitions;
 using Sandbox.Engine.Physics;
-using Sandbox.Game;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Character;
 using Sandbox.Game.Entities.Cube;
@@ -37,12 +36,6 @@ namespace SentisOptimisationsPlugin.ShipTool
 
         public static void Patch(PatchContext ctx)
         {
-            var MethodMyShipDrillInit = typeof(MyShipDrill).GetMethod(
-                nameof(MyShipDrill.Init), BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
-
-            ctx.GetPattern(MethodMyShipDrillInit).Suffixes.Add(
-                typeof(ShipToolPatch).GetMethod(nameof(MyShipDrillInitPatch),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
 
             var MethodActivateCommon = typeof(MyShipToolBase).GetMethod(
                 "ActivateCommon", BindingFlags.Instance | BindingFlags.NonPublic);
@@ -355,20 +348,6 @@ namespace SentisOptimisationsPlugin.ShipTool
                     "m_detectorSphere");
             BoundingSphere bs = new BoundingSphere(m_detectorSphere.Center, radius);
             ReflectionUtils.SetInstanceField(typeof(MyShipToolBase), __instance, "m_detectorSphere", bs);
-        }
-
-        private static void MyShipDrillInitPatch(MyShipDrill __instance)
-        {
-            try
-            {
-                MyInventoryBase inventoryBase = __instance.Components.Get<MyInventoryBase>();
-                ((MyInventory)inventoryBase).FixInventoryVolume(500000);
-                Log.Warn("DrillInit Set Inventory");
-            }
-            catch (Exception e)
-            {
-                Log.Error("Exception in during MyShipDrillInitPatch", e);
-            }
         }
     }
 }

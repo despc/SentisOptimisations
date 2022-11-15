@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Reflection;
+using HarmonyLib;
 using Havok;
 using NLog;
 using Sandbox;
@@ -13,35 +14,39 @@ using Torch.Managers.PatchManager;
 
 namespace SentisOptimisationsPlugin
 {
-    [PatchShim]
     public static class PerfomancePatch
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
         private static readonly Random Random = new Random();
 
-        public static void Patch(PatchContext ctx)
+        public static void Patch()
         {
-            var MethodLoadData = typeof(MyPhysics).GetMethod
-                ("LoadData", BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
+            if (SentisOptimisationsPlugin.Config.MoreCORES)
+            {
+                
+                var MethodLoadData = typeof(MyPhysics).GetMethod
+                    ("LoadData", BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
+                SentisOptimisationsPlugin.harmony.Patch(MethodLoadData, postfix: new HarmonyMethod(
+                    typeof(PerfomancePatch).GetMethod(nameof(MethodLoadDataPatched),
+                        BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic)));
+            }
+            if (SentisOptimisationsPlugin.Config.Adaptiveblockslowdown)
+            {
+                var MethodUpdateAfterSimulation10 = typeof(MyFunctionalBlock).GetMethod
+                    ("UpdateAfterSimulation10", BindingFlags.Instance | BindingFlags.Public);
 
-            ctx.GetPattern(MethodLoadData).Suffixes.Add(
-                typeof(PerfomancePatch).GetMethod(nameof(MethodLoadDataPatched),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-            
-            var MethodUpdateAfterSimulation10 = typeof(MyFunctionalBlock).GetMethod
-                ("UpdateAfterSimulation10", BindingFlags.Instance | BindingFlags.Public);
+                SentisOptimisationsPlugin.harmony.Patch(MethodUpdateAfterSimulation10, prefix: new HarmonyMethod(
+                    typeof(PerfomancePatch).GetMethod(nameof(MethodUpdateAfterSimulation10Patched),
+                        BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic)));
 
-            ctx.GetPattern(MethodUpdateAfterSimulation10).Prefixes.Add(
-                typeof(PerfomancePatch).GetMethod(nameof(MethodUpdateAfterSimulation10Patched),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+                var MethodUpdateAfterSimulation100 = typeof(MyFunctionalBlock).GetMethod
+                    ("UpdateAfterSimulation100", BindingFlags.Instance | BindingFlags.Public);
 
+                SentisOptimisationsPlugin.harmony.Patch(MethodUpdateAfterSimulation100, prefix: new HarmonyMethod(
+                    typeof(PerfomancePatch).GetMethod(nameof(MethodUpdateAfterSimulation100Patched),
+                        BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic)));
+            }
 
-            var MethodUpdateAfterSimulation100 = typeof(MyFunctionalBlock).GetMethod
-                ("UpdateAfterSimulation100", BindingFlags.Instance | BindingFlags.Public);
-
-            ctx.GetPattern(MethodUpdateAfterSimulation100).Prefixes.Add(
-                typeof(PerfomancePatch).GetMethod(nameof(MethodUpdateAfterSimulation100Patched),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
         }
 
 
@@ -49,7 +54,7 @@ namespace SentisOptimisationsPlugin
         {
             return DoAdaptiveSlowdown(__instance);
         }
-        
+
         private static void MethodLoadDataPatched(MyPhysics __instance)
         {
             var processorCount = Environment.ProcessorCount;
@@ -66,11 +71,6 @@ namespace SentisOptimisationsPlugin
 
         private static bool DoAdaptiveSlowdown(MyFunctionalBlock __instance)
         {
-            if (!SentisOptimisationsPlugin.Config.Adaptiveblockslowdown)
-            {
-                return true;
-            }
-
             if (!(__instance is MyShipToolBase ||
                   __instance is MyShipDrill ||
                   __instance is MyGasTank ||

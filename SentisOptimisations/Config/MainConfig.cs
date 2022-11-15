@@ -26,6 +26,7 @@ namespace SentisOptimisationsPlugin
         private int _noDamageFromVoxelsBeforeSpeed = 30;
         private bool _includeConnectedGrids = false;
         private bool _adaptiveblockslowdown = false;
+        private bool _moreCORES = false;
         private bool _gasTankOptimisation = true;
         private bool _removeEntityPhantomPatch = false;
         private String _pathToAsters = "C:\\Asteroids";
@@ -339,6 +340,13 @@ namespace SentisOptimisationsPlugin
         {
             get => _adaptiveblockslowdown;
             set => SetValue(ref _adaptiveblockslowdown, value);
+        }
+        
+        [DisplayTab(Name = "MORE CORES", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "MORE CORES")]
+        public bool MoreCORES
+        {
+            get => _moreCORES;
+            set => SetValue(ref _moreCORES, value);
         }
         
         [DisplayTab(Name = "Gas Tank Optimisation", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Gas Tank Optimisation")]
