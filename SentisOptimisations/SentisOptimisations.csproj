@@ -79,6 +79,7 @@
       <Compile Include="Perfomance\StreamingPatch.cs" />
       <Compile Include="Perfomance\WelderOptimization.cs" />
       <Compile Include="RemovePluginPatch.cs" />
+      <Compile Include="Rep\ReputationPatch.cs" />
       <Compile Include="Shared\Action2.cs" />
       <Compile Include="Shared\Ext2.cs" />
       <Compile Include="Shared\FrameExecutor.cs" />
