@@ -13,6 +13,7 @@ using Sandbox.Game.Entities.Character;
 using Sandbox.Game.Entities.Cube;
 using Sandbox.Game.Multiplayer;
 using Sandbox.Game.Weapons;
+using Sandbox.Game.Weapons.Guns;
 using Sandbox.Game.WorldEnvironment;
 using Sandbox.Game.WorldEnvironment.Modules;
 using Sandbox.ModAPI;
@@ -47,8 +48,62 @@ namespace SentisOptimisationsPlugin.ShipTool
             ctx.GetPattern(typeof(MyCubeGrid).GetMethod(nameof(MyCubeGrid.GetBlocksInsideSpheres)))
                 .Prefixes.Add(typeof(ShipToolPatch).GetMethod(nameof(GetBlocksInsideSpheresPatch),
                     BindingFlags.Static | BindingFlags.NonPublic));
+            
+            var DrillEnvironmentSector = typeof(MyDrillBase).GetMethod(
+                "DrillEnvironmentSector", BindingFlags.Instance | BindingFlags.NonPublic);
+
+            ctx.GetPattern(DrillEnvironmentSector).Prefixes.Add(
+                typeof(ShipToolPatch).GetMethod(nameof(DrillEnvironmentSectorPatch),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
         }
 
+        private static bool DrillEnvironmentSectorPatch(MyDrillSensorBase.DetectionInfo entry,
+            float speedMultiplier,
+            out MyStringHash targetMaterial,
+            MyDrillBase __instance,
+            ref bool __result)
+        {
+            targetMaterial = MyStringHash.GetOrCompute("Wood");
+            try
+            {
+                __instance.GetType().GetProperty("DrilledEntity").SetMethod.Invoke(__instance, new[] { entry.Entity });
+                __instance.GetType().GetProperty("DrilledEntityPoint").SetMethod.Invoke(__instance, new object[] { entry.DetectionPoint });
+                //__instance.DrilledEntity = entry.Entity;
+                //__instance.DrilledEntityPoint = entry.DetectionPoint;
+                if (Sync.IsServer)
+                {
+                    if ((int)__instance.easyGetField("m_lastItemId") != entry.ItemId)
+                    {
+                        __instance.easySetField("m_lastItemId", entry.ItemId);
+                        __instance.easySetField("m_lastContactTime", MySandboxGame.TotalGamePlayTimeInMilliseconds);
+                    }
+                    if ((double) (MySandboxGame.TotalGamePlayTimeInMilliseconds - (int)__instance.easyGetField("m_lastContactTime")) > 1500.0 * (double) speedMultiplier)
+                    {
+                        MyBreakableEnvironmentProxy module = (entry.Entity as MyEnvironmentSector).GetModule<MyBreakableEnvironmentProxy>();
+                        var drillEntity = ((MyEntity)__instance.easyGetField("m_drillEntity"));
+                        Vector3D vector3D = drillEntity.WorldMatrix.Forward + drillEntity.WorldMatrix.Right;
+                        vector3D.Normalize();
+                        double num1 = 10.0;
+                        float num2 = (float) (num1 * num1) * 100f;
+                        int itemId = entry.ItemId;
+                        Vector3D detectionPoint = entry.DetectionPoint;
+                        Vector3D hitnormal = vector3D;
+                        double impactEnergy = (double) num2;
+                        module.BreakAt(itemId, detectionPoint, hitnormal, impactEnergy);
+                        __instance.easySetField("m_lastContactTime", MySandboxGame.TotalGamePlayTimeInMilliseconds);
+                        __instance.easySetField("m_lastItemId", 0);
+                    }
+                }
+                __result = true;
+                
+            }
+            catch (Exception e)
+            {
+                Log.Error("Exception during DrillEnvironmentSector", e);
+            }
+
+            return false;
+        }
 
         private static void GetBlocksInsideSpheresPatch(MyCubeGrid __instance, ref BoundingSphereD sphere1,
             ref BoundingSphereD sphere2,

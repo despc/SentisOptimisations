@@ -51,7 +51,7 @@ namespace SentisOptimisationsPlugin.AllGridsActions
                 {
                     try
                     {
-                        await Task.Delay(15000);
+                        await Task.Delay(30000);
                         var myCubeGrids = MyEntities.GetEntities().OfType<MyCubeGrid>();
                         await Task.Run(() => { CheckAllGrids(myCubeGrids); });
                     }
