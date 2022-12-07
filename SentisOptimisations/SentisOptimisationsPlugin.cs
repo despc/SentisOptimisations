@@ -74,12 +74,12 @@ namespace SentisOptimisationsPlugin
             if (SessionManager == null)
                 return;
             SessionManager.SessionStateChanged += SessionManager_SessionStateChanged;
-            MyClusterTree.IdealClusterSize = new Vector3(Config.IdealClusterSize);
-            MyClusterTree.IdealClusterSizeHalfSqr =
-                MyClusterTree.IdealClusterSize * MyClusterTree.IdealClusterSize / 4f;
-            MyClusterTree.MinimumDistanceFromBorder = MyClusterTree.IdealClusterSize / 100f;
-            MyClusterTree.MaximumForSplit = MyClusterTree.IdealClusterSize * 2f;
-            MyClusterTree.MaximumClusterSize = Config.MaximumClusterSize;
+            // MyClusterTree.IdealClusterSize = new Vector3(Config.IdealClusterSize);
+            // MyClusterTree.IdealClusterSizeHalfSqr =
+            //     MyClusterTree.IdealClusterSize * MyClusterTree.IdealClusterSize / 4f;
+            // MyClusterTree.MinimumDistanceFromBorder = MyClusterTree.IdealClusterSize / 100f;
+            // MyClusterTree.MaximumForSplit = MyClusterTree.IdealClusterSize * 2f;
+            // MyClusterTree.MaximumClusterSize = Config.MaximumClusterSize;
         }
 
         private void SessionManager_SessionStateChanged(
