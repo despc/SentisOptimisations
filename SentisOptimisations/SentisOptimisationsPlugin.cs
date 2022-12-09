@@ -73,6 +73,7 @@ namespace SentisOptimisationsPlugin
             SessionManager = Torch.Managers.GetManager<TorchSessionManager>();
             if (SessionManager == null)
                 return;
+                    //SessionManager.AddOverrideMod(2891865838);
             SessionManager.SessionStateChanged += SessionManager_SessionStateChanged;
             // MyClusterTree.IdealClusterSize = new Vector3(Config.IdealClusterSize);
             // MyClusterTree.IdealClusterSizeHalfSqr =
