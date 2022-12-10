@@ -13,7 +13,7 @@ namespace SentisOptimisationsPlugin.AllGridsActions
 {
     public class AllGridsObserver
     {
-        private FallInVoxelDetector _fallInVoxelDetector = new FallInVoxelDetector();
+        public static FallInVoxelDetector FallInVoxelDetector = new FallInVoxelDetector();
         private GridAutoRenamer _autoRenamer = new GridAutoRenamer();
 
         public static HashSet<MyPlanet> Planets = new HashSet<MyPlanet>();
@@ -51,7 +51,7 @@ namespace SentisOptimisationsPlugin.AllGridsActions
                 {
                     try
                     {
-                        await Task.Delay(30000);
+                        await Task.Delay(20000);
                         var myCubeGrids = MyEntities.GetEntities().OfType<MyCubeGrid>();
                         await Task.Run(() => { CheckAllGrids(myCubeGrids); });
                     }
@@ -79,7 +79,7 @@ namespace SentisOptimisationsPlugin.AllGridsActions
                 SentisOptimisationsPlugin._limiter.CheckGrid(grid);
                 if (SentisOptimisationsPlugin.Config.AutoRestoreFromVoxel)
                 {
-                    _fallInVoxelDetector.CheckAndSavePos(grid);
+                    FallInVoxelDetector.CheckAndSavePos(grid);
                 }
                 
                 if (SentisOptimisationsPlugin.Config.AutoRenameGrids)

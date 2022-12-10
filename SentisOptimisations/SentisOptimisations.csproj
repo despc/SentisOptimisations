@@ -116,6 +116,7 @@
       <Compile Include="Utils\ProjectorUtils.cs" />
       <Compile Include="Utils\ReflectionUtils.cs" />
       <Compile Include="Utils\SoundUtils.cs" />
+      <Compile Include="Voxels\VoxelsPatch.cs" />
       <Compile Include="Wheels\WheelPatch.cs" />
     </ItemGroup>
     <ItemGroup>

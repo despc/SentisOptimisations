@@ -9,7 +9,9 @@ using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Cube;
 using Sandbox.Game.GameSystems;
 using Sandbox.Game.GameSystems.Conveyors;
+using Sandbox.ModAPI;
 using SentisOptimisations;
+using SpaceEngineers.Game.Entities.Blocks;
 using Torch.Managers.PatchManager;
 using VRage;
 using VRage.Algorithms;
@@ -210,6 +212,22 @@ namespace SentisOptimisationsPlugin
         {
             MyCubeGrid m_cubeGrid =
                 (MyCubeGrid) ReflectionUtils.GetInstanceField(__instance.GetType(), __instance, "m_cubeGrid");
+
+
+            if (VoxelsPatch.Protectors == null)
+            {
+                if (block.FatBlock is MyUpgradeModule)
+                {
+                    foreach (var myEntityComponent in block.FatBlock.Components)
+                    {
+                        if (myEntityComponent.GetType().Name.Equals("NanoBotSuppressor"))
+                        {
+                            VoxelsPatch.Protectors = (HashSet<IMyUpgradeModule>)myEntityComponent.GetType()
+                                .GetField("Protectors").GetValue(null);
+                        }
+                    }
+                }
+            }
             if (block.FatBlock is MyThrust)
             {
                 if (__instance.ShipSoundComponent != null)
