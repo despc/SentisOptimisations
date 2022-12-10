@@ -39,7 +39,26 @@ namespace SentisOptimisationsPlugin
             ctx.GetPattern(MethodCutOutShapeWithProperties).Prefixes.Add(
                 typeof(VoxelsPatch).GetMethod(nameof(PatchCutOutShape),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
+            var MethodCutOutShapeWithPropertiesAsync = typeof(MyVoxelBase).GetMethod(
+                "CutOutShapeWithPropertiesAsync",
+                BindingFlags.Instance | BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
 
+            ctx.GetPattern(MethodCutOutShapeWithPropertiesAsync).Prefixes.Add(
+                typeof(VoxelsPatch).GetMethod(nameof(PatchCutOutShape),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+
+            var type = typeof(MyVoxelBase).Assembly.GetType("Sandbox.Game.MyExplosion");
+
+            var MethodCCutOutVoxelMap = type.GetMethod(
+                "CutOutVoxelMap",
+                BindingFlags.Instance | BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+            
+            ctx.GetPattern(MethodCCutOutVoxelMap).Prefixes.Add(
+                typeof(VoxelsPatch).GetMethod(nameof(PatchCutOutVoxelMap),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
+            
             var MethodCutOutShape = typeof(MyVoxelGenerator).GetMethod(
                 "CutOutShape",
                 BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
@@ -123,6 +142,35 @@ namespace SentisOptimisationsPlugin
             return true;
         }
 
+        private static bool PatchCutOutVoxelMap(Vector3D center)
+        {
+            try
+            {
+                var pos = center;
+                if (Protectors == null)
+                {
+                    return true;
+                }
+
+                foreach (var myUpgradeModule in Protectors)
+                {
+                    if (Vector3D.Distance(myUpgradeModule.PositionComp.GetPosition(), pos) < 300)
+                    {
+                        if (myUpgradeModule.Enabled && myUpgradeModule.IsFunctional)
+                        {
+                            return false;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex);
+            }
+
+            return true;
+        }
+        
         private static bool PatchCutOutShape(MyShape shape)
         {
             try

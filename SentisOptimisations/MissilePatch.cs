@@ -188,6 +188,9 @@ namespace SentisOptimisationsPlugin
             voxelsTmp.Clear();
             foreach (MyVoxelBase voxelMap in voxelsToCutTmp)
             {
+                
+                if (!IsVoxelDestructable(sphere)) continue;
+
                 bool createDebris = true;
                 var type = typeof(MyVoxelBase).Assembly.GetType("Sandbox.Game.MyExplosion");
                 ReflectionUtils.InvokeStaticMethod(type, "CutOutVoxelMap",
@@ -197,7 +200,30 @@ namespace SentisOptimisationsPlugin
             }
             voxelsToCutTmp.Clear();
         }
-        
+
+        private static bool IsVoxelDestructable(BoundingSphereD sphere)
+        {
+            if (VoxelsPatch.Protectors == null)
+            {
+                return true;
+            }
+
+            var pos = sphere.Center;
+
+            foreach (var myUpgradeModule in VoxelsPatch.Protectors)
+            {
+                if (Vector3D.Distance(myUpgradeModule.PositionComp.GetPosition(), pos) < 300)
+                {
+                    if (myUpgradeModule.Enabled && myUpgradeModule.IsFunctional)
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+        }
+
         public static void ComputeDamagedBlocks(MyGridExplosion m_gridExplosion, bool pearcingDamage)
         {
             Dictionary<MySlimBlock, float> m_damagedBlocks = new Dictionary<MySlimBlock, float>();
