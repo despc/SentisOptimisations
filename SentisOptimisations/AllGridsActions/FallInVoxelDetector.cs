@@ -10,7 +10,7 @@ namespace SentisOptimisationsPlugin.AllGridsActions
 {
     public class FallInVoxelDetector
     {
-        private Dictionary<long, PositionAndOrientation> gridsPos = new Dictionary<long, PositionAndOrientation>();
+        public Dictionary<long, PositionAndOrientation> gridsPos = new Dictionary<long, PositionAndOrientation>();
 
         public void SavePos(MyCubeGrid grid)
         {
@@ -18,69 +18,74 @@ namespace SentisOptimisationsPlugin.AllGridsActions
                 new PositionAndOrientation(grid.PositionComp.GetPosition(), grid.PositionComp.GetOrientation());
         }
 
-        public void RestorePos(MyCubeGrid grid)
+        public void RestorePos(MyCubeGrid grid, bool force = false)
         {
             if (gridsPos.TryGetValue(grid.EntityId, out PositionAndOrientation pos))
             {
-                MyAPIGateway.Utilities.InvokeOnGameThread(() =>
-                {
-                    try
-                    {
-                        
-                        var grids = grid.GetConnectedGrids(GridLinkTypeEnum.Mechanical);
-                        var aabb = new BoundingBoxD(grid.PositionComp.WorldAABB.Min, grid.PositionComp.WorldAABB.Max);
-                        foreach (var g in grids)
-                        {
-                            if (g.IsStatic)
-                            {
-                                SentisOptimisationsPlugin.Log.Warn("Don't process static grid " + grid.DisplayName);
-                                return;
-                            }
-                            aabb.Include(g.PositionComp.WorldAABB);
-                        }
-
-                        MyPlanet planet = null;
-                        var currentPosition = grid.PositionComp.GetPosition();
-                        foreach (var p in AllGridsObserver.Planets)
-                        {
-                            if (planet == null)
-                            {
-                                planet = p;
-                                continue;
-                            }
-
-                            if (Vector3D.Distance(planet.PositionComp.GetPosition(), currentPosition) >
-                                Vector3D.Distance(p.PositionComp.GetPosition(), currentPosition))
-                            {
-                                planet = p;
-                            }
-                        }
-                        //var pos = planet.GetClosestSurfacePointGlobal(cockpit.WorldMatrix.Translation);
-                        foreach (var g in grids)
-                        {
-                            g.Physics.AngularVelocity = Vector3.Zero;
-                            g.Physics.LinearVelocity = Vector3.Zero;
-                        }
-
-                        var vec = (pos.Position - planet.PositionComp.WorldMatrix.Translation);
-                        vec.Normalize();
-                        currentPosition = pos.Position + vec * (aabb.Size.Max()+10);
-
-                        var m = grid.WorldMatrix;
-                        m.Translation = currentPosition;
-            
-                        //grid.WorldMatrix = m;
-                        //grid.PositionComp.SetPosition(currentPosition);
-                        grid.Teleport(m);
-                        SentisOptimisationsPlugin.Log.Warn("Restored from voxels grid " + grid.DisplayName);
-                    }
-                    catch (Exception e)
-                    {
-                        SentisOptimisationsPlugin.Log.Warn("RestorePos Prevent crash", e);
-                    }
-                });
+                MyAPIGateway.Utilities.InvokeOnGameThread(() => { DoRestoreSync(grid, force, pos); });
             }
         }
+
+        public void DoRestoreSync(MyCubeGrid grid, bool force, PositionAndOrientation pos)
+        {
+            try
+            {
+                var grids = grid.GetConnectedGrids(GridLinkTypeEnum.Mechanical);
+                var aabb = new BoundingBoxD(grid.PositionComp.WorldAABB.Min, grid.PositionComp.WorldAABB.Max);
+                foreach (var g in grids)
+                {
+                    if (g.IsStatic && !force)
+                    {
+                        
+                        SentisOptimisationsPlugin.Log.Warn("Don't process static grid " + grid.DisplayName);
+                        return;
+                    }
+
+                    aabb.Include(g.PositionComp.WorldAABB);
+                }
+
+                MyPlanet planet = null;
+                var currentPosition = grid.PositionComp.GetPosition();
+                foreach (var p in AllGridsObserver.Planets)
+                {
+                    if (planet == null)
+                    {
+                        planet = p;
+                        continue;
+                    }
+
+                    if (Vector3D.Distance(planet.PositionComp.GetPosition(), currentPosition) >
+                        Vector3D.Distance(p.PositionComp.GetPosition(), currentPosition))
+                    {
+                        planet = p;
+                    }
+                }
+
+                //var pos = planet.GetClosestSurfacePointGlobal(cockpit.WorldMatrix.Translation);
+                foreach (var g in grids)
+                {
+                    g.Physics.AngularVelocity = Vector3.Zero;
+                    g.Physics.LinearVelocity = Vector3.Zero;
+                }
+
+                var vec = (pos.Position - planet.PositionComp.WorldMatrix.Translation);
+                vec.Normalize();
+                currentPosition = pos.Position + vec * (aabb.Size.Max() + 10);
+
+                var m = grid.WorldMatrix;
+                m.Translation = currentPosition;
+
+                //grid.WorldMatrix = m;
+                //grid.PositionComp.SetPosition(currentPosition);
+                grid.Teleport(m);
+                SentisOptimisationsPlugin.Log.Warn("Restored from voxels grid " + grid.DisplayName);
+            }
+            catch (Exception e)
+            {
+                SentisOptimisationsPlugin.Log.Warn("RestorePos Prevent crash", e);
+            }
+        }
+
 
         public void CheckAndSavePos(MyCubeGrid grid)
         {
@@ -91,7 +96,7 @@ namespace SentisOptimisationsPlugin.AllGridsActions
 
             if (Voxels.IsGridInsideVoxel(grid))
             {
-                if (grid.Physics.LinearVelocity.Length() < 30)
+                if (grid.Physics.LinearVelocity.Length() < 10)
                 {
                     return;
                 }
@@ -103,7 +108,7 @@ namespace SentisOptimisationsPlugin.AllGridsActions
         }
     }
 
-    internal class PositionAndOrientation
+    public class PositionAndOrientation
     {
         private Vector3D _position;
         private MatrixD _orientation;

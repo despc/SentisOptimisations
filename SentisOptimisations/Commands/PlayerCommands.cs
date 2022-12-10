@@ -1,27 +1,108 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Threading.Tasks;
 using NLog;
 using Sandbox.Engine.Multiplayer;
 using Sandbox.Engine.Physics;
-using Sandbox.Engine.Voxels;
 using Sandbox.Game.Entities;
 using Sandbox.Game.World;
 using Sandbox.ModAPI;
-using SentisOptimisations;
+using Scripts.Shared;
+using SentisOptimisationsPlugin.AllGridsActions;
 using Torch.Commands;
 using Torch.Commands.Permissions;
 using VRage.Game;
 using VRage.Game.ModAPI;
-using VRage.Game.Voxels;
 using VRage.ModAPI;
 using VRage.Network;
 using VRageMath;
 
 namespace SentisOptimisationsPlugin
 {
+    [Category("vs")]
+    public class PlayerCommandsVS : CommandModule
+    {
+        public static readonly Logger Log = LogManager.GetCurrentClassLogger();
+
+
+        [Command("restore", ".", null)]
+        [Permission(MyPromoteLevel.None)]
+        public void Restore(string gridName = "")
+        {
+            var player = Context.Player;
+            if (player?.Character == null)
+                return;
+
+            var character = player?.Character;
+            Matrix headMatrix = character.GetHeadMatrix(true, true, false);
+            Vector3D vector3D = headMatrix.Translation + headMatrix.Forward * 0.5f;
+            Vector3D worldEnd = headMatrix.Translation + headMatrix.Forward * 500.5f;
+            List<MyPhysics.HitInfo> mRaycastResult = new List<MyPhysics.HitInfo>();
+            HashSet<IMyEntity> GridSets = new HashSet<IMyEntity>();
+            List<MyCubeGrid> GridsGroup;
+
+            MyCubeGrid gridToRevert = null;
+            if (gridName != string.Empty)
+            {
+                MyAPIGateway.Entities.GetEntities(GridSets, (IMyEntity Entity) => Entity is IMyCubeGrid &&
+                    Entity.DisplayName.Equals(gridName, StringComparison.InvariantCultureIgnoreCase) &&
+                    !((MyCubeGrid)Entity).IsPreview);
+                if (!GridSets.Any())
+                {
+                    Context.Respond("No such grid exist with name '" + gridName + "' .", "Voxel Shift", "Red");
+                    return;
+                }
+
+                gridToRevert = (MyCubeGrid)GridSets.First();
+            }
+            else
+            {
+                MyPhysics.CastRay(vector3D, worldEnd, mRaycastResult, 15);
+
+                foreach (var hitInfo in new HashSet<MyPhysics.HitInfo>(mRaycastResult))
+                {
+                    if (hitInfo.HkHitInfo.GetHitEntity() is MyCubeGrid grid)
+                    {
+                        if (grid is null)
+                            continue;
+
+                        // ignore projected grid.
+                        if (grid.IsPreview)
+                            continue;
+
+                        gridToRevert = grid;
+                        break;
+                    }
+                }
+            }
+
+            if (gridToRevert == null)
+            {
+                Context.Respond("No grid found", "Voxel Shift", "Red");
+                return;
+            }
+
+            // check ownership
+            if (gridToRevert.BigOwners.Count > 0 && !gridToRevert.BigOwners.Contains(player.IdentityId))
+            {
+                Context.Respond("Only grid owner can restore grid");
+                return;
+            }
+
+            if (!Voxels.IsGridInsideVoxel(gridToRevert))
+            {
+                Context.Respond("Grid not in voxels!");
+                return;
+            }
+
+            var fallInVoxelDetector = AllGridsObserver.FallInVoxelDetector;
+            if (fallInVoxelDetector.gridsPos.TryGetValue(gridToRevert.EntityId, out PositionAndOrientation pos))
+            {
+                fallInVoxelDetector.DoRestoreSync(gridToRevert, true, pos);
+            }
+        }
+    }
+
     [Category("convert")]
     public class PlayerCommands : CommandModule
     {
