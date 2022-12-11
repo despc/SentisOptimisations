@@ -51,7 +51,7 @@ namespace SentisOptimisationsPlugin
 
                     foreach (var myPlayer in players)
                     {
-                        if (Vector3D.Distance(grid.PositionComp.GetPosition(), myPlayer.GetPosition()) > 10000)
+                        if (Vector3D.Distance(grid.PositionComp.GetPosition(), myPlayer.GetPosition()) > 3000)
                         {
                             continue;
                         }
