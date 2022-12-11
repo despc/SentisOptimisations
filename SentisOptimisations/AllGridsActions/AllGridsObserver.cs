@@ -18,7 +18,7 @@ namespace SentisOptimisationsPlugin.AllGridsActions
 
         public static HashSet<MyPlanet> Planets = new HashSet<MyPlanet>();
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
-        
+
         public CancellationTokenSource CancellationTokenSource { get; set; }
 
         public void OnLoaded()
@@ -37,11 +37,12 @@ namespace SentisOptimisationsPlugin.AllGridsActions
                 Planets.Add(myPlanet);
             }
         }
+
         public void OnUnloading()
         {
             CancellationTokenSource.Cancel();
         }
-        
+
         public async void CheckLoop()
         {
             try
@@ -54,13 +55,12 @@ namespace SentisOptimisationsPlugin.AllGridsActions
                         await Task.Delay(20000);
                         var myCubeGrids = MyEntities.GetEntities().OfType<MyCubeGrid>();
                         await Task.Run(() => { CheckAllGrids(myCubeGrids); });
+                        await PhysicsProfilerMonitor.__instance.Profile();
                     }
                     catch (Exception e)
                     {
                         Log.Error("CheckLoop Error", e);
                     }
-                    
-                    await PhysicsProfilerMonitor.__instance.Profile();
                 }
             }
             catch (Exception e)
@@ -68,8 +68,8 @@ namespace SentisOptimisationsPlugin.AllGridsActions
                 Log.Error("CheckLoop start Error", e);
             }
         }
-        
-        
+
+
         private void CheckAllGrids(IEnumerable<MyCubeGrid> myCubeGrids)
         {
             foreach (var grid in myCubeGrids)
@@ -81,12 +81,12 @@ namespace SentisOptimisationsPlugin.AllGridsActions
                 {
                     FallInVoxelDetector.CheckAndSavePos(grid);
                 }
-                
+
                 if (SentisOptimisationsPlugin.Config.AutoRenameGrids)
                 {
                     _autoRenamer.CheckAndRename(grid);
                 }
-                
+
                 if (SentisOptimisationsPlugin.Config.DisableNoOwner)
                 {
                     CheckNobodyOwner(grid);
