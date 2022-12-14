@@ -5,12 +5,12 @@ using Havok;
 using NLog;
 using Sandbox;
 using Sandbox.Engine.Physics;
+using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Blocks;
 using Sandbox.Game.Entities.Cube;
 using Sandbox.Game.Weapons;
 using SentisOptimisations;
 using SpaceEngineers.Game.Weapons.Guns;
-using Torch.Managers.PatchManager;
 
 namespace SentisOptimisationsPlugin
 {
@@ -47,6 +47,13 @@ namespace SentisOptimisationsPlugin
                         BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic)));
             }
 
+
+            var MethodUpdateAfterSimulationDoor = typeof(MyAdvancedDoor).GetMethod
+                ("UpdateAfterSimulation", BindingFlags.Instance | BindingFlags.Public);
+
+            SentisOptimisationsPlugin.harmony.Patch(MethodUpdateAfterSimulationDoor, prefix: new HarmonyMethod(
+                typeof(PerfomancePatch).GetMethod(nameof(DoSlowdown10),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic)));
         }
 
 
@@ -93,6 +100,18 @@ namespace SentisOptimisationsPlugin
             var next = Random.Next(60, SentisOptimisationsPlugin.Config.AdaptiveBlockSlowdownThreshold);
 
             if (next > staticCpuLoad)
+            {
+                return true;
+            }
+
+            return false;
+        }
+        
+        private static bool DoSlowdown10(MyFunctionalBlock __instance)
+        {
+            var next = Random.Next(1, 11);
+
+            if (next > 9)
             {
                 return true;
             }
