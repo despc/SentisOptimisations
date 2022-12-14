@@ -20,6 +20,7 @@ namespace SentisOptimisationsPlugin
         private bool _enabledPcuLimiter = true;
         private bool _enableCheckBeacon = true;
         private bool _enableOnlyEarthSpawn = true;
+        private bool _disableTurretUpdate = false;
         private int _maxStaticGridPCU = 200000;
         private int _maxDinamycGridPCU = 30000;
         private int _accelerationToDamage = 1000;
@@ -220,6 +221,13 @@ namespace SentisOptimisationsPlugin
         {
             get => _enableRammingForStatic;
             set => SetValue(ref _enableRammingForStatic, value);
+        }
+        
+        [DisplayTab(Name = "Disable Turret Update", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Disable Turret Update if WeaponCore")]
+        public bool DisableTurretUpdate
+        {
+            get => _disableTurretUpdate;
+            set => SetValue(ref _disableTurretUpdate, value);
         }
 
         [DisplayTab(Name = "Safe zone Physics Threshold", GroupName = "Safe zone", Tab = "Safe zone", Order = 0, Description = "Safe zone Physics Threshold")]
