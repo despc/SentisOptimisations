@@ -8,6 +8,7 @@ using Sandbox.Engine.Physics;
 using Sandbox.Engine.Voxels;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Cube;
+using Sandbox.Game.GameSystems;
 using Sandbox.ModAPI;
 using Torch.Managers.PatchManager;
 using VRage.Game.ModAPI.Ingame;
@@ -74,6 +75,15 @@ namespace SentisOptimisationsPlugin
             ctx.GetPattern(MethodBreakLogicHandler).Prefixes.Add(
                 typeof(VoxelsPatch).GetMethod(nameof(PatchBreakLogicHandler),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
+            var MethodRequestCutOut = typeof(MyShipMiningSystem).GetMethod(
+                "RequestCutOut",
+                BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+
+            ctx.GetPattern(MethodRequestCutOut).Prefixes.Add(
+                typeof(VoxelsPatch).GetMethod(nameof(PatchRequestCutOut),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
         }
 
 
@@ -141,6 +151,36 @@ namespace SentisOptimisationsPlugin
 
             return true;
         }
+        
+        private static bool PatchRequestCutOut(Vector3D hitPosition)
+        {
+            try
+            {
+                var pos = hitPosition;
+                if (Protectors == null)
+                {
+                    return true;
+                }
+
+                foreach (var myUpgradeModule in Protectors)
+                {
+                    if (Vector3D.Distance(myUpgradeModule.PositionComp.GetPosition(), pos) < 300)
+                    {
+                        if (myUpgradeModule.Enabled && myUpgradeModule.IsFunctional)
+                        {
+                            return false;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex);
+            }
+
+            return true;
+        }
+        
 
         private static bool PatchCutOutVoxelMap(Vector3D center)
         {
