@@ -36,6 +36,7 @@
       <Compile Include="AllGridsActions\FallInVoxelDetector.cs" />
       <Compile Include="AllGridsActions\GridAutoRenamer.cs" />
       <Compile Include="Anticheat\HydrogenPatch.cs" />
+      <Compile Include="Anticheat\GrindPaintFix.cs" />
       <Compile Include="Anticheat\TorchPatch.cs" />
       <Compile Include="Api\ShieldApi.cs" />
       <Compile Include="Char\CharPatch.cs" />

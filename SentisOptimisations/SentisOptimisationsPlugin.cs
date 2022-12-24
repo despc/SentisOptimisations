@@ -70,6 +70,7 @@ namespace SentisOptimisationsPlugin
             MyFakes.ENABLE_SCRAP = false;
             SetupConfig();
             PerfomancePatch.Patch();
+            GrindPaintFix.Patch();
             SessionManager = Torch.Managers.GetManager<TorchSessionManager>();
             if (SessionManager == null)
                 return;
