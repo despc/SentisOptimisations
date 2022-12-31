@@ -86,7 +86,15 @@ namespace SentisOptimisationsPlugin
         
         //Arrakis
         private String _engineSubtypeKey = "test_subtype";
+        private bool _offlineProtectionReminder = false;
         private float _engineMultiplier = 5;
+        
+        
+        //Online Reward
+        private bool _onlineRewardEnabled = true;
+        private int _onlineRewardEachMinutes = 60;
+        private string _onlineReward = "Ingot_CleanSpice=5;Ingot_Uranium=50";
+        private string _onlineRewardMessage = "Спасибо что остаётесь с нами, награда за игру на сервере в вашем инвентаре.";
         
         private ObservableCollection<ConfigShipInMarket> configShipsInMarket = new ObservableCollection<ConfigShipInMarket>();
 
@@ -104,11 +112,34 @@ namespace SentisOptimisationsPlugin
             }
         }
         
+        [DisplayTab(Name = "Online Reward Enabled", GroupName = "Online Reward", Tab = "Online Reward", Order = 0, Description = "Online Reward Enabled")]
+        public bool OnlineRewardEnabled
+        {
+            get => _onlineRewardEnabled;
+            set => SetValue(ref _onlineRewardEnabled, value);
+        }
+        
+        [DisplayTab(Name = "Reward for online", GroupName = "Online Reward", Tab = "Online Reward", Order = 1, Description = "Reward for online")]
+        public String OnlineReward { get => _onlineReward; set => SetValue(ref _onlineReward, value); }
+        
+        [DisplayTab(Name = "Reward for online message", GroupName = "Online Reward", Tab = "Online Reward", Order = 1, Description = "Reward for online message")]
+        public String OnlineRewardMessage { get => _onlineRewardMessage; set => SetValue(ref _onlineRewardMessage, value); }
+        
+        [DisplayTab(Name = "Online reward each N minutes", GroupName = "Online Reward", Tab = "Online Reward", Order = 2, Description = "Online reward each N minutes")]
+        public int OnlineRewardEachMinutes { get => _onlineRewardEachMinutes; set => SetValue(ref _onlineRewardEachMinutes, value); }
+        
         [DisplayTab(Name = "Engine Subtype Key", GroupName = "Arrakis", Tab = "Arrakis", Order = 0, Description = "Engine Subtype Key")]
         public String EngineSubtypeKey { get => _engineSubtypeKey; set => SetValue(ref _engineSubtypeKey, value); }
         
         [DisplayTab(Name = "Engine Multiplier", GroupName = "Arrakis", Tab = "Arrakis", Order = 0, Description = "Engine Multiplier")]
         public float EngineMultiplier { get => _engineMultiplier; set => SetValue(ref _engineMultiplier, value); }
+        
+        [DisplayTab(Name = "Offline Protection Reminder", GroupName = "Arrakis", Tab = "Arrakis", Order = 0, Description = "Offline Protection Reminder")]
+        public bool OfflineProtectionReminder
+        {
+            get => _offlineProtectionReminder;
+            set => SetValue(ref _offlineProtectionReminder, value);
+        }
         
         [DisplayTab(Name = "Ideal Cluster Size", GroupName = "Physics", Tab = "Physics", Order = 0, Description = "Ideal Cluster Size")]
         public float IdealClusterSize { get => _idealClusterSize; set => SetValue(ref _idealClusterSize, value); }
