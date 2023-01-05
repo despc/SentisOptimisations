@@ -78,6 +78,7 @@ namespace SentisOptimisationsPlugin
         //Physics
         private float _idealClusterSize = 10000;
         private float _maximumClusterSize = 15000;
+        private bool _patchClusterActivity = false;
         
         //Tweaks
         private bool _autoRenameGrids = false;
@@ -117,6 +118,13 @@ namespace SentisOptimisationsPlugin
         {
             get => _onlineRewardEnabled;
             set => SetValue(ref _onlineRewardEnabled, value);
+        }
+        
+        [DisplayTab(Name = "Patch IsClusterActive", GroupName = "Physics", Tab = "Physics", Order = 0, Description = "Patch IsClusterActive")]
+        public bool PatchClusterActivity
+        {
+            get => _patchClusterActivity;
+            set => SetValue(ref _patchClusterActivity, value);
         }
         
         [DisplayTab(Name = "Reward for online", GroupName = "Online Reward", Tab = "Online Reward", Order = 1, Description = "Reward for online")]

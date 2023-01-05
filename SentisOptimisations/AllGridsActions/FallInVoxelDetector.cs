@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Sandbox.Engine.Physics;
 using Sandbox.Game.Entities;
 using Sandbox.ModAPI;
 using Scripts.Shared;
@@ -74,10 +75,11 @@ namespace SentisOptimisationsPlugin.AllGridsActions
 
                 var m = grid.WorldMatrix;
                 m.Translation = currentPosition;
-
                 //grid.WorldMatrix = m;
                 //grid.PositionComp.SetPosition(currentPosition);
                 grid.Teleport(m);
+                BoundingSphereD sphere = new BoundingSphereD(currentPosition, 30000);
+                MyPhysics.Clusters.ReorderClusters(BoundingBoxD.CreateFromSphere(sphere));
                 SentisOptimisationsPlugin.Log.Warn("Restored from voxels grid " + grid.DisplayName);
             }
             catch (Exception e)
