@@ -29,76 +29,106 @@ namespace SentisOptimisationsPlugin
         [Permission(MyPromoteLevel.None)]
         public void Restore(string gridName = "")
         {
-            var player = Context.Player;
-            if (player?.Character == null)
-                return;
-
-            var character = player?.Character;
-            Matrix headMatrix = character.GetHeadMatrix(true, true, false);
-            Vector3D vector3D = headMatrix.Translation + headMatrix.Forward * 0.5f;
-            Vector3D worldEnd = headMatrix.Translation + headMatrix.Forward * 500.5f;
-            List<MyPhysics.HitInfo> mRaycastResult = new List<MyPhysics.HitInfo>();
-            HashSet<IMyEntity> GridSets = new HashSet<IMyEntity>();
-            List<MyCubeGrid> GridsGroup;
-
-            MyCubeGrid gridToRevert = null;
-            if (gridName != string.Empty)
+            try
             {
-                MyAPIGateway.Entities.GetEntities(GridSets, (IMyEntity Entity) => Entity is IMyCubeGrid &&
-                    Entity.DisplayName.Equals(gridName, StringComparison.InvariantCultureIgnoreCase) &&
-                    !((MyCubeGrid)Entity).IsPreview);
-                if (!GridSets.Any())
+                var player = Context.Player;
+                if (player?.Character == null)
+                    return;
+
+                var character = player?.Character;
+                Matrix headMatrix = character.GetHeadMatrix(true, true, false);
+                Vector3D vector3D = headMatrix.Translation + headMatrix.Forward * 0.5f;
+                Vector3D worldEnd = headMatrix.Translation + headMatrix.Forward * 500.5f;
+                List<MyPhysics.HitInfo> mRaycastResult = new List<MyPhysics.HitInfo>();
+                HashSet<IMyEntity> GridSets = new HashSet<IMyEntity>();
+                List<MyCubeGrid> GridsGroup;
+
+                MyCubeGrid gridToRevert = null;
+                if (gridName != string.Empty)
                 {
-                    Context.Respond("No such grid exist with name '" + gridName + "' .", "Voxel Shift", "Red");
+                    MyAPIGateway.Entities.GetEntities(GridSets, (IMyEntity Entity) => Entity is IMyCubeGrid &&
+                        Entity.DisplayName.Equals(gridName, StringComparison.InvariantCultureIgnoreCase) &&
+                        !((MyCubeGrid)Entity).IsPreview);
+                    if (!GridSets.Any())
+                    {
+                        Context.Respond("No such grid exist with name '" + gridName + "' .", "Voxel Shift", "Red");
+                        return;
+                    }
+
+                    gridToRevert = (MyCubeGrid)GridSets.First();
+                }
+                else
+                {
+                    MyPhysics.CastRay(vector3D, worldEnd, mRaycastResult, 15);
+
+                    foreach (var hitInfo in new HashSet<MyPhysics.HitInfo>(mRaycastResult))
+                    {
+                        if (hitInfo.HkHitInfo.GetHitEntity() is MyCubeGrid grid)
+                        {
+                            if (grid is null)
+                                continue;
+
+                            // ignore projected grid.
+                            if (grid.IsPreview)
+                                continue;
+
+                            gridToRevert = grid;
+                            break;
+                        }
+                    }
+                }
+
+                if (gridToRevert == null)
+                {
+                    Context.Respond("No grid found", "Voxel Shift", "Red");
                     return;
                 }
 
-                gridToRevert = (MyCubeGrid)GridSets.First();
-            }
-            else
-            {
-                MyPhysics.CastRay(vector3D, worldEnd, mRaycastResult, 15);
-
-                foreach (var hitInfo in new HashSet<MyPhysics.HitInfo>(mRaycastResult))
+                // check ownership
+                if (gridToRevert.BigOwners.Count > 0 && !gridToRevert.BigOwners.Contains(player.IdentityId))
                 {
-                    if (hitInfo.HkHitInfo.GetHitEntity() is MyCubeGrid grid)
+                    Context.Respond("Only grid owner can restore grid");
+                    return;
+                }
+
+                if (!Voxels.IsGridInsideVoxel(gridToRevert))
+                {
+                    Context.Respond("Grid not in voxels!");
+                    return;
+                }
+
+                var fallInVoxelDetector = AllGridsObserver.FallInVoxelDetector;
+                if (fallInVoxelDetector.gridsPos.TryGetValue(gridToRevert.EntityId, out PositionAndOrientation pos))
+                {
+                    fallInVoxelDetector.DoRestoreSync(gridToRevert, true, pos);
+                }
+                else
+                {
+                    MyPlanet planet = null;
+                    var currentPosition = gridToRevert.PositionComp.GetPosition();
+                    foreach (var p in AllGridsObserver.Planets)
                     {
-                        if (grid is null)
+                        if (planet == null)
+                        {
+                            planet = p;
                             continue;
+                        }
 
-                        // ignore projected grid.
-                        if (grid.IsPreview)
-                            continue;
-
-                        gridToRevert = grid;
-                        break;
+                        if (Vector3D.Distance(planet.PositionComp.GetPosition(), currentPosition) >
+                            Vector3D.Distance(p.PositionComp.GetPosition(), currentPosition))
+                        {
+                            planet = p;
+                        }
                     }
+
+                    var pos1 = planet.GetClosestSurfacePointGlobal(gridToRevert.WorldMatrix.Translation);
+                    fallInVoxelDetector.DoRestoreSync(gridToRevert, true,
+                        new PositionAndOrientation(pos1, gridToRevert.PositionComp.GetOrientation()));
                 }
             }
-
-            if (gridToRevert == null)
+            catch (Exception e)
             {
-                Context.Respond("No grid found", "Voxel Shift", "Red");
-                return;
-            }
-
-            // check ownership
-            if (gridToRevert.BigOwners.Count > 0 && !gridToRevert.BigOwners.Contains(player.IdentityId))
-            {
-                Context.Respond("Only grid owner can restore grid");
-                return;
-            }
-
-            if (!Voxels.IsGridInsideVoxel(gridToRevert))
-            {
-                Context.Respond("Grid not in voxels!");
-                return;
-            }
-
-            var fallInVoxelDetector = AllGridsObserver.FallInVoxelDetector;
-            if (fallInVoxelDetector.gridsPos.TryGetValue(gridToRevert.EntityId, out PositionAndOrientation pos))
-            {
-                fallInVoxelDetector.DoRestoreSync(gridToRevert, true, pos);
+                Log.Error("Restore Exception ", e);
             }
         }
     }
