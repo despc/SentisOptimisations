@@ -65,7 +65,7 @@ namespace Scripts.Shared {
 
                 var grid_vsettings = new VoxelPlacementSettings();
                 grid_vsettings.PlacementMode = VoxelPlacementMode.Volumetric;
-                grid_vsettings.MaxAllowed = 0.20f;
+                grid_vsettings.MaxAllowed = SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.CheckInsideVoxel;
                 grid_vsettings.MinAllowed = 0;
 
                 grid_settings.VoxelPlacement = grid_vsettings;

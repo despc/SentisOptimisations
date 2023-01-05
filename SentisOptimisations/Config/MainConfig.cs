@@ -43,6 +43,7 @@ namespace SentisOptimisationsPlugin
         private float _ammoExplosionRadius = 15f;
 
         private float _physicsMsToAlert = 1.5f;
+        private float _checkInsideVoxel = 0.1f;
         private float _physicsMsToPunish = 2f;
         private float _warheadDamageMultiplier = 2.5f;
         private float _physicsMsToPunishImmediately = 5f;
@@ -295,6 +296,13 @@ namespace SentisOptimisationsPlugin
         {
             get => _physicsMsToAlert;
             set => SetValue(ref _physicsMsToAlert, value);
+        }
+        
+        [DisplayTab(Name = "Check Inside Voxel percent", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Check Inside Voxel percent")]
+        public float CheckInsideVoxel
+        {
+            get => _checkInsideVoxel;
+            set => SetValue(ref _checkInsideVoxel, value);
         }
 
         [DisplayTab(Name = "Physics ms to punish", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Physics ms to punish")]
