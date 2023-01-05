@@ -62,9 +62,20 @@ namespace SentisOptimisationsPlugin
         private FuckWelderProcessor _welderProcessor = new FuckWelderProcessor();
         private AllGridsObserver _allGridsObserver = new AllGridsObserver();
         public static ShieldApi SApi = new ShieldApi();
-        
+
+
+        static void MyHandler(object sender, UnhandledExceptionEventArgs args)
+        {
+            Exception e = (Exception) args.ExceptionObject;
+            Log.Error("MyHandler caught : " + e.Message);
+            Log.Error(e);
+            Log.Error("Runtime terminating: {0}", args.IsTerminating);
+        }
         public override void Init(ITorchBase torch)
         {
+            AppDomain currentDomain = AppDomain.CurrentDomain;
+            currentDomain.UnhandledException += new UnhandledExceptionEventHandler(MyHandler);
+            
             Instance = this;
             Log.Info("Init SentisOptimisationsPlugin");
             MyFakes.ENABLE_SCRAP = false;
@@ -161,6 +172,16 @@ namespace SentisOptimisationsPlugin
                 int active = 0;
                 foreach (MyClusterTree.MyCluster myCluster in clusters)
                 {
+
+                    if (SentisOptimisationsPlugin.Config.PatchClusterActivity)
+                    {
+                        if (ClusterActivityCheck.ActiveClusters.Contains(myCluster.ClusterId))
+                        {
+                            active++;
+                        }
+
+                        continue;
+                    }
                     if (myCluster.UserData is HkWorld userData && (bool)myPhysics.easyCallMethod("IsClusterActive", new object[]{myCluster.ClusterId, userData.CharacterRigidBodies.Count}))
                     {
                         active++;
