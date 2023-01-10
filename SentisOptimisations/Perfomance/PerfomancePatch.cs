@@ -55,48 +55,6 @@ namespace SentisOptimisationsPlugin
             SentisOptimisationsPlugin.harmony.Patch(MethodUpdateAfterSimulationDoor, prefix: new HarmonyMethod(
                 typeof(PerfomancePatch).GetMethod(nameof(DoSlowdown10),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic)));
-            
-            var MethodIsClusterActive = typeof(MyPhysics).GetMethod
-                ("IsClusterActive", BindingFlags.Instance | BindingFlags.NonPublic);
-
-            SentisOptimisationsPlugin.harmony.Patch(MethodIsClusterActive, prefix: new HarmonyMethod(
-                typeof(PerfomancePatch).GetMethod(nameof(IsClusterActivePatched),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic)));
-            
-            var MethodOnContact = typeof(HkContactListener).GetMethod
-                ("OnContact", BindingFlags.Instance | BindingFlags.Static | BindingFlags.NonPublic);
-
-            SentisOptimisationsPlugin.harmony.Patch(MethodOnContact, finalizer: new HarmonyMethod(
-                typeof(PerfomancePatch).GetMethod(nameof(OnContactFinalizerPatched),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic)));
-        }
-
-        private static Exception OnContactFinalizerPatched(Exception __exception)
-        {
-            if (__exception == null)
-            {
-                return null;
-            }
-            Log.Error(__exception);
-            return null;
-        }
-        
-        private static bool IsClusterActivePatched(int clusterId, int rigidBodiesCount, MyPhysics __instance, ref bool __result)
-        {
-            if (!SentisOptimisationsPlugin.Config.PatchClusterActivity || MySandboxGame.Static.SimulationFrameCounter < 1000)
-            {
-                return true;
-            }
-
-            try
-            {
-                __result = ClusterActivityCheck.ActiveClusters.Contains(clusterId);
-            }
-            catch (Exception e)
-            {
-                Log.Error("IsClusterActivePatched exception ", e);
-            }
-            return false;
         }
         
         private static bool MethodUpdateAfterSimulation10Patched(MyFunctionalBlock __instance)

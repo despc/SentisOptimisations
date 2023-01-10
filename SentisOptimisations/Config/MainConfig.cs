@@ -121,13 +121,6 @@ namespace SentisOptimisationsPlugin
             set => SetValue(ref _onlineRewardEnabled, value);
         }
         
-        [DisplayTab(Name = "Patch IsClusterActive", GroupName = "Physics", Tab = "Physics", Order = 0, Description = "Patch IsClusterActive")]
-        public bool PatchClusterActivity
-        {
-            get => _patchClusterActivity;
-            set => SetValue(ref _patchClusterActivity, value);
-        }
-        
         [DisplayTab(Name = "Reward for online", GroupName = "Online Reward", Tab = "Online Reward", Order = 1, Description = "Reward for online")]
         public String OnlineReward { get => _onlineReward; set => SetValue(ref _onlineReward, value); }
         

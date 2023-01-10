@@ -17,7 +17,6 @@ namespace SentisOptimisationsPlugin.AllGridsActions
         private GridAutoRenamer _autoRenamer = new GridAutoRenamer();
         private Reminder _reminder = new Reminder();
         private OnlineReward _onlineReward = new OnlineReward();
-        private ClusterActivityCheck _clusterActivityCheck = new ClusterActivityCheck();
 
         public static HashSet<MyPlanet> Planets = new HashSet<MyPlanet>();
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
@@ -28,7 +27,6 @@ namespace SentisOptimisationsPlugin.AllGridsActions
         {
             CancellationTokenSource = new CancellationTokenSource();
             CheckLoop();
-            CheckLoop5();
 
             HashSet<IMyEntity> list = new HashSet<IMyEntity>();
             MyAPIGateway.Entities.GetEntities(list);
@@ -73,31 +71,6 @@ namespace SentisOptimisationsPlugin.AllGridsActions
                 Log.Error("CheckLoop start Error", e);
             }
         }        
-        
-        public async void CheckLoop5()
-        {
-            try
-            {
-                Log.Info("CheckLoop5 started");
-                while (!CancellationTokenSource.Token.IsCancellationRequested)
-                {
-                    try
-                    {
-                        await Task.Delay(5000);
-                        await Task.Run(() => { _clusterActivityCheck.CheckClusters(); });
-                    }
-                    catch (Exception e)
-                    {
-                        Log.Error("CheckLoop5 Error", e);
-                    }
-                }
-            }
-            catch (Exception e)
-            {
-                Log.Error("CheckLoop5 start Error", e);
-            }
-        }
-
 
         private void CheckAllGrids(IEnumerable<MyCubeGrid> myCubeGrids)
         {
