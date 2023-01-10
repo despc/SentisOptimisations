@@ -172,16 +172,6 @@ namespace SentisOptimisationsPlugin
                 int active = 0;
                 foreach (MyClusterTree.MyCluster myCluster in clusters)
                 {
-
-                    if (SentisOptimisationsPlugin.Config.PatchClusterActivity)
-                    {
-                        if (ClusterActivityCheck.ActiveClusters.Contains(myCluster.ClusterId))
-                        {
-                            active++;
-                        }
-
-                        continue;
-                    }
                     if (myCluster.UserData is HkWorld userData && (bool)myPhysics.easyCallMethod("IsClusterActive", new object[]{myCluster.ClusterId, userData.CharacterRigidBodies.Count}))
                     {
                         active++;

@@ -33,7 +33,6 @@
     </PropertyGroup>
     <ItemGroup>
       <Compile Include="AllGridsActions\AllGridsObserver.cs" />
-      <Compile Include="AllGridsActions\ClusterActivityCheck.cs" />
       <Compile Include="AllGridsActions\FallInVoxelDetector.cs" />
       <Compile Include="AllGridsActions\GridAutoRenamer.cs" />
       <Compile Include="AllGridsActions\OnlineReward.cs" />
