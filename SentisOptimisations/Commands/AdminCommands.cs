@@ -7,9 +7,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using NAPI;
 using NLog;
+using NLog.Fluent;
 using Sandbox.Definitions;
 using Sandbox.Engine.Voxels;
 using Sandbox.Game.Entities;
+using Sandbox.Game.Entities.Blocks;
 using Sandbox.Game.Multiplayer;
 using Sandbox.Game.SessionComponents;
 using Sandbox.Game.World;
@@ -55,6 +57,37 @@ namespace SentisOptimisationsPlugin
                 }
                 Log.Error("DELETE faction " + faction.Value.Tag);
                 cleanFaction(faction);
+            }
+        }
+
+        [Command("cp", ".", null)]
+        [Permission(MyPromoteLevel.Moderator)]
+        public void CleanProjectors()
+        {
+            var myCubeGrids = MyEntities.GetEntities().OfType<MyCubeGrid>();
+            foreach (var myCubeGrid in myCubeGrids)
+            {
+                foreach (var myCubeBlock in myCubeGrid.GetFatBlocks())
+                {
+                    try
+                    {
+                        if (myCubeBlock is MyProjectorBase)
+                        {
+                            var projectedGrid = ((MyProjectorBase)myCubeBlock).ProjectedGrid;
+                            if (projectedGrid == null)
+                            {
+                                continue;
+                            }
+                            Log.Error("Clean projector on grid " + myCubeGrid.DisplayName);
+                            ((IMyProjector)myCubeBlock).SetProjectedGrid(null);
+                            ((MyProjectorBase)myCubeBlock).Clipboard.Clear();
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        Log.Error("CleanProjectors Exception ", e);
+                    }
+                }
             }
         }
         
