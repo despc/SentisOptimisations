@@ -141,7 +141,7 @@
       <Reference Include="PresentationCore" />
       <Reference Include="PresentationFramework" />
       <Reference Include="Profiler">
-        <HintPath>C:\Arrakis\torch-server\Plugins\Profiler\Profiler.dll</HintPath>
+        <HintPath>..\..\..\..\..\Arrakis\torch-server\Plugins\profiler-v3.1.0.28-25-g9393be6 (1)\Profiler.dll</HintPath>
       </Reference>
       <Reference Include="ProtoBuf.Net, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
         <HintPath>C:\Arrakis\torch-server\DedicatedServer64\ProtoBuf.Net.dll</HintPath>
@@ -209,6 +209,12 @@
       </Reference>
       <Reference Include="VRage.RemoteClient.Core">
         <HintPath>C:\Arrakis\torch-server\DedicatedServer64\VRage.RemoteClient.Core.dll</HintPath>
+      </Reference>
+      <Reference Include="VRage.Render">
+        <HintPath>..\..\..\..\..\Arrakis\torch-server\DedicatedServer64\VRage.Render.dll</HintPath>
+      </Reference>
+      <Reference Include="VRage.Render11">
+        <HintPath>..\..\..\..\..\Arrakis\torch-server\DedicatedServer64\VRage.Render11.dll</HintPath>
       </Reference>
       <Reference Include="VRage.Scripting, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
         <HintPath>C:\Arrakis\torch-server\DedicatedServer64\VRage.Scripting.dll</HintPath>
