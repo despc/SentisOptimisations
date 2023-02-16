@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Reflection;
 using Havok;
 using NLog;
-using ParallelTasks;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Cube;
 using Sandbox.ModAPI;
@@ -20,18 +19,18 @@ namespace SentisOptimisationsPlugin
     public static class DamagePatch
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
-        public static Dictionary<long,long> contactInfo = new Dictionary<long, long>();
+        public static Dictionary<long, long> contactInfo = new Dictionary<long, long>();
         public static HashSet<long> protectedChars = new HashSet<long>();
         private static bool _init;
-        
+
         public static void Init()
         {
             if (_init)
                 return;
             _init = true;
             MyAPIGateway.Session.DamageSystem.RegisterBeforeDamageHandler(0, ProcessDamage);
-        }    
-        
+        }
+
         private static void ProcessDamage(object target, ref MyDamageInformation info)
         {
             try
@@ -46,7 +45,6 @@ namespace SentisOptimisationsPlugin
 
         private static void DoProcessDamage(object target, ref MyDamageInformation damage)
         {
-
             IMyCharacter character = target as IMyCharacter;
             if (character != null)
             {
@@ -56,7 +54,7 @@ namespace SentisOptimisationsPlugin
                     return;
                 }
             }
-            
+
             IMySlimBlock damagedBlock = target as IMySlimBlock;
             if (damagedBlock == null)
             {
@@ -79,12 +77,12 @@ namespace SentisOptimisationsPlugin
             {
                 return;
             }
-            
+
             if (damagedBlock.BlockDefinition.Id.SubtypeName.Contains("Titanium"))
             {
                 damage.Amount = damage.Amount / 20;
             }
-            
+
             if (damagedBlock.BlockDefinition.Id.SubtypeName.Contains("Aluminum"))
             {
                 damage.Amount = damage.Amount / 5;
@@ -96,23 +94,23 @@ namespace SentisOptimisationsPlugin
             var gridDamageAccumulator = FuckWelderProcessor.WelderDamageAccumulator;
             if (gridDamageAccumulator.TryGetValue(damagedGrid.EntityId, out var weldersData))
             {
-                foreach (var welderData in new  Dictionary<long, int>(weldersData))
+                foreach (var welderData in new Dictionary<long, int>(weldersData))
                 {
-                    MyShipWelder welder = (MyShipWelder) MyEntities.GetEntityById(welderData.Key);
+                    MyShipWelder welder = (MyShipWelder)MyEntities.GetEntityById(welderData.Key);
                     if (welder == null || !welder.Enabled)
                     {
                         continue;
                     }
 
                     var currentHeat = welderData.Value;
-                    
+
                     if (welderData.Value > SentisOptimisationsPlugin.Config.MaxHeat)
                     {
                         return;
                     }
-                    weldersData[welderData.Key] = currentHeat + (int) damage.Amount;
+
+                    weldersData[welderData.Key] = currentHeat + (int)damage.Amount;
                 }
-                
             }
             else
             {
@@ -122,32 +120,14 @@ namespace SentisOptimisationsPlugin
 
         public static void Patch(PatchContext ctx)
         {
-
-            
             var MethodPerformDeformation = typeof(MyGridPhysics).GetMethod
-                    ("PerformDeformation", BindingFlags.Instance | BindingFlags.NonPublic);
-            
+                ("PerformDeformation", BindingFlags.Instance | BindingFlags.NonPublic);
+
             ctx.GetPattern(MethodPerformDeformation).Prefixes.Add(
                 typeof(DamagePatch).GetMethod(nameof(PatchPerformDeformation),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-            
-            
-            var MethodSpinOnce = typeof(MySpinWait).GetMethod
-                (nameof(MySpinWait.SpinOnce), BindingFlags.Instance | BindingFlags.Public);
-            
-            ctx.GetPattern(MethodSpinOnce).Prefixes.Add(
-                typeof(DamagePatch).GetMethod(nameof(SpinOnce),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-            
-            
         }
 
-
-        
-        private static bool SpinOnce()
-        {
-            return false;
-        }
         private static bool PatchPerformDeformation(
             MyGridPhysics __instance,
             ref HkBreakOffPointInfo pt,
@@ -155,8 +135,8 @@ namespace SentisOptimisationsPlugin
             float separatingVelocity,
             MyEntity otherEntity)
         {
-
-            if (otherEntity is MyVoxelBase && separatingVelocity < SentisOptimisationsPlugin.Config.NoDamageFromVoxelsBeforeSpeed)
+            if (otherEntity is MyVoxelBase &&
+                separatingVelocity < SentisOptimisationsPlugin.Config.NoDamageFromVoxelsBeforeSpeed)
             {
                 if (separatingVelocity < 5)
                 {
@@ -170,24 +150,28 @@ namespace SentisOptimisationsPlugin
                         contactInfo[myCubeGrid.EntityId] = 1;
                     }
                 }
+
                 return false;
             }
 
-            if (((MyCubeGrid) __instance.Entity).IsStatic)
+            if (((MyCubeGrid)__instance.Entity).IsStatic)
             {
                 return SentisOptimisationsPlugin.Config.StaticRamming;
             }
+
             if (otherEntity is MyCubeGrid)
             {
-                if (((MyCubeGrid) otherEntity).IsStatic)
+                if (((MyCubeGrid)otherEntity).IsStatic)
                 {
-                    return true;   
+                    return true;
                 }
-                if (((MyCubeGrid) otherEntity).Mass < SentisOptimisationsPlugin.Config.MinimumMassForKineticDamage)
+
+                if (((MyCubeGrid)otherEntity).Mass < SentisOptimisationsPlugin.Config.MinimumMassForKineticDamage)
                 {
                     return false;
                 }
             }
+
             return true;
         }
     }
