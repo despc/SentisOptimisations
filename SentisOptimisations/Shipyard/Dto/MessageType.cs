@@ -9,6 +9,10 @@ namespace SentisOptimisationsPlugin
     BuyReq,
     SetGridListReq,
     SelectGridReq,
-    SetGridListResp
+    SetGridListResp,
+    FixShip,
+    ListForGuiReq,
+    ListForGuiResp,
+    CancelSellReq
   }
 }

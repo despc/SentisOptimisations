@@ -4,6 +4,7 @@ using Sandbox.Game.Entities;
 using SentisOptimisations;
 using Torch.Managers.PatchManager;
 using VRage.Game;
+using VRage.Game.ModAPI;
 using VRageMath;
 
 namespace SentisOptimisationsPlugin
@@ -21,11 +22,11 @@ namespace SentisOptimisationsPlugin
         {
             try
             {
-                var pcu = GridUtils.GetPCU(__instance, true,
+                var pcu = GridUtils.GetPCU((IMyCubeGrid)__instance, true,
                     SentisOptimisationsPlugin.Config.IncludeConnectedGrids);
                 var configMaxDinamycGridPcu = SentisOptimisationsPlugin.Config.MaxDinamycGridPCU;
                 bool enemyAround = false;
-                var owner = PlayerUtils.GetOwner(__instance);
+                var owner = PlayerUtils.GetOwner((IMyCubeGrid)__instance);
                 foreach (var player in PlayerUtils.GetAllPlayers())
                 {
                     

@@ -1,11 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
-using FixTurrets.Garage;
+using System.Threading.Tasks;
+using System.Windows.Controls;
+using HarmonyLib;
+using Havok;
+using NAPI;
 using NLog;
 using Sandbox;
 using Sandbox.Engine.Multiplayer;
+using Sandbox.Engine.Physics;
 using Sandbox.Engine.Utils;
 using Sandbox.Engine.Voxels;
 using Sandbox.Game;
@@ -15,37 +21,61 @@ using Sandbox.Game.GameSystems;
 using Sandbox.Game.World;
 using Sandbox.ModAPI;
 using SentisOptimisations;
-using SentisOptimisationsPlugin.Clusters;
+using SentisOptimisationsPlugin.AllGridsActions;
+using SentisOptimisationsPlugin.ShipTool;
+using SOPlugin.GUI;
 using Torch;
 using Torch.API;
 using Torch.API.Managers;
+using Torch.API.Plugins;
 using Torch.API.Session;
 using Torch.Commands;
 using Torch.Commands.Permissions;
+using Torch.Managers;
 using Torch.Session;
+using VRage.Collections;
+using VRage.Game;
 using VRage.Game.ModAPI;
 using VRage.Game.Voxels;
 using VRage.Network;
+using VRage.ObjectBuilders;
 using VRageMath;
+using VRageMath.Spatial;
 
 namespace SentisOptimisationsPlugin
 {
-    public class SentisOptimisationsPlugin : TorchPluginBase
+    public class SentisOptimisationsPlugin : TorchPluginBase, IWpfPlugin
     {
+        private static Guid NexusGUID = new Guid("28a12184-0422-43ba-a6e6-2e228611cca5");
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
         public static PcuLimiter _limiter = new PcuLimiter();
-        public static OldGridProcessor _oldGridProcessor = new OldGridProcessor();
-        public static ClusterBuilder _cb = new ClusterBuilder();
         public static Dictionary<long,long> stuckGrids = new Dictionary<long, long>();
         public static Dictionary<long,long> gridsInSZ = new Dictionary<long, long>();
-        public static MethodInfo m_myProgrammableBlockKillProgramm;
         private static TorchSessionManager SessionManager;
-        public static Config Config;
+        private static Persistent<MainConfig> _config;
+        public static Harmony harmony = new Harmony("SentisOptimisations.H");
+        public static MainConfig Config => _config.Data;
         public static Random _random = new Random();
+        public UserControl _control = null;
         public static SentisOptimisationsPlugin Instance { get; private set; }
 
+        private FuckWelderProcessor _welderProcessor = new FuckWelderProcessor();
+        private AllGridsObserver _allGridsObserver = new AllGridsObserver();
+        public static ShieldApi SApi = new ShieldApi();
+
+
+        static void MyHandler(object sender, UnhandledExceptionEventArgs args)
+        {
+            Exception e = (Exception) args.ExceptionObject;
+            Log.Error("MyHandler caught : " + e.Message);
+            Log.Error(e);
+            Log.Error("Runtime terminating: {0}", args.IsTerminating);
+        }
         public override void Init(ITorchBase torch)
         {
+            AppDomain currentDomain = AppDomain.CurrentDomain;
+            currentDomain.UnhandledException += new UnhandledExceptionEventHandler(MyHandler);
+            
             Instance = this;
             Log.Info("Init SentisOptimisationsPlugin");
             MyFakes.ENABLE_SCRAP = false;
@@ -53,8 +83,26 @@ namespace SentisOptimisationsPlugin
             SessionManager = Torch.Managers.GetManager<TorchSessionManager>();
             if (SessionManager == null)
                 return;
+            var configOverrideModIds = Config.OverrideModIds;
             SessionManager.SessionStateChanged += SessionManager_SessionStateChanged;
-            m_myProgrammableBlockKillProgramm = typeof (MyProgrammableBlock).GetMethod("OnProgramTermination", BindingFlags.Instance | BindingFlags.NonPublic);
+            if (string.IsNullOrEmpty(configOverrideModIds))
+            {
+                foreach (var modId in configOverrideModIds.Split(','))
+                {
+                    if (string.IsNullOrEmpty(configOverrideModIds))
+                    {
+                        try
+                        {
+                            var modIdL = Convert.ToUInt64(modId);
+                            SessionManager.AddOverrideMod(modIdL);
+                        }
+                        catch (Exception e)
+                        {
+                            Log.Warn("Skip wrong modId " + modId);
+                        }
+                    }
+                }
+            }
         }
 
         private void SessionManager_SessionStateChanged(
@@ -64,7 +112,7 @@ namespace SentisOptimisationsPlugin
             if (newState == TorchSessionState.Unloading)
             {
                 _limiter.OnUnloading();
-                _cb.OnUnloading();
+                _allGridsObserver.OnUnloading();
             }
             else
             {
@@ -72,19 +120,109 @@ namespace SentisOptimisationsPlugin
                     return;
                 DamagePatch.Init();
                 _limiter.OnLoaded();
-                _cb.OnLoaded();
-                _oldGridProcessor.OnLoaded();
+                _allGridsObserver.OnLoaded();
+                InitShieldApi();
                 Communication.RegisterHandlers();
+                ITorchPlugin Plugin;
+                if (DependencyProviderExtensions
+                    .GetManager<PluginManager>((IDependencyProvider) this.Torch.CurrentSession.Managers).Plugins
+                    .TryGetValue(NexusGUID, out Plugin))
+                {
+                    AquireNexus(Plugin);
+                }
+                    
             }
         }
 
+        public async void InitShieldApi()
+        {
+            try
+            {
+                await Task.Delay(60000);
+                SApi.Load();
+            }
+            catch (Exception e)
+            {
+                Log.Error(e);
+            }
+        }
+
+        private static void AquireNexus(ITorchPlugin Plugin)
+        {
+            Type type = ((object) Plugin).GetType()?.Assembly.GetType("Nexus.API.PluginAPISync");
+            if (type == (Type) null)
+                return;
+            type.GetMethod("ApplyPatching", BindingFlags.Static | BindingFlags.NonPublic).Invoke((object) null, new object[2]
+            {
+                (object) typeof (NexusAPI),
+                (object) "SentisOptimisations"
+            });
+            NexusSupport.Init();
+        }
+        
+        public void UpdateGui()
+        {
+            try
+            {
+                ListReader<MyClusterTree.MyCluster> clusters = MyPhysics.Clusters.GetClusters();
+                var myPhysics = MySession.Static.GetComponent<MyPhysics>();
+                int active = 0;
+                foreach (MyClusterTree.MyCluster myCluster in clusters)
+                {
+                    if (myCluster.UserData is HkWorld userData && (bool)myPhysics.easyCallMethod("IsClusterActive", new object[]{myCluster.ClusterId, userData.CharacterRigidBodies.Count}))
+                    {
+                        active++;
+                    }
+                }
+                
+                var clustersCount = clusters.Count;
+                
+                Instance.UpdateUI((x) =>
+                {
+                    var gui = x as ConfigGUI;
+
+                    gui.ClustersStatistic.Text =
+                        $"Count: {clustersCount}, Active: {active}";
+                });
+            }
+            catch (Exception e)
+            {
+                Log.Error(e, "WTF?");
+            }
+        }
+        
+        public void UpdateUI(Action<UserControl> action)
+        {
+            try
+            {
+                if (_control != null)
+                {
+                    _control.Dispatcher.Invoke(() =>
+                    {
+                        try
+                        {
+                            action.Invoke(_control);
+                        }
+                        catch (Exception e)
+                        {
+                            Log.Error(e, "Something wrong in executing function:" + action);
+                        }
+                    });
+                }
+            }
+            catch (Exception e)
+            {
+                Log.Error(e, "Cant UpdateUI");
+            }
+        }
+        
         public override void Update()
         {
-
+            FrameExecutor.Update();
             if (MySandboxGame.Static.SimulationFrameCounter % 500 == 0)
             {
-                
-                foreach (var keyValuePair in new Dictionary<long, long>(PerfomancePatch.entityesInSZ))
+                Task.Run(UpdateGui);
+                foreach (var keyValuePair in new Dictionary<long, long>(SafezonePatch.entitiesInSZ))
                 {
                     var entityId = keyValuePair.Key;
                     var entityById = MyEntities.GetEntityById(entityId);
@@ -95,7 +233,7 @@ namespace SentisOptimisationsPlugin
                     }
 
                     var time = keyValuePair.Value;
-                    if (time > 5)
+                    if (time > 10)
                     {
                         Log.Error("Entity in sz " + entityId + "   " + displayName + " time - " + time);
                         if (gridsInSZ.ContainsKey(entityId))
@@ -155,9 +293,13 @@ namespace SentisOptimisationsPlugin
                         }
                     }
                 }
-                PerfomancePatch.entityesInSZ.Clear();
+                SafezonePatch.entitiesInSZ.Clear();
             }
-            
+
+            if (MySandboxGame.Static.SimulationFrameCounter % 60 == 0)
+            {
+                _welderProcessor.Process();
+            }
 
             if (MySandboxGame.Static.SimulationFrameCounter % 120 == 0)
             {
@@ -171,13 +313,13 @@ namespace SentisOptimisationsPlugin
                     }
 
                     var contactCount = keyValuePair.Value;
-                    if (contactCount > 150)
+                    if (contactCount > Config.ContactCountAlert)
                     {
                         Log.Error("Entity  " + entityById.DisplayName + " position " +
                                   entityById.PositionComp.GetPosition() + " contact count - " + contactCount);
                     }
 
-                    if (contactCount < 2000)
+                    if (contactCount < 800)
                     {
                         continue;
                     }
@@ -214,9 +356,9 @@ namespace SentisOptimisationsPlugin
                                     MatrixD worldMatrix = myCubeGrid.WorldMatrix;
                                     var position = myCubeGrid.PositionComp.GetPosition();
 
-                                    var garbageLocation = new Vector3D(position.X + _random.Next(-100000, 100000),
-                                        position.Y + _random.Next(-100000, 100000),
-                                        position.Z + _random.Next(-100000, 100000));
+                                    var garbageLocation = new Vector3D(position.X + _random.Next(-10000, 10000),
+                                        position.Y + _random.Next(-10000, 10000),
+                                        position.Z + _random.Next(-10000, 10000));
                                     worldMatrix.Translation = garbageLocation;
                                     myCubeGrid.Teleport(worldMatrix, (object) null, false);
                                 }
@@ -254,6 +396,19 @@ namespace SentisOptimisationsPlugin
                                     var myBatteryBlock = block;
                                     myBatteryBlock.CurrentStoredPower = myBatteryBlock.MaxStoredPower;
                                 }
+                                if (mySlimBlock.FatBlock is MyReactor reactor)
+                                {
+                                    var myInventory = reactor.GetInventory();
+                                    var definitionId = new MyDefinitionId(typeof(MyObjectBuilder_Ingot), "Uranium");
+                                    var content = (MyObjectBuilder_PhysicalObject) MyObjectBuilderSerializer.CreateNewObject(definitionId);
+                                    MyObjectBuilder_InventoryItem inventoryItem = new MyObjectBuilder_InventoryItem
+                                        {Amount = 1000, Content = content};
+                                    myInventory.AddItems(100, inventoryItem);
+                                }
+                                if (mySlimBlock.FatBlock is MyGasTank tank)
+                                {
+                                    tank.ChangeFillRatioAmount(1);
+                                }
                             }
                         }
                     }
@@ -261,28 +416,18 @@ namespace SentisOptimisationsPlugin
             }
         }
 
+        public UserControl GetControl()
+        {
+            if (_control == null)
+            {
+                _control = new ConfigGUI();
+            }
+            return _control;
+        }
+
         private void SetupConfig()
         {
-            
-            Config = ConfigUtils.Load<Config>( this, "SentisOptimisations.cfg");
-            ConfigUtils.Save( this, Config, "SentisOptimisations.cfg");
-
-            // try
-            // {
-            //     _config = Persistent<Config>.Load(configFile);
-            // }
-            // catch (Exception e)
-            // {
-            //     Log.Warn(e);
-            // }
-            //
-            // if (_config?.Data == null)
-            // {
-            //     Log.Info("Create Default Config, because none was found!");
-            //
-            //     _config = new Persistent<Config>(configFile, new Config());
-            //     _config.Save();
-            // }
+            _config = Persistent<MainConfig>.Load(Path.Combine(StoragePath, "SentisOptimisations.cfg"));
         }
 
         public class TestCommands : CommandModule
@@ -315,8 +460,8 @@ namespace SentisOptimisationsPlugin
         }
         public override void Dispose()
         {
-            _limiter.CancellationTokenSource.Cancel();
-            _cb.CancellationTokenSource.Cancel();
+            _config.Save(Path.Combine(StoragePath, "SentisOptimisations.cfg"));
+            _allGridsObserver.CancellationTokenSource.Cancel();
             base.Dispose();
         }
     }

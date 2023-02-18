@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project ToolsVersion="15.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
     <PropertyGroup>
         <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -32,38 +32,76 @@
         <WarningLevel>4</WarningLevel>
     </PropertyGroup>
     <ItemGroup>
-      <Compile Include="AdminCommands.cs" />
-      <Compile Include="Clusters\ClusterBuilder.cs" />
-      <Compile Include="ConfigShipInMarket.cs" />
+      <Compile Include="AllGridsActions\AllGridsObserver.cs" />
+      <Compile Include="AllGridsActions\FallInVoxelDetector.cs" />
+      <Compile Include="AllGridsActions\GridAutoRenamer.cs" />
+      <Compile Include="AllGridsActions\OnlineReward.cs" />
+      <Compile Include="AllGridsActions\Reminder.cs" />
+      <Compile Include="Anticheat\HydrogenPatch.cs" />
+      <Compile Include="Anticheat\TorchPatch.cs" />
+      <Compile Include="Api\ShieldApi.cs" />
+      <Compile Include="Char\CharPatch.cs" />
+      <Compile Include="Cleanup\CleanupPatch.cs" />
+      <Compile Include="Commands\AdminCommands.cs" />
+      <Compile Include="Commands\PlayerCommands.cs" />
+      <Compile Include="Config\ConfigShipInMarket.cs" />
+      <Compile Include="Config\MainConfig.cs" />
       <Compile Include="ConnectorPatch.cs" />
       <Compile Include="CrashFix\CrashFixPatch.cs" />
-      <Compile Include="Garage\Delegate.cs" />
-      <Compile Include="Garage\GarageCommands.cs" />
-      <Compile Include="Garage\GarageCore.cs" />
-      <Compile Include="Garage\OldGridProcessor.cs" />
-      <Compile Include="ParallelPatch.cs" />
-      <Compile Include="PerfomancePatch.cs" />
-      <Compile Include="Config.cs" />
       <Compile Include="ContractPricePatch.cs" />
       <Compile Include="DamagePatch.cs" />
+      <Compile Include="Donation.cs" />
+      <Compile Include="Eco\EcoPatch.cs" />
+      <Compile Include="FixShip\FixShipLogic.cs" />
+      <Compile Include="Gravity\GravityPatch.cs" />
+      <Compile Include="GUI\ConfigGUI.cs">
+        <DependentUpon>ConfigGUI.xaml</DependentUpon>
+      </Compile>
+      <Compile Include="GUI\DisplayTab.cs" />
+      <Compile Include="GUI\FilteredGrid.cs" />
       <Compile Include="Limits\BuildBlockPatch.cs" />
       <Compile Include="Limits\ConvertPatch.cs" />
-      <Compile Include="Limits\MergePatch.cs" />
       <Compile Include="Limits\PcuLimiter.cs" />
       <Compile Include="MissilePatch.cs" />
+      <Compile Include="Nexus\CharacterUtilities.cs" />
+      <Compile Include="Nexus\Chat.cs" />
+      <Compile Include="Nexus\NexusAPI.cs" />
+      <Compile Include="Nexus\NexusMessage.cs" />
+      <Compile Include="Nexus\NexusMessageType.cs" />
+      <Compile Include="Nexus\NexusSupport.cs" />
       <Compile Include="NoScrapPatch.cs" />
-      <Compile Include="NpcStorePatch.cs" />
+      <Compile Include="NPC\NpcPatches.cs" />
+      <Compile Include="Perfomance\ExplosionsPatch.cs" />
+      <Compile Include="Perfomance\GasTankOptimisations.cs" />
+      <Compile Include="Perfomance\Limits\PhysicsProfilerMonitor.cs" />
+      <Compile Include="Perfomance\Limits\Punisher.cs" />
+      <Compile Include="Perfomance\PBFix.cs" />
+      <Compile Include="Perfomance\SafezonePatch.cs" />
+      <Compile Include="Perfomance\StreamingPatch.cs" />
+      <Compile Include="Perfomance\WelderOptimization.cs" />
       <Compile Include="RemovePluginPatch.cs" />
+      <Compile Include="Rep\ReputationPatch.cs" />
+      <Compile Include="Shared\Action2.cs" />
+      <Compile Include="Shared\Ext2.cs" />
+      <Compile Include="Shared\FrameExecutor.cs" />
+      <Compile Include="Shared\SharpUtils.cs" />
+      <Compile Include="Shared\Voxels.cs" />
+      <Compile Include="ShipTool\FuckWelderProcessor.cs" />
+      <Compile Include="ShipTool\ShipToolPatch.cs" />
       <Compile Include="Shipyard\Communication.cs" />
+      <Compile Include="Shipyard\Dto\CancelSellRequest.cs" />
       <Compile Include="Shipyard\Dto\ClientBuyRequest.cs" />
       <Compile Include="Shipyard\Dto\FillListRequest.cs" />
       <Compile Include="Shipyard\Dto\FillListResponse.cs" />
+      <Compile Include="Shipyard\Dto\FixShipRequest.cs" />
       <Compile Include="Shipyard\Dto\GridForList.cs" />
+      <Compile Include="Shipyard\Dto\GUI\GuiGridsRequest.cs" />
+      <Compile Include="Shipyard\Dto\GUI\GuiGridsResponse.cs" />
       <Compile Include="Shipyard\Dto\MessageType.cs" />
       <Compile Include="Shipyard\Dto\StartSellRequest.cs" />
       <Compile Include="Shipyard\ShipyardLogic\Shipyard.cs" />
-      <Compile Include="TurretPatchs.cs" />
       <Compile Include="SentisOptimisationsPlugin.cs" />
+      <Compile Include="TurretPatchs.cs" />
       <Compile Include="Utils\BlockUtils.cs" />
       <Compile Include="Utils\ChatUtils.cs" />
       <Compile Include="Utils\ConfigUtils.cs" />
@@ -73,70 +111,125 @@
       <Compile Include="Utils\IdentityUtils.cs" />
       <Compile Include="Utils\NetworkUtils.cs" />
       <Compile Include="Utils\NotificationUtils.cs" />
+      <Compile Include="Utils\PhysicsUtils.cs" />
       <Compile Include="Utils\PlayerUtils.cs" />
       <Compile Include="Utils\ProjectorUtils.cs" />
       <Compile Include="Utils\ReflectionUtils.cs" />
       <Compile Include="Utils\SoundUtils.cs" />
-      <Compile Include="ConveyorPatch.cs" />
+      <Compile Include="Voxels\VoxelsPatch.cs" />
+      <Compile Include="Wheels\WheelPatch.cs" />
     </ItemGroup>
     <ItemGroup>
-      <Reference Include="DePatch, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\..\..\Downloads\DePatch-1.18.65\DePatch.dll</HintPath>
+      <Reference Include="0Harmony, Version=2.1.1.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>lib\0Harmony.dll</HintPath>
       </Reference>
       <Reference Include="HavokWrapper, Version=0.1.1.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>D:\torch-server\DedicatedServer64\HavokWrapper.dll</HintPath>
+        <HintPath>C:\Arrakis\torch-server\DedicatedServer64\HavokWrapper.dll</HintPath>
+      </Reference>
+      <Reference Include="Microsoft.CodeAnalysis, Version=2.9.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35">
+        <HintPath>C:\Arrakis\torch-server\DedicatedServer64\Microsoft.CodeAnalysis.dll</HintPath>
+      </Reference>
+      <Reference Include="Microsoft.CodeAnalysis.CSharp, Version=2.9.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35">
+        <HintPath>C:\Arrakis\torch-server\DedicatedServer64\Microsoft.CodeAnalysis.CSharp.dll</HintPath>
       </Reference>
       <Reference Include="NLog, Version=4.0.0.0, Culture=neutral, PublicKeyToken=5120e14c03d0593c">
-        <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\NLog.dll</HintPath>
+        <HintPath>C:\Arrakis\torch-server\DedicatedServer64\NLog.dll</HintPath>
+      </Reference>
+      <Reference Include="PresentationCore" />
+      <Reference Include="PresentationFramework" />
+      <Reference Include="Profiler">
+        <HintPath>..\..\..\..\..\Arrakis\torch-server\Plugins\Profiler\Profiler.dll</HintPath>
       </Reference>
       <Reference Include="ProtoBuf.Net, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\ProtoBuf.Net.dll</HintPath>
+        <HintPath>C:\Arrakis\torch-server\DedicatedServer64\ProtoBuf.Net.dll</HintPath>
       </Reference>
       <Reference Include="ProtoBuf.Net.Core, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\ProtoBuf.Net.Core.dll</HintPath>
+        <HintPath>C:\Arrakis\torch-server\DedicatedServer64\ProtoBuf.Net.Core.dll</HintPath>
       </Reference>
       <Reference Include="Sandbox.Common, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>D:\torch-server\DedicatedServer64\Sandbox.Common.dll</HintPath>
+        <HintPath>C:\Arrakis\torch-server\DedicatedServer64\Sandbox.Common.dll</HintPath>
       </Reference>
       <Reference Include="Sandbox.Game, Version=0.1.1.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\Sandbox.Game.dll</HintPath>
+        <HintPath>C:\Arrakis\torch-server\DedicatedServer64\Sandbox.Game.dll</HintPath>
+      </Reference>
+      <Reference Include="Sandbox.Graphics">
+        <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\Sandbox.Graphics.dll</HintPath>
       </Reference>
       <Reference Include="Sandbox.RenderDirect, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\Sandbox.RenderDirect.dll</HintPath>
+        <HintPath>C:\Arrakis\torch-server\DedicatedServer64\Sandbox.RenderDirect.dll</HintPath>
       </Reference>
       <Reference Include="SpaceEngineers.Game, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>D:\torch-server\DedicatedServer64\SpaceEngineers.Game.dll</HintPath>
+        <HintPath>C:\Arrakis\torch-server\DedicatedServer64\SpaceEngineers.Game.dll</HintPath>
       </Reference>
       <Reference Include="SpaceEngineers.ObjectBuilders, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>D:\torch-server\DedicatedServer64\SpaceEngineers.ObjectBuilders.dll</HintPath>
+        <HintPath>C:\Arrakis\torch-server\DedicatedServer64\SpaceEngineers.ObjectBuilders.dll</HintPath>
       </Reference>
       <Reference Include="System" />
+      <Reference Include="System.Collections.Immutable, Version=1.2.3.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
+        <HintPath>C:\Arrakis\torch-server\DedicatedServer64\System.Collections.Immutable.dll</HintPath>
+      </Reference>
       <Reference Include="System.Core" />
+      <Reference Include="System.Data" />
+      <Reference Include="System.Data.DataSetExtensions" />
+      <Reference Include="System.Text.RegularExpressions, Version=4.1.1.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
+        <HintPath>C:\Arrakis\torch-server\DedicatedServer64\System.Text.RegularExpressions.dll</HintPath>
+      </Reference>
+      <Reference Include="System.Xaml" />
       <Reference Include="System.Xml" />
-      <Reference Include="Torch, Version=1.3.1.153, Culture=neutral, PublicKeyToken=null">
-        <HintPath>D:\torch-server\Torch.dll</HintPath>
+      <Reference Include="System.Xml.Linq" />
+      <Reference Include="Torch">
+        <HintPath>C:\Arrakis\torch-server\Torch.dll</HintPath>
       </Reference>
-      <Reference Include="Torch.API, Version=1.3.1.153, Culture=neutral, PublicKeyToken=null">
-        <HintPath>D:\torch-server\Torch.API.dll</HintPath>
+      <Reference Include="Torch.API">
+        <HintPath>C:\Arrakis\torch-server\Torch.API.dll</HintPath>
       </Reference>
-      <Reference Include="Torch.Server, Version=1.3.1.153, Culture=neutral, PublicKeyToken=null">
-        <HintPath>D:\torch-server\Torch.Server.exe</HintPath>
+      <Reference Include="TorchMonitor">
+        <HintPath>C:\Arrakis\torch-server\Plugins\Torch Monitor\TorchMonitor.dll</HintPath>
       </Reference>
       <Reference Include="VRage, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\VRage.dll</HintPath>
+        <HintPath>C:\Arrakis\torch-server\DedicatedServer64\VRage.dll</HintPath>
       </Reference>
       <Reference Include="VRage.Game, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\VRage.Game.dll</HintPath>
+        <HintPath>C:\Arrakis\torch-server\DedicatedServer64\VRage.Game.dll</HintPath>
       </Reference>
       <Reference Include="VRage.Library, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\VRage.Library.dll</HintPath>
+        <HintPath>C:\Arrakis\torch-server\DedicatedServer64\VRage.Library.dll</HintPath>
       </Reference>
-      <Reference Include="VRage.Math, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>D:\torch-server\DedicatedServer64\VRage.Math.dll</HintPath>
+      <Reference Include="VRage.Math">
+        <HintPath>C:\Arrakis\torch-server\DedicatedServer64\VRage.Math.dll</HintPath>
       </Reference>
+      <Reference Include="VRage.Network">
+        <HintPath>C:\Arrakis\torch-server\DedicatedServer64\VRage.Network.dll</HintPath>
+      </Reference>
+      <Reference Include="VRage.Platform.Windows">
+        <HintPath>C:\Arrakis\torch-server\DedicatedServer64\VRage.Platform.Windows.dll</HintPath>
+      </Reference>
+      <Reference Include="VRage.RemoteClient.Core">
+        <HintPath>C:\Arrakis\torch-server\DedicatedServer64\VRage.RemoteClient.Core.dll</HintPath>
+      </Reference>
+      <Reference Include="VRage.Render">
+        <HintPath>..\..\..\..\..\Arrakis\torch-server\DedicatedServer64\VRage.Render.dll</HintPath>
+      </Reference>
+      <Reference Include="VRage.Render11">
+        <HintPath>..\..\..\..\..\Arrakis\torch-server\DedicatedServer64\VRage.Render11.dll</HintPath>
+      </Reference>
+      <Reference Include="VRage.Scripting, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>C:\Arrakis\torch-server\DedicatedServer64\VRage.Scripting.dll</HintPath>
+      </Reference>
+      <Reference Include="WindowsBase" />
     </ItemGroup>
     <ItemGroup>
       <Content Include="manifest.xml" />
+    </ItemGroup>
+    <ItemGroup>
+        <Page Include="GUI\ConfigGUI.xaml">
+            <Generator>MSBuild:Compile</Generator>
+            <SubType>Designer</SubType>
+        </Page>
+        <Page Include="GUI\FilteredGrid.xaml">
+            <Generator>MSBuild:Compile</Generator>
+            <SubType>Designer</SubType>
+        </Page>
     </ItemGroup>
     <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
     <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

@@ -12,9 +12,12 @@ using System.Threading.Tasks;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Cube;
 using Sandbox.ModAPI;
+using SentisOptimisationsPlugin;
+using VRage.Game.Entity;
 using VRage.Game.ModAPI;
 using VRage.Groups;
 using VRage.ModAPI;
+using VRageMath;
 
 namespace SentisOptimisations
 {
@@ -27,8 +30,33 @@ namespace SentisOptimisations
             {
                 List<IMySlimBlock> blocks = new List<IMySlimBlock>();
                 grid.GetBlocks(blocks);
+                bool hasActiveEngine = false;
                 foreach (IMySlimBlock mySlimBlock in blocks)
+                {
                     num += BlockUtils.GetPCU(mySlimBlock as MySlimBlock);
+                    if (!(mySlimBlock.FatBlock is IMyUpgradeModule))
+                    {
+                        continue;
+                    }
+                    if (mySlimBlock.BlockDefinition.Id.SubtypeName.Contains(SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.EngineSubtypeKey))
+                    {
+                        var myUpgradeModule = ((IMyUpgradeModule)mySlimBlock.FatBlock);
+                        if (myUpgradeModule.IsFunctional && myUpgradeModule.Enabled)
+                        {
+                            hasActiveEngine = true;
+                        }
+                    }
+                }
+
+                if (hasActiveEngine)
+                {
+                    WheelPatch.gridsWithEngine.Add(grid.EntityId);
+                }
+                else
+                {
+                    WheelPatch.gridsWithEngine.Remove(grid.EntityId);
+                }
+                
                 if (includeSubGrids)
                 {
                     List<IMyCubeGrid> subGrids = GetSubGrids(grid, includeConnectorDocked);
@@ -53,7 +81,7 @@ namespace SentisOptimisations
             GridLinkTypeEnum type = GridLinkTypeEnum.Mechanical;
             if (includeConnectorDocked)
                 type = GridLinkTypeEnum.Physical;
-            MyAPIGateway.GridGroups.GetGroup(grid, type, (ICollection<IMyCubeGrid>) source);
+            MyAPIGateway.GridGroups.GetGroup(((IMyCubeGrid)grid), type, (ICollection<IMyCubeGrid>) source);
             if (source != null && source.Count > 0)
             {
                 IMyCubeGrid myCubeGrid = source
@@ -149,5 +177,29 @@ namespace SentisOptimisations
                 return playerId == myCubeGrid.BigOwners[0];
             return (ulong) playerId <= 0UL;
         }
+        
+        public static List<MyCubeGrid> FindAllGridsInRadius(Vector3 center, float radius)
+        {
+            MyDynamicAABBTreeD m_dynamicObjectsTree =
+                (MyDynamicAABBTreeD) ReflectionUtils.GetPrivateStaticField(typeof(MyGamePruningStructure),
+                    "m_dynamicObjectsTree");
+            MyDynamicAABBTreeD m_staticObjectsTree =
+                (MyDynamicAABBTreeD) ReflectionUtils.GetPrivateStaticField(typeof(MyGamePruningStructure),
+                    "m_staticObjectsTree");
+            BoundingSphereD boundingSphere = new BoundingSphereD(center, radius);
+            List<MyEntity> result = new List<MyEntity>();
+            m_dynamicObjectsTree.OverlapAllBoundingSphere(ref boundingSphere, result);
+            m_staticObjectsTree.OverlapAllBoundingSphere(ref boundingSphere, result);
+            List<MyCubeGrid> grids = new List<MyCubeGrid>();
+            foreach (var myEntity in result)
+            {
+                if (myEntity is MyCubeGrid)
+                {
+                    grids.Add((MyCubeGrid) myEntity);
+                }
+            }
+            return grids;
+        }
+
     }
 }

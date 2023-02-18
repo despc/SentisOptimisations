@@ -74,13 +74,5 @@ namespace SentisOptimisationsPlugin
             }
             return false;
         }
-
-        private static object InvokeInstanceMethod(Type type, object instance, string methodName, Object[] args)
-        {
-            BindingFlags bindFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
-                                     | BindingFlags.Static;
-            var method = type.GetMethod(methodName, bindFlags);
-            return method.Invoke(instance, args);
-        }
     }
 }

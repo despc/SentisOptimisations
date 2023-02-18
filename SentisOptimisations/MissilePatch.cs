@@ -2,8 +2,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using NAPI;
 using NLog;
-using Sandbox;
+using ParallelTasks;
 using Sandbox.Definitions;
 using Sandbox.Engine.Physics;
 using Sandbox.Engine.Utils;
@@ -12,21 +13,18 @@ using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Character;
 using Sandbox.Game.Entities.Cube;
 using Sandbox.Game.GameSystems;
-using Sandbox.Game.Weapons;
 using Sandbox.Game.World;
 using Sandbox.ModAPI;
+using SentisOptimisations;
 using Torch.Managers.PatchManager;
 using VRage.Game;
 using VRage.Game.Components;
 using VRage.Game.Entity;
-using VRage.Game.Entity.EntityComponents.Interfaces;
 using VRage.Game.ModAPI;
 using VRage.Game.ModAPI.Ingame;
-using VRage.Game.Models;
 using VRage.Groups;
 using VRage.Utils;
 using VRageMath;
-using Game = Sandbox.Engine.Platform.Game;
 
 namespace SentisOptimisationsPlugin
 {
@@ -37,200 +35,194 @@ namespace SentisOptimisationsPlugin
 
         public static void Patch(PatchContext ctx)
         {
-            var UpdateBeforeSimulationMethod = typeof(MyMissile).GetMethod(
-                nameof(MyMissile.UpdateBeforeSimulation), BindingFlags.Instance | BindingFlags.Public);
-            ctx.GetPattern(UpdateBeforeSimulationMethod).Prefixes.Add(
-                typeof(MissilePatch).GetMethod(nameof(UpdateBeforeSimulationPatched),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-
-            var ExecuteExplosionMethod = typeof(MyMissile).GetMethod(
-                "ExecuteExplosion", BindingFlags.Instance | BindingFlags.NonPublic);
-            ctx.GetPattern(ExecuteExplosionMethod).Prefixes.Add(
-                typeof(MissilePatch).GetMethod(nameof(ExecuteExplosionMethodPatched),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-            
-            
             var MyWarheadExplodeMethod = typeof(MyWarhead).GetMethod(
                 nameof(MyWarhead.Explode), BindingFlags.Instance | BindingFlags.Public);
             ctx.GetPattern(MyWarheadExplodeMethod).Prefixes.Add(
                 typeof(MissilePatch).GetMethod(nameof(MyWarheadExplodePatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-            
+
             var MyWarheadDoDamageMethod = typeof(MyWarhead)
                 .GetMethods(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
                 .First(info => info.Name.Contains("DoDamage"));
             ctx.GetPattern(MyWarheadDoDamageMethod).Prefixes.Add(
                 typeof(MissilePatch).GetMethod(nameof(MyWarheadDoDamagePatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-            
-            
+
+
             var MyWarheadOnDestroyMethod = typeof(MyWarhead)
-                .GetMethod( nameof(MyWarhead.OnDestroy), BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+                .GetMethod(nameof(MyWarhead.OnDestroy),
+                    BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
             ctx.GetPattern(MyWarheadOnDestroyMethod).Prefixes.Add(
                 typeof(MissilePatch).GetMethod(nameof(MyWarheadOnDestroyPatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-
-            var MoveMissileMethod = typeof(MyMissiles).GetMethod(
-                "OnMissileMoved", BindingFlags.Static | BindingFlags.Public);
-            ctx.GetPattern(MoveMissileMethod).Prefixes.Add(
-                typeof(MissilePatch).GetMethod(nameof(MoveMissilePatched),
+            
+            
+            var MyExplosionType = typeof(MyVoxelBase).Assembly.GetType("Sandbox.Game.MyExplosion");
+            var MyExplosionApplyVolumetricExplosion = MyExplosionType
+                .GetMethod("ApplyVolumetricExplosion",
+                    BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            ctx.GetPattern(MyExplosionApplyVolumetricExplosion).Prefixes.Add(
+                typeof(MissilePatch).GetMethod(nameof(ApplyVolumetricExplosionPatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-
-
-            var registerMissileMethod = typeof(MyMissiles).GetMethod(
-                "RegisterMissile", BindingFlags.Static | BindingFlags.NonPublic);
-            ctx.GetPattern(registerMissileMethod).Prefixes.Add(
-                typeof(MissilePatch).GetMethod(nameof(RegisterMissilePatched),
+            
+            
+            
+            var CalculateStoredExplosiveDamageMethod = typeof(MyCubeBlock)
+                .GetMethod("CalculateStoredExplosiveDamage",
+                    BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            ctx.GetPattern(CalculateStoredExplosiveDamageMethod).Prefixes.Add(
+                typeof(MissilePatch).GetMethod(nameof(CalculateStoredExplosiveDamageMethodPatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
         }
 
-
-        private static bool UpdateBeforeSimulationPatched(MyMissile __instance)
+        private static bool CalculateStoredExplosiveDamageMethodPatched(MyCubeBlock __instance, 
+            List<MyCubeBlock.StoredExplosive> storedExplosives, ref float __result)
         {
             try
             {
-                if ((bool) GetInstanceField(typeof(MyMissile), __instance, "m_shouldExplode"))
+                var m_detonationData = __instance.easyGetField("m_detonationData", typeof(MyCubeBlock));
+                float ExplosionDamagePerLiter = (float) m_detonationData.easyGetField("ExplosionDamagePerLiter");
+                float ExplosionDamageMax = 50000;
+                float val2 = 0.0f;
+                foreach (MyCubeBlock.StoredExplosive storedExplosive in storedExplosives)
                 {
-                    //Log.Error("ExecuteExplosion ");
-                    InvokeInstanceMethod(typeof(MyMissile), __instance, "ExecuteExplosion", new Object[0]);
+                    val2 += storedExplosive.Volume * 1000f * ExplosionDamagePerLiter;
                 }
-                else
-                {
-                    IMyGameLogicComponent myGameLogicComponent =
-                        (IMyGameLogicComponent) GetInstanceField(typeof(MyEntity), __instance, "m_gameLogic");
-                    myGameLogicComponent.UpdateBeforeSimulation(true);
-
-                    var mPhysicsEnabled = (bool) GetInstanceField(typeof(MyMissile), __instance, "m_physicsEnabled");
-                    if (mPhysicsEnabled)
-                    {
-                        SetInstanceField(typeof(MyMissile), __instance, "m_linearVelocity",
-                            __instance.Physics.LinearVelocity);
-                        __instance.Physics.AngularVelocity = Vector3.Zero;
-                    }
-
-                    MyMissileAmmoDefinition mMissileAmmoDefinition =
-                        (MyMissileAmmoDefinition) GetInstanceField(typeof(MyMissile), __instance,
-                            "m_missileAmmoDefinition");
-                    Vector3 currentLinearVelocity =
-                        (Vector3) GetInstanceField(typeof(MyMissile), __instance, "m_linearVelocity");
-                    var mLinearVelocity = !mMissileAmmoDefinition.MissileSkipAcceleration
-                        ? (Vector3) (currentLinearVelocity + __instance.PositionComp.WorldMatrixRef.Forward *
-                            mMissileAmmoDefinition.MissileAcceleration * 0.0166666675359011)
-                        : (Vector3) (__instance.WorldMatrix.Forward * (double) mMissileAmmoDefinition.DesiredSpeed);
-                    SetInstanceField(typeof(MyMissile), __instance, "m_linearVelocity", mLinearVelocity);
-                    if (mPhysicsEnabled)
-                    {
-                        __instance.Physics.LinearVelocity = mLinearVelocity;
-                    }
-                    else
-                    {
-                        Vector3.ClampToSphere(ref mLinearVelocity, mMissileAmmoDefinition.DesiredSpeed);
-                        __instance.PositionComp.SetPosition(__instance.PositionComp.GetPosition() +
-                                                            mLinearVelocity * 0.01666667f);
-                    }
-
-                    Vector3D mOrigin = (Vector3D) GetInstanceField(typeof(MyMissile), __instance, "m_origin");
-                    float mMaxTrajectory = (float) GetInstanceField(typeof(MyMissile), __instance, "m_maxTrajectory");
-                    if (Vector3.DistanceSquared(__instance.PositionComp.GetPosition(),
-                        mOrigin) >= mMaxTrajectory * (double) mMaxTrajectory)
-                    {
-                        InvokeInstanceMethod(typeof(MyMissile), __instance, "MarkForExplosion", new Object[0]);
-                    }
-
-                    MyEntity entity;
-                    MyHitInfo hitInfoRet;
-                    Vector3D position = __instance.PositionComp.GetPosition();
-
-                    MatrixD matrixD = __instance.PositionComp.WorldMatrixRef;
-                    Vector3D to = matrixD.Translation +
-                                  matrixD.Forward * (mMissileAmmoDefinition.MissileInitialSpeed / 15);
-
-                    LineD line = new LineD(position, to);
-                    var hitEntityIsNotNull = GetHitEntityAndPosition(line, out entity, out hitInfoRet);
-
-                    if (!hitEntityIsNotNull)
-                    {
-                        // if (mMissileAmmoDefinition.Id.SubtypeName.Contains("Guided"))
-                        // {
-                        //     Vector3D guidedTo = matrixD.Translation + matrixD.Forward * mMissileAmmoDefinition.MaxTrajectory;
-                        //     IMyEntity guidedEntity;
-                        //     MyHitInfo guidedHitInfoRet;
-                        //     LineD guidedline = new LineD(position, guidedTo);
-                        //     var guidedHitEntityAndPositionNotNull =
-                        //         GetHitEntityAndPosition(guidedline, out guidedEntity, out guidedHitInfoRet);
-                        //     if (guidedHitEntityAndPositionNotNull)
-                        //     {
-                        //         var targetPosition = guidedEntity.GetPosition();
-                        //         Vector3D aimDirection =   targetPosition - position;
-                        //         MatrixD matrixD2 = __instance.PositionComp.WorldMatrix;
-                        //         matrixD2.Forward = Vector3D.Normalize(aimDirection);
-                        //     }
-                        // }
-
-                        return false;
-                    }
-
-                    double explosionOffcet = 0;
-                    if (entity is MyCubeGrid)
-                    {
-                        explosionOffcet = mMissileAmmoDefinition.MissileExplosionRadius / 2;
-                    }
-
-                    var missileExplosionPosition = hitInfoRet.Position // точка взрыва
-                                                   - (line.Direction * explosionOffcet);
-                    //Log.Error("Explosion Position " + missileExplosionPosition);
-                    SetInstanceField(typeof(MyMissile), __instance, "m_collidedEntity", entity);
-                    entity.Pin();
-                    SetInstanceField(typeof(MyMissile), __instance, "m_collisionPoint", hitInfoRet.Position);
-                    SetInstanceField(typeof(MyMissile), __instance, "m_collisionNormal", hitInfoRet.Normal);
-
-                    MySandboxGame.Static.Invoke(
-                        (Action) (() =>
-                            InvokeInstanceMethod(typeof(MyMissile), __instance, "MarkForExplosion", new Object[0])),
-                        "MyMissile - collision invoke");
-
-                    long OriginEntity = (long) GetInstanceField(typeof(MyMissile), __instance, "m_originEntity");
-                    var attackerId = GetInstanceField(typeof(MyMissile), __instance, "m_owner");
-                    MakeExplosionAndDamage((long) attackerId, missileExplosionPosition, mMissileAmmoDefinition.MissileExplosionRadius, mMissileAmmoDefinition.MissileExplosionDamage,
-                        OriginEntity,isPearcingDamage(mMissileAmmoDefinition));
-                    missileExplosionPosition = hitInfoRet.Position
-                                               - line.Direction *
-                                               (mMissileAmmoDefinition.MissileInitialSpeed / 150);
-                    __instance.PositionComp.SetPosition(missileExplosionPosition);
-                }
+                __result = Math.Min(ExplosionDamageMax, val2);
             }
             catch (Exception e)
             {
-                Log.Error("Missile target detection Exception ", e);
+                Log.Error(e);
+            }
+            return false;
+        }
+
+        private static bool ApplyVolumetricExplosionPatched(ref MyExplosionInfo m_explosionInfo,
+            List<MyEntity> entities, ref bool __result)
+        {
+            try
+            {
+                HashSet<MyEntity> entitiesSet = new HashSet<MyEntity>(entities);
+                var explosionSphere = m_explosionInfo.ExplosionSphere;
+                float damage = m_explosionInfo.Damage;
+                // BoundingSphereD ExplosionSphere = (BoundingSphereD) m_explosionInfo.easyGetField("m_explosionSphere");
+                if (m_explosionInfo.OwnerEntity is MyFloatingObject)
+                {
+                    var myFloatingObject = ((MyFloatingObject) m_explosionInfo.OwnerEntity);
+                    var count = myFloatingObject.Amount.Value.ToIntSafe();
+                    var itemDefinition = myFloatingObject.ItemDefinition;
+                    if ("Explosives".Equals(itemDefinition.DisplayNameText))
+                    {
+                        damage = SentisOptimisationsPlugin.Config.ExplosivesDamage * count;
+                        explosionSphere.Radius = 15;
+                    }
+
+                    if (itemDefinition is MyAmmoMagazineDefinition)
+                    {
+                        var ammoDefinitionId = ((MyAmmoMagazineDefinition) itemDefinition).AmmoDefinitionId;
+                        var myAmmoDefinition = MyDefinitionManager.Static.GetAmmoDefinition(ammoDefinitionId);
+                        if (myAmmoDefinition is MyProjectileAmmoDefinition)
+                        {
+                            var ProjectileMassDamage = ((MyProjectileAmmoDefinition) myAmmoDefinition).ProjectileMassDamage;
+                            if (ProjectileMassDamage == 0)
+                            {
+                                ProjectileMassDamage = 30;
+                            }
+                            damage = ProjectileMassDamage
+                                     * SentisOptimisationsPlugin.Config.ProjectileAmmoExplosionMultiplier * count;
+                                explosionSphere.Radius = SentisOptimisationsPlugin.Config.AmmoExplosionRadius;
+                            
+                        }
+                        if (myAmmoDefinition is MyMissileAmmoDefinition)
+                        {
+                            var missileExplosionDamage = ((MyMissileAmmoDefinition) myAmmoDefinition).MissileExplosionDamage;
+                            if (missileExplosionDamage == 0)
+                            {
+                                missileExplosionDamage = 5000;
+                            }
+
+                            damage = missileExplosionDamage
+                                     * SentisOptimisationsPlugin.Config.MissileAmmoExplosionMultiplier * count;
+                                explosionSphere.Radius = SentisOptimisationsPlugin.Config.AmmoExplosionRadius;
+                            
+                        }
+                    }
+                }
+                // if (DamageShieldAndObjects(0, entities, explosionSphere, damage))
+                // {
+                //     __result = true;
+                //     return false;
+                // }
+                ApplyVolumetricExplosionOnGrid(damage, ref explosionSphere, 0L, new List<MyEntity>(entitiesSet), 0);
+                __result = true;
+                return false;
+            }
+            catch (Exception e)
+            {
+                Log.Error(e);
             }
 
             return false;
         }
-
         private static void MakeExplosionAndDamage(long attackerId, Vector3D explosionPosition,
-            float explosionRadius, float explosionDamage, long originEntity, bool isPearcingDamage, bool isWarhead = false)
+            float explosionRadius, float explosionDamage, long originEntity, bool isPearcingDamage,
+            bool isWarhead = false)
         {
             BoundingSphereD explosionSphere = new BoundingSphereD(explosionPosition, explosionRadius);
             var topMostEntitiesInSphere =
                 new HashSet<MyEntity>(MyEntities.GetTopMostEntitiesInSphere(ref explosionSphere));
-            MyGridExplosion m_gridExplosion = ApplyVolumetricExplosionOnGrid(
+            ApplyVolumetricExplosionOnGrid(
                 explosionDamage, ref explosionSphere, originEntity,
-                new List<MyEntity>(topMostEntitiesInSphere), isWarhead);
-            ComputeDamagedBlocks(m_gridExplosion, isPearcingDamage);
-            ApplyVolumetricDamageToGrid(m_gridExplosion, attackerId);
+                new List<MyEntity>(topMostEntitiesInSphere), attackerId, isWarhead, isPearcingDamage);
         }
 
-
-        public static bool isPearcingDamage(MyMissileAmmoDefinition missileAmmoDefinition)
+        private static void ApplyExplosionOnVoxel(BoundingSphereD sphere)
         {
-            if (missileAmmoDefinition.Id.SubtypeId.Equals(MyStringHash.GetOrCompute("2500mm_saatory")))
+            if ( !MySession.Static.EnableVoxelDestruction || !MySession.Static.HighSimulationQuality)
+                return;
+            List<MyVoxelBase> voxelsTmp = new List<MyVoxelBase>();
+            List<MyVoxelBase> voxelsToCutTmp = new List<MyVoxelBase>();
+            MySession.Static.VoxelMaps.GetAllOverlappingWithSphere(ref sphere, voxelsTmp);
+            for (int index = voxelsTmp.Count - 1; index >= 0; --index)
+                voxelsToCutTmp.Add(voxelsTmp[index].RootVoxel);
+            voxelsTmp.Clear();
+            foreach (MyVoxelBase voxelMap in voxelsToCutTmp)
+            {
+                
+                if (!IsVoxelDestructable(sphere)) continue;
+
+                bool createDebris = true;
+                var type = typeof(MyVoxelBase).Assembly.GetType("Sandbox.Game.MyExplosion");
+                ReflectionUtils.InvokeStaticMethod(type, "CutOutVoxelMap",
+                    new object[] {(float) sphere.Radius * 0.3f, sphere.Center, voxelMap, createDebris, false});
+                // Sandbox.Game.MyExplosion.CutOutVoxelMap((float) sphere.Radius * 1, sphere.Center, voxelMap, createDebris);
+                voxelMap.RequestVoxelCutoutSphere(sphere.Center, (float) sphere.Radius * 0.3f, createDebris, false);
+            }
+            voxelsToCutTmp.Clear();
+        }
+
+        private static bool IsVoxelDestructable(BoundingSphereD sphere)
+        {
+            if (VoxelsPatch.Protectors == null)
             {
                 return true;
             }
 
-            return false;
-        }
+            var pos = sphere.Center;
 
+            foreach (var myUpgradeModule in VoxelsPatch.Protectors)
+            {
+                if (Vector3D.Distance(myUpgradeModule.PositionComp.GetPosition(), pos) < 300)
+                {
+                    if (myUpgradeModule.Enabled && myUpgradeModule.IsFunctional)
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+        }
 
         public static void ComputeDamagedBlocks(MyGridExplosion m_gridExplosion, bool pearcingDamage)
         {
@@ -298,6 +290,7 @@ namespace SentisOptimisationsPlugin
                     m_damageRemaining.Add(key, raycastDamageInfo);
                 }
             }
+
             foreach (var mDamagedBlock in m_damagedBlocks)
             {
                 m_gridExplosion.DamagedBlocks.Add(mDamagedBlock.Key, mDamagedBlock.Value);
@@ -419,11 +412,10 @@ namespace SentisOptimisationsPlugin
             return new MyGridExplosion.MyRaycastDamageInfo(0.0f, distanceToExplosion);
         }
 
-        private static MyGridExplosion ApplyVolumetricExplosionOnGrid(
-            float MissileExplosionDamage,
+        private static void ApplyVolumetricExplosionOnGrid(float MissileExplosionDamage,
             ref BoundingSphereD sphere,
             long OriginEntity,
-            List<MyEntity> entities, bool isWarhead = false)
+            List<MyEntity> entities, long attackerId, bool isWarhead = false, bool isPearcingDamage = false)
         {
             MyGridExplosion m_gridExplosion = new MyGridExplosion();
             m_gridExplosion.Init(sphere, MissileExplosionDamage);
@@ -443,18 +435,110 @@ namespace SentisOptimisationsPlugin
                 }
             }
 
+            if (SentisOptimisationsPlugin.Config.AsyncExplosion)
+            {
+                var d = sphere;
+                Parallel.StartBackground(() => CollectBlocksAsync(d, new List<MyEntity>(entities), isWarhead, Node2,
+                    group, m_gridExplosion, attackerId, isPearcingDamage));
+
+                void CollectBlocksAsync(BoundingSphereD sphere_t, List<MyEntity> entities_t, bool isWarhead_t,
+                    MyCubeGrid Node2_t, MyGroups<MyCubeGrid, MyGridLogicalGroupData>.Group group_t,
+                    MyGridExplosion m_gridExplosion_t,
+                    long attackerId_t, bool isPearcingDamage_t)
+                {
+                    try
+                    {
+                        CollectBlocks(sphere_t, entities_t, isWarhead_t, Node2_t, group_t, m_gridExplosion_t);
+                        MyAPIGateway.Utilities.InvokeOnGameThread(() =>
+                        {
+                            try
+                            {
+                                if (DamageShieldAndObjects(attackerId, entities_t, sphere_t, m_gridExplosion_t.Damage)) return;
+                                ComputeDamagedBlocks(m_gridExplosion_t, isPearcingDamage_t);
+                                ApplyExplosionOnVoxel(sphere_t);
+                                ApplyVolumetricDamageToGrid(m_gridExplosion_t, attackerId_t);
+                            }
+                            catch (Exception e)
+                            {
+                            }
+                        });
+                    }
+                    catch (Exception e)
+                    {
+                    }
+                }
+
+                return;
+            }
+
+            CollectBlocks(sphere, entities, isWarhead, Node2, group, m_gridExplosion);
+            ApplyExplosionOnVoxel(sphere);
+            if (DamageShieldAndObjects(attackerId, entities, sphere, m_gridExplosion.Damage)) return;
+            ComputeDamagedBlocks(m_gridExplosion, isPearcingDamage);
+            ApplyVolumetricDamageToGrid(m_gridExplosion, attackerId);
+        }
+
+        private static bool DamageShieldAndObjects(long attackerId, List<MyEntity> entities_t, BoundingSphereD sphere_t,
+            float damage)
+        {
+            bool hasShield = false;
+            foreach (var myEntity in entities_t)
+            {
+                if (myEntity is MyCharacter)
+                {
+                    var myCharacter = ((MyCharacter) myEntity);
+                    if (myCharacter.IsUsing is MyCockpit)
+                    {
+                        myCharacter.DoDamage(((MyCharacter) myEntity).Integrity - 3, MyDamageType.Explosion, true, attackerId: attackerId);
+                        continue;
+                    }
+                    myCharacter.DoDamage(99999, MyDamageType.Explosion, true, attackerId: attackerId);
+                }
+
+                if (myEntity is MyFloatingObject)
+                {
+                    ((MyFloatingObject) myEntity).DoDamage(99999, MyDamageType.Explosion, true, attackerId: attackerId);
+                }
+                
+                if ("dShield".Equals(myEntity.DisplayName))
+                {
+                    IMyTerminalBlock shield = null;
+                    var entToShield =
+                        SentisOptimisationsPlugin.SApi.MatchEntToShieldFastExt(myEntity, true);
+                    if (entToShield.HasValue)
+                    {
+                        shield = entToShield.Value.Item1;
+
+                        SentisOptimisationsPlugin.SApi.PointAttackShieldCon(shield, sphere_t.Center,
+                            attackerId, (float) (damage * (sphere_t.Radius / SentisOptimisationsPlugin.Config.WarheadDamageMultiplier)), 0, false, true);
+                    }
+
+                    hasShield = true;
+                }
+            }
+            return hasShield;
+        }
+
+        private static void CollectBlocks(BoundingSphereD sphere, List<MyEntity> entities, bool isWarhead,
+            MyCubeGrid Node2, MyGroups<MyCubeGrid, MyGridLogicalGroupData>.Group group,
+            MyGridExplosion m_gridExplosion)
+        {
             foreach (MyEntity entity in entities)
             {
+                if (entity.IsPreview)
+                {
+                    continue;
+                }
+                
                 var Node = entity as MyCubeGrid;
                 if (Node == null)
                 {
                     continue;
                 }
-                // Log.Error("Process Entity " + entity.DisplayName);
+
                 if (isWarhead || (
-                    // entity != explosionInfo.ExcludedEntity &&
-                    (Node.CreatePhysics && Node != Node2) &&
-                    (group == null || MyCubeGridGroups.Static.Logical.GetGroup(Node) != group)))
+                        (Node.CreatePhysics && Node != Node2) &&
+                        (group == null || MyCubeGridGroups.Static.Logical.GetGroup(Node) != group)))
                 {
                     m_gridExplosion.AffectedCubeGrids.Add(Node);
                     float detectionBlockHalfSize = (float) ((double) Node.GridSize / 2.0 / 1.25);
@@ -464,10 +548,6 @@ namespace SentisOptimisationsPlugin
                     BoundingSphereD sphere2 = new BoundingSphereD(sphere.Center, sphere.Radius);
                     BoundingSphereD sphere3 = new BoundingSphereD(sphere.Center,
                         sphere.Radius + (double) Node.GridSize * 0.5 * Math.Sqrt(3.0));
-                    // AddGps("Center ", sphere.Center);
-                    // AddGps("1 sphere ", sphere.Center - Direction * sphere1.Radius);
-                    // AddGps("2 sphere ", sphere.Center - Direction * sphere2.Radius);
-                    // AddGps("3 sphere ", sphere.Center - Direction * sphere3.Radius);
                     HashSet<MySlimBlock> m_explodedBlocksInner = new HashSet<MySlimBlock>();
                     HashSet<MySlimBlock> m_explodedBlocksExact = new HashSet<MySlimBlock>();
                     HashSet<MySlimBlock> m_explodedBlocksOuter = new HashSet<MySlimBlock>();
@@ -483,28 +563,6 @@ namespace SentisOptimisationsPlugin
                     m_explodedBlocksExact.Clear();
                     m_explodedBlocksOuter.Clear();
                 }
-            }
-
-            return m_gridExplosion;
-        }
-
-        private static void AddGps(string message, Vector3D? asteroidPosition)
-        {
-            try
-            {
-                var asteroidGPS =
-                    MyAPIGateway.Session?.GPS.Create(message, message, asteroidPosition.Value, true);
-                asteroidGPS.GPSColor = Color.Red;
-                var players = new List<IMyPlayer>();
-                MyAPIGateway.Players.GetPlayers(players);
-                foreach (var myPlayer in players)
-                {
-                    MyAPIGateway.Session?.GPS.AddGps(myPlayer.IdentityId, asteroidGPS);
-                }
-            }
-            catch (Exception e)
-            {
-                Log.Error("AddGps Exception ", e);
             }
         }
 
@@ -555,47 +613,11 @@ namespace SentisOptimisationsPlugin
             }
         }
 
-        private static bool RegisterMissilePatched(MyMissile missile)
-        {
-            return false;
-        }
-
-        private static bool MoveMissilePatched(MyMissile missile, ref Vector3 velocity)
-        {
-            return false;
-        }
         private static bool MyWarheadOnDestroyPatched()
         {
             return false;
         }
 
-        private static void DoDamageInternalPatched(MySlimBlock __instance, float damage,
-            MyStringHash damageType,
-            bool addDirtyParts = true,
-            MyHitInfo? hitInfo = null,
-            long attackerId = 0)
-        {
-            var instanceFatBlock = __instance.FatBlock;
-            if (instanceFatBlock == null)
-            {
-                Log.Error("SlimBlock damage " + damage);
-                return;
-            }
-
-            Log.Error(
-                "FatBlock " + instanceFatBlock.DisplayName + " damage " + damage + " damage type " + damageType);
-        }
-
-        private static void ApplyAccumulatedDamagePatched(bool addDirtyParts, long attackerId)
-        {
-            Log.Error("ApplyAccumulatedDamagePatched");
-        }
-
-        private static void MyComponentStackApplyDamageMethodPatched(float damage)
-        {
-            Log.Error("MyComponentStackApplyDamageMethodPatched " + damage);
-        }
-        
         private static bool MyWarheadDoDamagePatched(MyWarhead __instance, ref bool __result,
             float damage,
             MyStringHash damageType,
@@ -605,13 +627,18 @@ namespace SentisOptimisationsPlugin
         {
             try
             {
+                if (!__instance.IsArmed)
+                {
+                    return true;
+                }
+
                 __result = true;
                 bool m_marked = (bool) GetInstanceField(typeof(MyWarhead), __instance, "m_marked");
                 MyDamageInformation info = new MyDamageInformation(false, damage, damageType, attackerId);
                 if (!m_marked)
                 {
                     InvokeInstanceMethod(typeof(MyWarhead), __instance, "MarkForExplosion", new Object[0]);
-                    InvokeInstanceMethod(typeof(MyWarhead), __instance, "ExplodeDelayed", new Object[]{500});
+                    InvokeInstanceMethod(typeof(MyWarhead), __instance, "ExplodeDelayed", new Object[] {500});
                 }
             }
             catch (Exception e)
@@ -619,6 +646,7 @@ namespace SentisOptimisationsPlugin
                 Log.Error(e);
                 throw;
             }
+
             return false;
         }
 
@@ -676,7 +704,7 @@ namespace SentisOptimisationsPlugin
                 MyExplosions.AddExplosion(ref explosionInfo);
                 MakeExplosionAndDamage(instanceOwnerId, m_explosionFullSphere.Center,
                     (float) m_explosionFullSphere.Radius,
-                    m_warheadDefinition.WarheadExplosionDamage, instanceEntityId, false, true);
+                    m_warheadDefinition.WarheadExplosionDamage * SentisOptimisationsPlugin.Config.WarheadDamageMultiplier, instanceEntityId, false, true);
                 //MySyncDamage.DoDamageSynced(__instance, 999999, MyDamageType.Bullet, 0);
                 InvokeInstanceMethod(typeof(MyCubeGrid), __instance.CubeGrid, "RemoveBlockByCubeBuilder",
                     new Object[] {__instance.SlimBlock});
@@ -690,42 +718,7 @@ namespace SentisOptimisationsPlugin
 
             return false;
         }
-        
 
-        private static bool ExecuteExplosionMethodPatched(MyMissile __instance)
-        {
-            MyMissileAmmoDefinition mMissileAmmoDefinition =
-                (MyMissileAmmoDefinition) GetInstanceField(typeof(MyMissile), __instance,
-                    "m_missileAmmoDefinition");
-            InvokeInstanceMethod(typeof(MyMissile), __instance, "PlaceDecal", new Object[0]);
-            var instanceField = GetInstanceField(typeof(MyMissile), __instance, "m_origin");
-            float missileExplosionRadius = mMissileAmmoDefinition.MissileExplosionRadius;
-            BoundingSphereD boundingSphereD =
-                new BoundingSphereD(__instance.PositionComp.GetPosition(), (double) missileExplosionRadius);
-            MyExplosionInfo explosionInfo = new MyExplosionInfo()
-            {
-                PlayerDamage = 0.0f,
-                Damage = 0.0f,
-                ExplosionType = MyExplosionTypeEnum.MISSILE_EXPLOSION,
-                ExplosionSphere = boundingSphereD,
-                LifespanMiliseconds = 700,
-                ParticleScale = 1f,
-                Direction = new Vector3?(
-                    Vector3.Normalize(__instance.PositionComp.GetPosition() - (Vector3D) instanceField)),
-                VoxelExplosionCenter = boundingSphereD.Center +
-                                       (double) missileExplosionRadius * __instance.WorldMatrix.Forward * 0.25,
-                ExplosionFlags = MyExplosionFlags.AFFECT_VOXELS | MyExplosionFlags.CREATE_DECALS |
-                                 MyExplosionFlags.CREATE_PARTICLE_EFFECT | MyExplosionFlags.CREATE_SHRAPNELS |
-                                 MyExplosionFlags.CREATE_PARTICLE_DEBRIS,
-                VoxelCutoutScale = 0.3f,
-                PlaySound = true,
-                ApplyForceAndDamage = false,
-                KeepAffectedBlocks = true
-            };
-            MyExplosions.AddExplosion(ref explosionInfo);
-            InvokeInstanceMethod(typeof(MyMissile), __instance, "Return", new Object[0]);
-            return false;
-        }
 
         internal static object GetInstanceField(Type type, object instance, string fieldName)
         {
@@ -749,73 +742,6 @@ namespace SentisOptimisationsPlugin
                                      | BindingFlags.Static;
             var method = type.GetMethod(methodName, bindFlags);
             method.Invoke(instance, args);
-        }
-
-
-        private static bool GetHitEntityAndPosition(
-            LineD line,
-            out MyEntity entity,
-            out MyHitInfo hitInfoRet)
-        {
-            entity = null;
-            hitInfoRet = new MyHitInfo();
-
-            int index = 0;
-            List<MyPhysics.HitInfo> mRaycastResult = new List<MyPhysics.HitInfo>();
-            using (MyUtils.ReuseCollection(ref mRaycastResult))
-            {
-                MyPhysics.CastRay(line.From, line.To, mRaycastResult, 15);
-                do
-                {
-                    if (index < mRaycastResult.Count)
-                    {
-                        MyPhysics.HitInfo hitInfo = mRaycastResult[index];
-                        entity = (hitInfo.HkHitInfo.GetHitEntity() as MyEntity);
-                        hitInfoRet.Position = hitInfo.Position;
-                        hitInfoRet.Normal = hitInfo.HkHitInfo.Normal;
-                        hitInfoRet.ShapeKey = hitInfo.HkHitInfo.GetShapeKey(0);
-                    }
-
-                    MyCharacterHitInfo mCharHitInfo = null;
-                    if (entity is MyCharacter myCharacter && !Game.IsDedicated)
-                    {
-                        if (!myCharacter.GetIntersectionWithLine(ref line, ref mCharHitInfo))
-                            entity = null;
-                    }
-                    else if (entity is MyCubeGrid myCubeGrid)
-                    {
-                        MyCubeGrid.MyCubeGridHitInfo mCubeGridHitInfo = null;
-                        if (myCubeGrid.GetIntersectionWithLine(ref line, ref mCubeGridHitInfo))
-                        {
-                            hitInfoRet.Position = mCubeGridHitInfo.Triangle.IntersectionPointInWorldSpace;
-                            hitInfoRet.Normal = mCubeGridHitInfo.Triangle.NormalInWorldSpace;
-                            if (Vector3.Dot(hitInfoRet.Normal, line.Direction) > 0.0)
-                                hitInfoRet.Normal = -hitInfoRet.Normal;
-                        }
-
-                        if (mCubeGridHitInfo != null &&
-                            mCubeGridHitInfo.Triangle.UserObject is MyCube userObject &&
-                            (userObject.CubeBlock.FatBlock != null && userObject.CubeBlock.FatBlock.Physics == null))
-                            entity = userObject.CubeBlock.FatBlock;
-                    }
-                    else
-                    {
-                        MyIntersectionResultLineTriangleEx? t;
-                        if (entity is MyVoxelBase myVoxelBase &&
-                            myVoxelBase.GetIntersectionWithLine(ref line, out t, IntersectionFlags.DIRECT_TRIANGLES))
-                        {
-                            hitInfoRet.Position = t.Value.IntersectionPointInWorldSpace;
-                            hitInfoRet.Normal = t.Value.NormalInWorldSpace;
-                            hitInfoRet.ShapeKey = 0U;
-                        }
-                    }
-
-                    if (entity != null)
-                        break;
-                } while (++index < mRaycastResult.Count);
-            }
-
-            return entity != null;
         }
     }
 }

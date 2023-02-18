@@ -1,0 +1,153 @@
+﻿using System;
+using System.Collections.Generic;
+using NLog;
+using Sandbox.Game;
+using Sandbox.Game.Entities;
+using Sandbox.Game.Entities.Character;
+using Sandbox.ModAPI;
+using SentisOptimisationsPlugin.ShipTool;
+using VRage.Game.ModAPI;
+using VRage.ModAPI;
+using VRage.ObjectBuilders;
+using VRageMath;
+
+namespace SentisOptimisationsPlugin.FixShip
+{
+    public class FixShipLogic
+    {
+        public static readonly Logger Log = LogManager.GetCurrentClassLogger();
+        public static void DoFixShip(long gridId, long owner) => FixGroups(FindLookAtGridGroup(gridId, owner));
+
+        private static void FixGroups(List<MyCubeGrid> groups)
+        {
+            MyAPIGateway.Utilities.InvokeOnGameThread(() =>
+            {
+                try
+                {
+                    FixGroup(groups);
+                }
+                catch (Exception e)
+                {
+                    Log.Error("Fixship from COCK failed ", e);
+                }
+                
+            });
+
+        }
+
+        public static List<MyCubeGrid> FindLookAtGridGroup(long gridId, long owner)
+        {
+            MyCubeGrid grid = (MyCubeGrid) MyAPIGateway.Entities.GetEntityById(gridId);
+            if (!grid.BigOwners.Contains(owner))
+            {
+                return new List<MyCubeGrid>();
+            }
+
+            var gridEntityId = grid.EntityId;
+            try
+            {
+                if (FuckWelderProcessor.WelderDamageAccumulator.TryGetValue(gridEntityId, out Dictionary<long, int> welders))
+                {
+                    foreach (var welder in welders)
+                    {
+                        if (welder.Value > SentisOptimisationsPlugin.Config.WeldersOverheatThreshold / 2)
+                        {
+                            MyVisualScriptLogicProvider.ShowNotification(
+                                "Repair system so hot, pls cool them before fist ship",
+                                5000, "Red", grid.BigOwners[0]);
+                            return new List<MyCubeGrid>();
+                        }
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Log.Error("Fix Ship exception", e);
+            }
+
+            
+                
+            List<MyCubeGrid> groupNodes =
+                MyCubeGridGroups.Static.GetGroups(GridLinkTypeEnum.Logical).GetGroupNodes(grid);
+            return groupNodes;
+        }
+
+        private static void FixGroup(List<MyCubeGrid> groups)
+        {
+            string str = "Server";
+
+            List<MyObjectBuilder_EntityBase> objectBuilders = new List<MyObjectBuilder_EntityBase>();
+            List<MyCubeGrid> myCubeGridList = new List<MyCubeGrid>();
+            Dictionary<Vector3I, MyCharacter> characters = new Dictionary<Vector3I, MyCharacter>();
+
+            foreach (MyCubeGrid nodeData in groups)
+            {
+                myCubeGridList.Add(nodeData);
+                // nodeData.Physics.LinearVelocity = Vector3.Zero;
+                MyObjectBuilder_EntityBase objectBuilder = nodeData.GetObjectBuilder(true);
+                if (!objectBuilders.Contains(objectBuilder))
+                {
+                    objectBuilders.Add(objectBuilder);
+                }
+
+                foreach (var myCubeBlock in nodeData.GetFatBlocks())
+                {
+                    if (myCubeBlock is MyCockpit)
+                    {
+                        var cockpit = (MyCockpit) myCubeBlock;
+                        MyCharacter myCharacter = cockpit.Pilot;
+                        if (myCharacter == null)
+                        {
+                            continue;
+                        }
+                        characters[cockpit.Position] = myCharacter;
+                        DamagePatch.protectedChars.Add(myCharacter.EntityId);
+                        cockpit.RemovePilot();
+                    }
+                }
+            }
+
+            foreach (MyCubeGrid myCubeGrid in myCubeGridList)
+            {
+                IMyEntity myEntity = (IMyEntity) myCubeGrid;
+                Log.Warn("Player used ShipFixerPlugin from COCK on Grid " +
+                         myCubeGrid.DisplayName + " for cut & paste!");
+
+                myEntity.Close();
+            }
+
+            MyAPIGateway.Entities.RemapObjectBuilderCollection(
+                (IEnumerable<MyObjectBuilder_EntityBase>) objectBuilders);
+            foreach (MyObjectBuilder_EntityBase cubeGrid in objectBuilders)
+                
+                MyAPIGateway.Entities.CreateFromObjectBuilderParallel(cubeGrid,
+                    completionCallback: ((Action<IMyEntity>) (entity =>
+                    {
+                        ((MyCubeGrid) entity).DetectDisconnectsAfterFrame();
+                        MyAPIGateway.Entities.AddEntity(entity);
+                        foreach (var myCubeBlock in ((MyCubeGrid) entity).GetFatBlocks())
+                        {
+                            if (myCubeBlock is MyCockpit)
+                            {
+                                var cockpit = (MyCockpit) myCubeBlock;
+                                MyCharacter myCharacter;
+                                if (!characters.TryGetValue(cockpit.Position, out myCharacter))
+                                {
+                                    continue;
+                                }
+                                
+                                MyAPIGateway.Parallel.StartBackground(() =>
+                                {
+                                    MyAPIGateway.Parallel.Sleep(2000); 
+                                    MyAPIGateway.Utilities.InvokeOnGameThread(() =>
+                                    {
+                                        ((IMyCockpit)cockpit).AttachPilot(myCharacter);
+                                        DamagePatch.protectedChars.Remove(myCharacter.EntityId);
+                                    });
+                                });
+                            }
+                        }
+                    })));
+        }
+    }
+}
