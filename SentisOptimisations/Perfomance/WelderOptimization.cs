@@ -25,11 +25,6 @@ namespace Optimizer.Optimizations
     [PatchShim]
     public class WelderOptimization
     {
-        const string ActionNAME = "ShipWelder BuildProjection";
-
-
-        public static Random random = new Random();
-
         public static void Patch(PatchContext ctx)
         {
             var MethodActivate = typeof(MyShipWelder).GetMethod
@@ -61,21 +56,17 @@ namespace Optimizer.Optimizations
                         return false;
                     }
                 }
-                
             }
-            
+
             if (!SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.WelderTweaksEnabled)
             {
                 return true;
             }
 
-            if (SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.WelderTweaksExcludeNanobot)
+            var def = (MyShipWelderDefinition)__instance.BlockDefinition;
+            if (def.SensorRadius < 0.01f) //NanobotOptimization
             {
-                var def = (MyShipWelderDefinition) __instance.BlockDefinition;
-                if (def.SensorRadius < 0.01f) //NanobotOptimiztion
-                {
-                    return false;
-                }
+                return false;
             }
 
             if (!SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.WelderTweaksSelfWelding)
@@ -83,20 +74,7 @@ namespace Optimizer.Optimizations
                 targets.Remove(__instance.SlimBlock);
             }
 
-            if (SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.WelderTweaksWeldNextFrames)
-            {
-                var ntargets = new HashSet<MySlimBlock>(targets.Count);
-                foreach (var x in targets)
-                {
-                    ntargets.Add(x);
-                }
-
-                FrameExecutor.addDelayedLogic(random.Next(4) + 1, (x) => { ActivateInternal(__instance, ntargets); });
-            }
-            else
-            {
-                ActivateInternal(__instance, targets);
-            }
+            ActivateInternal(__instance, targets);
 
             //we dont need any checks now;
             return false;
@@ -163,17 +141,9 @@ namespace Optimizer.Optimizations
         private static void WeldProjectionsWithWelding(MyShipWelder welder, bool welded)
         {
             if (!welded || SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config
-                .WelderTweaksCanWeldProjectionsIfWeldedOtherBlocks)
+                    .WelderTweaksCanWeldProjectionsIfWeldedOtherBlocks)
             {
-
-                if (SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.WelderTweaksWeldProjectionsNextFrame)
-                {
-                    FrameExecutor.addDelayedLogic(random.Next(4), (x) => { WeldProjections(welder); });
-                }
-                else
-                {
-                    WeldProjections(welder);
-                }
+                WeldProjections(welder);
             }
         }
 
