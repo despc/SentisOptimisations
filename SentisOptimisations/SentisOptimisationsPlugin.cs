@@ -80,19 +80,29 @@ namespace SentisOptimisationsPlugin
             Log.Info("Init SentisOptimisationsPlugin");
             MyFakes.ENABLE_SCRAP = false;
             SetupConfig();
-            PerfomancePatch.Patch();
-            GrindPaintFix.Patch();
             SessionManager = Torch.Managers.GetManager<TorchSessionManager>();
             if (SessionManager == null)
                 return;
-                    //SessionManager.AddOverrideMod(2891865838);
+            var configOverrideModIds = Config.OverrideModIds;
             SessionManager.SessionStateChanged += SessionManager_SessionStateChanged;
-            // MyClusterTree.IdealClusterSize = new Vector3(Config.IdealClusterSize);
-            // MyClusterTree.IdealClusterSizeHalfSqr =
-            //     MyClusterTree.IdealClusterSize * MyClusterTree.IdealClusterSize / 4f;
-            // MyClusterTree.MinimumDistanceFromBorder = MyClusterTree.IdealClusterSize / 100f;
-            // MyClusterTree.MaximumForSplit = MyClusterTree.IdealClusterSize * 2f;
-            // MyClusterTree.MaximumClusterSize = Config.MaximumClusterSize;
+            if (string.IsNullOrEmpty(configOverrideModIds))
+            {
+                foreach (var modId in configOverrideModIds.Split(','))
+                {
+                    if (string.IsNullOrEmpty(configOverrideModIds))
+                    {
+                        try
+                        {
+                            var modIdL = Convert.ToUInt64(modId);
+                            SessionManager.AddOverrideMod(modIdL);
+                        }
+                        catch (Exception e)
+                        {
+                            Log.Warn("Skip wrong modId " + modId);
+                        }
+                    }
+                }
+            }
         }
 
         private void SessionManager_SessionStateChanged(
@@ -103,7 +113,6 @@ namespace SentisOptimisationsPlugin
             {
                 _limiter.OnUnloading();
                 _allGridsObserver.OnUnloading();
-                ConveyorPatch.OnUnloading();
             }
             else
             {
@@ -113,7 +122,6 @@ namespace SentisOptimisationsPlugin
                 _limiter.OnLoaded();
                 _allGridsObserver.OnLoaded();
                 InitShieldApi();
-                ConveyorPatch.OnLoaded();
                 Communication.RegisterHandlers();
                 ITorchPlugin Plugin;
                 if (DependencyProviderExtensions
@@ -156,17 +164,6 @@ namespace SentisOptimisationsPlugin
         {
             try
             {
-
-                
-                var conveyourCache = ConveyorPatch.ConveyourCache;
-                var cachedGrids = conveyourCache.Count;
-                var totalCacheCount = 0;
-                var uncachedCalls = ConveyorPatch.UncachedCalls;
-                foreach (var keyValuePair in conveyourCache)
-                {
-                    totalCacheCount = totalCacheCount + keyValuePair.Value.Count;
-                }
-
                 ListReader<MyClusterTree.MyCluster> clusters = MyPhysics.Clusters.GetClusters();
                 var myPhysics = MySession.Static.GetComponent<MyPhysics>();
                 int active = 0;
@@ -184,12 +181,9 @@ namespace SentisOptimisationsPlugin
                 {
                     var gui = x as ConfigGUI;
 
-                    gui.CacheStatistic.Text =
-                        $"Cached grids: {cachedGrids} ||  Total cache size: {totalCacheCount} ||  Uncached calls: {uncachedCalls}";
                     gui.ClustersStatistic.Text =
                         $"Count: {clustersCount}, Active: {active}";
                 });
-                ConveyorPatch.UncachedCalls = 0;
             }
             catch (Exception e)
             {

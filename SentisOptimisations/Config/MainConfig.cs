@@ -34,6 +34,7 @@ namespace SentisOptimisationsPlugin
         private String _pathToGarage = "D:\\torch-server\\GARAGE";
         private String _planetsWithEco = "Earth,Moon";
         private String _ignoreCleanupSubtypes = "Cargo";
+        private String _overrideModIds = "";
         private float _explosivesDamage = 10;
         private int _contactCountAlert = 150;
         private int _adaptiveBlockSlowdownThreshold = 150;
@@ -374,6 +375,8 @@ namespace SentisOptimisationsPlugin
             get => _autoRestoreFromVoxel;
             set => SetValue(ref _autoRestoreFromVoxel, value);
         }
+        [DisplayTab(Name = "Client Only Mods", GroupName = "Tweaks", Tab = "Tweaks", Order = 0, Description = "Client Only Mods splitted with comma")]
+        public String OverrideModIds { get => _overrideModIds; set => SetValue(ref _overrideModIds, value); }
         
         [DisplayTab(Name = "Auto Rename Grids", GroupName = "Tweaks", Tab = "Tweaks", Order = 0, Description = "Auto Rename Grids")]
         public bool AutoRenameGrids
@@ -404,19 +407,6 @@ namespace SentisOptimisationsPlugin
             set => SetValue(ref _gasTankOptimisation, value);
         }
         
-        [DisplayTab(Name = "Adaptive block slowdown threshold", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Adaptive block slowdown threshold")]
-        public int AdaptiveBlockSlowdownThreshold
-        {
-            get => _adaptiveBlockSlowdownThreshold;
-            set => SetValue(ref _adaptiveBlockSlowdownThreshold, value);
-        }
-        
-        [DisplayTab(Name = "Conveyor cache enabled", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Conveyor cache enabled")]
-        public bool ConveyorCacheEnabled
-        {
-            get => _conveyorCacheEnabled;
-            set => SetValue(ref _conveyorCacheEnabled, value);
-        }
         
          //=================================================================================================
 
@@ -426,20 +416,11 @@ namespace SentisOptimisationsPlugin
         [DisplayTab(Name = "No Limits Check", GroupName = "Welder Tweaks (WIP)", Tab = "Welder Optimizations", Order = 1, Description = "Welder doesn't check limits, which making welding faster (not recommended)")]
         public bool WelderTweaksNoLimitsCheck { get => _welderNoLimitsCheck; set => SetValue(ref _welderNoLimitsCheck, value); }
 
-        [DisplayTab(Name = "Weld Next Frames", GroupName = "Welder Tweaks (WIP)", Tab = "Welder Optimizations", Order = 2, Description = "Welder block search is in 1 frame, but welding in random next 5 frames (will remove high simulation drops because 100 welders were enabled in 1 frame)")]
-        public bool WelderTweaksWeldNextFrames { get => _welderWeldNextFrames; set => SetValue(ref _welderWeldNextFrames, value); }
-
-        [DisplayTab(Name = "Weld Projections Next Frame", GroupName = "Welder Tweaks (WIP)", Tab = "Welder Optimizations", Order = 3, Description = "Welder can weld it self")]
-        public bool WelderTweaksWeldProjectionsNextFrame { get => _welderWeldProjectionsNextFrame; set => SetValue(ref _welderWeldProjectionsNextFrame, value); }
-
         [DisplayTab(Name = "Weld Projections if welded other blocks", GroupName = "Welder Tweaks (WIP)", Tab = "Welder Optimizations", Order = 4, Description = "Welder can weld projections and non projected blocks on same frame (faster welding, less optimization)")]
         public bool WelderTweaksCanWeldProjectionsIfWeldedOtherBlocks { get => _welderCanWeldProjectionsIfWeldedOtherBlocks; set => SetValue(ref _welderCanWeldProjectionsIfWeldedOtherBlocks, value); }
 
         [DisplayTab(Name = "Self Welding", GroupName = "Welder Tweaks (WIP)", Tab = "Welder Optimizations", Order = 5, Description = "Welder can weld it self")]
         public bool WelderTweaksSelfWelding { get => _welderSelfWelding; set => SetValue(ref _welderSelfWelding, value); }
-
-        [DisplayTab(Name = "Exclude Nanobot", GroupName = "Welder Tweaks (WIP)", Tab = "Welder Optimizations", Order = 6, Description = "Nanobot can't weld as regular welder (and shouldn't)")]
-        public bool WelderTweaksExcludeNanobot { get => _welderExcludeNanobot; set => SetValue(ref _welderExcludeNanobot, value); }
 
         [DisplayTab(Name = "Faster block search", GroupName = "Welder Tweaks (WIP)", Tab = "Welder Optimizations", Order = 7, Description = "Inaccurate block search")]
         public bool WelderTweaksFasterSearch { get => _welderFasterSearch; set => SetValue(ref _welderFasterSearch, value); }
@@ -449,7 +430,6 @@ namespace SentisOptimisationsPlugin
         
         [DisplayTab(Name = "Async weld", GroupName = "Welder Tweaks (WIP)", Tab = "Welder Optimizations", Order = 8, Description = "Async weld")]
         public bool AsyncWeld { get => _asyncWeld; set => SetValue(ref _asyncWeld, value); }
-        
         
         [DisplayTab(Name = "Async explosion", GroupName = "Performance", Tab = "Performance", Order = 8, Description = "Async explosion")]
         public bool AsyncExplosion { get => _asyncExplosion; set => SetValue(ref _asyncExplosion, value); }
