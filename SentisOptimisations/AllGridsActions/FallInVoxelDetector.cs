@@ -62,7 +62,6 @@ namespace SentisOptimisationsPlugin.AllGridsActions
                     }
                 }
 
-                //var pos = planet.GetClosestSurfacePointGlobal(cockpit.WorldMatrix.Translation);
                 foreach (var g in grids)
                 {
                     g.Physics.AngularVelocity = Vector3.Zero;
@@ -75,8 +74,6 @@ namespace SentisOptimisationsPlugin.AllGridsActions
 
                 var m = grid.WorldMatrix;
                 m.Translation = currentPosition;
-                //grid.WorldMatrix = m;
-                //grid.PositionComp.SetPosition(currentPosition);
                 grid.Teleport(m);
                 BoundingSphereD sphere = new BoundingSphereD(currentPosition, 30000);
                 MyPhysics.Clusters.ReorderClusters(BoundingBoxD.CreateFromSphere(sphere));

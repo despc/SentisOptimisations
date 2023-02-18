@@ -6,10 +6,7 @@ using NLog;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Cube;
 using Sandbox.ModAPI;
-using SentisOptimisationsPlugin.ShipTool;
-using SpaceEngineers.Game.Entities.Blocks;
 using Torch.Managers.PatchManager;
-using VRage.Game;
 using VRage.Game.Entity;
 using VRage.Game.ModAPI;
 
@@ -54,70 +51,7 @@ namespace SentisOptimisationsPlugin
                     return;
                 }
             }
-
-            IMySlimBlock damagedBlock = target as IMySlimBlock;
-            if (damagedBlock == null)
-            {
-                return;
-            }
-
-            IMyCubeGrid damagedGrid = damagedBlock.CubeGrid;
-            if (damagedGrid == null)
-            {
-                return;
-            }
-
-            AccumulateDamageHeat(damage, damagedGrid);
-            if (damage.Type != MyDamageType.Deformation)
-            {
-                return;
-            }
-
-            if (damagedBlock.FatBlock != null)
-            {
-                return;
-            }
-
-            if (damagedBlock.BlockDefinition.Id.SubtypeName.Contains("Titanium"))
-            {
-                damage.Amount = damage.Amount / 20;
-            }
-
-            if (damagedBlock.BlockDefinition.Id.SubtypeName.Contains("Aluminum"))
-            {
-                damage.Amount = damage.Amount / 5;
-            }
         }
-
-        private static void AccumulateDamageHeat(MyDamageInformation damage, IMyCubeGrid damagedGrid)
-        {
-            var gridDamageAccumulator = FuckWelderProcessor.WelderDamageAccumulator;
-            if (gridDamageAccumulator.TryGetValue(damagedGrid.EntityId, out var weldersData))
-            {
-                foreach (var welderData in new Dictionary<long, int>(weldersData))
-                {
-                    MyShipWelder welder = (MyShipWelder)MyEntities.GetEntityById(welderData.Key);
-                    if (welder == null || !welder.Enabled)
-                    {
-                        continue;
-                    }
-
-                    var currentHeat = welderData.Value;
-
-                    if (welderData.Value > SentisOptimisationsPlugin.Config.MaxHeat)
-                    {
-                        return;
-                    }
-
-                    weldersData[welderData.Key] = currentHeat + (int)damage.Amount;
-                }
-            }
-            else
-            {
-                gridDamageAccumulator.Add(damagedGrid.EntityId, new Dictionary<long, int>());
-            }
-        }
-
         public static void Patch(PatchContext ctx)
         {
             var MethodPerformDeformation = typeof(MyGridPhysics).GetMethod

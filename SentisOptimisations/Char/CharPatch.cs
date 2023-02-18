@@ -14,7 +14,7 @@ namespace SentisOptimisationsPlugin
 
         public static void Patch(PatchContext ctx)
         {
-            //MyCharacterOxygenComponent.Init
+            
             var MethodInit = typeof(MyCharacterOxygenComponent).GetMethod("Init",
                 BindingFlags.Instance | BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.DeclaredOnly | BindingFlags.Public);
 

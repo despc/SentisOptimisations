@@ -36,7 +36,6 @@
       <Compile Include="AllGridsActions\FallInVoxelDetector.cs" />
       <Compile Include="AllGridsActions\GridAutoRenamer.cs" />
       <Compile Include="AllGridsActions\OnlineReward.cs" />
-      <Compile Include="AllGridsActions\Reminder.cs" />
       <Compile Include="Anticheat\HydrogenPatch.cs" />
       <Compile Include="Anticheat\TorchPatch.cs" />
       <Compile Include="Api\ShieldApi.cs" />
@@ -46,14 +45,10 @@
       <Compile Include="Commands\PlayerCommands.cs" />
       <Compile Include="Config\ConfigShipInMarket.cs" />
       <Compile Include="Config\MainConfig.cs" />
-      <Compile Include="ConnectorPatch.cs" />
       <Compile Include="CrashFix\CrashFixPatch.cs" />
       <Compile Include="ContractPricePatch.cs" />
       <Compile Include="DamagePatch.cs" />
-      <Compile Include="Donation.cs" />
-      <Compile Include="Eco\EcoPatch.cs" />
       <Compile Include="FixShip\FixShipLogic.cs" />
-      <Compile Include="Gravity\GravityPatch.cs" />
       <Compile Include="GUI\ConfigGUI.cs">
         <DependentUpon>ConfigGUI.xaml</DependentUpon>
       </Compile>
@@ -63,30 +58,19 @@
       <Compile Include="Limits\ConvertPatch.cs" />
       <Compile Include="Limits\PcuLimiter.cs" />
       <Compile Include="MissilePatch.cs" />
-      <Compile Include="Nexus\CharacterUtilities.cs" />
-      <Compile Include="Nexus\Chat.cs" />
-      <Compile Include="Nexus\NexusAPI.cs" />
-      <Compile Include="Nexus\NexusMessage.cs" />
-      <Compile Include="Nexus\NexusMessageType.cs" />
-      <Compile Include="Nexus\NexusSupport.cs" />
       <Compile Include="NoScrapPatch.cs" />
       <Compile Include="NPC\NpcPatches.cs" />
       <Compile Include="Perfomance\ExplosionsPatch.cs" />
       <Compile Include="Perfomance\GasTankOptimisations.cs" />
       <Compile Include="Perfomance\Limits\PhysicsProfilerMonitor.cs" />
       <Compile Include="Perfomance\Limits\Punisher.cs" />
-      <Compile Include="Perfomance\PBFix.cs" />
       <Compile Include="Perfomance\SafezonePatch.cs" />
-      <Compile Include="Perfomance\StreamingPatch.cs" />
       <Compile Include="Perfomance\WelderOptimization.cs" />
-      <Compile Include="RemovePluginPatch.cs" />
-      <Compile Include="Rep\ReputationPatch.cs" />
       <Compile Include="Shared\Action2.cs" />
       <Compile Include="Shared\Ext2.cs" />
       <Compile Include="Shared\FrameExecutor.cs" />
       <Compile Include="Shared\SharpUtils.cs" />
       <Compile Include="Shared\Voxels.cs" />
-      <Compile Include="ShipTool\FuckWelderProcessor.cs" />
       <Compile Include="ShipTool\ShipToolPatch.cs" />
       <Compile Include="Shipyard\Communication.cs" />
       <Compile Include="Shipyard\Dto\CancelSellRequest.cs" />
@@ -116,8 +100,6 @@
       <Compile Include="Utils\ProjectorUtils.cs" />
       <Compile Include="Utils\ReflectionUtils.cs" />
       <Compile Include="Utils\SoundUtils.cs" />
-      <Compile Include="Voxels\VoxelsPatch.cs" />
-      <Compile Include="Wheels\WheelPatch.cs" />
     </ItemGroup>
     <ItemGroup>
       <Reference Include="0Harmony, Version=2.1.1.0, Culture=neutral, PublicKeyToken=null">

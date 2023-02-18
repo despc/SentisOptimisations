@@ -19,7 +19,6 @@ namespace SentisOptimisationsPlugin
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
         public static void Patch(PatchContext ctx)
         {
-            Log.Info("Patch init");
             var methodInfo = typeof(MyLargeTurretBase).GetMethod("DoUpdateTimerTick",BindingFlags.DeclaredOnly
                 | BindingFlags.Instance | BindingFlags.Public);
             ctx.GetPattern(methodInfo).Prefixes.Add(

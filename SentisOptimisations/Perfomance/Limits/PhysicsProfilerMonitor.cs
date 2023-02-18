@@ -19,23 +19,6 @@ namespace TorchMonitor.ProfilerMonitors
         
         public static PhysicsProfilerMonitor __instance = new PhysicsProfilerMonitor();
         private Punisher _punisher = Punisher.__instance;
-        // static readonly ILogger Log = LogManager.GetCurrentClassLogger();
-        // readonly IConfig _physicsConfig;
-        //
-        // public PhysicsProfilerMonitor(IMonitorGeneralConfig config, IConfig physicsConfig)
-        // {
-        //     _config = config;
-        //     _physicsConfig = physicsConfig;
-        // }
-        //
-        // public void OnInterval(int intervalsSinceStart)
-        // {
-        //     if (!_physicsConfig.PhysicsEnabled) return;
-        //     if (intervalsSinceStart < _config.FirstIgnoredSeconds) return;
-        //     if (intervalsSinceStart % _physicsConfig.PhysicsInterval != 0) return;
-        //
-        //     Profile().Forget(Log);
-        // }
 
         public static Task MoveToGameLoop(CancellationToken cancellationToken = default (CancellationToken))
         {

@@ -2,10 +2,8 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Threading.Tasks;
 using System.Windows.Controls;
-using HarmonyLib;
 using Havok;
 using NAPI;
 using NLog;
@@ -22,7 +20,6 @@ using Sandbox.Game.World;
 using Sandbox.ModAPI;
 using SentisOptimisations;
 using SentisOptimisationsPlugin.AllGridsActions;
-using SentisOptimisationsPlugin.ShipTool;
 using SOPlugin.GUI;
 using Torch;
 using Torch.API;
@@ -31,7 +28,6 @@ using Torch.API.Plugins;
 using Torch.API.Session;
 using Torch.Commands;
 using Torch.Commands.Permissions;
-using Torch.Managers;
 using Torch.Session;
 using VRage.Collections;
 using VRage.Game;
@@ -46,36 +42,22 @@ namespace SentisOptimisationsPlugin
 {
     public class SentisOptimisationsPlugin : TorchPluginBase, IWpfPlugin
     {
-        private static Guid NexusGUID = new Guid("28a12184-0422-43ba-a6e6-2e228611cca5");
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
         public static PcuLimiter _limiter = new PcuLimiter();
         public static Dictionary<long,long> stuckGrids = new Dictionary<long, long>();
         public static Dictionary<long,long> gridsInSZ = new Dictionary<long, long>();
         private static TorchSessionManager SessionManager;
         private static Persistent<MainConfig> _config;
-        public static Harmony harmony = new Harmony("SentisOptimisations.H");
         public static MainConfig Config => _config.Data;
         public static Random _random = new Random();
         public UserControl _control = null;
         public static SentisOptimisationsPlugin Instance { get; private set; }
 
-        private FuckWelderProcessor _welderProcessor = new FuckWelderProcessor();
         private AllGridsObserver _allGridsObserver = new AllGridsObserver();
         public static ShieldApi SApi = new ShieldApi();
 
-
-        static void MyHandler(object sender, UnhandledExceptionEventArgs args)
-        {
-            Exception e = (Exception) args.ExceptionObject;
-            Log.Error("MyHandler caught : " + e.Message);
-            Log.Error(e);
-            Log.Error("Runtime terminating: {0}", args.IsTerminating);
-        }
         public override void Init(ITorchBase torch)
         {
-            AppDomain currentDomain = AppDomain.CurrentDomain;
-            currentDomain.UnhandledException += new UnhandledExceptionEventHandler(MyHandler);
-            
             Instance = this;
             Log.Info("Init SentisOptimisationsPlugin");
             MyFakes.ENABLE_SCRAP = false;
@@ -123,14 +105,7 @@ namespace SentisOptimisationsPlugin
                 _allGridsObserver.OnLoaded();
                 InitShieldApi();
                 Communication.RegisterHandlers();
-                ITorchPlugin Plugin;
-                if (DependencyProviderExtensions
-                    .GetManager<PluginManager>((IDependencyProvider) this.Torch.CurrentSession.Managers).Plugins
-                    .TryGetValue(NexusGUID, out Plugin))
-                {
-                    AquireNexus(Plugin);
-                }
-                    
+                
             }
         }
 
@@ -145,19 +120,6 @@ namespace SentisOptimisationsPlugin
             {
                 Log.Error(e);
             }
-        }
-
-        private static void AquireNexus(ITorchPlugin Plugin)
-        {
-            Type type = ((object) Plugin).GetType()?.Assembly.GetType("Nexus.API.PluginAPISync");
-            if (type == (Type) null)
-                return;
-            type.GetMethod("ApplyPatching", BindingFlags.Static | BindingFlags.NonPublic).Invoke((object) null, new object[2]
-            {
-                (object) typeof (NexusAPI),
-                (object) "SentisOptimisations"
-            });
-            NexusSupport.Init();
         }
         
         public void UpdateGui()
@@ -296,11 +258,6 @@ namespace SentisOptimisationsPlugin
                 SafezonePatch.entitiesInSZ.Clear();
             }
 
-            if (MySandboxGame.Static.SimulationFrameCounter % 60 == 0)
-            {
-                _welderProcessor.Process();
-            }
-
             if (MySandboxGame.Static.SimulationFrameCounter % 120 == 0)
             {
                 foreach (var keyValuePair in DamagePatch.contactInfo)
@@ -313,7 +270,7 @@ namespace SentisOptimisationsPlugin
                     }
 
                     var contactCount = keyValuePair.Value;
-                    if (contactCount > Config.ContactCountAlert)
+                    if (contactCount > 50)
                     {
                         Log.Error("Entity  " + entityById.DisplayName + " position " +
                                   entityById.PositionComp.GetPosition() + " contact count - " + contactCount);
