@@ -105,7 +105,6 @@ namespace SentisOptimisationsPlugin
                 HashSet<MyEntity> entitiesSet = new HashSet<MyEntity>(entities);
                 var explosionSphere = m_explosionInfo.ExplosionSphere;
                 float damage = m_explosionInfo.Damage;
-                // BoundingSphereD ExplosionSphere = (BoundingSphereD) m_explosionInfo.easyGetField("m_explosionSphere");
                 if (m_explosionInfo.OwnerEntity is MyFloatingObject)
                 {
                     var myFloatingObject = ((MyFloatingObject) m_explosionInfo.OwnerEntity);
@@ -148,11 +147,6 @@ namespace SentisOptimisationsPlugin
                         }
                     }
                 }
-                // if (DamageShieldAndObjects(0, entities, explosionSphere, damage))
-                // {
-                //     __result = true;
-                //     return false;
-                // }
                 ApplyVolumetricExplosionOnGrid(damage, ref explosionSphere, 0L, new List<MyEntity>(entitiesSet), 0);
                 __result = true;
                 return false;
@@ -188,40 +182,13 @@ namespace SentisOptimisationsPlugin
             voxelsTmp.Clear();
             foreach (MyVoxelBase voxelMap in voxelsToCutTmp)
             {
-                
-                if (!IsVoxelDestructable(sphere)) continue;
-
                 bool createDebris = true;
                 var type = typeof(MyVoxelBase).Assembly.GetType("Sandbox.Game.MyExplosion");
                 ReflectionUtils.InvokeStaticMethod(type, "CutOutVoxelMap",
                     new object[] {(float) sphere.Radius * 0.3f, sphere.Center, voxelMap, createDebris, false});
-                // Sandbox.Game.MyExplosion.CutOutVoxelMap((float) sphere.Radius * 1, sphere.Center, voxelMap, createDebris);
                 voxelMap.RequestVoxelCutoutSphere(sphere.Center, (float) sphere.Radius * 0.3f, createDebris, false);
             }
             voxelsToCutTmp.Clear();
-        }
-
-        private static bool IsVoxelDestructable(BoundingSphereD sphere)
-        {
-            if (VoxelsPatch.Protectors == null)
-            {
-                return true;
-            }
-
-            var pos = sphere.Center;
-
-            foreach (var myUpgradeModule in VoxelsPatch.Protectors)
-            {
-                if (Vector3D.Distance(myUpgradeModule.PositionComp.GetPosition(), pos) < 300)
-                {
-                    if (myUpgradeModule.Enabled && myUpgradeModule.IsFunctional)
-                    {
-                        return false;
-                    }
-                }
-            }
-
-            return true;
         }
 
         public static void ComputeDamagedBlocks(MyGridExplosion m_gridExplosion, bool pearcingDamage)
@@ -600,7 +567,6 @@ namespace SentisOptimisationsPlugin
                     {
                         if (key.FatBlock != null)
                             amount *= 7f;
-                        //Log.Error("attackerId " + attackerId);
                         key.DoDamage(amount, MyDamageType.Explosion, true, null, attackerId: attackerId);
                         if (!key.IsDestroyed)
                             key.CubeGrid.ApplyDestructionDeformation(key, 1f, new MyHitInfo?(), attackerId);

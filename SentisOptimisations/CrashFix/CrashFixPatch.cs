@@ -7,7 +7,6 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NAPI;
 using Sandbox.Game.Entities.Blocks;
-using Sandbox.Game.Weapons;
 using SentisOptimisations;
 using Torch.Managers.PatchManager;
 using VRage.Scripting;
@@ -39,13 +38,7 @@ namespace SentisOptimisationsPlugin.CrashFix
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
 
         }
-        
-        
-        private static bool MethodIsValidPatched(MyTurretTargetFlags value, ref bool __result)
-        {
-            __result = true;
-            return false;
-        }
+
         private static void MethodPistonInitPatched(MyPistonBase __instance)
         {
             __instance.Velocity.ValueChanged += VelocityOnValueChanged;

@@ -15,7 +15,6 @@ namespace SentisOptimisationsPlugin.AllGridsActions
     {
         public static FallInVoxelDetector FallInVoxelDetector = new FallInVoxelDetector();
         private GridAutoRenamer _autoRenamer = new GridAutoRenamer();
-        private Reminder _reminder = new Reminder();
         private OnlineReward _onlineReward = new OnlineReward();
 
         public static HashSet<MyPlanet> Planets = new HashSet<MyPlanet>();
@@ -54,7 +53,7 @@ namespace SentisOptimisationsPlugin.AllGridsActions
                 {
                     try
                     {
-                        await Task.Delay(20000);
+                        await Task.Delay(30000);
                         var myCubeGrids = MyEntities.GetEntities().OfType<MyCubeGrid>();
                         await Task.Run(() => { CheckAllGrids(myCubeGrids); });
                         await Task.Run(() => { _onlineReward.RewardOnline(); });
@@ -93,7 +92,6 @@ namespace SentisOptimisationsPlugin.AllGridsActions
                 {
                     CheckNobodyOwner(grid);
                 }
-                _reminder.RemindOffline(grid);
             }
         }
 

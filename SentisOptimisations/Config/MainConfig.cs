@@ -12,91 +12,76 @@ namespace SentisOptimisationsPlugin
         {
             ConfigShipsInMarket.CollectionChanged += (sender, args) => OnPropertyChanged();
         }
+        
+        //contracts
         private double _contractEscortMultiplier = 10;
         private double _contractAcquisitionMultiplier = 30; //Доставка
         private double _contractHaulingtMultiplier = 10; //Перевозка
         private double _contractRepairMultiplier = 10;
         private double _contractFindMultiplier = 25;
+        
+        //PCU limiter
         private bool _enabledPcuLimiter = true;
-        private bool _enableCheckBeacon = true;
-        private bool _enableOnlyEarthSpawn = true;
-        private bool _disableTurretUpdate = false;
         private int _maxStaticGridPCU = 200000;
         private int _maxDinamycGridPCU = 30000;
-        private int _accelerationToDamage = 1000;
-        private int _noDamageFromVoxelsBeforeSpeed = 30;
         private bool _includeConnectedGrids = false;
-        private bool _adaptiveblockslowdown = false;
-        private bool _moreCORES = false;
+        
+        //alerts
+        private bool _enableCheckBeacon = true;
+        
+        //optimisations
         private bool _gasTankOptimisation = true;
-        private bool _removeEntityPhantomPatch = false;
-        private String _pathToAsters = "C:\\Asteroids";
-        private String _pathToGarage = "D:\\torch-server\\GARAGE";
-        private String _planetsWithEco = "Earth,Moon";
-        private String _ignoreCleanupSubtypes = "Cargo";
-        private String _overrideModIds = "";
-        private float _explosivesDamage = 10;
-        private int _contactCountAlert = 150;
-        private int _adaptiveBlockSlowdownThreshold = 150;
-
-        private float _projectileAmmoExplosionMultiplier = 0.1f;
-        private float _missileAmmoExplosionMultiplier = 0.3f;
-        private float _ammoExplosionRadius = 15f;
-
-        private float _physicsMsToAlert = 1.5f;
-        private float _checkInsideVoxel = 0.1f;
-        private float _physicsMsToPunish = 2f;
-        private float _warheadDamageMultiplier = 2.5f;
-        private float _physicsMsToPunishImmediately = 5f;
-        private int _physicsChecksBeforePunish = 5;
-        
-        private int _minimumMassForKineticDamage = 5000;
-        
         private bool _safeZoneSubGridOptimisation = true;
-        private bool _enableRammingForStatic = true;
-        private bool _conveyorCacheEnabled = false;
-        private bool _streamingWithoutZip = true;
-        private int _safeZonePhysicsThreshold = 10;
+        private int _safeZonePhysicsThreshold = 10; // детект сварки динамики в сз, автоперевод в статику если грид обрабатывается больше N мс
         
-        //WelderFuck
-        private int _coolingSpeed = 30000;
-        private int _maxHeat = 2000000;
-        private int _weldersOverheatThreshold = 1000000;
-        private int _weldersMessageTime = 325;
-        
+        //welders
         private bool _welderTweaksEnabled = true;
         private bool _welderNoLimitsCheck = true;
-        private bool _welderWeldProjectionsNextFrame = false;
-        private bool _welderWeldNextFrames = false;
         private bool _welderCanWeldProjectionsIfWeldedOtherBlocks = false;
         private bool _welderSelfWelding = true;
-        private bool _welderExcludeNanobot = true;
         private bool _welderFasterSearch = true;
         private bool _asyncWeld = true;
         private bool _welderSkipCreativeWelding = true;
         
+        //fixes
+        private bool _removeEntityPhantomPatch = false;  //фикс краша из за гонки при входе/выходе из сз нескольких гридов/сабгридов одновременно
+        
+        //other
+        private String _pathToAsters = "C:\\Asteroids";
+        private String _pathToGarage = "D:\\torch-server\\GARAGE";
+        private String _ignoreCleanupSubtypes = "Cargo";
+        private String _overrideModIds = "";
+        
+        //explosions
         private bool _asyncExplosion = true;
+        private float _warheadDamageMultiplier = 2.5f;
+        private int _accelerationToDamage = 1000;  // взрыв боеприпаса или взрывчатки от удара об что-то, указывается ускорение объекта которое приводит к взрыву
+        private float _explosivesDamage = 10;
+        private float _projectileAmmoExplosionMultiplier = 0.1f;
+        private float _missileAmmoExplosionMultiplier = 0.3f;
+        private float _ammoExplosionRadius = 15f;
         
-        //Physics
-        private float _idealClusterSize = 10000;
-        private float _maximumClusterSize = 15000;
-        private bool _patchClusterActivity = false;
-        
+        //physics profile антипалочная защита
+        private float _physicsMsToAlert = 1.5f;
+        private float _checkInsideVoxel = 0.2f;
+        private float _physicsMsToPunish = 2f;
+        private float _physicsMsToPunishImmediately = 5f;
+        private int _physicsChecksBeforePunish = 5;
+
         //Tweaks
         private bool _autoRenameGrids = false;
+        private bool _enableRammingForStatic = true;
         private bool _autoRestoreFromVoxel = false;
         private bool _disableNoOwner = false;
-        
-        //Arrakis
-        private String _engineSubtypeKey = "test_subtype";
-        private bool _offlineProtectionReminder = false;
-        private float _engineMultiplier = 5;
-        
+        private bool _disableTurretUpdate = false;
+        private bool _enableOnlyEarthSpawn = false;
+        private int _noDamageFromVoxelsBeforeSpeed = 30;
+        private int _minimumMassForKineticDamage = 5000;
         
         //Online Reward
         private bool _onlineRewardEnabled = true;
         private int _onlineRewardEachMinutes = 60;
-        private string _onlineReward = "Ingot_CleanSpice=5;Ingot_Uranium=50";
+        private string _onlineReward = "Ingot_Platinum=50;Ingot_Uranium=50";
         private string _onlineRewardMessage = "Спасибо что остаётесь с нами, награда за игру на сервере в вашем инвентаре.";
         
         private ObservableCollection<ConfigShipInMarket> configShipsInMarket = new ObservableCollection<ConfigShipInMarket>();
@@ -131,64 +116,33 @@ namespace SentisOptimisationsPlugin
         [DisplayTab(Name = "Online reward each N minutes", GroupName = "Online Reward", Tab = "Online Reward", Order = 2, Description = "Online reward each N minutes")]
         public int OnlineRewardEachMinutes { get => _onlineRewardEachMinutes; set => SetValue(ref _onlineRewardEachMinutes, value); }
         
-        [DisplayTab(Name = "Engine Subtype Key", GroupName = "Arrakis", Tab = "Arrakis", Order = 0, Description = "Engine Subtype Key")]
-        public String EngineSubtypeKey { get => _engineSubtypeKey; set => SetValue(ref _engineSubtypeKey, value); }
+        [DisplayTab(Name = "Async explosion", GroupName = "Explosions", Tab = "Explosions", Order = 8, Description = "Async explosion")]
+        public bool AsyncExplosion { get => _asyncExplosion; set => SetValue(ref _asyncExplosion, value); }
         
-        [DisplayTab(Name = "Engine Multiplier", GroupName = "Arrakis", Tab = "Arrakis", Order = 0, Description = "Engine Multiplier")]
-        public float EngineMultiplier { get => _engineMultiplier; set => SetValue(ref _engineMultiplier, value); }
-        
-        [DisplayTab(Name = "Offline Protection Reminder", GroupName = "Arrakis", Tab = "Arrakis", Order = 0, Description = "Offline Protection Reminder")]
-        public bool OfflineProtectionReminder
-        {
-            get => _offlineProtectionReminder;
-            set => SetValue(ref _offlineProtectionReminder, value);
-        }
-        
-        [DisplayTab(Name = "Ideal Cluster Size", GroupName = "Physics", Tab = "Physics", Order = 0, Description = "Ideal Cluster Size")]
-        public float IdealClusterSize { get => _idealClusterSize; set => SetValue(ref _idealClusterSize, value); }
-        
-        [DisplayTab(Name = "Maximum Cluster Size", GroupName = "Physics", Tab = "Physics", Order = 0, Description = "Maximum Cluster Size")]
-        public float MaximumClusterSize { get => _maximumClusterSize; set => SetValue(ref _maximumClusterSize, value); }
-        
-        [DisplayTab(Name = "Explosives damage", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Explosives damage")]
+        [DisplayTab(Name = "Explosives damage", GroupName = "Explosions", Tab = "Explosions", Order = 0, Description = "Explosives damage")]
         public float ExplosivesDamage { get => _explosivesDamage; set => SetValue(ref _explosivesDamage, value); }
         
-        [DisplayTab(Name = "Projectile Ammo Explosion Multiplier", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Projectile Ammo Explosion Multiplier")]
+        [DisplayTab(Name = "Projectile Ammo Explosion Multiplier", GroupName = "Explosions", Tab = "Explosions", Order = 0, Description = "Projectile Ammo Explosion Multiplier")]
         public float ProjectileAmmoExplosionMultiplier { get => _projectileAmmoExplosionMultiplier; set => SetValue(ref _projectileAmmoExplosionMultiplier, value); }
         
-        [DisplayTab(Name = "Missile Ammo Explosion Multiplier", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Missile Ammo Explosion Multiplier")]
+        [DisplayTab(Name = "Missile Ammo Explosion Multiplier", GroupName = "Explosions", Tab = "Explosions", Order = 0, Description = "Missile Ammo Explosion Multiplier")]
         public float MissileAmmoExplosionMultiplier { get => _missileAmmoExplosionMultiplier; set => SetValue(ref _missileAmmoExplosionMultiplier, value); }
-        [DisplayTab(Name = "Ammo Explosion Radius", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Ammo Explosion Radius")]
+        [DisplayTab(Name = "Ammo Explosion Radius", GroupName = "Explosions", Tab = "Explosions", Order = 0, Description = "Ammo Explosion Radius")]
         public float AmmoExplosionRadius { get => _ammoExplosionRadius; set => SetValue(ref _ammoExplosionRadius, value); }
         
-        [DisplayTab(Name = "Warhead damage multiplier", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Warhead damage multiplier")]
+        [DisplayTab(Name = "Warhead damage multiplier", GroupName = "Explosions", Tab = "Explosions", Order = 0, Description = "Warhead damage multiplier")]
         public float WarheadDamageMultiplier { get => _warheadDamageMultiplier; set => SetValue(ref _warheadDamageMultiplier, value); }
         
-        [DisplayTab(Name = "Acceleration to Damage", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Acceleration to Damage")]
+        [DisplayTab(Name = "Acceleration to Damage", GroupName = "Explosions", Tab = "Explosions", Order = 0, Description = "Acceleration to Damage")]
         public int AccelerationToDamage { get => _accelerationToDamage; set => SetValue(ref _accelerationToDamage, value); }
         
-        [DisplayTab(Name = "Welders Cooling Speed", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Welders Cooling Speed")]
-        public int CoolingSpeed { get => _coolingSpeed; set => SetValue(ref _coolingSpeed, value); }
-        
-        [DisplayTab(Name = "Welders Max Heat", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Welders Max Heat")]
-        public int MaxHeat { get => _maxHeat; set => SetValue(ref _maxHeat, value); }
-        
-        [DisplayTab(Name = "Welders Overheat Threshold", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Welders Overheat Threshold")]
-        public int WeldersOverheatThreshold { get => _weldersOverheatThreshold; set => SetValue(ref _weldersOverheatThreshold, value); }
-        
-        [DisplayTab(Name = "Welder Message time in ms", GroupName = "Balance", Tab = "Balance", Order = 0, Description = "Welder Message time in ms")]
-        public int WeldersMessageTime { get => _weldersMessageTime; set => SetValue(ref _weldersMessageTime, value); }
-        
-        [DisplayTab(Name = "Path to asteroids", GroupName = "Asteroids", Tab = "Asteroids", Order = 0, Description = "Path to asteroids to restore")]
+        [DisplayTab(Name = "Path to asteroids", GroupName = "Other", Tab = "Other", Order = 100, Description = "Path to asteroids to restore")]
         public String PathToAsters { get => _pathToAsters; set => SetValue(ref _pathToAsters, value); }
-        
-        [DisplayTab(Name = "Planets With Economic", GroupName = "Contracts", Tab = "Contracts", Order = 0, Description = "Planets With Economic")]
-        public String PlanetsWithEco { get => _planetsWithEco; set => SetValue(ref _planetsWithEco, value); }
-        
-        [DisplayTab(Name = "Dont clean with blocks", GroupName = "Tweaks", Tab = "Tweaks", Order = 0, Description = "Dont clean with blocks")]
+
+        [DisplayTab(Name = "Dont clean with blocks", GroupName = "Other", Tab = "Other", Order = 0, Description = "Dont clean with blocks")]
         public String IgnoreCleanupSubtypes { get => _ignoreCleanupSubtypes; set => SetValue(ref _ignoreCleanupSubtypes, value); }
 
-        [DisplayTab(Name = "Path to Garage", GroupName = "Garage", Tab = "Garage", Order = 0, Description = "Path to Garage")]
+        [DisplayTab(Name = "Path to Garage", GroupName = "Other", Tab = "Other", Order = 0, Description = "Path to Garage")]
         public String PathToGarage { get => _pathToGarage; set => SetValue(ref _pathToGarage, value); }
         
         [DisplayTab(Name = "Contract escort multiplier", GroupName = "Contracts", Tab = "Contracts", Order = 0, Description = "Contract escort reward multiplier")]
@@ -236,7 +190,7 @@ namespace SentisOptimisationsPlugin
             set => SetValue(ref _enableCheckBeacon, value);
         }
         
-        [DisplayTab(Name = "Enabled Only Earth Spawn", GroupName = "PCU limiter", Tab = "PCU limiter", Order = 0, Description = "Enabled Only Earth Spawn")]
+        [DisplayTab(Name = "Enabled Only Earth Spawn", GroupName = "Other", Tab = "Other", Order = 0, Description = "Enabled Only Earth Spawn")]
         public bool EnableOnlyEarthSpawn
         {
             get => _enableOnlyEarthSpawn;
@@ -320,25 +274,18 @@ namespace SentisOptimisationsPlugin
             set => SetValue(ref _physicsChecksBeforePunish, value);
         }
 
-        [DisplayTab(Name = "Minimum mass for kinetic damage", GroupName = "Damage Tweaks", Tab = "Damage Tweaks", Order = 0, Description = "Minimum mass for kinetic damage")]
+        [DisplayTab(Name = "Minimum mass for kinetic damage", GroupName = "Tweaks", Tab = "Tweaks", Order = 0, Description = "Minimum mass for kinetic damage")]
         public int MinimumMassForKineticDamage
         {
             get => _minimumMassForKineticDamage;
             set => SetValue(ref _minimumMassForKineticDamage, value);
         }
         
-        [DisplayTab(Name = "No damage from voxels before speed", GroupName = "Damage Tweaks", Tab = "Damage Tweaks", Order = 0, Description = "No damage from voxels before speed")]
+        [DisplayTab(Name = "No damage from voxels before speed", GroupName = "Tweaks", Tab = "Tweaks", Order = 0, Description = "No damage from voxels before speed")]
         public int NoDamageFromVoxelsBeforeSpeed
         {
             get => _noDamageFromVoxelsBeforeSpeed;
             set => SetValue(ref _noDamageFromVoxelsBeforeSpeed, value);
-        }
-        
-        [DisplayTab(Name = "Contact Count to Alert", GroupName = "Damage Tweaks", Tab = "Damage Tweaks", Order = 0, Description = "Contact Count to Alert")]
-        public int ContactCountAlert
-        {
-            get => _contactCountAlert;
-            set => SetValue(ref _contactCountAlert, value);
         }
 
         [DisplayTab(Name = "Include connected grids", GroupName = "PCU limiter", Tab = "PCU limiter", Order = 0, Description = "Include grinds connected with CONNECTOR")]
@@ -361,21 +308,14 @@ namespace SentisOptimisationsPlugin
             get => _disableNoOwner;
             set => SetValue(ref _disableNoOwner, value);
         }
-        
-        [DisplayTab(Name = "Fix freeze by voxel streaming", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Fix freeze by voxel streaming")]
-        public bool StreamingWithoutZip
-        {
-            get => _streamingWithoutZip;
-            set => SetValue(ref _streamingWithoutZip, value);
-        }
-        
+
         [DisplayTab(Name = "Auto Restore From Voxel", GroupName = "Tweaks", Tab = "Tweaks", Order = 0, Description = "Grids inside voxels rollback for 15sec")]
         public bool AutoRestoreFromVoxel
         {
             get => _autoRestoreFromVoxel;
             set => SetValue(ref _autoRestoreFromVoxel, value);
         }
-        [DisplayTab(Name = "Client Only Mods", GroupName = "Tweaks", Tab = "Tweaks", Order = 0, Description = "Client Only Mods splitted with comma")]
+        [DisplayTab(Name = "Client Only Mods", GroupName = "Other", Tab = "Other", Order = 0, Description = "Client Only Mods splitted with comma")]
         public String OverrideModIds { get => _overrideModIds; set => SetValue(ref _overrideModIds, value); }
         
         [DisplayTab(Name = "Auto Rename Grids", GroupName = "Tweaks", Tab = "Tweaks", Order = 0, Description = "Auto Rename Grids")]
@@ -384,22 +324,7 @@ namespace SentisOptimisationsPlugin
             get => _autoRenameGrids;
             set => SetValue(ref _autoRenameGrids, value);
         }
-        
-                
-        [DisplayTab(Name = "Adaptive block slowdown", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Adaptive block slowdown")]
-        public bool Adaptiveblockslowdown
-        {
-            get => _adaptiveblockslowdown;
-            set => SetValue(ref _adaptiveblockslowdown, value);
-        }
-        
-        [DisplayTab(Name = "MORE CORES", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "MORE CORES")]
-        public bool MoreCORES
-        {
-            get => _moreCORES;
-            set => SetValue(ref _moreCORES, value);
-        }
-        
+
         [DisplayTab(Name = "Gas Tank Optimisation", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Gas Tank Optimisation")]
         public bool GasTankOptimisation
         {
@@ -431,7 +356,5 @@ namespace SentisOptimisationsPlugin
         [DisplayTab(Name = "Async weld", GroupName = "Welder Tweaks (WIP)", Tab = "Welder Optimizations", Order = 8, Description = "Async weld")]
         public bool AsyncWeld { get => _asyncWeld; set => SetValue(ref _asyncWeld, value); }
         
-        [DisplayTab(Name = "Async explosion", GroupName = "Performance", Tab = "Performance", Order = 8, Description = "Async explosion")]
-        public bool AsyncExplosion { get => _asyncExplosion; set => SetValue(ref _asyncExplosion, value); }
     }
 }

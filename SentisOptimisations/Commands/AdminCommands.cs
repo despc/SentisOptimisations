@@ -90,37 +90,7 @@ namespace SentisOptimisationsPlugin
                 }
             }
         }
-        
-        [Command("ga add", ".", null)]
-        [Permission(MyPromoteLevel.Moderator)]
-        public void AddGravityPoint(String cords, float gravity, float radius)
-        {
-            var cordsSplitted = cords.Split(':');
-            var point = new Vector3D(double.Parse(cordsSplitted[0]), double.Parse(cordsSplitted[1]),
-                double.Parse(cordsSplitted[2]));
-            GravityPatch.gravityPoints.Add(new GravityPatch.GravityPoint(point, gravity, radius));
-        }
-        
-        [Command("ga del", ".", null)]
-        [Permission(MyPromoteLevel.Moderator)]
-        public void DelGravityPoint(int index)
-        {
-            GravityPatch.gravityPoints.RemoveAt(index - 1);
-        }
-        
-        [Command("ga list", ".", null)]
-        [Permission(MyPromoteLevel.Moderator)]
-        public void GravityPointList()
-        {
-            
-            string str = "Существующие гравитационные аномалии " + " \n";
-            
-            for (int index = 1; index < GravityPatch.gravityPoints.Count + 1; ++index)
-                str = string.Format("{0}{1}. {2}\n", str, index,
-                    GravityPatch.gravityPoints[index - 1]);
-            Context.Respond(str);
-        }
-        
+
         [Command("rename_faction", ".", null)]
         [Permission(MyPromoteLevel.Moderator)]
         public void RenameFaction(String oldTag, String newtag)

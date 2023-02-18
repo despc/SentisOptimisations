@@ -3,10 +3,12 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Reflection;
 using NLog;
+using NLog.Fluent;
 using Sandbox;
 using Sandbox.Definitions;
 using Sandbox.Game.Entities.Blocks;
 using Torch.Managers.PatchManager;
+using VRage.Game;
 
 namespace SentisOptimisationsPlugin
 {
@@ -24,6 +26,14 @@ namespace SentisOptimisationsPlugin
             ctx.GetPattern(ChangeStockpileMode).Suffixes.Add(
                 typeof(HydrogenPatch).GetMethod(nameof(ChangeStockpileModePatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
+            var ChangeEnabled = typeof(MyGasTank).GetMethod
+                ("OnEnabledChanged", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+
+            ctx.GetPattern(ChangeEnabled).Suffixes.Add(
+                typeof(HydrogenPatch).GetMethod(nameof(ChangeStockpileModePatched),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
         }
         private static void ChangeStockpileModePatched(MyGasTank __instance)
         {
@@ -51,6 +61,11 @@ namespace SentisOptimisationsPlugin
                             foreach (var myProgrammableBlock in myFatBlockReader)
                             {
                                 myProgrammableBlock.Enabled = false;
+                                var mySlimBlock = myProgrammableBlock.SlimBlock;
+                                mySlimBlock.DoDamage((float)(mySlimBlock.Integrity / 1.5), MyDamageType.Explosion, true, null, 0);
+                                SentisOptimisationsPlugin.Log.Warn(myProgrammableBlock.OwnerId +
+                                                                   " Try to cheat hydrogen!");
+                                myProgrammableBlock.UpdateProgram("oh nononononono...");
                             }
                             _stockpileChangeDictionary.Remove(__instance.EntityId);
                             return;
