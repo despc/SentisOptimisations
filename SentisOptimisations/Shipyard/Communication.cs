@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Sandbox.ModAPI;
+using SentisOptimisationsPlugin.FixShip;
 using SentisOptimisationsPlugin.ShipyardLogic;
 using VRage.ModAPI;
 using VRageMath;
@@ -29,6 +30,9 @@ namespace SentisOptimisationsPlugin
         Array.Copy((Array) bytes, 1, (Array) data, 0, data.Length);
         switch (messageType)
         {
+          case MessageType.FixShip:
+            FixShip(data);
+            break;
           case MessageType.BuyReq:
             OnClientBuy(data);
             break;
@@ -41,8 +45,11 @@ namespace SentisOptimisationsPlugin
           case MessageType.SetGridListReq:
             Shipyard.OnListRequest(data);
             break;
-          case MessageType.SetGridListResp:
-            //OnClearGridReq(data);
+          case MessageType.ListForGuiReq:
+            Shipyard.OnListRequestForGui(data);
+            break;
+          case MessageType.CancelSellReq:
+            Shipyard.OnCancelSell(data);
             break;
         }
       }
@@ -58,6 +65,19 @@ namespace SentisOptimisationsPlugin
       if (clientBuyRequest.SteamId <= 0UL)
         return;
       Shipyard.OnClientBuy(clientBuyRequest);
+    }
+    
+    private static void FixShip(byte[] data)
+    {
+      FixShipRequest request = MyAPIGateway.Utilities.SerializeFromBinary<FixShipRequest>(data);
+      var requestGridId = request.gridId;
+      var owner = request.owner;
+      if (owner == 0)
+      {
+        return;
+      }
+      FixShipLogic.DoFixShip(requestGridId, owner);
+
     }
     
     private static void OnStartSellGrid(byte[] data)
