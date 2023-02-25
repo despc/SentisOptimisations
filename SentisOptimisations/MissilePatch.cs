@@ -78,6 +78,11 @@ namespace SentisOptimisationsPlugin
         private static bool CalculateStoredExplosiveDamageMethodPatched(MyCubeBlock __instance, 
             List<MyCubeBlock.StoredExplosive> storedExplosives, ref float __result)
         {
+            if (!SentisOptimisationsPlugin.Config.ExplosionTweaks)
+            {
+                return true;
+            }
+            
             try
             {
                 var m_detonationData = __instance.easyGetField("m_detonationData", typeof(MyCubeBlock));
@@ -100,6 +105,11 @@ namespace SentisOptimisationsPlugin
         private static bool ApplyVolumetricExplosionPatched(ref MyExplosionInfo m_explosionInfo,
             List<MyEntity> entities, ref bool __result)
         {
+            if (!SentisOptimisationsPlugin.Config.ExplosionTweaks)
+            {
+                return true;
+            }
+            
             try
             {
                 HashSet<MyEntity> entitiesSet = new HashSet<MyEntity>(entities);
@@ -581,6 +591,10 @@ namespace SentisOptimisationsPlugin
 
         private static bool MyWarheadOnDestroyPatched()
         {
+            if (!SentisOptimisationsPlugin.Config.ExplosionTweaks)
+            {
+                return true;
+            }
             return false;
         }
 
@@ -591,6 +605,11 @@ namespace SentisOptimisationsPlugin
             MyHitInfo? hitInfo,
             long attackerId)
         {
+            if (!SentisOptimisationsPlugin.Config.ExplosionTweaks)
+            {
+                return true;
+            }
+            
             try
             {
                 if (!__instance.IsArmed)
@@ -618,6 +637,10 @@ namespace SentisOptimisationsPlugin
 
         private static bool MyWarheadExplodePatched(MyWarhead __instance)
         {
+            if (!SentisOptimisationsPlugin.Config.ExplosionTweaks)
+            {
+                return true;
+            }
             try
             {
                 bool m_isExploded = (bool) GetInstanceField(typeof(MyWarhead), __instance, "m_isExploded");

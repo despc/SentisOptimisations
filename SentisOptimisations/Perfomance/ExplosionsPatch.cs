@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
-using NLog;
 using Sandbox.Game.Entities;
 using Sandbox.Game.World;
 using SentisOptimisations;
@@ -15,11 +14,6 @@ namespace SentisOptimisationsPlugin
     [PatchShim]
     public static class ExplosionsPatch
     {
-        public static readonly Logger Log = LogManager.GetCurrentClassLogger();
-        private static readonly Random Random = new Random();
-        private static int m_updateCounter = 0;
-        
-
         public static void Patch(PatchContext ctx)
         {
             var UpdateAfterSimulationParallel = typeof(MyFloatingObject).GetMethod
@@ -61,6 +55,11 @@ namespace SentisOptimisationsPlugin
 
         private static bool ReduceFloatingObjectsPatched()
         {
+            if (!SentisOptimisationsPlugin.Config.ExplosionTweaks)
+            {
+                return true;
+            }
+            
             try
             {
                 SortedSet<MyFloatingObject> m_floatingOres =
@@ -89,6 +88,11 @@ namespace SentisOptimisationsPlugin
 
         private static bool UnRegisterFloatingObjectPatched(MyFloatingObject obj)
         {
+            if (!SentisOptimisationsPlugin.Config.ExplosionTweaks)
+            {
+                return true;
+            }
+            
             try
             {
                 if (obj.VoxelMaterial != null)
@@ -123,6 +127,11 @@ namespace SentisOptimisationsPlugin
         
         private static bool RegisterFloatingObjectPatched(MyFloatingObject obj)
         {
+            if (!SentisOptimisationsPlugin.Config.ExplosionTweaks)
+            {
+                return true;
+            }
+            
             try
             {
                 if (obj == null || obj.WasRemovedFromWorld)
@@ -159,11 +168,20 @@ namespace SentisOptimisationsPlugin
 
         private static bool CheckObjectInVoxelPatched()
         {
+            if (!SentisOptimisationsPlugin.Config.ExplosionTweaks)
+            {
+                return true;
+            }
             return false;
         }
 
         private static bool UpdateAfterSimulationParallelPatched(MyFloatingObject __instance)
         {
+            if (!SentisOptimisationsPlugin.Config.ExplosionTweaks)
+            {
+                return true;
+            }
+           
             try
             {
                 var acceleration = __instance.Physics.LinearAcceleration;

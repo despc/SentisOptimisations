@@ -53,6 +53,7 @@ namespace SentisOptimisationsPlugin
         private String _overrideModIds = "";
         
         //explosions
+        private bool _explosionTweaks = false;
         private bool _asyncExplosion = true;
         private float _warheadDamageMultiplier = 2.5f;
         private int _accelerationToDamage = 1000;  // взрыв боеприпаса или взрывчатки от удара об что-то, указывается ускорение объекта которое приводит к взрыву
@@ -62,11 +63,12 @@ namespace SentisOptimisationsPlugin
         private float _ammoExplosionRadius = 15f;
         
         //physics profile антипалочная защита
+        private bool _enablePhysicsGuard = false;
         private float _physicsMsToAlert = 1.5f;
-        private float _checkInsideVoxel = 0.2f;
         private float _physicsMsToPunish = 2f;
         private float _physicsMsToPunishImmediately = 5f;
         private int _physicsChecksBeforePunish = 5;
+        private float _checkInsideVoxel = 0.2f;
 
         //Tweaks
         private bool _autoRenameGrids = false;
@@ -77,6 +79,7 @@ namespace SentisOptimisationsPlugin
         private bool _enableOnlyEarthSpawn = false;
         private int _noDamageFromVoxelsBeforeSpeed = 30;
         private int _minimumMassForKineticDamage = 5000;
+        private int _raycastLimit = -1;
         
         //Online Reward
         private bool _onlineRewardEnabled = true;
@@ -118,6 +121,9 @@ namespace SentisOptimisationsPlugin
         
         [DisplayTab(Name = "Async explosion", GroupName = "Explosions", Tab = "Explosions", Order = 8, Description = "Async explosion")]
         public bool AsyncExplosion { get => _asyncExplosion; set => SetValue(ref _asyncExplosion, value); }
+        
+        [DisplayTab(Name = "Explosion Tweaks Enabled", GroupName = "Explosions", Tab = "Explosions", Order = -1, Description = "Explosion Tweaks Enabled")]
+        public bool ExplosionTweaks { get => _explosionTweaks; set => SetValue(ref _explosionTweaks, value); }
         
         [DisplayTab(Name = "Explosives damage", GroupName = "Explosions", Tab = "Explosions", Order = 0, Description = "Explosives damage")]
         public float ExplosivesDamage { get => _explosivesDamage; set => SetValue(ref _explosivesDamage, value); }
@@ -273,12 +279,25 @@ namespace SentisOptimisationsPlugin
             get => _physicsChecksBeforePunish;
             set => SetValue(ref _physicsChecksBeforePunish, value);
         }
+        [DisplayTab(Name = "Enable physics guard", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Enable physics guard")]
+        public bool EnablePhysicsGuard
+        {
+            get => _enablePhysicsGuard;
+            set => SetValue(ref _enablePhysicsGuard, value);
+        }
 
         [DisplayTab(Name = "Minimum mass for kinetic damage", GroupName = "Tweaks", Tab = "Tweaks", Order = 0, Description = "Minimum mass for kinetic damage")]
         public int MinimumMassForKineticDamage
         {
             get => _minimumMassForKineticDamage;
             set => SetValue(ref _minimumMassForKineticDamage, value);
+        }
+        
+        [DisplayTab(Name = "Raycast Limit", GroupName = "Tweaks", Tab = "Tweaks", Order = 0, Description = "Raycast Limit. Need Restart")]
+        public int RaycastLimit
+        {
+            get => _raycastLimit;
+            set => SetValue(ref _raycastLimit, value);
         }
         
         [DisplayTab(Name = "No damage from voxels before speed", GroupName = "Tweaks", Tab = "Tweaks", Order = 0, Description = "No damage from voxels before speed")]
