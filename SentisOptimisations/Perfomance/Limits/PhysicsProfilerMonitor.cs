@@ -41,6 +41,10 @@ namespace TorchMonitor.ProfilerMonitors
         
         public async Task Profile()
         {
+            if (!SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.EnablePhysicsGuard)
+            {
+                return;
+            }
             using (var profiler = new PhysicsProfiler())
             using (ProfilerResultQueue.Profile(profiler))
             {

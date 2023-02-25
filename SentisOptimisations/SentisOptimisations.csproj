@@ -56,6 +56,7 @@
       <Compile Include="GUI\FilteredGrid.cs" />
       <Compile Include="Limits\BuildBlockPatch.cs" />
       <Compile Include="Limits\ConvertPatch.cs" />
+      <Compile Include="Limits\RaycastPatch.cs" />
       <Compile Include="Limits\PcuLimiter.cs" />
       <Compile Include="MissilePatch.cs" />
       <Compile Include="NoScrapPatch.cs" />
