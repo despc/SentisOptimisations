@@ -46,18 +46,19 @@ namespace SentisOptimisationsPlugin
                 MyAPIGateway.Utilities.InvokeOnGameThread(() =>
                 {
                     var pos = voxelMap.GetPosition();
-                    BoundingSphereD sphere = new BoundingSphereD(pos, SentisOptimisationsPlugin.Config.AsteroidsRestoreRange);
+                    var range = SentisOptimisationsPlugin.Config.AsteroidsRestoreRange;
+                    BoundingSphereD sphere = new BoundingSphereD(pos, range);
                     var entitiesInSphere = MyEntities.GetEntitiesInSphere(ref sphere);
-                    var myEntities = entitiesInSphere.Where(entity => entity is MyCharacter || entity is MyCubeGrid)
-                        .ToHashSet();
+                    var myEntities = entitiesInSphere.Where(entity => (entity is MyCharacter || entity is MyCubeGrid) 
+                                            && Vector3D.Distance(entity.PositionComp.GetPosition(), pos) < range).ToHashSet();
                     foreach (var myEntity in myEntities)
                     {
-                        Log.Warn("Asteroid revert: found entity - " + myEntity.DisplayName);
+                        Log.Info("Asteroid revert: found entity - " + myEntity.DisplayName);
                     }
 
                     if (myEntities.Any())
                     {
-                        Log.Warn("Asteroid revert: " + voxelMap.StorageName + " revert cancelled");
+                        Log.Info("Asteroid revert: " + voxelMap.StorageName + " revert cancelled");
                         return;
                     }
 
