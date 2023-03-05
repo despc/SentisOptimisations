@@ -16,6 +16,7 @@ namespace SentisOptimisationsPlugin.AllGridsActions
         public static FallInVoxelDetector FallInVoxelDetector = new FallInVoxelDetector();
         private GridAutoRenamer _autoRenamer = new GridAutoRenamer();
         private OnlineReward _onlineReward = new OnlineReward();
+        private AsteroidReverter _asteroidReverter = new AsteroidReverter();
 
         public static HashSet<MyPlanet> Planets = new HashSet<MyPlanet>();
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
@@ -53,7 +54,8 @@ namespace SentisOptimisationsPlugin.AllGridsActions
                 {
                     try
                     {
-                        await Task.Delay(30000);
+                        await Task.Delay(60000);
+                        await Task.Run(() => { _asteroidReverter.CheckAndRestore(); });
                         var myCubeGrids = MyEntities.GetEntities().OfType<MyCubeGrid>();
                         await Task.Run(() => { CheckAllGrids(myCubeGrids); });
                         await Task.Run(() => { _onlineReward.RewardOnline(); });
