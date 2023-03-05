@@ -1,24 +1,18 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using NAPI;
 using NLog;
-using NLog.Fluent;
 using Sandbox.Definitions;
 using Sandbox.Engine.Voxels;
 using Sandbox.Game.Entities;
-using Sandbox.Game.Entities.Blocks;
-using Sandbox.Game.Multiplayer;
 using Sandbox.Game.SessionComponents;
 using Sandbox.Game.World;
 using Sandbox.ModAPI;
 using Torch.Commands;
 using Torch.Commands.Permissions;
-using Torch.Managers;
 using VRage;
 using VRage.Game;
 using VRage.Game.Definitions.SessionComponents;
@@ -34,86 +28,6 @@ namespace SentisOptimisationsPlugin
     public class AdminCommands : CommandModule
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
-
-        private static MethodInfo _factionChangeSuccessInfo = typeof(MyFactionCollection).GetMethod("FactionStateChangeSuccess", BindingFlags.NonPublic | BindingFlags.Static);
-        
-
-        [Command("cf", ".", null)]
-        [Permission(MyPromoteLevel.Moderator)]
-        public void CleanFactions()
-        {
-            
-            foreach (var faction in MySession.Static.Factions.ToList())
-            {
-                Log.Error("init clean faction " + faction.Value.Tag);
-                if (faction.Value.Tag.Length < 7)
-                {
-                    continue;
-                }
-
-                if (faction.Value.Members.Count > 1)
-                {
-                    continue;
-                }
-                Log.Error("DELETE faction " + faction.Value.Tag);
-                cleanFaction(faction);
-            }
-        }
-
-        [Command("cp", ".", null)]
-        [Permission(MyPromoteLevel.Moderator)]
-        public void CleanProjectors()
-        {
-            var myCubeGrids = MyEntities.GetEntities().OfType<MyCubeGrid>();
-            foreach (var myCubeGrid in myCubeGrids)
-            {
-                foreach (var myCubeBlock in myCubeGrid.GetFatBlocks())
-                {
-                    try
-                    {
-                        if (myCubeBlock is MyProjectorBase)
-                        {
-                            var projectedGrid = ((MyProjectorBase)myCubeBlock).ProjectedGrid;
-                            if (projectedGrid == null)
-                            {
-                                continue;
-                            }
-                            Log.Error("Clean projector on grid " + myCubeGrid.DisplayName);
-                            ((IMyProjector)myCubeBlock).SetProjectedGrid(null);
-                            ((MyProjectorBase)myCubeBlock).Clipboard.Clear();
-                        }
-                    }
-                    catch (Exception e)
-                    {
-                        Log.Error("CleanProjectors Exception ", e);
-                    }
-                }
-            }
-        }
-
-        [Command("rename_faction", ".", null)]
-        [Permission(MyPromoteLevel.Moderator)]
-        public void RenameFaction(String oldTag, String newtag)
-        {
-            try
-            {
-                var f = MySession.Static.Factions.TryGetFactionByTag(oldTag);
-                f.Tag = newtag;
-            }
-            catch (Exception e)
-            {
-                Log.Error(e);
-            }
-
-        }
-
-        private static void cleanFaction(KeyValuePair<long, MyFaction> faction)
-        {
-            NetworkManager.RaiseStaticEvent(_factionChangeSuccessInfo, MyFactionStateChange.RemoveFaction,
-                faction.Value.FactionId, faction.Value.FactionId, 0L, 0L);
-            if (!MyAPIGateway.Session.Factions.FactionTagExists(faction.Value.Tag)) return;
-            MyAPIGateway.Session.Factions.RemoveFaction(faction.Value.FactionId);
-        }
 
         [Command("refresh_asters", ".", null)]
         [Permission(MyPromoteLevel.Moderator)]
@@ -166,16 +80,21 @@ namespace SentisOptimisationsPlugin
             var player = Context.Player;
             if (player?.Character == null)
                 return;
-            
+            Log.Warn("Field Spawner: Start spawn field ");
             Task.Run(() => { DoSpawnField(player?.Character, count, fieldSize, materials, radius); });
         }
 
         public void DoSpawnField(IMyCharacter playerCharacter, int count, int fieldSize, string materials, int radius)
         {
             var materialsArray = materials.Split(',');
-            
+            Log.Warn("Field Spawner: Selected Ores " );
+            foreach (var ore in materialsArray)
+            {
+                Log.Warn("Field Spawner: " + ore );
+            }
             for (int i = 0; i < count; i++)
             {
+                Log.Warn("Field Spawner: Spawn  " + ( i+1 )+ "/"+ count + " asteroid");
                 var _random = new Random();
                 var seed = _random.Next(100, 10000000);
                 string storageName = MakeStorageName("FieldAster-" + (object) seed + "r" + (object) radius);
@@ -194,9 +113,9 @@ namespace SentisOptimisationsPlugin
                 MyStorageBase storage1 = (MyStorageBase) new MyOctreeStorage(
                     (IMyStorageDataProvider) myCompositeShapeProvider,
                     GetAsteroidVoxelSize((double) radius));
-
+                Log.Warn("Field Spawner: Start replace material");
                 ReplaceMaterial(materialsArray, storage1);
-
+                Log.Warn("Field Spawner: End replace material");
                 MyAPIGateway.Utilities.InvokeOnGameThread(() =>
                 {
                     try
@@ -226,6 +145,7 @@ namespace SentisOptimisationsPlugin
                     Log.Error("Exception ", e);
                 }
             });
+                Log.Warn("Field Spawner: Spawned  " + ( i+1 )+ "/" + count + " asteroid");
             }
             
             
@@ -344,52 +264,11 @@ namespace SentisOptimisationsPlugin
 
         public void DoRefreshAsters()
         {
-            var configPathToAsters = SentisOptimisationsPlugin.Config.PathToAsters;
-            IEnumerable<IMyVoxelMap> voxelMaps = MyEntities.GetEntities().OfType<IMyVoxelMap>();
-            var myVoxelMaps = MyEntities.GetEntities().OfType<IMyVoxelMap>().ToArray<IMyVoxelMap>();
-            for (int i = 0; i < myVoxelMaps.Count(); i++)
+            foreach (var myVoxelMap in MyEntities.GetEntities().OfType<IMyVoxelMap>())
             {
-                try
-                {
-                    var voxelMap = myVoxelMaps[i];
-                    var voxelMapStorageName = voxelMap.StorageName;
-                    if (string.IsNullOrEmpty(voxelMapStorageName))
-                    {
-                        continue;
-                    }
-
-                    var asteroidName = voxelMapStorageName + ".vx2";
-                    //Log.Error("start refresh aster " + asteroidName);
-                    var pathToAster = configPathToAsters + "\\" + asteroidName;
-                    if (!File.Exists(pathToAster))
-                    {
-                        continue;
-                    }
-                    MyAPIGateway.Utilities.InvokeOnGameThread(() =>
-                    {
-                        try
-                        {
-                            Vector3D position = voxelMap.PositionComp.GetPosition();
-                            //Log.Error("position1 " + position);
-                            byte[] bytes = File.ReadAllBytes(pathToAster);
-                            voxelMap.Close();
-                            IMyStorage newStorage = MyAPIGateway.Session.VoxelMaps.CreateStorage(bytes) as IMyStorage;
-                            var addVoxelMap = MyWorldGenerator.AddVoxelMap(voxelMapStorageName, (MyStorageBase) newStorage, position);
-                            addVoxelMap.PositionComp.SetPosition(position);
-                            //Log.Error("position2 " + addVoxelMap.PositionComp.GetPosition());
-                            //Log.Error("refresh aster successful" + asteroidName);
-                        }
-                        catch (Exception e)
-                        {
-                            Log.Error("Exception ", e);
-                        }
-                    });
-                }
-                catch (Exception e)
-                {
-                    Log.Error("Exception ", e);
-                }
+                AsteroidReverter.DoRestoreSavedAsteroid(myVoxelMap);
             }
         }
+
     }
 }

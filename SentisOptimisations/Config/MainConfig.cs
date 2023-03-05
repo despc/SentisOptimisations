@@ -51,6 +51,8 @@ namespace SentisOptimisationsPlugin
         private String _pathToGarage = "D:\\torch-server\\GARAGE";
         private String _ignoreCleanupSubtypes = "Cargo";
         private String _overrideModIds = "";
+        private int _asteroidsRestoreCooldown = 200;
+        private int _asteroidsRestoreRange = 1000;
         
         //explosions
         private bool _explosionTweaks = false;
@@ -144,7 +146,13 @@ namespace SentisOptimisationsPlugin
         
         [DisplayTab(Name = "Path to asteroids", GroupName = "Other", Tab = "Other", Order = 100, Description = "Path to asteroids to restore")]
         public String PathToAsters { get => _pathToAsters; set => SetValue(ref _pathToAsters, value); }
+        
+        [DisplayTab(Name = "Asteroids restore cooldown Min", GroupName = "Other", Tab = "Other", Order = 100, Description = "Asteroids cleanup cooldown Min")]
+        public int AsteroidsRestoreCooldown { get => _asteroidsRestoreCooldown; set => SetValue(ref _asteroidsRestoreCooldown, value); }
 
+        [DisplayTab(Name = "Asteroids restore range", GroupName = "Other", Tab = "Other", Order = 100, Description = "Asteroids restore range")]
+        public int AsteroidsRestoreRange { get => _asteroidsRestoreRange; set => SetValue(ref _asteroidsRestoreRange, value); }
+        
         [DisplayTab(Name = "Dont clean with blocks", GroupName = "Other", Tab = "Other", Order = 0, Description = "Dont clean with blocks")]
         public String IgnoreCleanupSubtypes { get => _ignoreCleanupSubtypes; set => SetValue(ref _ignoreCleanupSubtypes, value); }
 
