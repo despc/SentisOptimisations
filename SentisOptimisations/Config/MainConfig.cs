@@ -89,6 +89,12 @@ namespace SentisOptimisationsPlugin
         private string _onlineReward = "Ingot_Platinum=50;Ingot_Uranium=50";
         private string _onlineRewardMessage = "Спасибо что остаётесь с нами, награда за игру на сервере в вашем инвентаре.";
         
+        //PvE Zone
+        private bool _pveZoneEnabled = false;
+        private bool _pveDamageFromNpc = false;
+        private string _pveZonePos = "-73641.29:-623775.25:-1089014.23";
+        private int _pveZoneRadius = 100000;
+        
         private ObservableCollection<ConfigShipInMarket> configShipsInMarket = new ObservableCollection<ConfigShipInMarket>();
 
         public ObservableCollection<ConfigShipInMarket> ConfigShipsInMarket
@@ -111,6 +117,27 @@ namespace SentisOptimisationsPlugin
             get => _onlineRewardEnabled;
             set => SetValue(ref _onlineRewardEnabled, value);
         }
+        
+        [DisplayTab(Name = "PvE zone enabled", GroupName = "PvE Zone", Tab = "PvE Zone", Order = 0, Description = "PvE zone enabled")]
+        public bool PvEZoneEnabled
+        {
+            get => _pveZoneEnabled;
+            set => SetValue(ref _pveZoneEnabled, value);
+        }
+        
+        [DisplayTab(Name = "Enable damage from NPC", GroupName = "PvE Zone", Tab = "PvE Zone", Order = 1, Description = "Enable damage from NPC")]
+        public bool EnableDamageFromNPC
+        {
+            get => _pveDamageFromNpc;
+            set => SetValue(ref _pveDamageFromNpc, value);
+        }
+        
+        [DisplayTab(Name = "PvE zone position", GroupName = "PvE Zone", Tab = "PvE Zone", Order = 2, Description = "PvE zone position")]
+        public String PveZonePos { get => _pveZonePos; set => SetValue(ref _pveZonePos, value); }
+        
+        [DisplayTab(Name = "PvE Zone Radius", GroupName = "PvE Zone", Tab = "PvE Zone", Order = 3, Description = "PvE Zone Radius")]
+        public int PveZoneRadius { get => _pveZoneRadius; set => SetValue(ref _pveZoneRadius, value); }
+        
         
         [DisplayTab(Name = "Reward for online", GroupName = "Online Reward", Tab = "Online Reward", Order = 1, Description = "Reward for online")]
         public String OnlineReward { get => _onlineReward; set => SetValue(ref _onlineReward, value); }

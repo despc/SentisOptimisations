@@ -17,6 +17,7 @@ namespace SentisOptimisationsPlugin.AllGridsActions
         private GridAutoRenamer _autoRenamer = new GridAutoRenamer();
         private OnlineReward _onlineReward = new OnlineReward();
         private AsteroidReverter _asteroidReverter = new AsteroidReverter();
+        private PvEGridChecker _pvEGridChecker = new PvEGridChecker();
 
         public static HashSet<MyPlanet> Planets = new HashSet<MyPlanet>();
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
@@ -93,6 +94,10 @@ namespace SentisOptimisationsPlugin.AllGridsActions
                 if (SentisOptimisationsPlugin.Config.DisableNoOwner)
                 {
                     CheckNobodyOwner(grid);
+                }
+                if (SentisOptimisationsPlugin.Config.PvEZoneEnabled)
+                {
+                    _pvEGridChecker.CheckGridIsPvE(grid);
                 }
             }
         }

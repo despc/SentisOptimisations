@@ -6,6 +6,8 @@ using NLog;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Cube;
 using Sandbox.ModAPI;
+using SentisOptimisation.PveZone;
+using SentisOptimisations;
 using Torch.Managers.PatchManager;
 using VRage.Game.Entity;
 using VRage.Game.ModAPI;
@@ -86,6 +88,19 @@ namespace SentisOptimisationsPlugin
                 }
 
                 return false;
+            }
+
+            if (SentisOptimisationsPlugin.Config.PvEZoneEnabled)
+            {
+                if (PvECore.EntitiesInZone.Contains(((MyCubeGrid)__instance.Entity).EntityId))
+                {
+                    if (SentisOptimisationsPlugin.Config.EnableDamageFromNPC 
+                        && otherEntity is MyCubeGrid && ((MyCubeGrid)otherEntity).isNpcGrid())
+                    {
+                        return true;
+                    }
+                    return false;
+                }
             }
 
             if (((MyCubeGrid)__instance.Entity).IsStatic)

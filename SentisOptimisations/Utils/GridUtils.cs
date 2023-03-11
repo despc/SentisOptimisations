@@ -11,6 +11,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Cube;
+using Sandbox.Game.World;
 using Sandbox.ModAPI;
 using VRage.Game.Entity;
 using VRage.Game.ModAPI;
@@ -179,5 +180,14 @@ namespace SentisOptimisations
             return grids;
         }
 
+        public static bool isNpcGrid(this MyCubeGrid instance)
+        {
+            var identityId = PlayerUtils.GetOwner(instance);
+            if (identityId == 0)
+            {
+                return false;
+            }
+            return MySession.Static.Players.IdentityIsNpc(identityId);
+        }
     }
 }

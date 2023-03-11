@@ -7,6 +7,7 @@ using NLog.Fluent;
 using Sandbox;
 using Sandbox.Definitions;
 using Sandbox.Game.Entities.Blocks;
+using Sandbox.ModAPI;
 using Torch.Managers.PatchManager;
 using VRage.Game;
 
@@ -56,10 +57,29 @@ namespace SentisOptimisationsPlugin
 
                         if (cheatDelta > 5)
                         {
-                            __instance.ChangeFillRatioAmount(0);
+                            
                             var myFatBlockReader = __instance.CubeGrid.GetFatBlocks<MyProgrammableBlock>();
+                            var isPam = false;
                             foreach (var myProgrammableBlock in myFatBlockReader)
                             {
+                                var programData = ((IMyProgrammableBlock)myProgrammableBlock).ProgramData;
+                                if (String.IsNullOrEmpty(programData))
+                                {
+                                    continue;
+                                }
+                                if (programData.Contains("Path Auto Miner"))
+                                {
+                                    isPam = true;
+                                }
+                            }
+
+                            if (isPam)
+                            {
+                                return;
+                            }
+                            foreach (var myProgrammableBlock in myFatBlockReader)
+                            {
+                                
                                 myProgrammableBlock.Enabled = false;
                                 var mySlimBlock = myProgrammableBlock.SlimBlock;
                                 mySlimBlock.DoDamage((float)(mySlimBlock.Integrity / 1.5), MyDamageType.Explosion, true, null, 0);
@@ -67,6 +87,7 @@ namespace SentisOptimisationsPlugin
                                                                    " Try to cheat hydrogen!");
                                 myProgrammableBlock.UpdateProgram("oh nononononono...");
                             }
+                            __instance.ChangeFillRatioAmount(0);
                             _stockpileChangeDictionary.Remove(__instance.EntityId);
                             return;
                         }
