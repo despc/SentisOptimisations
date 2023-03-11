@@ -37,7 +37,9 @@
       <Compile Include="AllGridsActions\FallInVoxelDetector.cs" />
       <Compile Include="AllGridsActions\GridAutoRenamer.cs" />
       <Compile Include="AllGridsActions\OnlineReward.cs" />
+      <Compile Include="AllGridsActions\PvEGridChecker.cs" />
       <Compile Include="Anticheat\HydrogenPatch.cs" />
+      <Compile Include="Anticheat\KEEN_ColorChangeExploitFix.cs" />
       <Compile Include="Anticheat\TorchPatch.cs" />
       <Compile Include="Api\ShieldApi.cs" />
       <Compile Include="Char\CharPatch.cs" />
@@ -68,6 +70,9 @@
       <Compile Include="Perfomance\Limits\Punisher.cs" />
       <Compile Include="Perfomance\SafezonePatch.cs" />
       <Compile Include="Perfomance\WelderOptimization.cs" />
+      <Compile Include="PVEZONE\DamageHandler.cs" />
+      <Compile Include="PVEZONE\MyDrillDamageFix.cs" />
+      <Compile Include="PVEZONE\PvECore.cs" />
       <Compile Include="Shared\Action2.cs" />
       <Compile Include="Shared\Ext2.cs" />
       <Compile Include="Shared\FrameExecutor.cs" />

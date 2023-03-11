@@ -18,6 +18,7 @@ using Sandbox.Game.Entities.Blocks;
 using Sandbox.Game.GameSystems;
 using Sandbox.Game.World;
 using Sandbox.ModAPI;
+using SentisOptimisation.PveZone;
 using SentisOptimisations;
 using SentisOptimisationsPlugin.AllGridsActions;
 using SOPlugin.GUI;
@@ -105,7 +106,7 @@ namespace SentisOptimisationsPlugin
                 _allGridsObserver.OnLoaded();
                 InitShieldApi();
                 Communication.RegisterHandlers();
-                
+                PvECore.Init();
             }
         }
 
