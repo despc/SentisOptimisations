@@ -32,6 +32,7 @@ using Torch.Commands.Permissions;
 using Torch.Session;
 using VRage.Collections;
 using VRage.Game;
+using VRage.Game.Entity;
 using VRage.Game.ModAPI;
 using VRage.Game.Voxels;
 using VRage.Network;
@@ -66,6 +67,8 @@ namespace SentisOptimisationsPlugin
             SessionManager = Torch.Managers.GetManager<TorchSessionManager>();
             if (SessionManager == null)
                 return;
+            MyEntities.OnEntityAdd += _allGridsObserver.MyEntitiesOnOnEntityAdd;
+            MyEntities.OnEntityRemove += _allGridsObserver.MyEntitiesOnOnEntityRemove;
             var configOverrideModIds = Config.OverrideModIds;
             SessionManager.SessionStateChanged += SessionManager_SessionStateChanged;
             if (string.IsNullOrEmpty(configOverrideModIds))
@@ -87,6 +90,8 @@ namespace SentisOptimisationsPlugin
                 }
             }
         }
+
+
 
         private void SessionManager_SessionStateChanged(
             ITorchSession session,
