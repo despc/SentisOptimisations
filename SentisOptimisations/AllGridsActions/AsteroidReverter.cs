@@ -1,7 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Threading.Tasks;
+using System.Threading;
 using NLog;
 using Sandbox.Engine.Voxels;
 using Sandbox.Game.Entities;
@@ -18,8 +19,22 @@ namespace SentisOptimisationsPlugin
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
         private int cooldown = 0;
-        public void CheckAndRestore()
+        private Random r = new Random();
+        private static HashSet<IMyVoxelMap> inQueue = new HashSet<IMyVoxelMap>();
+        private static bool inProcess = false;
+
+        public void CheckAndRestore(HashSet<IMyVoxelMap> myVoxelMaps)
         {
+            if (inProcess)
+            {
+                return;
+            }
+            if (inQueue.Count > 0)
+            {
+                inProcess = true;
+                DoRestoreSavedAsteroid(inQueue.First());
+                return;
+            }
             var configAsteroidsRestoreCooldown = SentisOptimisationsPlugin.Config.AsteroidsRestoreCooldown;
             if (cooldown < configAsteroidsRestoreCooldown)
             {
@@ -27,9 +42,11 @@ namespace SentisOptimisationsPlugin
                 return;
             }
             cooldown = 0;
+            Log.Warn("Start check and revert asteroids");
             var configPathToAsters = SentisOptimisationsPlugin.Config.PathToAsters;
-            foreach (var voxelMap in MyEntities.GetEntities().OfType<IMyVoxelMap>())
+            foreach (var voxelMap in myVoxelMaps)
             {
+                Thread.Sleep(10);
                 var voxelMapStorageName = voxelMap.StorageName;
                 if (string.IsNullOrEmpty(voxelMapStorageName))
                 {
@@ -42,29 +59,40 @@ namespace SentisOptimisationsPlugin
                 {
                     continue;
                 }
-
-                MyAPIGateway.Utilities.InvokeOnGameThread(() =>
+                byte[] bytes = File.ReadAllBytes(pathToAster);
+                IMyStorage newStorage = MyAPIGateway.Session.VoxelMaps.CreateStorage(bytes) as IMyStorage;
+                var lengthNew = newStorage.GetVoxelData().Length;
+                var lengthCurrent = ((IMyStorage)voxelMap.Storage).GetVoxelData().Length;
+                if (lengthCurrent == lengthNew)
                 {
-                    var pos = voxelMap.GetPosition();
-                    var range = SentisOptimisationsPlugin.Config.AsteroidsRestoreRange;
-                    BoundingSphereD sphere = new BoundingSphereD(pos, range);
-                    var entitiesInSphere = MyEntities.GetEntitiesInSphere(ref sphere);
-                    var myEntities = entitiesInSphere.Where(entity => (entity is MyCharacter || entity is MyCubeGrid) 
-                                            && Vector3D.Distance(entity.PositionComp.GetPosition(), pos) < range).ToHashSet();
-                    foreach (var myEntity in myEntities)
-                    {
-                        Log.Info("Asteroid revert: found entity - " + myEntity.DisplayName);
-                    }
-
-                    if (myEntities.Any())
-                    {
-                        Log.Info("Asteroid revert: " + voxelMap.StorageName + " revert cancelled");
-                        return;
-                    }
-
-                    Task.Run(() => { DoRestoreSavedAsteroid(voxelMap); });
-                });
+                    continue;
+                }
+                inQueue.Add(voxelMap);
+                
             }
+            Log.Warn(inQueue.Count + " asteroids to restore queue size");
+        }
+
+        private static bool IsEmptySpace(IMyVoxelMap voxelMap)
+        {
+            var pos = voxelMap.GetPosition();
+            var range = SentisOptimisationsPlugin.Config.AsteroidsRestoreRange;
+            BoundingSphereD sphere = new BoundingSphereD(pos, range);
+            var entitiesInSphere = MyEntities.GetEntitiesInSphere(ref sphere);
+            var myEntities = entitiesInSphere.Where(entity => (entity is MyCharacter || entity is MyCubeGrid)
+                                                              && Vector3D.Distance(entity.PositionComp.GetPosition(), pos) <
+                                                              range).ToHashSet();
+            foreach (var myEntity in myEntities)
+            {
+                Log.Info("found entity - " + myEntity.DisplayName);
+            }
+
+            if (myEntities.Any())
+            {
+                Log.Info("" + voxelMap.StorageName + " revert cancelled");
+                return false;
+            }
+            return true;
         }
 
 
@@ -72,10 +100,14 @@ namespace SentisOptimisationsPlugin
         {
             try
             {
+                Log.Warn("start DoRestoreSavedAsteroid " + voxelMap.StorageName);
+                
                 var configPathToAsters = SentisOptimisationsPlugin.Config.PathToAsters;
                 var voxelMapStorageName = voxelMap.StorageName;
                 if (string.IsNullOrEmpty(voxelMapStorageName))
                 {
+                    inQueue.Remove(voxelMap);
+                    inProcess = false;
                     return;
                 }
 
@@ -83,30 +115,47 @@ namespace SentisOptimisationsPlugin
                 var pathToAster = configPathToAsters + "\\" + asteroidName;
                 if (!File.Exists(pathToAster))
                 {
+                    inQueue.Remove(voxelMap);
+                    inProcess = false;
                     return;
                 }
                 
+                Vector3D position = voxelMap.PositionComp.GetPosition();
+                byte[] bytes = File.ReadAllBytes(pathToAster);
+                IMyStorage newStorage = MyAPIGateway.Session.VoxelMaps.CreateStorage(bytes) as IMyStorage;
+                
+
                 MyAPIGateway.Utilities.InvokeOnGameThread(() =>
                 {
                     try
                     {
-                        Vector3D position = voxelMap.PositionComp.GetPosition();
-                        byte[] bytes = File.ReadAllBytes(pathToAster);
+                        if (!IsEmptySpace(voxelMap))
+                        {
+                            inQueue.Remove(voxelMap);
+                            inProcess = false;
+                            return;
+                        }
+
+                        Log.Warn("start " + voxelMap.StorageName + " revert");
                         voxelMap.Close();
-                        IMyStorage newStorage = MyAPIGateway.Session.VoxelMaps.CreateStorage(bytes) as IMyStorage;
                         var addVoxelMap =
                             MyWorldGenerator.AddVoxelMap(voxelMapStorageName, (MyStorageBase)newStorage, position);
                         addVoxelMap.PositionComp.SetPosition(position);
-                        Log.Warn("Asteroid revert: " + voxelMap.StorageName + " reverted");
+                        Log.Warn("" + voxelMap.StorageName + " reverted");
                     }
                     catch (Exception e)
                     {
                         Log.Error("Exception ", e);
                     }
+
+                    inQueue.Remove(voxelMap);
+                    inProcess = false;
                 });
             }
             catch (Exception e)
             {
+                inQueue.Remove(voxelMap);
+                inProcess = false;
                 Log.Error("Exception ", e);
             }
         }

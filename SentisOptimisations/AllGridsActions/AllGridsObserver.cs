@@ -7,6 +7,8 @@ using NLog;
 using Sandbox.Game.Entities;
 using Sandbox.ModAPI;
 using TorchMonitor.ProfilerMonitors;
+using VRage.Game.Entity;
+using VRage.Game.ModAPI;
 using VRage.ModAPI;
 
 namespace SentisOptimisationsPlugin.AllGridsActions
@@ -18,14 +20,40 @@ namespace SentisOptimisationsPlugin.AllGridsActions
         private OnlineReward _onlineReward = new OnlineReward();
         private AsteroidReverter _asteroidReverter = new AsteroidReverter();
         private PvEGridChecker _pvEGridChecker = new PvEGridChecker();
-
+        private HashSet<MyCubeGrid> myCubeGrids = new HashSet<MyCubeGrid>();
+        private HashSet<IMyVoxelMap> myVoxelMaps = new HashSet<IMyVoxelMap>();
         public static HashSet<MyPlanet> Planets = new HashSet<MyPlanet>();
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
+        public void MyEntitiesOnOnEntityRemove(MyEntity entity)
+        {
+            if (entity is MyCubeGrid)
+            {
+                myCubeGrids.Remove((MyCubeGrid)entity);
+            }
+            if (entity is IMyVoxelMap)
+            {
+                myVoxelMaps.Remove((IMyVoxelMap)entity);
+            }
+        }
+
+        public void MyEntitiesOnOnEntityAdd(MyEntity entity)
+        {
+            if (entity is MyCubeGrid)
+            {
+                myCubeGrids.Add((MyCubeGrid)entity);
+            }
+            if (entity is IMyVoxelMap)
+            {
+                myVoxelMaps.Add((IMyVoxelMap)entity);
+            }
+        }
+        
         public CancellationTokenSource CancellationTokenSource { get; set; }
 
         public void OnLoaded()
         {
+            
             CancellationTokenSource = new CancellationTokenSource();
             CheckLoop();
 
@@ -56,9 +84,8 @@ namespace SentisOptimisationsPlugin.AllGridsActions
                     try
                     {
                         await Task.Delay(60000);
-                        await Task.Run(() => { _asteroidReverter.CheckAndRestore(); });
-                        var myCubeGrids = MyEntities.GetEntities().OfType<MyCubeGrid>();
-                        await Task.Run(() => { CheckAllGrids(myCubeGrids); });
+                        await Task.Run(() => { _asteroidReverter.CheckAndRestore(myVoxelMaps); });
+                        await Task.Run(CheckAllGrids);
                         await Task.Run(() => { _onlineReward.RewardOnline(); });
                         await PhysicsProfilerMonitor.__instance.Profile();
                     }
@@ -74,7 +101,7 @@ namespace SentisOptimisationsPlugin.AllGridsActions
             }
         }        
 
-        private void CheckAllGrids(IEnumerable<MyCubeGrid> myCubeGrids)
+        private void CheckAllGrids()
         {
             foreach (var grid in myCubeGrids)
             {
