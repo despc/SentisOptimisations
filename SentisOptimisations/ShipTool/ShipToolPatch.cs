@@ -2,9 +2,9 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Threading.Tasks;
 using NAPI;
 using NLog;
-using ParallelTasks;
 using Sandbox;
 using Sandbox.Definitions;
 using Sandbox.Engine.Physics;
@@ -18,6 +18,7 @@ using Sandbox.Game.WorldEnvironment;
 using Sandbox.Game.WorldEnvironment.Modules;
 using Sandbox.ModAPI;
 using SentisOptimisations;
+using SentisOptimisationsPlugin.AllGridsActions;
 using SpaceEngineers.Game.Entities.Blocks;
 using Torch.Managers.PatchManager;
 using VRage.Game;
@@ -32,8 +33,6 @@ namespace SentisOptimisationsPlugin.ShipTool
     public static class ShipToolPatch
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
-
-        public static Random r = new Random();
 
         public static void Patch(PatchContext ctx)
         {
@@ -227,16 +226,11 @@ namespace SentisOptimisationsPlugin.ShipTool
 
         private static bool ActivateCommonPatch(MyShipToolBase __instance)
         {
-            if (__instance is MyShipWelder)
-            {
-                SetRadius(__instance, GetWelderRadius((MyShipWelder)__instance));
-            }
-
             DoActivateCommon(__instance);
             return false;
         }
 
-        private static void DoActivateCommon(MyShipToolBase __instance)
+        private static async void DoActivateCommon(MyShipToolBase __instance)
         {
             BoundingSphere m_detectorSphere =
                 (BoundingSphere)__instance.easyGetField("m_detectorSphere", typeof(MyShipToolBase));
@@ -245,76 +239,42 @@ namespace SentisOptimisationsPlugin.ShipTool
                 (double)m_detectorSphere.Radius);
             BoundingSphereD sphere = new BoundingSphereD(boundingSphereD.Center,
                 (double)m_detectorSphere.Radius * 0.5);
+            
             __instance.easySetField("m_isActivatedOnSomething", false, typeof(MyShipToolBase));
-            List<MyEntity> entitiesInSphere = MyEntities.GetTopMostEntitiesInSphere(ref boundingSphereD);
-            ActivateInGameThread(__instance, entitiesInSphere, boundingSphereD, sphere);
+            List<MyEntity> topEntities;
+            bool flag = false;
+            if (SentisOptimisationsPlugin.Config.AsyncWeld)
+            {
+                topEntities = await Task.Run(() => GetTopEntitiesInSphereAsync(boundingSphereD));
+                var entitiesInContactAsync= await Task.Run(() => GetEntitiesInContact(__instance, topEntities, ref flag));
+                ProcessEntitiesInContact(__instance, boundingSphereD, flag, entitiesInContactAsync, sphere);
+                topEntities.Clear();
+                return;
+            }
+
+            topEntities = MyEntities.GetTopMostEntitiesInSphere(ref boundingSphereD);
+            var entitiesInContactSync = GetEntitiesInContact(__instance, topEntities, ref flag);
+            ProcessEntitiesInContact(__instance,  boundingSphereD, flag, entitiesInContactSync, sphere);
+            topEntities.Clear();
         }
 
-        private static void ActivateInGameThread(MyShipToolBase __instance, List<MyEntity> entitiesInSphere,
-            BoundingSphereD boundingSphereD, BoundingSphereD sphere)
+        private static void ProcessEntitiesInContact(MyShipToolBase __instance,
+            BoundingSphereD boundingSphereD, bool flag, HashSet<MyEntity> entitiesInContact, BoundingSphereD sphere)
         {
-            bool flag = false;
-            var m_entitiesInContact =
-                ((HashSet<MyEntity>)__instance.easyGetField("m_entitiesInContact", typeof(MyShipToolBase)));
-            m_entitiesInContact.Clear();
-            foreach (MyEntity myEntity in entitiesInSphere)
-            {
-                if (myEntity is MyEnvironmentSector)
-                    flag = true;
-                MyEntity topMostParent = myEntity.GetTopMostParent((Type)null);
-                if ((bool)__instance.easyCallMethod("CanInteractWith", new object[] { topMostParent }, true,
-                        typeof(MyShipToolBase)))
-                    m_entitiesInContact.Add(topMostParent);
-            }
+            
+            CheckEnvironment(__instance, boundingSphereD, flag);
 
-            bool m_checkEnvironmentSector =
-                (bool)__instance.easyGetField("m_checkEnvironmentSector", typeof(MyShipToolBase));
-            if (m_checkEnvironmentSector & flag)
-            {
-                MyPhysics.HitInfo? nullable = MyPhysics.CastRay(boundingSphereD.Center,
-                    boundingSphereD.Center + boundingSphereD.Radius * __instance.WorldMatrix.Forward, 24);
-                if (nullable.HasValue && nullable.HasValue)
-                {
-                    IMyEntity hitEntity = nullable.Value.HkHitInfo.GetHitEntity();
-                    if (hitEntity is MyEnvironmentSector)
-                    {
-                        MyEnvironmentSector environmentSector = hitEntity as MyEnvironmentSector;
-                        uint shapeKey = nullable.Value.HkHitInfo.GetShapeKey(0);
-                        int itemFromShapeKey = environmentSector.GetItemFromShapeKey(shapeKey);
-                        if (environmentSector.DataView.Items[itemFromShapeKey].ModelIndex >= (short)0)
-                        {
-                            MyBreakableEnvironmentProxy module =
-                                environmentSector.GetModule<MyBreakableEnvironmentProxy>();
-                            Vector3D vector3D = __instance.CubeGrid.WorldMatrix.Right +
-                                                __instance.CubeGrid.WorldMatrix.Forward;
-                            vector3D.Normalize();
-                            double num1 = 10.0;
-                            float num2 = (float)(num1 * num1) * __instance.CubeGrid.Physics.Mass;
-                            int itemId = itemFromShapeKey;
-                            Vector3D position = (Vector3D)nullable.Value.HkHitInfo.Position;
-                            Vector3D hitnormal = vector3D;
-                            double impactEnergy = (double)num2;
-                            module.BreakAt(itemId, position, hitnormal, impactEnergy);
-                        }
-                    }
-                }
-            }
-
-            entitiesInSphere.Clear();
-            HashSet<MySlimBlock> m_blocksToActivateOn2 =
-                (HashSet<MySlimBlock>)__instance.easyGetField("m_blocksToActivateOn", typeof(MyShipToolBase));
-            foreach (MyEntity myEntity in m_entitiesInContact)
+            HashSet<MySlimBlock> blocksToActivateOnSync = new HashSet<MySlimBlock>();
+            foreach (MyEntity myEntity in entitiesInContact)
             {
                 MyCharacter myCharacter = myEntity as MyCharacter;
-
                 MyCubeGrid myCubeGrid = myEntity as MyCubeGrid;
 
                 if (myCubeGrid != null && !SentisOptimisationsPlugin.Config.AsyncWeld)
                 {
-                    HashSet<MySlimBlock> m_tempBlocksBuffer = new HashSet<MySlimBlock>();
-                    myCubeGrid.GetBlocksInsideSphere(ref boundingSphereD, m_tempBlocksBuffer, true);
-
-                    m_blocksToActivateOn2.UnionWith((IEnumerable<MySlimBlock>)m_tempBlocksBuffer);
+                    HashSet<MySlimBlock> mTempBlocksBuffer = new HashSet<MySlimBlock>();
+                    myCubeGrid.GetBlocksInsideSphere(ref boundingSphereD, mTempBlocksBuffer);
+                    blocksToActivateOnSync.UnionWith(mTempBlocksBuffer);
                 }
 
                 if (myCharacter != null && Sync.IsServer)
@@ -338,37 +298,108 @@ namespace SentisOptimisationsPlugin.ShipTool
 
             if (SentisOptimisationsPlugin.Config.AsyncWeld)
             {
-                Parallel.StartBackground(() => Action(m_entitiesInContact));
-
-                void Action(HashSet<MyEntity> m_entitiesInContact2)
-                {
-                    try
-                    {
-                        var blocksToActivateOn = new HashSet<MySlimBlock>();
-                        foreach (MyEntity myEntity in m_entitiesInContact2)
-                        {
-                            MyCubeGrid myCubeGrid = myEntity as MyCubeGrid;
-                            if (myCubeGrid != null)
-                            {
-                                HashSet<MySlimBlock> m_tempBlocksBuffer = new HashSet<MySlimBlock>();
-                                myCubeGrid.GetBlocksInsideSphere(ref boundingSphereD, m_tempBlocksBuffer, true);
-
-                                blocksToActivateOn.UnionWith((IEnumerable<MySlimBlock>)m_tempBlocksBuffer);
-                            }
-                        }
-
-                        MyAPIGateway.Utilities.InvokeOnGameThread(() => CallActivate(__instance, blocksToActivateOn));
-                    }
-                    catch (Exception e)
-                    {
-                        SentisOptimisationsPlugin.Log.Error(e);
-                    }
-                }
-
+                CollectTargetBlocksAsyncAndCallActivate(__instance, boundingSphereD, entitiesInContact);
                 return;
             }
+            CallActivate(__instance, blocksToActivateOnSync);
+        }
 
-            CallActivate(__instance, m_blocksToActivateOn2);
+        private static HashSet<MyEntity> GetEntitiesInContact(MyShipToolBase __instance, List<MyEntity> topEntities, ref bool flag)
+        {
+            HashSet<MyEntity> entitiesInContact = new HashSet<MyEntity>();
+            foreach (MyEntity myEntity in topEntities)
+            {
+                if (myEntity is MyEnvironmentSector)
+                    flag = true;
+                MyEntity topMostParent = myEntity.GetTopMostParent((Type)null);
+                if ((bool)__instance.easyCallMethod("CanInteractWith", new object[] { topMostParent }, true,
+                        typeof(MyShipToolBase)))
+                    entitiesInContact.Add(topMostParent);
+            }
+
+            return entitiesInContact;
+        }
+
+        private static List<MyEntity> GetTopEntitiesInSphereAsync(BoundingSphereD boundingSphereD)
+        {
+            List<MyEntity> entitiesInSphereAsync = new List<MyEntity>();
+            foreach (var entity in new HashSet<MyEntity>(AllGridsObserver.entitiesToShipTools))
+            {
+                if (entity.PositionComp.WorldAABB.Intersects(boundingSphereD))
+                {
+                    entitiesInSphereAsync.Add(entity);
+                }
+            }
+            return entitiesInSphereAsync;
+        }
+
+        private static async void CollectTargetBlocksAsyncAndCallActivate(MyShipToolBase myShipToolBase,
+            BoundingSphereD boundingSphereD, HashSet<MyEntity> entitiesInContact)
+        {
+            var resultBlocksToActivateOnAsync = await Task.Run(() => Action(new HashSet<MyEntity>(entitiesInContact)));
+
+            HashSet<MySlimBlock> Action(HashSet<MyEntity> entitiesInContactAsync)
+            {
+                var blocksToActivateOnAsync = new HashSet<MySlimBlock>();
+                try
+                {
+                    foreach (MyEntity myEntity in entitiesInContactAsync)
+                    {
+                        if (myEntity is MyCubeGrid myCubeGrid)
+                        {
+                            HashSet<MySlimBlock> mTempBlocksBuffer = new HashSet<MySlimBlock>();
+                            myCubeGrid.GetBlocksInsideSphere(ref boundingSphereD, mTempBlocksBuffer);
+                            blocksToActivateOnAsync.UnionWith(mTempBlocksBuffer);
+                        }
+                    }
+
+                    return blocksToActivateOnAsync;
+                }
+                catch (Exception e)
+                {
+                    SentisOptimisationsPlugin.Log.Error(e);
+                }
+
+                return blocksToActivateOnAsync;
+            }
+
+            MyAPIGateway.Utilities.InvokeOnGameThread(() => CallActivate(myShipToolBase, resultBlocksToActivateOnAsync));
+        }
+
+        private static void CheckEnvironment(MyShipToolBase __instance, BoundingSphereD boundingSphereD, bool flag)
+        {
+            var mCheckEnvironmentSector =
+                (bool)__instance.easyGetField("m_checkEnvironmentSector", typeof(MyShipToolBase));
+            
+            if (!(mCheckEnvironmentSector & flag)) return;
+            
+            MyPhysics.HitInfo? nullable = MyPhysics.CastRay(boundingSphereD.Center,
+                boundingSphereD.Center + boundingSphereD.Radius * __instance.WorldMatrix.Forward, 24);
+            if (nullable.HasValue && nullable.HasValue)
+            {
+                IMyEntity hitEntity = nullable.Value.HkHitInfo.GetHitEntity();
+                if (hitEntity is MyEnvironmentSector)
+                {
+                    MyEnvironmentSector environmentSector = hitEntity as MyEnvironmentSector;
+                    uint shapeKey = nullable.Value.HkHitInfo.GetShapeKey(0);
+                    int itemFromShapeKey = environmentSector.GetItemFromShapeKey(shapeKey);
+                    if (environmentSector.DataView.Items[itemFromShapeKey].ModelIndex >= (short)0)
+                    {
+                        MyBreakableEnvironmentProxy module =
+                            environmentSector.GetModule<MyBreakableEnvironmentProxy>();
+                        Vector3D vector3D = __instance.CubeGrid.WorldMatrix.Right +
+                                            __instance.CubeGrid.WorldMatrix.Forward;
+                        vector3D.Normalize();
+                        double num1 = 10.0;
+                        float num2 = (float)(num1 * num1) * __instance.CubeGrid.Physics.Mass;
+                        int itemId = itemFromShapeKey;
+                        Vector3D position = (Vector3D)nullable.Value.HkHitInfo.Position;
+                        Vector3D hitnormal = vector3D;
+                        double impactEnergy = (double)num2;
+                        module.BreakAt(itemId, position, hitnormal, impactEnergy);
+                    }
+                }
+            }
         }
 
         private static void CallActivate(MyShipToolBase __instance, HashSet<MySlimBlock> m_blocksToActivateOn)
