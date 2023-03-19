@@ -1,15 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using NLog;
 using Sandbox.Game.Entities;
+using Sandbox.Game.Entities.Character;
+using Sandbox.Game.WorldEnvironment;
 using Sandbox.ModAPI;
 using TorchMonitor.ProfilerMonitors;
 using VRage.Game.Entity;
 using VRage.Game.ModAPI;
-using VRage.ModAPI;
 
 namespace SentisOptimisationsPlugin.AllGridsActions
 {
@@ -20,16 +20,33 @@ namespace SentisOptimisationsPlugin.AllGridsActions
         private OnlineReward _onlineReward = new OnlineReward();
         private AsteroidReverter _asteroidReverter = new AsteroidReverter();
         private PvEGridChecker _pvEGridChecker = new PvEGridChecker();
-        private HashSet<MyCubeGrid> myCubeGrids = new HashSet<MyCubeGrid>();
-        private HashSet<IMyVoxelMap> myVoxelMaps = new HashSet<IMyVoxelMap>();
+        public static HashSet<MyEntity> entitiesToShipTools = new HashSet<MyEntity>();
+        public static HashSet<MyCubeGrid> myCubeGrids = new HashSet<MyCubeGrid>();
+        public static HashSet<IMyVoxelMap> myVoxelMaps = new HashSet<IMyVoxelMap>();
         public static HashSet<MyPlanet> Planets = new HashSet<MyPlanet>();
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
         public void MyEntitiesOnOnEntityRemove(MyEntity entity)
         {
+            if (entity is MyEnvironmentSector 
+                || entity is MyCubeGrid 
+                || entity is MyPlanet 
+                || entity is IMyVoxelMap
+                || entity is MyCharacter)
+            {
+                entitiesToShipTools.Remove(entity);
+            }
+            
             if (entity is MyCubeGrid)
             {
                 myCubeGrids.Remove((MyCubeGrid)entity);
+                return;
+            }
+            
+            if (entity is MyPlanet)
+            {
+                Planets.Remove((MyPlanet)entity);
+                return;
             }
             if (entity is IMyVoxelMap)
             {
@@ -39,10 +56,28 @@ namespace SentisOptimisationsPlugin.AllGridsActions
 
         public void MyEntitiesOnOnEntityAdd(MyEntity entity)
         {
+            if (entity is MyEnvironmentSector 
+                || entity is MyCubeGrid 
+                || entity is MyPlanet 
+                || entity is IMyVoxelMap
+                || entity is MyCharacter)
+            {
+                entitiesToShipTools.Add(entity);
+            }
+            
+            if (entity is MyPlanet)
+            {
+                Log.Warn("Add planet to list " + entity.DisplayName);
+                Planets.Add((MyPlanet)entity);
+                return;
+            }
+            
             if (entity is MyCubeGrid)
             {
                 myCubeGrids.Add((MyCubeGrid)entity);
+                return;
             }
+
             if (entity is IMyVoxelMap)
             {
                 myVoxelMaps.Add((IMyVoxelMap)entity);
@@ -53,20 +88,8 @@ namespace SentisOptimisationsPlugin.AllGridsActions
 
         public void OnLoaded()
         {
-            
             CancellationTokenSource = new CancellationTokenSource();
-            CheckLoop();
-
-            HashSet<IMyEntity> list = new HashSet<IMyEntity>();
-            MyAPIGateway.Entities.GetEntities(list);
-            foreach (var entity in list)
-            {
-                if (entity == null || !MyAPIGateway.Entities.Exist(entity)) continue;
-
-                var myPlanet = entity as MyPlanet;
-                if (myPlanet == null) continue;
-                Planets.Add(myPlanet);
-            }
+            Task.Run(CheckLoop);
         }
 
         public void OnUnloading()
@@ -83,8 +106,8 @@ namespace SentisOptimisationsPlugin.AllGridsActions
                 {
                     try
                     {
-                        await Task.Delay(60000);
-                        await Task.Run(() => { _asteroidReverter.CheckAndRestore(myVoxelMaps); });
+                        await Task.Delay(30000);
+                        await Task.Run(() => { _asteroidReverter.CheckAndRestore(new HashSet<IMyVoxelMap>(myVoxelMaps)); });
                         await Task.Run(CheckAllGrids);
                         await Task.Run(() => { _onlineReward.RewardOnline(); });
                         await PhysicsProfilerMonitor.__instance.Profile();
@@ -103,10 +126,14 @@ namespace SentisOptimisationsPlugin.AllGridsActions
 
         private void CheckAllGrids()
         {
-            foreach (var grid in myCubeGrids)
+            foreach (var grid in new HashSet<MyCubeGrid>(myCubeGrids))
             {
                 if (CancellationTokenSource.Token.IsCancellationRequested)
                     break;
+                if (grid == null)
+                {
+                    continue;
+                }
                 SentisOptimisationsPlugin._limiter.CheckGrid(grid);
                 if (SentisOptimisationsPlugin.Config.AutoRestoreFromVoxel)
                 {

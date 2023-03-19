@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Reflection;
 using NAPI;
-using ParallelTasks;
 using Sandbox;
 using Sandbox.Definitions;
 using Sandbox.Game;
@@ -19,6 +18,7 @@ using VRage;
 using VRage.Game;
 using VRage.Game.Entity;
 using VRageMath;
+using Task = System.Threading.Tasks.Task;
 
 namespace Optimizer.Optimizations
 {
@@ -33,6 +33,7 @@ namespace Optimizer.Optimizations
             ctx.GetPattern(MethodActivate).Prefixes.Add(
                 typeof(WelderOptimization).GetMethod(nameof(Activate),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
         }
 
         private static bool Activate(MyShipWelder __instance, ref bool __result, HashSet<MySlimBlock> targets)
@@ -55,8 +56,6 @@ namespace Optimizer.Optimizations
             }
 
             ActivateInternal(__instance, targets);
-
-            //we dont need any checks now;
             return false;
         }
 
@@ -109,7 +108,7 @@ namespace Optimizer.Optimizations
             if (SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.AsyncWeld)
             {
                 var targetsToThread = new HashSet<MySlimBlock>(targets);
-                Parallel.StartBackground(() => Weld(welder, targetsToThread, inventory, num, WeldProjectionsWithWelding));
+                Task.Run(() => Weld(welder, targetsToThread, inventory, num, WeldProjectionsWithWelding));
                 return;
             }
 
@@ -212,7 +211,7 @@ namespace Optimizer.Optimizations
 
             if (SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.AsyncWeld)
             {
-                Parallel.StartBackground(() => FindProjectedBlocks(welder, DoWeldProjections));
+                Task.Run(() => FindProjectedBlocks(welder, DoWeldProjections));
                 return;
             }
 
@@ -347,7 +346,7 @@ namespace Optimizer.Optimizations
                             list.Clear();
                             foreach (MySlimBlock mySlimBlock in blocksInThread)
                             {
-                                if (list.Count > 4)
+                                if (list.Count > 1)
                                 {
                                     break;
                                 }

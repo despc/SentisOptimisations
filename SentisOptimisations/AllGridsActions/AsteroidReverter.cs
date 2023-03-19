@@ -47,6 +47,10 @@ namespace SentisOptimisationsPlugin
             foreach (var voxelMap in myVoxelMaps)
             {
                 Thread.Sleep(10);
+                if (voxelMap == null)
+                {
+                    continue;
+                }
                 var voxelMapStorageName = voxelMap.StorageName;
                 if (string.IsNullOrEmpty(voxelMapStorageName))
                 {
