@@ -30,6 +30,7 @@ using Torch.API.Session;
 using Torch.Commands;
 using Torch.Commands.Permissions;
 using Torch.Session;
+using VRage;
 using VRage.Collections;
 using VRage.Game;
 using VRage.Game.Entity;
@@ -63,6 +64,7 @@ namespace SentisOptimisationsPlugin
             Instance = this;
             Log.Info("Init SentisOptimisationsPlugin");
             MyFakes.ENABLE_SCRAP = false;
+            MySimpleProfiler.ENABLE_SIMPLE_PROFILER = false;
             SetupConfig();
             SessionManager = Torch.Managers.GetManager<TorchSessionManager>();
             if (SessionManager == null)
