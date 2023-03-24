@@ -68,7 +68,9 @@
       <Compile Include="Perfomance\GasTankOptimisations.cs" />
       <Compile Include="Perfomance\Limits\PhysicsProfilerMonitor.cs" />
       <Compile Include="Perfomance\Limits\Punisher.cs" />
+      <Compile Include="Perfomance\OtherPerfPatch.cs" />
       <Compile Include="Perfomance\ParallelUpdateTweaks.cs" />
+      <Compile Include="Perfomance\PBFix.cs" />
       <Compile Include="Perfomance\SafezonePatch.cs" />
       <Compile Include="Perfomance\WelderOptimization.cs" />
       <Compile Include="PVEZONE\DamageHandler.cs" />
