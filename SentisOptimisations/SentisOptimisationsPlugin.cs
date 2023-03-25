@@ -345,40 +345,6 @@ namespace SentisOptimisationsPlugin
 
                 DamagePatch.contactInfo.Clear();
             }
-            if (MySandboxGame.Static.SimulationFrameCounter % 6000 == 0)
-            {
-                foreach (KeyValuePair<long, MyFaction> faction in MySession.Static.Factions)
-                {
-                    foreach (MyStation station in faction.Value.Stations)
-                    {
-                        if (station.StationEntityId != 0L &&
-                            MyEntities.GetEntityById(station.StationEntityId) is MyCubeGrid entityById)
-                        {
-                            foreach (var mySlimBlock in entityById.GetBlocks())
-                            {
-                                if (mySlimBlock.FatBlock is MyBatteryBlock block)
-                                {
-                                    var myBatteryBlock = block;
-                                    myBatteryBlock.CurrentStoredPower = myBatteryBlock.MaxStoredPower;
-                                }
-                                if (mySlimBlock.FatBlock is MyReactor reactor)
-                                {
-                                    var myInventory = reactor.GetInventory();
-                                    var definitionId = new MyDefinitionId(typeof(MyObjectBuilder_Ingot), "Uranium");
-                                    var content = (MyObjectBuilder_PhysicalObject) MyObjectBuilderSerializer.CreateNewObject(definitionId);
-                                    MyObjectBuilder_InventoryItem inventoryItem = new MyObjectBuilder_InventoryItem
-                                        {Amount = 1000, Content = content};
-                                    myInventory.AddItems(100, inventoryItem);
-                                }
-                                if (mySlimBlock.FatBlock is MyGasTank tank)
-                                {
-                                    tank.ChangeFillRatioAmount(1);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
         }
 
         public UserControl GetControl()
