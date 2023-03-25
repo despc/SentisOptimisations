@@ -64,6 +64,8 @@
       <Compile Include="MissilePatch.cs" />
       <Compile Include="NoScrapPatch.cs" />
       <Compile Include="NPC\NpcPatches.cs" />
+      <Compile Include="Perfomance\ConveyorPatch.cs" />
+      <Compile Include="Voxels\VoxelsPatch.cs" />
       <Compile Include="Perfomance\ExplosionsPatch.cs" />
       <Compile Include="Perfomance\GasTankOptimisations.cs" />
       <Compile Include="Perfomance\Limits\PhysicsProfilerMonitor.cs" />
