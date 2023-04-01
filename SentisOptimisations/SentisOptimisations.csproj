@@ -11,6 +11,7 @@
         <AssemblyName>SentisOptimisations</AssemblyName>
         <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
         <FileAlignment>512</FileAlignment>
+        <LangVersion>latest</LangVersion>
     </PropertyGroup>
     <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
         <PlatformTarget>AnyCPU</PlatformTarget>
@@ -132,7 +133,7 @@
       <Reference Include="PresentationCore" />
       <Reference Include="PresentationFramework" />
       <Reference Include="Profiler">
-        <HintPath>..\..\..\..\..\Arrakis\torch-server\Plugins\Profiler\Profiler.dll</HintPath>
+        <HintPath>..\..\..\..\..\Arrakis\torch-server2\Plugins\Profiler\Profiler.dll</HintPath>
       </Reference>
       <Reference Include="ProtoBuf.Net, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
         <HintPath>C:\Arrakis\torch-server\DedicatedServer64\ProtoBuf.Net.dll</HintPath>
