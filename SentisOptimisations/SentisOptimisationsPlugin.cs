@@ -14,7 +14,6 @@ using Sandbox.Engine.Utils;
 using Sandbox.Engine.Voxels;
 using Sandbox.Game;
 using Sandbox.Game.Entities;
-using Sandbox.Game.Entities.Blocks;
 using Sandbox.Game.GameSystems;
 using Sandbox.Game.World;
 using Sandbox.ModAPI;
@@ -32,12 +31,9 @@ using Torch.Commands.Permissions;
 using Torch.Session;
 using VRage;
 using VRage.Collections;
-using VRage.Game;
-using VRage.Game.Entity;
 using VRage.Game.ModAPI;
 using VRage.Game.Voxels;
 using VRage.Network;
-using VRage.ObjectBuilders;
 using VRageMath;
 using VRageMath.Spatial;
 
@@ -372,13 +368,22 @@ namespace SentisOptimisationsPlugin
                 {
                     try
                     {
+                        
                         var voxelMap = myVoxelMaps[i];
+                        if (voxelMap.Name == null)
+                        {
+                            continue;
+                        }
+                        if (!voxelMap.Name.Contains("Field"))
+                        {
+                            continue;
+                        }
                         Vector3D position = voxelMap.GetPosition();
                         byte[] storageData;
                         voxelMap.Storage.Save(out storageData);
                         IMyStorage storage = MyAPIGateway.Session.VoxelMaps.CreateStorage(storageData) as IMyStorage;
-                        voxelMap.Close();
-                        var addVoxelMap = MyWorldGenerator.AddVoxelMap(voxelMap.Name, (MyStorageBase) storage, position);
+                        voxelMap.PositionComp.SetPosition(Vector3D.Zero);
+                        var addVoxelMap = MyWorldGenerator.AddVoxelMap(voxelMap.Name + "new", (MyStorageBase) storage, position);
                         addVoxelMap.PositionComp.SetPosition(position);
                         Log.Error("refresh voxels " + voxelMap.DisplayName);
                     }

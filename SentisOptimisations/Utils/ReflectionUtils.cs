@@ -1,10 +1,37 @@
 ﻿using System;
+using System.Linq;
 using System.Reflection;
 
 namespace SentisOptimisations
 {
-    public class ReflectionUtils
+    public static class ReflectionUtils
     {
+        
+        public const BindingFlags InstanceFlags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
+
+        public const BindingFlags StaticFlags = BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public;
+        
+        public static MethodInfo GetMethod(this Type type, string name, BindingFlags flags)
+        {
+            return type.GetMethod(name, flags) ?? throw new Exception($"Couldn't find method {name} on {type}");
+        }
+
+        public static MethodInfo[] GetMethods(this Type type, string name, BindingFlags flags)
+        {
+            return type.GetMethods(flags).Where(m => m.Name == name).ToArray();
+        }
+
+        public static MethodInfo GetInstanceMethod(this Type t, string name)
+        {
+            return GetMethod(t, name, InstanceFlags);
+        }
+
+        public static MethodInfo GetStaticMethod(this Type t, string name)
+        {
+            return GetMethod(t, name, StaticFlags);
+        }
+        
+        
         public static void SetInstanceField(Type type, object instance, string fieldName, Object value)
         {
             BindingFlags bindFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic

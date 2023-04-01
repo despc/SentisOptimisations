@@ -23,32 +23,7 @@ namespace SentisOptimisationsPlugin
             ctx.GetPattern(Method).Prefixes.Add(
                 typeof(CleanupPatch).GetMethod(nameof(OnEntityAddPatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-            
-            var VoxelsAreSuitableForReversionM = typeof(MySessionComponentTrash).GetMethod("VoxelsAreSuitableForReversion",
-                BindingFlags.Instance | BindingFlags.NonPublic);
-
-            ctx.GetPattern(VoxelsAreSuitableForReversionM).Prefixes.Add(
-                typeof(CleanupPatch).GetMethod(nameof(VoxelsAreSuitableForReversionPatched),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-            
-        }
-
-        private static bool VoxelsAreSuitableForReversionPatched(MyVoxelBase vox, MyStorageBase storage,ref bool __result)
-        {
-            try
-            {
-                var configPathToAsters = SentisOptimisationsPlugin.Config.PathToAsters;
-                if (vox.StorageName != null && vox.StorageName.Contains("FieldAster"))
-                {
-                    __result = false;
-                    return false;
-                }
-            }
-            catch (Exception e)
-            {
-                //do nothing
-            }
-            return true;
+           
         }
 
         private static bool OnEntityAddPatched(MyEntity entity)
