@@ -6,7 +6,7 @@ namespace SentisOptimisations
     {
         public static int GetPCU(MySlimBlock block)
         {
-            int num = 1;
+            int num = 0;
             if (block.ComponentStack.IsFunctional)
                 num = block.BlockDefinition.PCU;
             return num;
