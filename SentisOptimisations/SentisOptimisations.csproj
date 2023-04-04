@@ -39,6 +39,7 @@
       <Compile Include="AllGridsActions\GridAutoRenamer.cs" />
       <Compile Include="AllGridsActions\OnlineReward.cs" />
       <Compile Include="AllGridsActions\PvEGridChecker.cs" />
+      <Compile Include="Anticheat\FuckRamPatch.cs" />
       <Compile Include="Anticheat\HydrogenPatch.cs" />
       <Compile Include="Anticheat\KEEN_ColorChangeExploitFix.cs" />
       <Compile Include="Anticheat\TorchPatch.cs" />
