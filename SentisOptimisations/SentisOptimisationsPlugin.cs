@@ -8,6 +8,7 @@ using Havok;
 using NAPI;
 using NLog;
 using Sandbox;
+using Sandbox.Definitions;
 using Sandbox.Engine.Multiplayer;
 using Sandbox.Engine.Physics;
 using Sandbox.Engine.Utils;
@@ -69,6 +70,8 @@ namespace SentisOptimisationsPlugin
             MyEntities.OnEntityRemove += _allGridsObserver.MyEntitiesOnOnEntityRemove;
             var configOverrideModIds = Config.OverrideModIds;
             SessionManager.SessionStateChanged += SessionManager_SessionStateChanged;
+            ReflectionUtils.SetPrivateStaticField(typeof(MyCubeBlockDefinition), nameof(MyCubeBlockDefinition.PCU_CONSTRUCTION_STAGE_COST), 0);
+             
             if (string.IsNullOrEmpty(configOverrideModIds))
             {
                 foreach (var modId in configOverrideModIds.Split(','))
