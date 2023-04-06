@@ -2,12 +2,14 @@
 using System.Collections.Generic;
 using System.Linq;
 using NLog;
+using NLog.Fluent;
 using Sandbox.Engine.Multiplayer;
 using Sandbox.Engine.Physics;
 using Sandbox.Game.Entities;
 using Sandbox.Game.World;
 using Sandbox.ModAPI;
 using Scripts.Shared;
+using SentisOptimisations;
 using SentisOptimisationsPlugin.AllGridsActions;
 using Torch.Commands;
 using Torch.Commands.Permissions;
@@ -133,11 +135,70 @@ namespace SentisOptimisationsPlugin
         }
     }
 
+    public class ConvertCommands : CommandModule
+    {
+        public static readonly Logger Log = LogManager.GetCurrentClassLogger();
+        
+        [Command("convert", ".", null)]
+        [Permission(MyPromoteLevel.None)]
+        public void Convert(string gridName = "")
+        {
+            try
+            {
+                var player = Context.Player;
+                if (player?.Character == null)
+                    return;
+
+                if (gridName != string.Empty)
+                {
+                    HashSet<IMyEntity> GridSets = new HashSet<IMyEntity>();
+                    MyAPIGateway.Entities.GetEntities(GridSets,
+                        (IMyEntity Entity) => Entity is IMyCubeGrid &&
+                                              Entity.DisplayName.Equals(gridName,
+                                                  StringComparison.InvariantCultureIgnoreCase));
+                    foreach (var IEntity in GridSets)
+                    {
+                        if (IEntity is null)
+                            continue;
+                        var myCubeGrid = (MyCubeGrid)IEntity;
+                        if (myCubeGrid.IsStatic)
+                        {
+                            PlayerCommands.DoConvertDynamic(myCubeGrid, player, Context);
+                            return;
+                        }
+
+                        PlayerCommands.DoConvertStatic(myCubeGrid, player, Context);
+                        return;
+                    }
+                }
+
+                var entitiesInView = PlayerCommands.GetEntitiesInView(player);
+                foreach (var hitInfo in new HashSet<MyPhysics.HitInfo>(entitiesInView))
+                {
+                    if (hitInfo.HkHitInfo.GetHitEntity() is MyCubeGrid grid)
+                    {
+                        if (grid.IsStatic)
+                        {
+                            PlayerCommands.DoConvertDynamic(grid, player, Context);
+                            break;
+                        }
+
+                        PlayerCommands.DoConvertStatic(grid, player, Context);
+                        break;
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Log.Error(e);
+            }
+        }
+    }
+
     [Category("convert")]
     public class PlayerCommands : CommandModule
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
-
 
         [Command("static", ".", null)]
         [Permission(MyPromoteLevel.None)]
@@ -158,7 +219,7 @@ namespace SentisOptimisationsPlugin
                 {
                     if (IEntity is null)
                         continue;
-                    DoConvertStatic((MyCubeGrid) IEntity, player);
+                    DoConvertStatic((MyCubeGrid) IEntity, player, Context);
                     return;
                 }
             }
@@ -167,13 +228,13 @@ namespace SentisOptimisationsPlugin
             {
                 if (hitInfo.HkHitInfo.GetHitEntity() is MyCubeGrid grid)
                 {
-                    DoConvertStatic(grid, player);
+                    DoConvertStatic(grid, player, Context);
                     return;
                 }
             }
         }
 
-        private void DoConvertStatic(MyCubeGrid grid, IMyPlayer player)
+        public static void DoConvertStatic(MyCubeGrid grid, IMyPlayer player, CommandContext Context)
         {
             if (grid.IsPreview)
                 return;
@@ -224,7 +285,7 @@ namespace SentisOptimisationsPlugin
                 {
                     if (IEntity is null)
                         continue;
-                    DoConvertDynamic((MyCubeGrid) IEntity, player);
+                    DoConvertDynamic((MyCubeGrid) IEntity, player, Context);
                     return;
                 }
             }
@@ -235,13 +296,13 @@ namespace SentisOptimisationsPlugin
             {
                 if (hitInfo.HkHitInfo.GetHitEntity() is MyCubeGrid grid)
                 {
-                    DoConvertDynamic(grid, player);
+                    DoConvertDynamic(grid, player, Context);
                     return;
                 }
             }
         }
 
-        private void DoConvertDynamic(MyCubeGrid grid, IMyPlayer player)
+        public static void DoConvertDynamic(MyCubeGrid grid, IMyPlayer player, CommandContext Context)
         {
             if (grid.IsPreview)
                 return; // continue;
@@ -268,7 +329,7 @@ namespace SentisOptimisationsPlugin
         }
 
 
-        private static List<MyPhysics.HitInfo> GetEntitiesInView(IMyPlayer player)
+        public static List<MyPhysics.HitInfo> GetEntitiesInView(IMyPlayer player)
         {
             Matrix headMatrix = player.Character.GetHeadMatrix(true, true, false);
             Vector3D vector3D = headMatrix.Translation + headMatrix.Forward * 0.5f;
@@ -278,12 +339,13 @@ namespace SentisOptimisationsPlugin
             return mRaycastResult;
         }
 
-        private bool ConvertToStatic(MyCubeGrid grid)
+        public static bool ConvertToStatic(MyCubeGrid grid)
         {
             try
             {
                 grid.Physics?.SetSpeeds(Vector3.Zero, Vector3.Zero);
                 grid.ConvertToStatic();
+                SyncConvert(grid, true);
                 try
                 {
                     MyMultiplayer.RaiseEvent(grid, x => x.ConvertToStatic);
@@ -327,17 +389,42 @@ namespace SentisOptimisationsPlugin
 
             return false;
         }
-        private bool ConvertToDynamic(MyCubeGrid grid)
+        public static bool ConvertToDynamic(MyCubeGrid grid)
         {
             try
             {
                 grid.OnConvertToDynamic();
+                SyncConvert(grid, false);
                 return true;
             }
             catch (Exception e)
             {
                 return false;
             }
+        }
+
+        public static void SyncConvert(MyCubeGrid grid, bool isStatic)
+        {
+            ConvertSyncRequest response = new ConvertSyncRequest();
+            response.IsStatic = isStatic;
+            response.GridEntityId = grid.EntityId;
+            foreach (var p in PlayerUtils.GetAllPlayers())
+            {
+                if (p.IsBot)
+                {
+                    continue;
+                }
+
+                if (p.Character == null)
+                {
+                    continue;
+                }
+                Communication.SendToClient(MessageType.SyncConvert,
+                    MyAPIGateway.Utilities.SerializeToBinary(response),p.SteamUserId);
+            }
+
+            // Communication.BroadcastToClients(MessageType.SyncConvert,
+            //     MyAPIGateway.Utilities.SerializeToBinary(response));
         }
     }
 }

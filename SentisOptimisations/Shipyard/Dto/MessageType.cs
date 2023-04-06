@@ -13,6 +13,7 @@ namespace SentisOptimisationsPlugin
     FixShip,
     ListForGuiReq,
     ListForGuiResp,
-    CancelSellReq
+    CancelSellReq,
+    SyncConvert
   }
 }
