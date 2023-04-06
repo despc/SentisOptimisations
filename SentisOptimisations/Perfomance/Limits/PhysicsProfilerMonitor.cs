@@ -12,7 +12,7 @@ using SentisOptimisations.Utils;
 using VRage.Game.Entity;
 using VRage.Game.ModAPI;
 
-namespace TorchMonitor.ProfilerMonitors
+namespace SentisOptimisationsPlugin
 {
     public sealed class PhysicsProfilerMonitor
     {
@@ -41,7 +41,7 @@ namespace TorchMonitor.ProfilerMonitors
         
         public async Task Profile()
         {
-            if (!SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.EnablePhysicsGuard)
+            if (!SentisOptimisationsPlugin.Config.EnablePhysicsGuard)
             {
                 return;
             }
@@ -76,17 +76,17 @@ namespace TorchMonitor.ProfilerMonitors
                 var gridName = heaviestGrid.DisplayName;
                 var mainMs = entity.MainThreadTime / result.TotalFrameCount;
                 
-                if (mainMs > SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.PhysicsMsToPunishImmediately)
+                if (mainMs > SentisOptimisationsPlugin.Config.PhysicsMsToPunishImmediately)
                 {
                     _punisher.PunishPlayerGridImmediately(heaviestGrid);
                 }
                 
-                if (mainMs > SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.PhysicsMsToPunish)
+                if (mainMs > SentisOptimisationsPlugin.Config.PhysicsMsToPunish)
                 {
                     _punisher.PunishPlayerGrid(heaviestGrid);
                 }
                 
-                if (mainMs > SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.PhysicsMsToAlert)
+                if (mainMs > SentisOptimisationsPlugin.Config.PhysicsMsToAlert)
                 {
                     _punisher.AlertPlayerGrid(heaviestGrid);
                 }

@@ -10,7 +10,7 @@ using VRage.Game.ModAPI;
 using VRage.Network;
 using VRageMath;
 
-namespace TorchMonitor.ProfilerMonitors
+namespace SentisOptimisationsPlugin
 {
     public class Punisher
     {
@@ -40,7 +40,7 @@ namespace TorchMonitor.ProfilerMonitors
                 timeToAlarmDictionary[grid.EntityId] = 1;
             }
             
-            if (timeToAlarmDictionary[grid.EntityId] > SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.PhysicsChecksBeforePunish / 2)
+            if (timeToAlarmDictionary[grid.EntityId] > SentisOptimisationsPlugin.Config.PhysicsChecksBeforePunish / 2)
             {
                 ChatUtils.SendTo(grid.BigOwners[0],
                     "Warning. Grid " + grid.DisplayName + " has an increased impact on server performance,\n" +
@@ -89,7 +89,7 @@ namespace TorchMonitor.ProfilerMonitors
                 timeToFixDictionary[grid.EntityId] = 1;
             }
             
-            if (timeToFixDictionary[grid.EntityId] > SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.PhysicsChecksBeforePunish)
+            if (timeToFixDictionary[grid.EntityId] > SentisOptimisationsPlugin.Config.PhysicsChecksBeforePunish)
             {
                 ConvertToStatic((MyCubeGrid) grid);
                 timeToFixDictionary.Remove(grid.EntityId);
@@ -109,6 +109,7 @@ namespace TorchMonitor.ProfilerMonitors
             {
                 myCubeGrid.Physics?.SetSpeeds(Vector3.Zero, Vector3.Zero);
                 myCubeGrid.ConvertToStatic();
+                PlayerCommands.SyncConvert(myCubeGrid, true);
                 try
                 {
                     MyMultiplayer.RaiseEvent<MyCubeGrid>(myCubeGrid, (MyCubeGrid x) => new Action(x.ConvertToStatic),

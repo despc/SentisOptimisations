@@ -218,6 +218,7 @@ namespace SentisOptimisationsPlugin
                                         {
                                             myCubeGrid.Physics?.SetSpeeds(Vector3.Zero, Vector3.Zero);
                                             myCubeGrid.ConvertToStatic();
+                                            PlayerCommands.SyncConvert(myCubeGrid, true);
                                             try
                                             {
                                                 MyMultiplayer.RaiseEvent<MyCubeGrid>(myCubeGrid, (MyCubeGrid x) => new Action(x.ConvertToStatic), default(EndpointId));
