@@ -48,7 +48,7 @@ namespace SentisOptimisationsPlugin
             {
                 value = (string)text;
             }
-            if (value.Length > 50)
+            if (value.Length > 64)
             {
                 Thread.Sleep(15);
                 return false;
@@ -58,7 +58,7 @@ namespace SentisOptimisationsPlugin
         
         private static bool SetValueLimitedPatchedStorage(String value)
         {
-            if (value.Length > 2048)
+            if (value.Length > 10240)
             {
                 Thread.Sleep(15);
                 return false;
@@ -68,7 +68,7 @@ namespace SentisOptimisationsPlugin
         
         private static bool SetValueLimitedPatched(String value)
         {
-            if (value.Length > 50)
+            if (value.Length > 64)
             {
                 Thread.Sleep(15);
                 return false;
