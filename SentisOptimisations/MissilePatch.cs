@@ -201,7 +201,7 @@ namespace SentisOptimisationsPlugin
             voxelsToCutTmp.Clear();
         }
 
-        public static void ComputeDamagedBlocks(MyGridExplosion m_gridExplosion, bool pearcingDamage)
+        public static void ComputeDamagedBlocks(MyGridExplosion m_gridExplosion, bool pearcingDamage, long onShieldGridId = -1)
         {
             Dictionary<MySlimBlock, float> m_damagedBlocks = new Dictionary<MySlimBlock, float>();
 
@@ -218,6 +218,10 @@ namespace SentisOptimisationsPlugin
 
             foreach (MySlimBlock affectedCubeBlock in m_gridExplosion.AffectedCubeBlocks)
             {
+                if (affectedCubeBlock.CubeGrid.EntityId == onShieldGridId)
+                {
+                    continue;
+                }
                 Dictionary<MySlimBlock, MyGridExplosion.MyRaycastDamageInfo> m_damageRemaining =
                     new Dictionary<MySlimBlock, MyGridExplosion.MyRaycastDamageInfo>();
                 Stack<MySlimBlock> m_castBlocks = new Stack<MySlimBlock>();
@@ -430,8 +434,8 @@ namespace SentisOptimisationsPlugin
                         {
                             try
                             {
-                                if (DamageShieldAndObjects(attackerId, entities_t, sphere_t, m_gridExplosion_t.Damage)) return;
-                                ComputeDamagedBlocks(m_gridExplosion_t, isPearcingDamage_t);
+                                var onShieldGridId = DamageShieldAndObjects(attackerId, entities_t, sphere_t, m_gridExplosion_t.Damage);
+                                ComputeDamagedBlocks(m_gridExplosion_t, isPearcingDamage_t, onShieldGridId);
                                 ApplyExplosionOnVoxel(sphere_t);
                                 ApplyVolumetricDamageToGrid(m_gridExplosion_t, attackerId_t);
                             }
@@ -450,15 +454,15 @@ namespace SentisOptimisationsPlugin
 
             CollectBlocks(sphere, entities, isWarhead, Node2, group, m_gridExplosion);
             ApplyExplosionOnVoxel(sphere);
-            if (DamageShieldAndObjects(attackerId, entities, sphere, m_gridExplosion.Damage)) return;
-            ComputeDamagedBlocks(m_gridExplosion, isPearcingDamage);
+            var damageShieldAndObjects = DamageShieldAndObjects(attackerId, entities, sphere, m_gridExplosion.Damage);
+            ComputeDamagedBlocks(m_gridExplosion, isPearcingDamage, damageShieldAndObjects);
             ApplyVolumetricDamageToGrid(m_gridExplosion, attackerId);
         }
 
-        private static bool DamageShieldAndObjects(long attackerId, List<MyEntity> entities_t, BoundingSphereD sphere_t,
+        private static long DamageShieldAndObjects(long attackerId, List<MyEntity> entities_t, BoundingSphereD sphere_t,
             float damage)
         {
-            bool hasShield = false;
+            long onShieldGridId = -1;
             foreach (var myEntity in entities_t)
             {
                 if (myEntity is MyCharacter)
@@ -485,15 +489,24 @@ namespace SentisOptimisationsPlugin
                     if (entToShield.HasValue)
                     {
                         shield = entToShield.Value.Item1;
-
+                        
+                        var currentShieldHp = (SentisOptimisationsPlugin.SApi.GetMaxHpCap(shield) * (SentisOptimisationsPlugin.SApi.GetShieldPercent(shield) / 100)) * 10000;
+                        if (currentShieldHp < damage * SentisOptimisationsPlugin.Config.WarheadDamageMultiplier)
+                        {
+                            onShieldGridId = -1;
+                        }
+                        else
+                        {
+                            onShieldGridId = shield.CubeGrid.EntityId;
+                        }
                         SentisOptimisationsPlugin.SApi.PointAttackShieldCon(shield, sphere_t.Center,
                             attackerId, (float) (damage * (sphere_t.Radius / SentisOptimisationsPlugin.Config.WarheadDamageMultiplier)), 0, false, true);
                     }
 
-                    hasShield = true;
+                    
                 }
             }
-            return hasShield;
+            return onShieldGridId;
         }
 
         private static void CollectBlocks(BoundingSphereD sphere, List<MyEntity> entities, bool isWarhead,

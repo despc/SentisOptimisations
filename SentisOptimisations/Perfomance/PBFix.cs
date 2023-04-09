@@ -47,8 +47,28 @@ namespace SentisOptimisationsPlugin
             ctx.GetPattern(RecalculateOwnersInternal).Prefixes.Add(
                 typeof(PBFix).GetMethod(nameof(RecalculateOwnersInternalPatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
+            
+            var CompileAction = typeof(MyProgrammableBlock).GetMethod
+                ("Compile", BindingFlags.Instance | BindingFlags.NonPublic);
+            
+            ctx.GetPattern(CompileAction).Prefixes.Add(
+                typeof(PBFix).GetMethod(nameof(CompileActionPatched),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
         }
 
+        
+        private static bool CompileActionPatched(MyProgrammableBlock __instance, string program)
+        {
+            if (program.Contains("double maxCurrentMs = 0.5;"))
+            {
+                var newProgram = program.Replace("double maxCurrentMs = 0.5;", "double maxCurrentMs = 0.1;");
+                __instance.UpdateProgram(newProgram);
+                return false;
+            }
+            return true;
+        }
+        
         private static void RecalculateOwnersInternalPatched(Object __instance)
         {
             MyCubeGrid cubeGrid =
