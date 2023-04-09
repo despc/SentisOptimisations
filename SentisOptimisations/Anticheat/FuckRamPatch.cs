@@ -48,8 +48,9 @@ namespace SentisOptimisationsPlugin
             {
                 value = (string)text;
             }
-            if (value.Length > 256)
+            if (value.Length > 512)
             {
+                Log.Error("DisplayName TOO LONG " + value);
                 Thread.Sleep(15);
                 return false;
             }
@@ -69,8 +70,9 @@ namespace SentisOptimisationsPlugin
         
         private static bool SetValueLimitedPatched(String value)
         {
-            if (value.Length > 256)
+            if (value.Length > 100240)
             {
+                Log.Error("CustomData TOO LONG " + value);
                 Thread.Sleep(15);
                 return false;
             }
