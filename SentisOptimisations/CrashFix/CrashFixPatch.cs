@@ -37,6 +37,17 @@ namespace SentisOptimisationsPlugin.CrashFix
                 typeof(CrashFixPatch).GetMethod(nameof(CreateCompilationPatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
 
+            // var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+            // foreach (var assembly in assemblies)
+            // {
+            //     if (assembly.FullName.Contains("Essentials"))
+            //     {
+            //         var sendMotdMethod = assembly.GetType("Essentials.EssentialsPlugin").getMethod("SendMotd", BindingFlags.Instance | BindingFlags.Public);
+            //         
+            //     }
+            // }
+            // Essentials.EssentialsPlugin.SendMotd
+
         }
 
         private static void MethodPistonInitPatched(MyPistonBase __instance)

@@ -37,6 +37,7 @@
       <Compile Include="AllGridsActions\AsteroidReverter.cs" />
       <Compile Include="AllGridsActions\FallInVoxelDetector.cs" />
       <Compile Include="AllGridsActions\GridAutoRenamer.cs" />
+      <Compile Include="AllGridsActions\NpcStationsPowerFix.cs" />
       <Compile Include="AllGridsActions\OnlineReward.cs" />
       <Compile Include="AllGridsActions\PvEGridChecker.cs" />
       <Compile Include="Anticheat\FuckRamPatch.cs" />
@@ -69,6 +70,7 @@
       <Compile Include="NPC\NpcPatches.cs" />
       <Compile Include="Perfomance\ConveyorPatch.cs" />
       <Compile Include="Production\RefineryPatchs.cs" />
+      <Compile Include="RemovePluginPatch.cs" />
       <Compile Include="Shipyard\Dto\ConvertSyncRequest.cs" />
       <Compile Include="Voxels\VoxelsPatch.cs" />
       <Compile Include="Perfomance\ExplosionsPatch.cs" />

@@ -60,7 +60,7 @@ namespace SentisOptimisationsPlugin
         
         private static bool CompileActionPatched(MyProgrammableBlock __instance, string program)
         {
-            if (program.Contains("double maxCurrentMs = 0.5;"))
+            if (program != null && program.Contains("double maxCurrentMs = 0.5;"))
             {
                 var newProgram = program.Replace("double maxCurrentMs = 0.5;", "double maxCurrentMs = 0.1;");
                 __instance.UpdateProgram(newProgram);

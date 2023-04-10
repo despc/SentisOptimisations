@@ -20,12 +20,13 @@ namespace SentisOptimisationsPlugin.AllGridsActions
         private OnlineReward _onlineReward = new OnlineReward();
         private AsteroidReverter _asteroidReverter = new AsteroidReverter();
         private PvEGridChecker _pvEGridChecker = new PvEGridChecker();
+        private NpcStationsPowerFix _npcStationsPowerFix = new NpcStationsPowerFix();
         public static HashSet<MyEntity> entitiesToShipTools = new HashSet<MyEntity>();
         public static HashSet<MyCubeGrid> myCubeGrids = new HashSet<MyCubeGrid>();
         public static HashSet<IMyVoxelMap> myVoxelMaps = new HashSet<IMyVoxelMap>();
         public static HashSet<MyPlanet> Planets = new HashSet<MyPlanet>();
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
-
+        private int counter = 0;
         public void MyEntitiesOnOnEntityRemove(MyEntity entity)
         {
             if (entity is MyEnvironmentSector 
@@ -106,9 +107,18 @@ namespace SentisOptimisationsPlugin.AllGridsActions
                 {
                     try
                     {
+                        counter++;
                         await Task.Delay(30000);
-                        await Task.Run(() => { _asteroidReverter.CheckAndRestore(new HashSet<IMyVoxelMap>(myVoxelMaps)); });
+                        await Task.Run(() =>
+                        {
+                            _asteroidReverter.CheckAndRestore(new HashSet<IMyVoxelMap>(myVoxelMaps));
+                        });
                         await Task.Run(CheckAllGrids);
+                        if (counter % 20 == 0)
+                        {
+                            await Task.Run(() => _npcStationsPowerFix.RefillPowerStations());
+                        }
+
                         await Task.Run(() => { _onlineReward.RewardOnline(); });
                         await PhysicsProfilerMonitor.__instance.Profile();
                     }
