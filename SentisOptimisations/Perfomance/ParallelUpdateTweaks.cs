@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Reflection;
 using NLog;
 using Sandbox.Game.Entities;
+using Sandbox.Game.Entities.Character;
+using Sandbox.Game.Multiplayer;
 using Torch.Managers.PatchManager;
 
 namespace FixTurrets.Perfomance
@@ -11,7 +13,7 @@ namespace FixTurrets.Perfomance
     public class ParallelUpdateTweaks
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
-
+        public static readonly Random r = new Random();
         private static Dictionary<long, int> ResourceDistributorCounters = new Dictionary<long, int>();
 
         private static Type MyThrusterBlockThrustComponentType =
@@ -23,10 +25,40 @@ namespace FixTurrets.Perfomance
 
         public static void Patch(PatchContext ctx)
         {
+            var MethodRenderUpdate = typeof(MyThrust).GetMethod
+                ("RenderUpdate", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+
+            ctx.GetPattern(MethodRenderUpdate).Prefixes.Add(
+                typeof(ParallelUpdateTweaks).GetMethod(nameof(Disabled),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+
             var MethodThrustUpdateBeforeSimulation = MyThrusterBlockThrustComponentType.GetMethod
                 ("UpdateBeforeSimulation", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
             ctx.GetPattern(MethodThrustUpdateBeforeSimulation).Prefixes.Add(
                 typeof(ParallelUpdateTweaks).GetMethod(nameof(MethodThrustUpdateBeforeSimulationPatched),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+
+
+            var MethodSoundEmitterUpdate = typeof(MyEntity3DSoundEmitter).GetMethod
+                (nameof(MyEntity3DSoundEmitter.Update), BindingFlags.Instance | BindingFlags.Public);
+
+            ctx.GetPattern(MethodSoundEmitterUpdate).Prefixes.Add(
+                typeof(ParallelUpdateTweaks).GetMethod(nameof(Disabled),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+
+            var MethodUpdateHeadAndWeapon = typeof(MyCharacter).GetMethod
+                ("UpdateHeadAndWeapon", BindingFlags.Instance | BindingFlags.NonPublic);
+
+            ctx.GetPattern(MethodUpdateHeadAndWeapon).Prefixes.Add(
+                typeof(ParallelUpdateTweaks).GetMethod(nameof(Disabled),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+
+
+            var MethodSendDirtyBlockLimit = typeof(MyPlayerCollection).GetMethod
+                (nameof(MyPlayerCollection.SendDirtyBlockLimit), BindingFlags.Instance | BindingFlags.Public);
+
+            ctx.GetPattern(MethodSendDirtyBlockLimit).Prefixes.Add(
+                typeof(ParallelUpdateTweaks).GetMethod(nameof(Slowdown10),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
         }
 
@@ -34,12 +66,27 @@ namespace FixTurrets.Perfomance
         {
             MyCubeGrid grid = (MyCubeGrid)GetEntityMethod.Invoke(__instance, new object[] { });
 
-            if (grid.IsStatic)
+            if (grid == null || grid.IsStatic)
             {
                 return false;
             }
 
             return true;
+        }
+
+        private static bool Disabled()
+        {
+            return false;
+        }
+
+        private static bool Slowdown10()
+        {
+            if (r.NextDouble() < 0.05)
+            {
+                return true;
+            }
+
+            return false;
         }
     }
 }

@@ -10,7 +10,7 @@ namespace FixTurrets.Perfomance
         public static void Patch(PatchContext ctx)
         {
             var MethodExecuteGasTransfer = typeof(MyTextPanelComponent).GetMethod
-                ("SetDefaultTexture", BindingFlags.Instance | BindingFlags.NonPublic);
+                ("SetDefaultTexture", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
             
             ctx.GetPattern(MethodExecuteGasTransfer).Prefixes.Add(
                 typeof(OtherPerfPatch).GetMethod(nameof(Disabled),
