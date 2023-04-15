@@ -11,6 +11,10 @@
 			<TextBlock Text="Clusters:" />
 			<TextBlock Name="ClustersStatistic" Margin="3,0,0,0" Width="Auto" Text="Clusters statistic will be here" FontWeight="Bold" />
 		</StackPanel>
+		<StackPanel Orientation="Horizontal" Margin="3,3,3,20">
+			<TextBlock Text="Conveyor cache:" />
+			<TextBlock Name="CacheStatistic" Margin="3,0,0,0" Width="Auto" Text="Cache statistic will be here" FontWeight="Bold" />
+		</StackPanel>
 		<gui:FilteredGrid x:Name="MainFilteredGrid" />
 	</StackPanel>
 </UserControl>

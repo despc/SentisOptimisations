@@ -71,6 +71,7 @@
       <Compile Include="Perfomance\ConveyorPatch.cs" />
       <Compile Include="Production\RefineryPatchs.cs" />
       <Compile Include="RemovePluginPatch.cs" />
+      <Compile Include="ParallelPatch.cs" />
       <Compile Include="Shipyard\Dto\ConvertSyncRequest.cs" />
       <Compile Include="Voxels\VoxelsPatch.cs" />
       <Compile Include="Perfomance\ExplosionsPatch.cs" />

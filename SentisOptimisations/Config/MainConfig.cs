@@ -31,6 +31,7 @@ namespace SentisOptimisationsPlugin
         
         //optimisations
         private bool _gasTankOptimisation = true;
+        private bool _conveyorCacheEnabled = true;
         private bool _safeZoneSubGridOptimisation = true;
         private int _safeZonePhysicsThreshold = 10; // детект сварки динамики в сз, автоперевод в статику если грид обрабатывается больше N мс
         
@@ -109,6 +110,13 @@ namespace SentisOptimisationsPlugin
                     configShipsInMarket.Add(shipInMarket);
                 }
             }
+        }
+        
+        [DisplayTab(Name = "Conveyor cache enabled", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Conveyor cache enabled")]
+        public bool ConveyorCacheEnabled
+        {
+            get => _conveyorCacheEnabled;
+            set => SetValue(ref _conveyorCacheEnabled, value);
         }
         
         [DisplayTab(Name = "Online Reward Enabled", GroupName = "Online Reward", Tab = "Online Reward", Order = 0, Description = "Online Reward Enabled")]
