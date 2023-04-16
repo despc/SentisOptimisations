@@ -27,7 +27,7 @@ namespace SentisOptimisationsPlugin
     public static class SafezonePatch
     {
         public static Dictionary<long, long> entitiesInSZ = new Dictionary<long, long>();
-
+        public static Dictionary<long, int> Cooldowns = new Dictionary<long, int>();
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
         public static void Patch(PatchContext ctx)
@@ -47,6 +47,13 @@ namespace SentisOptimisationsPlugin
                 typeof(SafezonePatch).GetMethod(nameof(MySafeZoneIsSafePatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
 
+            var MySafeZoneUpdateBeforeSimulation = typeof(MySafeZone).GetMethod
+                (nameof(MySafeZone.UpdateBeforeSimulation), BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
+            
+            ctx.GetPattern(MySafeZoneUpdateBeforeSimulation).Prefixes.Add(
+                typeof(SafezonePatch).GetMethod(nameof(UpdateBeforeSimulationPatched),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
             var MyRemoveEntityPhantom = typeof(MySafeZone).GetMethod
                 ("RemoveEntityPhantom", BindingFlags.Instance | BindingFlags.NonPublic);
 
@@ -209,7 +216,54 @@ namespace SentisOptimisationsPlugin
             }
             return false;
         }
+        
+        private static bool NeedSkip(long blockId, int cd)
+        {
+            int cooldown;
+            if (Cooldowns.TryGetValue(blockId, out cooldown))
+            {
+                if (cooldown > cd)
+                {
+                    Cooldowns[blockId] = 0;
+                    return false;
+                }
+                Cooldowns[blockId] = cooldown + 1;
+                return true;
+            }
 
+            Cooldowns[blockId] = 0;
+            return true;
+        }
+
+        private static bool UpdateBeforeSimulationPatched(MySafeZone __instance)
+        {
+            var safeZoneBlockId = __instance.SafeZoneBlockId;
+            if (safeZoneBlockId == 0)
+            {
+                return true;
+            }
+            MyCubeBlock entity;
+            if (!MyEntities.TryGetEntityById<MyCubeBlock>(safeZoneBlockId, out entity))
+            {
+                return true;
+            }
+
+            var entityCubeGrid = entity.CubeGrid;
+            if (SentisOptimisationsPlugin.Config.SlowdownEnabled)
+            {
+                    var myUpdateTiersPlayerPresence = entityCubeGrid.PlayerPresenceTier;
+                    if (myUpdateTiersPlayerPresence == MyUpdateTiersPlayerPresence.Tier1)
+                    {
+                        if (NeedSkip(entityCubeGrid.EntityId, 10)) return false;
+                    }
+                    else if (myUpdateTiersPlayerPresence == MyUpdateTiersPlayerPresence.Tier2)
+                    {
+                        if (NeedSkip(entityCubeGrid.EntityId, 100)) return false;
+                    }   
+            }
+
+            return true;
+        }
 
         private static bool MySafeZoneIsSafePatched(MySafeZone __instance, MyEntity entity, ref bool __result)
         {
@@ -218,6 +272,33 @@ namespace SentisOptimisationsPlugin
             {
                 return true;
             }
+            
+            if (SentisOptimisationsPlugin.Config.SlowdownEnabled)
+            {
+                var myCubeGrid = entity as MyCubeGrid;
+                if (myCubeGrid != null)
+                {
+                    var myUpdateTiersPlayerPresence = myCubeGrid.PlayerPresenceTier;
+                    if (myUpdateTiersPlayerPresence == MyUpdateTiersPlayerPresence.Tier1)
+                    {
+                        if (NeedSkip(myCubeGrid.EntityId, 10))
+                        {
+                            __result = true;
+                            return false;
+                        }
+                    }
+                    else if (myUpdateTiersPlayerPresence == MyUpdateTiersPlayerPresence.Tier2)
+                    {
+                        if (NeedSkip(myCubeGrid.EntityId, 100))
+                        {
+                            __result = true;
+                            return false;
+                        }
+                    }   
+                }
+                
+            }
+            
             try
             {
                 MyFloatingObject myFloatingObject = entity as MyFloatingObject;

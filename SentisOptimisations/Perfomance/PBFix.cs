@@ -12,6 +12,7 @@ using Sandbox.Game.GameSystems;
 using Sandbox.Game.Localization;
 using Sandbox.ModAPI;
 using SentisOptimisations;
+using SentisOptimisationsPlugin.AllGridsActions;
 using Torch.Managers.PatchManager;
 using VRage;
 using VRage.Game.ModAPI;
@@ -27,7 +28,7 @@ namespace SentisOptimisationsPlugin
 
         public static ConcurrentDictionary<long, byte> needUpdateGridBlocksOwnership =
             new ConcurrentDictionary<long, byte>();
-
+        public static Dictionary<long, int> Cooldowns = new Dictionary<long, int>();
         public static void Patch(PatchContext ctx)
         {
             var RunSandboxedProgramAction = typeof(MyProgrammableBlock).GetMethod
@@ -82,6 +83,22 @@ namespace SentisOptimisationsPlugin
         {
             try
             {
+                var blockId = __instance.EntityId;
+                var gridId = __instance.CubeGrid.EntityId;
+
+                if (SentisOptimisationsPlugin.Config.SlowdownEnabled && MySandboxGame.Static.SimulationFrameCounter > 12000)
+                {
+                    var myUpdateTiersPlayerPresence = __instance.CubeGrid.PlayerPresenceTier;
+                    if (myUpdateTiersPlayerPresence == MyUpdateTiersPlayerPresence.Tier1)
+                    {
+                        if (NeedSkip(blockId, 10)) return false;
+                    }
+                    else if (myUpdateTiersPlayerPresence == MyUpdateTiersPlayerPresence.Tier2)
+                    {
+                        if (NeedSkip(blockId, 100)) return false;
+                    }  
+                }
+
                 if (MySandboxGame.Static.UpdateThread != Thread.CurrentThread &&
                     MyVRage.Platform.Scripting.ReportIncorrectBehaviour(MyCommonTexts
                         .ModRuleViolation_PBParallelInvocation))
@@ -182,10 +199,10 @@ namespace SentisOptimisationsPlugin
                 m_groupCache.Clear();
                 if (terminalSystem != null)
                 {
-                    if (needUpdateGridBlocksOwnership.ContainsKey(__instance.CubeGrid.EntityId))
+                    if (needUpdateGridBlocksOwnership.ContainsKey(gridId))
                     {
                         terminalSystem.UpdateGridBlocksOwnership(__instance.OwnerId);
-                        needUpdateGridBlocksOwnership.Remove(__instance.CubeGrid.EntityId);
+                        needUpdateGridBlocksOwnership.Remove(gridId);
                     }
                 }
                 else
@@ -202,10 +219,29 @@ namespace SentisOptimisationsPlugin
             }
             catch (Exception e)
             {
-                SentisOptimisationsPlugin.Log.Warn("RunSandboxedProgramActionPatched Exception ", e);
+                SentisOptimisationsPlugin.Log.Warn("RunSandboxedProgramActionPatched Exception " + __instance.DisplayName + " grid " + __instance.CubeGrid.DisplayName, e);
+                __instance.Enabled = false;
             }
 
             return false;
+        }
+
+        private static bool NeedSkip(long blockId, int cd)
+        {
+            int cooldown;
+            if (Cooldowns.TryGetValue(blockId, out cooldown))
+            {
+                if (cooldown > cd)
+                {
+                    Cooldowns[blockId] = 0;
+                    return false;
+                }
+                Cooldowns[blockId] = cooldown + 1;
+                return true;
+            }
+
+            Cooldowns[blockId] = 0;
+            return true;
         }
     }
 }

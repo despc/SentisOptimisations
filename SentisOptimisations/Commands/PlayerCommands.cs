@@ -93,11 +93,11 @@ namespace SentisOptimisationsPlugin
                     return;
                 }
 
-                if (!Voxels.IsGridInsideVoxel(gridToRevert))
-                {
-                    Context.Respond("Grid not in voxels!");
-                    return;
-                }
+                // if (!Voxels.IsGridInsideVoxel(gridToRevert))
+                // {
+                //     Context.Respond("Grid not in voxels!");
+                //     return;
+                // }
 
                 var fallInVoxelDetector = AllGridsObserver.FallInVoxelDetector;
                 if (fallInVoxelDetector.gridsPos.TryGetValue(gridToRevert.EntityId, out PositionAndOrientation pos))

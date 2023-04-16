@@ -96,6 +96,10 @@ namespace SentisOptimisationsPlugin
         private string _pveZonePos = "-73641.29:-623775.25:-1089014.23";
         private int _pveZoneRadius = 100000;
         
+        //Slowdown
+        private bool _slowdownEnabled = false;
+        private int _slowdownRadius = 15000;
+        
         private ObservableCollection<ConfigShipInMarket> configShipsInMarket = new ObservableCollection<ConfigShipInMarket>();
 
         public ObservableCollection<ConfigShipInMarket> ConfigShipsInMarket
@@ -111,6 +115,21 @@ namespace SentisOptimisationsPlugin
                 }
             }
         }
+        
+        [DisplayTab(Name = "Slowdown Enabled", GroupName = "Slowdown", Tab = "Slowdown", Order = 0, Description = "Slowdown Enabled")]
+        public bool SlowdownEnabled
+        {
+            get => _slowdownEnabled;
+            set => SetValue(ref _slowdownEnabled, value);
+        }
+        
+        [DisplayTab(Name = "Slowdown Radius", GroupName = "Slowdown", Tab = "Slowdown", Order = 0, Description = "Slowdown Radius")]
+        public int SlowdownRadius
+        {
+            get => _slowdownRadius;
+            set => SetValue(ref _slowdownRadius, value);
+        }
+        
         
         [DisplayTab(Name = "Conveyor cache enabled", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Conveyor cache enabled")]
         public bool ConveyorCacheEnabled
