@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Havok;
+using Profiler;
 using Profiler.Basics;
 using Profiler.Core;
 using Sandbox.Game.World;
@@ -45,6 +46,13 @@ namespace SentisOptimisationsPlugin
             {
                 return;
             }
+
+            var profilerEnabled = ProfilerConfig.Instance.Enabled;
+            bool needDisable = !profilerEnabled;
+            if (!profilerEnabled)
+            {
+                ProfilerConfig.Instance.Enabled = true;
+            }
             using (var profiler = new PhysicsProfiler())
             using (ProfilerResultQueue.Profile(profiler))
             {
@@ -61,6 +69,10 @@ namespace SentisOptimisationsPlugin
 
                 var result = profiler.GetResult();
                 ProcessResult(result);
+            }
+            if (needDisable)
+            {
+                ProfilerConfig.Instance.Enabled = false;
             }
         }
 

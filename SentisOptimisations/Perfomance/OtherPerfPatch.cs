@@ -48,10 +48,8 @@ namespace FixTurrets.Perfomance
             ctx.GetPattern(MethodMyCryoChamberUpdateAfterSimulation100).Prefixes.Add(
                 typeof(OtherPerfPatch).GetMethod(nameof(Disabled),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-            
-            
         }
-        
+
         private static bool Disabled()
         {
             return false;
