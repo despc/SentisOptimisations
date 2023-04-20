@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Reflection;
 using NAPI;
@@ -24,7 +25,7 @@ namespace SentisOptimisationsPlugin
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
         // public static Dictionary<CashedEntry, bool> ConveyerCache = new Dictionary<CashedEntry, bool>();
-        public static Dictionary<long, Dictionary<CashedEntry, bool>> ConveyerCacheGrids = new Dictionary<long, Dictionary<CashedEntry, bool>>();
+        public static ConcurrentDictionary<long, ConcurrentDictionary<CashedEntry, bool>> ConveyerCacheGrids = new ConcurrentDictionary<long, ConcurrentDictionary<CashedEntry, bool>>();
         public static long UncachedCalls = 0;
         public static void Patch(PatchContext ctx)
         {
@@ -67,6 +68,9 @@ namespace SentisOptimisationsPlugin
             ctx.GetPattern(MethodCanTransferTo).Suffixes.Add(
                 typeof(ConveyorPatch).GetMethod(nameof(CanTransferToSuffix),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
+            
+            //Sandbox.Game.GameSystems.MyGridConveyorSystem.CanTransfer(IMyConveyorEndpointBlock, IMyConveyorEndpointBlock, MyDefinitionId, Boolean, Boolean)
         }
 
         private static void MethodUpdateLinesPatched(
@@ -74,7 +78,7 @@ namespace SentisOptimisationsPlugin
         {
             try
             {
-                Dictionary<CashedEntry, bool> gridCache;
+                ConcurrentDictionary<CashedEntry, bool> gridCache;
                 if (ConveyerCacheGrids.TryGetValue(__instance.ResourceSink.Grid.EntityId, out gridCache))
                 {
                     gridCache.Clear();
@@ -109,7 +113,7 @@ namespace SentisOptimisationsPlugin
                 return false;
             }
             var cashedEntity = new CashedEntry(startBlock.EntityId, endBlock.EntityId, itemType);
-            Dictionary<CashedEntry, bool> cacheByGrid;
+            ConcurrentDictionary<CashedEntry, bool> cacheByGrid;
 
             if (ConveyerCacheGrids.TryGetValue(endBlock.CubeGrid.EntityId, out cacheByGrid))
             {
@@ -146,41 +150,42 @@ namespace SentisOptimisationsPlugin
                 return;
             }
             var cashedEntity = new CashedEntry(startBlock.EntityId, endBlock.EntityId, itemType);
-            Dictionary<CashedEntry, bool> cacheByGrid;
+            ConcurrentDictionary<CashedEntry, bool> cacheByGrid;
             if (ConveyerCacheGrids.TryGetValue(endBlock.CubeGrid.EntityId, out cacheByGrid))
             {
                 cacheByGrid[cashedEntity] = __result;
                 return;
             }
 
-            cacheByGrid = new Dictionary<CashedEntry, bool>();
+            cacheByGrid = new ConcurrentDictionary<CashedEntry, bool>();
             cacheByGrid[cashedEntity] = __result;
             ConveyerCacheGrids[endBlock.CubeGrid.EntityId] = cacheByGrid;
         }
         
-        private static bool ComputeCanTransferPrefix(
-            IMyConveyorEndpointBlock start,
-            IMyConveyorEndpointBlock end,
-            MyDefinitionId? itemId,
+        
+                private static bool CanTransferTo2Prefix(
+                    MyInventory __instance, MyInventory dstInventory, MyDefinitionId? itemType,
             ref bool __result)
         {
             if (!SentisOptimisationsPlugin.Config.ConveyorCacheEnabled)
             {
                 return true;
             }
-            var startBlock = start as IMyCubeBlock;
+            IMyConveyorEndpointBlock owner1 = __instance.Owner as IMyConveyorEndpointBlock;
+            IMyConveyorEndpointBlock owner2 = dstInventory.Owner as IMyConveyorEndpointBlock;
+            var startBlock = owner1 as IMyCubeBlock;
             if (startBlock == null)
             {
                 return false;
             }
 
-            var endBlock = end as IMyCubeBlock;
+            var endBlock = owner2 as IMyCubeBlock;
             if (endBlock == null)
             {
                 return false;
             }
-            var cashedEntity = new CashedEntry(startBlock.EntityId, endBlock.EntityId, itemId);
-            Dictionary<CashedEntry, bool> cacheByGrid;
+            var cashedEntity = new CashedEntry(startBlock.EntityId, endBlock.EntityId, itemType);
+            ConcurrentDictionary<CashedEntry, bool> cacheByGrid;
 
             if (ConveyerCacheGrids.TryGetValue(endBlock.CubeGrid.EntityId, out cacheByGrid))
             {
@@ -194,6 +199,88 @@ namespace SentisOptimisationsPlugin
             return true;
         }
         
+        private static void CanTransferTo2Suffix(
+            MyInventory __instance, MyInventory dstInventory, MyDefinitionId? itemType,
+            ref bool __result)
+        {
+            if (!SentisOptimisationsPlugin.Config.ConveyorCacheEnabled)
+            {
+                return;
+            }
+            UncachedCalls++;
+            IMyConveyorEndpointBlock owner1 = __instance.Owner as IMyConveyorEndpointBlock;
+            IMyConveyorEndpointBlock owner2 = dstInventory.Owner as IMyConveyorEndpointBlock;
+            var startBlock = owner1 as IMyCubeBlock;
+            if (startBlock == null)
+            {
+                return;
+            }
+
+            var endBlock = owner2 as IMyCubeBlock;
+            if (endBlock == null)
+            {
+                return;
+            }
+            var cashedEntity = new CashedEntry(startBlock.EntityId, endBlock.EntityId, itemType);
+            ConcurrentDictionary<CashedEntry, bool> cacheByGrid;
+            if (ConveyerCacheGrids.TryGetValue(endBlock.CubeGrid.EntityId, out cacheByGrid))
+            {
+                cacheByGrid[cashedEntity] = __result;
+                return;
+            }
+
+            cacheByGrid = new ConcurrentDictionary<CashedEntry, bool>();
+            cacheByGrid[cashedEntity] = __result;
+            ConveyerCacheGrids[endBlock.CubeGrid.EntityId] = cacheByGrid;
+        }
+        
+        
+        private static bool ComputeCanTransferPrefix(
+            IMyConveyorEndpointBlock start,
+            IMyConveyorEndpointBlock end,
+            MyDefinitionId? itemId,
+            ref bool __result)
+        {
+            if (!SentisOptimisationsPlugin.Config.ConveyorCacheEnabled)
+            {
+                return true;
+            }
+
+            try
+            {
+                var startBlock = start as IMyCubeBlock;
+                if (startBlock == null)
+                {
+                    return false;
+                }
+
+                var endBlock = end as IMyCubeBlock;
+                if (endBlock == null)
+                {
+                    return false;
+                }
+
+                var cashedEntity = new CashedEntry(startBlock.EntityId, endBlock.EntityId, itemId);
+                ConcurrentDictionary<CashedEntry, bool> cacheByGrid;
+
+                if (ConveyerCacheGrids.TryGetValue(endBlock.CubeGrid.EntityId, out cacheByGrid))
+                {
+                    bool cachedResult;
+                    if (cacheByGrid.TryGetValue(cashedEntity, out cachedResult))
+                    {
+                        __result = cachedResult;
+                        return false;
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Log.Error(e);
+            }
+
+            return true;
+        }
+
         private static void ComputeCanTransferSuffix(
             IMyConveyorEndpointBlock start,
             IMyConveyorEndpointBlock end,
@@ -204,29 +291,38 @@ namespace SentisOptimisationsPlugin
             {
                 return;
             }
-            UncachedCalls++;
-            var startBlock = start as IMyCubeBlock;
-            if (startBlock == null)
-            {
-                return;
-            }
 
-            var endBlock = end as IMyCubeBlock;
-            if (endBlock == null)
+            try
             {
-                return;
-            }
-            var cashedEntity = new CashedEntry(startBlock.EntityId, endBlock.EntityId, itemId);
-            Dictionary<CashedEntry, bool> cacheByGrid;
-            if (ConveyerCacheGrids.TryGetValue(endBlock.CubeGrid.EntityId, out cacheByGrid))
-            {
+                UncachedCalls++;
+                var startBlock = start as IMyCubeBlock;
+                if (startBlock == null)
+                {
+                    return;
+                }
+
+                var endBlock = end as IMyCubeBlock;
+                if (endBlock == null)
+                {
+                    return;
+                }
+
+                var cashedEntity = new CashedEntry(startBlock.EntityId, endBlock.EntityId, itemId);
+                ConcurrentDictionary<CashedEntry, bool> cacheByGrid;
+                if (ConveyerCacheGrids.TryGetValue(endBlock.CubeGrid.EntityId, out cacheByGrid))
+                {
+                    cacheByGrid[cashedEntity] = __result;
+                    return;
+                }
+
+                cacheByGrid = new ConcurrentDictionary<CashedEntry, bool>();
                 cacheByGrid[cashedEntity] = __result;
-                return;
+                ConveyerCacheGrids[endBlock.CubeGrid.EntityId] = cacheByGrid;
             }
-
-            cacheByGrid = new Dictionary<CashedEntry, bool>();
-            cacheByGrid[cashedEntity] = __result;
-            ConveyerCacheGrids[endBlock.CubeGrid.EntityId] = cacheByGrid;
+            catch (Exception e)
+            {
+                Log.Error(e);
+            }
         }
         
 

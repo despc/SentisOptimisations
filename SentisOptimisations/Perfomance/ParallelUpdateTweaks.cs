@@ -1,9 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
+using NAPI;
 using NLog;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Character;
+using Sandbox.Game.EntityComponents;
+using Sandbox.Game.GameSystems;
 using Sandbox.Game.Multiplayer;
 using Torch.Managers.PatchManager;
 
@@ -38,7 +41,13 @@ namespace FixTurrets.Perfomance
                 typeof(ParallelUpdateTweaks).GetMethod(nameof(MethodThrustUpdateBeforeSimulationPatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
 
-
+            var MethodOnRegisteredToThrustComponent = typeof(MyThrust).GetMethod
+                ("OnRegisteredToThrustComponent", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+            ctx.GetPattern(MethodOnRegisteredToThrustComponent).Prefixes.Add(
+                typeof(ParallelUpdateTweaks).GetMethod(nameof(OnRegisteredToThrustComponentPatched),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
+                
             var MethodSoundEmitterUpdate = typeof(MyEntity3DSoundEmitter).GetMethod
                 (nameof(MyEntity3DSoundEmitter.Update), BindingFlags.Instance | BindingFlags.Public);
 
@@ -62,6 +71,24 @@ namespace FixTurrets.Perfomance
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
         }
 
+        
+        private static bool OnRegisteredToThrustComponentPatched(MyThrust __instance, ref bool __result)
+        {
+            try
+            {
+                MyResourceSinkComponent resourceSinkComponent = ((MyEntityThrustComponent)__instance.easyGetField("m_thrustComponent")).ResourceSink(__instance);
+                resourceSinkComponent.IsPoweredChanged += new Action(__instance.Sink_IsPoweredChanged);
+                resourceSinkComponent.Update();
+                __result = true;
+            }
+            catch (Exception e)
+            {
+                Log.Error("Register thrust exception ", e);
+            }
+           
+            return false;
+        }
+        
         private static bool MethodThrustUpdateBeforeSimulationPatched(Object __instance)
         {
             MyCubeGrid grid = (MyCubeGrid)GetEntityMethod.Invoke(__instance, new object[] { });
