@@ -4,7 +4,7 @@ using NLog;
 using Sandbox;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Blocks;
-using Sandbox.Game.Entities.Cube;
+using Sandbox.Game.Entities.Character;
 using Torch.Managers.PatchManager;
 using VRage.Game.ModAPI;
 
@@ -20,6 +20,9 @@ namespace SentisOptimisationsPlugin
         public static Dictionary<long, int> CooldownsMyShipController = new Dictionary<long, int>();
         public static Dictionary<long, int> CooldownsMyBattery = new Dictionary<long, int>();
         public static Dictionary<long, int> CooldownsMyConveyorConnector = new Dictionary<long, int>();
+        
+        public static Dictionary<long, int> CooldownsMyCharacterAfter = new Dictionary<long, int>();
+        public static Dictionary<long, int> CooldownsMyCharacterBefore = new Dictionary<long, int>();
 
         public static void Patch(PatchContext ctx)
         {
@@ -64,12 +67,62 @@ namespace SentisOptimisationsPlugin
             ctx.GetPattern(MyConveyorConnectorUpdateAfterSimulation).Prefixes.Add(
                 typeof(Slowdowns).GetMethod(nameof(MyConveyorConnectorPatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
+            var MyCharacterUpdateAfterSimulation = typeof(MyCharacter).GetMethod
+                ("UpdateAfterSimulation", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
+
+            ctx.GetPattern(MyCharacterUpdateAfterSimulation).Prefixes.Add(
+                typeof(Slowdowns).GetMethod(nameof(MyCharacterUpdateAfterSimulationPatched),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
+            var MyCharacterUpdateBeforeSimulation = typeof(MyCharacter).GetMethod
+                ("UpdateBeforeSimulation", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
+
+            ctx.GetPattern(MyCharacterUpdateBeforeSimulation).Prefixes.Add(
+                typeof(Slowdowns).GetMethod(nameof(MyCharacterUpdateBeforeSimulationPatched),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
         }
 
+        private static bool MyCharacterUpdateBeforeSimulationPatched(MyCharacter __instance)
+        {
+            var isClientOnline = __instance.IsClientOnline;
+            if (isClientOnline != null && isClientOnline.Value)
+            {
+                return true;
+            }
+
+            if (SentisOptimisationsPlugin.Config.SlowdownEnabled && MySandboxGame.Static.SimulationFrameCounter > 6000)
+            {
+                if (NeedSkip(__instance.EntityId, 100, CooldownsMyCharacterBefore))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+        
+        private static bool MyCharacterUpdateAfterSimulationPatched(MyCharacter __instance)
+        {
+            var isClientOnline = __instance.IsClientOnline;
+            if (isClientOnline != null && isClientOnline.Value)
+            {
+                return true;
+            }
+
+            if (SentisOptimisationsPlugin.Config.SlowdownEnabled && MySandboxGame.Static.SimulationFrameCounter > 6000)
+            {
+                if (NeedSkip(__instance.EntityId, 100, CooldownsMyCharacterAfter))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+        
         private static bool MyConveyorConnectorPatched(MyConveyorConnector __instance)
         {
             var blockId = __instance.EntityId;
-            if (SentisOptimisationsPlugin.Config.SlowdownEnabled && MySandboxGame.Static.SimulationFrameCounter > 12000)
+            if (SentisOptimisationsPlugin.Config.SlowdownEnabled && MySandboxGame.Static.SimulationFrameCounter > 6000)
             {
                 var myUpdateTiersPlayerPresence = __instance.CubeGrid.PlayerPresenceTier;
                 if (myUpdateTiersPlayerPresence == MyUpdateTiersPlayerPresence.Tier1)
@@ -93,7 +146,7 @@ namespace SentisOptimisationsPlugin
         private static bool MyBatteryBlockUpdatePatched(MyBatteryBlock __instance)
         {
             var blockId = __instance.EntityId;
-            if (SentisOptimisationsPlugin.Config.SlowdownEnabled && MySandboxGame.Static.SimulationFrameCounter > 12000)
+            if (SentisOptimisationsPlugin.Config.SlowdownEnabled && MySandboxGame.Static.SimulationFrameCounter > 6000)
             {
                 var myUpdateTiersPlayerPresence = __instance.CubeGrid.PlayerPresenceTier;
                 if (myUpdateTiersPlayerPresence == MyUpdateTiersPlayerPresence.Tier1)
@@ -117,7 +170,7 @@ namespace SentisOptimisationsPlugin
         private static bool MyShipControllerUpdatePatched(MyShipController __instance)
         {
             var blockId = __instance.EntityId;
-            if (SentisOptimisationsPlugin.Config.SlowdownEnabled && MySandboxGame.Static.SimulationFrameCounter > 12000)
+            if (SentisOptimisationsPlugin.Config.SlowdownEnabled && MySandboxGame.Static.SimulationFrameCounter > 6000)
             {
                 var myUpdateTiersPlayerPresence = __instance.CubeGrid.PlayerPresenceTier;
                 if (myUpdateTiersPlayerPresence == MyUpdateTiersPlayerPresence.Tier1)
@@ -141,7 +194,7 @@ namespace SentisOptimisationsPlugin
         private static bool MyGasGeneratorUpdatePatched(MyGasGenerator __instance)
         {
             var blockId = __instance.EntityId;
-            if (SentisOptimisationsPlugin.Config.SlowdownEnabled && MySandboxGame.Static.SimulationFrameCounter > 12000)
+            if (SentisOptimisationsPlugin.Config.SlowdownEnabled && MySandboxGame.Static.SimulationFrameCounter > 6000)
             {
                 var myUpdateTiersPlayerPresence = __instance.CubeGrid.PlayerPresenceTier;
                 if (myUpdateTiersPlayerPresence == MyUpdateTiersPlayerPresence.Tier1)
@@ -165,7 +218,7 @@ namespace SentisOptimisationsPlugin
         private static bool MySensorBlockUpdatePatched(MySensorBlock __instance)
         {
             var blockId = __instance.EntityId;
-            if (SentisOptimisationsPlugin.Config.SlowdownEnabled && MySandboxGame.Static.SimulationFrameCounter > 12000)
+            if (SentisOptimisationsPlugin.Config.SlowdownEnabled && MySandboxGame.Static.SimulationFrameCounter > 6000)
             {
                 var myUpdateTiersPlayerPresence = __instance.CubeGrid.PlayerPresenceTier;
                 if (myUpdateTiersPlayerPresence == MyUpdateTiersPlayerPresence.Tier1)
@@ -190,7 +243,7 @@ namespace SentisOptimisationsPlugin
         private static bool CheckIsWorkingPatched(MyThrust __instance, ref bool __result)
         {
             var blockId = __instance.EntityId;
-            if (SentisOptimisationsPlugin.Config.SlowdownEnabled && MySandboxGame.Static.SimulationFrameCounter > 12000)
+            if (SentisOptimisationsPlugin.Config.SlowdownEnabled && MySandboxGame.Static.SimulationFrameCounter > 6000)
             {
                 var myUpdateTiersPlayerPresence = __instance.CubeGrid.PlayerPresenceTier;
                 if (myUpdateTiersPlayerPresence == MyUpdateTiersPlayerPresence.Tier1)

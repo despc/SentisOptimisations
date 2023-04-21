@@ -8,6 +8,7 @@ using HarmonyLib;
 using Havok;
 using NAPI;
 using NLog;
+using Profiler;
 using Sandbox;
 using Sandbox.Definitions;
 using Sandbox.Engine.Multiplayer;
@@ -114,6 +115,7 @@ namespace SentisOptimisationsPlugin
                 InitShieldApi();
                 Communication.RegisterHandlers();
                 PvECore.Init();
+                ProfilerConfig.Instance.Enabled = false;
             }
         }
 
