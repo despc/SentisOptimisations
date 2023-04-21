@@ -7,6 +7,7 @@ using Sandbox.Game.Weapons;
 using Sandbox.Game.World;
 using SentisOptimisations;
 using SpaceEngineers.Game.Entities.Blocks;
+using SpaceEngineers.Game.Weapons.Guns;
 using Torch.Managers.PatchManager;
 using VRage.Game.ModAPI;
 using VRage.ModAPI;
@@ -35,6 +36,12 @@ namespace SentisOptimisationsPlugin
             var methodInfo2 = typeof(MyLargeTurretBase).GetMethod("UpdateAfterSimulation",BindingFlags.DeclaredOnly
                 | BindingFlags.Instance | BindingFlags.Public);
             ctx.GetPattern(methodInfo2).Prefixes.Add(
+                typeof(FixTurretsPatch).GetMethod(nameof(UpdateAfterSimulationPatch),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
+            var methodUpdateBeforeSimulation100 = typeof(MyLargeConveyorTurretBase).GetMethod("UpdateBeforeSimulation100",BindingFlags.DeclaredOnly
+                | BindingFlags.Instance | BindingFlags.Public);
+            ctx.GetPattern(methodUpdateBeforeSimulation100).Prefixes.Add(
                 typeof(FixTurretsPatch).GetMethod(nameof(UpdateAfterSimulationPatch),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
 
