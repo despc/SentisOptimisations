@@ -23,6 +23,7 @@ using SpaceEngineers.Game.Entities.Blocks;
 using Torch.Managers.PatchManager;
 using VRage.Game;
 using VRage.Game.Entity;
+using VRage.Game.ModAPI;
 using VRage.ModAPI;
 using VRage.Utils;
 using VRageMath;
@@ -33,7 +34,7 @@ namespace SentisOptimisationsPlugin.ShipTool
     public static class ShipToolPatch
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
-
+        public static Dictionary<long, int> Cooldowns = new Dictionary<long, int>();
         public static void Patch(PatchContext ctx)
         {
 
@@ -226,6 +227,21 @@ namespace SentisOptimisationsPlugin.ShipTool
 
         private static bool ActivateCommonPatch(MyShipToolBase __instance)
         {
+            var blockId = __instance.EntityId;
+
+            if (SentisOptimisationsPlugin.Config.SlowdownEnabled && MySandboxGame.Static.SimulationFrameCounter > 12000)
+            {
+                var myUpdateTiersPlayerPresence = __instance.CubeGrid.PlayerPresenceTier;
+                if (myUpdateTiersPlayerPresence == MyUpdateTiersPlayerPresence.Tier1)
+                {
+                    if (NeedSkip(blockId, 10)) return false;
+                }
+                else if (myUpdateTiersPlayerPresence == MyUpdateTiersPlayerPresence.Tier2)
+                {
+                    if (NeedSkip(blockId, 100)) return false;
+                }
+            }
+
             DoActivateCommon(__instance);
             return false;
         }
@@ -434,6 +450,24 @@ namespace SentisOptimisationsPlugin.ShipTool
                     "m_detectorSphere");
             BoundingSphere bs = new BoundingSphere(m_detectorSphere.Center, radius);
             ReflectionUtils.SetInstanceField(typeof(MyShipToolBase), __instance, "m_detectorSphere", bs);
+        }
+        
+        private static bool NeedSkip(long blockId, int cd)
+        {
+            int cooldown;
+            if (Cooldowns.TryGetValue(blockId, out cooldown))
+            {
+                if (cooldown > cd)
+                {
+                    Cooldowns[blockId] = 0;
+                    return false;
+                }
+                Cooldowns[blockId] = cooldown + 1;
+                return true;
+            }
+
+            Cooldowns[blockId] = 0;
+            return true;
         }
     }
 }

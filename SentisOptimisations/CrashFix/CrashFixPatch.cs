@@ -3,12 +3,15 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using HarmonyLib;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NAPI;
+using NLog.Fluent;
 using Sandbox.Game.Entities.Blocks;
 using SentisOptimisations;
 using Torch.Managers.PatchManager;
+using VRage.Network;
 using VRage.Scripting;
 using VRage.Sync;
 
@@ -17,9 +20,9 @@ namespace SentisOptimisationsPlugin.CrashFix
     [PatchShim]
     public static class CrashFixPatch
     {
+        private static Harmony harmony = new Harmony("CrashFixPatch");
         public static void Patch(PatchContext ctx)
         {
-            
             
             var MethodPistonInit = typeof(MyPistonBase).GetMethod
                 (nameof(MyPistonBase.Init), BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
@@ -32,24 +35,29 @@ namespace SentisOptimisationsPlugin.CrashFix
             var MethodCreateCompilation = typeof(MyScriptCompiler).GetMethod
                 ("CreateCompilation", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
 
-            
+
             ctx.GetPattern(MethodCreateCompilation).Prefixes.Add(
                 typeof(CrashFixPatch).GetMethod(nameof(CreateCompilationPatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
 
-            // var assemblies = AppDomain.CurrentDomain.GetAssemblies();
-            // foreach (var assembly in assemblies)
-            // {
-            //     if (assembly.FullName.Contains("Essentials"))
-            //     {
-            //         var sendMotdMethod = assembly.GetType("Essentials.EssentialsPlugin").getMethod("SendMotd", BindingFlags.Instance | BindingFlags.Public);
-            //         
-            //     }
-            // }
-            // Essentials.EssentialsPlugin.SendMotd
+            var MethodSetDetailedInfo = typeof(MyProgrammableBlock).GetMethod
+                ("SetDetailedInfo", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
 
+            var finalizer = typeof(CrashFixPatch).GetMethod(nameof(SuppressExceptionFinalizer),
+                BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic);
+            harmony.Patch(MethodSetDetailedInfo, finalizer: new HarmonyMethod(finalizer));
         }
 
+
+        private static Exception SuppressExceptionFinalizer(Exception __exception)
+        {
+            if (__exception != null)
+            {
+                SentisOptimisationsPlugin.Log.Error(__exception);
+            }
+            return null;
+        }
+        
         private static void MethodPistonInitPatched(MyPistonBase __instance)
         {
             __instance.Velocity.ValueChanged += VelocityOnValueChanged;
