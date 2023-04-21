@@ -98,7 +98,6 @@ namespace SentisOptimisationsPlugin
         
         //Slowdown
         private bool _slowdownEnabled = false;
-        private int _slowdownRadius = 15000;
         
         private ObservableCollection<ConfigShipInMarket> configShipsInMarket = new ObservableCollection<ConfigShipInMarket>();
 
@@ -122,15 +121,7 @@ namespace SentisOptimisationsPlugin
             get => _slowdownEnabled;
             set => SetValue(ref _slowdownEnabled, value);
         }
-        
-        [DisplayTab(Name = "Slowdown Radius", GroupName = "Slowdown", Tab = "Slowdown", Order = 0, Description = "Slowdown Radius")]
-        public int SlowdownRadius
-        {
-            get => _slowdownRadius;
-            set => SetValue(ref _slowdownRadius, value);
-        }
-        
-        
+       
         [DisplayTab(Name = "Conveyor cache enabled", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Conveyor cache enabled")]
         public bool ConveyorCacheEnabled
         {

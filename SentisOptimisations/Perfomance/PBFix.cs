@@ -86,7 +86,7 @@ namespace SentisOptimisationsPlugin
                 var blockId = __instance.EntityId;
                 var gridId = __instance.CubeGrid.EntityId;
 
-                if (SentisOptimisationsPlugin.Config.SlowdownEnabled && MySandboxGame.Static.SimulationFrameCounter > 12000)
+                if (SentisOptimisationsPlugin.Config.SlowdownEnabled && MySandboxGame.Static.SimulationFrameCounter > 6000)
                 {
                     var myUpdateTiersPlayerPresence = __instance.CubeGrid.PlayerPresenceTier;
                     if (myUpdateTiersPlayerPresence == MyUpdateTiersPlayerPresence.Tier1)

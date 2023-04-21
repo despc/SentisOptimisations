@@ -229,7 +229,7 @@ namespace SentisOptimisationsPlugin.ShipTool
         {
             var blockId = __instance.EntityId;
 
-            if (SentisOptimisationsPlugin.Config.SlowdownEnabled && MySandboxGame.Static.SimulationFrameCounter > 12000)
+            if (SentisOptimisationsPlugin.Config.SlowdownEnabled && MySandboxGame.Static.SimulationFrameCounter > 6000)
             {
                 var myUpdateTiersPlayerPresence = __instance.CubeGrid.PlayerPresenceTier;
                 if (myUpdateTiersPlayerPresence == MyUpdateTiersPlayerPresence.Tier1)
