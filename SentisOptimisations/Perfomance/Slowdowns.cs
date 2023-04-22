@@ -1,10 +1,10 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Reflection;
 using NLog;
 using Sandbox;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Blocks;
-using Sandbox.Game.Entities.Character;
 using Torch.Managers.PatchManager;
 using VRage.Game.ModAPI;
 
@@ -24,6 +24,10 @@ namespace SentisOptimisationsPlugin
         public static Dictionary<long, int> CooldownsMyCharacterAfter = new Dictionary<long, int>();
         public static Dictionary<long, int> CooldownsMyCharacterBefore = new Dictionary<long, int>();
 
+        public static Dictionary<long, int> CooldownsMyCubeGridAfter = new Dictionary<long, int>();
+        public static Dictionary<long, int> CooldownsMyCubeGridBefore = new Dictionary<long, int>();
+        
+        public static readonly Random r = new Random();
         public static void Patch(PatchContext ctx)
         {
             var MethodCheckIsWorking = typeof(MyThrust).GetMethod
@@ -67,58 +71,9 @@ namespace SentisOptimisationsPlugin
             ctx.GetPattern(MyConveyorConnectorUpdateAfterSimulation).Prefixes.Add(
                 typeof(Slowdowns).GetMethod(nameof(MyConveyorConnectorPatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-            
-            var MyCharacterUpdateAfterSimulation = typeof(MyCharacter).GetMethod
-                ("UpdateAfterSimulation", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
 
-            ctx.GetPattern(MyCharacterUpdateAfterSimulation).Prefixes.Add(
-                typeof(Slowdowns).GetMethod(nameof(MyCharacterUpdateAfterSimulationPatched),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-            
-            var MyCharacterUpdateBeforeSimulation = typeof(MyCharacter).GetMethod
-                ("UpdateBeforeSimulation", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
-
-            ctx.GetPattern(MyCharacterUpdateBeforeSimulation).Prefixes.Add(
-                typeof(Slowdowns).GetMethod(nameof(MyCharacterUpdateBeforeSimulationPatched),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
         }
 
-        private static bool MyCharacterUpdateBeforeSimulationPatched(MyCharacter __instance)
-        {
-            var isClientOnline = __instance.IsClientOnline;
-            if (isClientOnline != null && isClientOnline.Value)
-            {
-                return true;
-            }
-
-            if (SentisOptimisationsPlugin.Config.SlowdownEnabled && MySandboxGame.Static.SimulationFrameCounter > 6000)
-            {
-                if (NeedSkip(__instance.EntityId, 100, CooldownsMyCharacterBefore))
-                {
-                    return false;
-                }
-            }
-            return true;
-        }
-        
-        private static bool MyCharacterUpdateAfterSimulationPatched(MyCharacter __instance)
-        {
-            var isClientOnline = __instance.IsClientOnline;
-            if (isClientOnline != null && isClientOnline.Value)
-            {
-                return true;
-            }
-
-            if (SentisOptimisationsPlugin.Config.SlowdownEnabled && MySandboxGame.Static.SimulationFrameCounter > 6000)
-            {
-                if (NeedSkip(__instance.EntityId, 100, CooldownsMyCharacterAfter))
-                {
-                    return false;
-                }
-            }
-            return true;
-        }
-        
         private static bool MyConveyorConnectorPatched(MyConveyorConnector __instance)
         {
             var blockId = __instance.EntityId;
@@ -282,7 +237,7 @@ namespace SentisOptimisationsPlugin
                 return true;
             }
 
-            cooldowns[blockId] = 0;
+            cooldowns[blockId] = r.Next(0, cd);
             return true;
         }
     }

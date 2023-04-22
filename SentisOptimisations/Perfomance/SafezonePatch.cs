@@ -29,7 +29,7 @@ namespace SentisOptimisationsPlugin
         public static Dictionary<long, long> entitiesInSZ = new Dictionary<long, long>();
         public static Dictionary<long, int> Cooldowns = new Dictionary<long, int>();
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
-
+        public static readonly Random r = new Random();
         public static void Patch(PatchContext ctx)
         {
             var MethodPhantom_Leave = typeof(MySafeZone).GetMethod
@@ -231,7 +231,7 @@ namespace SentisOptimisationsPlugin
                 return true;
             }
 
-            Cooldowns[blockId] = 0;
+            Cooldowns[blockId] = r.Next(0, cd);
             return true;
         }
 

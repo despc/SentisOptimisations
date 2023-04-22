@@ -12,7 +12,6 @@ using Sandbox.Game.GameSystems;
 using Sandbox.Game.Localization;
 using Sandbox.ModAPI;
 using SentisOptimisations;
-using SentisOptimisationsPlugin.AllGridsActions;
 using Torch.Managers.PatchManager;
 using VRage;
 using VRage.Game.ModAPI;
@@ -29,6 +28,7 @@ namespace SentisOptimisationsPlugin
         public static ConcurrentDictionary<long, byte> needUpdateGridBlocksOwnership =
             new ConcurrentDictionary<long, byte>();
         public static Dictionary<long, int> Cooldowns = new Dictionary<long, int>();
+        public static readonly Random r = new Random();
         public static void Patch(PatchContext ctx)
         {
             var RunSandboxedProgramAction = typeof(MyProgrammableBlock).GetMethod
@@ -91,11 +91,11 @@ namespace SentisOptimisationsPlugin
                     var myUpdateTiersPlayerPresence = __instance.CubeGrid.PlayerPresenceTier;
                     if (myUpdateTiersPlayerPresence == MyUpdateTiersPlayerPresence.Tier1)
                     {
-                        if (NeedSkip(blockId, 10)) return false;
+                        if (NeedSkip(blockId, 30)) return false;
                     }
                     else if (myUpdateTiersPlayerPresence == MyUpdateTiersPlayerPresence.Tier2)
                     {
-                        if (NeedSkip(blockId, 100)) return false;
+                        if (NeedSkip(blockId, 300)) return false;
                     }  
                 }
 
@@ -240,7 +240,7 @@ namespace SentisOptimisationsPlugin
                 return true;
             }
 
-            Cooldowns[blockId] = 0;
+            Cooldowns[blockId] = r.Next(0, cd);
             return true;
         }
     }

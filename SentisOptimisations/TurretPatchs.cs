@@ -33,6 +33,13 @@ namespace SentisOptimisationsPlugin
                 typeof(FixTurretsPatch).GetMethod(nameof(DoUpdateTimerTickSlPatch),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
             
+                
+            var MethodSlUpdateAfter = typeof(MySearchlight).GetMethod("UpdateAfterSimulation",BindingFlags.DeclaredOnly
+                | BindingFlags.Instance | BindingFlags.Public);
+            ctx.GetPattern(MethodSlUpdateAfter).Prefixes.Add(
+                typeof(FixTurretsPatch).GetMethod(nameof(UpdateAfterSimulationPatch),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
             var methodInfo2 = typeof(MyLargeTurretBase).GetMethod("UpdateAfterSimulation",BindingFlags.DeclaredOnly
                 | BindingFlags.Instance | BindingFlags.Public);
             ctx.GetPattern(methodInfo2).Prefixes.Add(

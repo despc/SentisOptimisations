@@ -33,6 +33,7 @@ namespace SentisOptimisationsPlugin.AllGridsActions
                                 var mySlimBlocks = new HashSet<MySlimBlock>(entityById.GetBlocks());
                                 Task.Run(() =>
                                 {
+                                    List<MyGasTank> tanks = new List<MyGasTank>();
                                     foreach (var mySlimBlock in mySlimBlocks)
                                     {
                                         if (mySlimBlock.FatBlock is MyBatteryBlock block)
@@ -40,6 +41,7 @@ namespace SentisOptimisationsPlugin.AllGridsActions
                                             MyAPIGateway.Utilities.InvokeOnGameThread((Action)(() =>
                                             {
                                                 block.CurrentStoredPower = block.MaxStoredPower;
+                                                
                                             }));
                                         }
 
@@ -63,11 +65,21 @@ namespace SentisOptimisationsPlugin.AllGridsActions
 
                                         if (mySlimBlock.FatBlock is MyGasTank tank)
                                         {
+                                            tanks.Add(tank);
                                             MyAPIGateway.Utilities.InvokeOnGameThread((Action)(() =>
                                             {
                                                 tank.ChangeFillRatioAmount(1);
                                             }));
                                         }
+                                    }
+                                    for (var i = 0; i < tanks.Count; i++)
+                                    {
+                                        if (i == 0) continue;
+                                        var myGasTank = tanks[i];
+                                        MyAPIGateway.Utilities.InvokeOnGameThread((Action)(() =>
+                                        {
+                                            myGasTank.Enabled = false;
+                                        }));
                                     }
                                 });
                             }

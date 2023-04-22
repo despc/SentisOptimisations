@@ -35,6 +35,7 @@ namespace SentisOptimisationsPlugin.ShipTool
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
         public static Dictionary<long, int> Cooldowns = new Dictionary<long, int>();
+        public static readonly Random r = new Random();
         public static void Patch(PatchContext ctx)
         {
 
@@ -234,11 +235,11 @@ namespace SentisOptimisationsPlugin.ShipTool
                 var myUpdateTiersPlayerPresence = __instance.CubeGrid.PlayerPresenceTier;
                 if (myUpdateTiersPlayerPresence == MyUpdateTiersPlayerPresence.Tier1)
                 {
-                    if (NeedSkip(blockId, 10)) return false;
+                    if (NeedSkip(blockId, 30)) return false;
                 }
                 else if (myUpdateTiersPlayerPresence == MyUpdateTiersPlayerPresence.Tier2)
                 {
-                    if (NeedSkip(blockId, 100)) return false;
+                    if (NeedSkip(blockId, 300)) return false;
                 }
             }
 
@@ -466,7 +467,7 @@ namespace SentisOptimisationsPlugin.ShipTool
                 return true;
             }
 
-            Cooldowns[blockId] = 0;
+            Cooldowns[blockId] = r.Next(0, cd);
             return true;
         }
     }
