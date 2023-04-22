@@ -68,6 +68,7 @@ namespace SentisOptimisationsPlugin
             if (grid.BigOwners.Count == 0)
             {
                 ConvertToStatic((MyCubeGrid) grid);
+                return;
             }
             
             ChatUtils.SendTo(grid.BigOwners[0],
