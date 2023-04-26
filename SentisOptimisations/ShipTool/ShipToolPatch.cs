@@ -324,30 +324,45 @@ namespace SentisOptimisationsPlugin.ShipTool
         private static HashSet<MyEntity> GetEntitiesInContact(MyShipToolBase __instance, List<MyEntity> topEntities, ref bool flag)
         {
             HashSet<MyEntity> entitiesInContact = new HashSet<MyEntity>();
-            foreach (MyEntity myEntity in topEntities)
+            try
             {
-                if (myEntity is MyEnvironmentSector)
-                    flag = true;
-                MyEntity topMostParent = myEntity.GetTopMostParent((Type)null);
-                if ((bool)__instance.easyCallMethod("CanInteractWith", new object[] { topMostParent }, true,
-                        typeof(MyShipToolBase)))
-                    entitiesInContact.Add(topMostParent);
+                foreach (MyEntity myEntity in topEntities)
+                {
+                    if (myEntity is MyEnvironmentSector)
+                        flag = true;
+                    MyEntity topMostParent = myEntity.GetTopMostParent((Type)null);
+                    if ((bool)__instance.easyCallMethod("CanInteractWith", new object[] { topMostParent }, true,
+                            typeof(MyShipToolBase)))
+                        entitiesInContact.Add(topMostParent);
+                }
             }
-
+            catch (Exception e)
+            {
+                Log.Error("Async exception " + e);
+            }
             return entitiesInContact;
         }
 
         private static List<MyEntity> GetTopEntitiesInSphereAsync(BoundingSphereD boundingSphereD)
         {
-            List<MyEntity> entitiesInSphereAsync = new List<MyEntity>();
-            foreach (var entity in new HashSet<MyEntity>(AllGridsObserver.entitiesToShipTools))
+            try
             {
-                if (entity.PositionComp.WorldAABB.Intersects(boundingSphereD))
+                List<MyEntity> entitiesInSphereAsync = new List<MyEntity>();
+                foreach (var entity in new HashSet<MyEntity>(AllGridsObserver.entitiesToShipTools))
                 {
-                    entitiesInSphereAsync.Add(entity);
+                    if (entity.PositionComp.WorldAABB.Intersects(boundingSphereD))
+                    {
+                        entitiesInSphereAsync.Add(entity);
+                    }
                 }
+                return entitiesInSphereAsync;
             }
-            return entitiesInSphereAsync;
+            catch (Exception e)
+            {
+                Log.Error("Async exception " + e);
+            }
+
+            return new List<MyEntity>();
         }
 
         private static async void CollectTargetBlocksAsyncAndCallActivate(MyShipToolBase myShipToolBase,

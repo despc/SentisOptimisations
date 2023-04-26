@@ -54,6 +54,7 @@
       <Compile Include="Config\MainConfig.cs" />
       <Compile Include="CrashFix\CrashFixPatch.cs" />
       <Compile Include="ContractPricePatch.cs" />
+      <Compile Include="CrashFix\UpdateSimulationFixes.cs" />
       <Compile Include="DamagePatch.cs" />
       <Compile Include="FixShip\FixShipLogic.cs" />
       <Compile Include="FixShip\MessageType.cs" />
@@ -75,7 +76,6 @@
       <Compile Include="RemovePluginPatch.cs" />
       <Compile Include="ParallelPatch.cs" />
       <Compile Include="Shipyard\Dto\ConvertSyncRequest.cs" />
-      <Compile Include="Voxels\VoxelsPatch.cs" />
       <Compile Include="Perfomance\ExplosionsPatch.cs" />
       <Compile Include="Perfomance\GasTankOptimisations.cs" />
       <Compile Include="Perfomance\Limits\PhysicsProfilerMonitor.cs" />
@@ -122,6 +122,8 @@
       <Compile Include="Utils\ProjectorUtils.cs" />
       <Compile Include="Utils\ReflectionUtils.cs" />
       <Compile Include="Utils\SoundUtils.cs" />
+      <Compile Include="Voxels\SendReplicablesAsync.cs" />
+      <Compile Include="Voxels\VoxelsPatch.cs" />
     </ItemGroup>
     <ItemGroup>
       <Reference Include="0Harmony, Version=2.1.1.0, Culture=neutral, PublicKeyToken=null">

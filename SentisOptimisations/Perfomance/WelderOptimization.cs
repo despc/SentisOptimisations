@@ -108,7 +108,19 @@ namespace Optimizer.Optimizations
             if (SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.AsyncWeld)
             {
                 var targetsToThread = new HashSet<MySlimBlock>(targets);
-                Task.Run(() => Weld(welder, targetsToThread, inventory, num, WeldProjectionsWithWelding));
+                Task.Run(() =>
+                {
+                    try
+                    {
+                        return Weld(welder, targetsToThread, inventory, num, WeldProjectionsWithWelding);
+                    }
+                    catch (Exception e)
+                    {
+                        SentisOptimisationsPlugin.SentisOptimisationsPlugin.Log.Error("Async exception " + e);
+                    }
+
+                    return false;
+                });
                 return;
             }
 
@@ -211,7 +223,18 @@ namespace Optimizer.Optimizations
 
             if (SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.AsyncWeld)
             {
-                Task.Run(() => FindProjectedBlocks(welder, DoWeldProjections));
+                Task.Run(() =>
+                {
+                    try
+                    {
+                        return FindProjectedBlocks(welder, DoWeldProjections);
+                    }
+                    catch (Exception e)
+                    {
+                        SentisOptimisationsPlugin.SentisOptimisationsPlugin.Log.Error("Async exception " + e);
+                    }
+                    return new List<MyWelder.ProjectionRaycastData>();
+                });
                 return;
             }
 

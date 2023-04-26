@@ -7,7 +7,6 @@ using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Character;
 using Sandbox.Game.WorldEnvironment;
 using Sandbox.ModAPI;
-using TorchMonitor.ProfilerMonitors;
 using VRage.Game.Entity;
 using VRage.Game.ModAPI;
 
@@ -111,15 +110,33 @@ namespace SentisOptimisationsPlugin.AllGridsActions
                         await Task.Delay(30000);
                         await Task.Run(() =>
                         {
-                            _asteroidReverter.CheckAndRestore(new HashSet<IMyVoxelMap>(myVoxelMaps));
+                            try
+                            {
+                                _asteroidReverter.CheckAndRestore(new HashSet<IMyVoxelMap>(myVoxelMaps));
+                            }
+                            catch (Exception e)
+                            {
+                                Log.Error(e);
+                            }
+                            
                         });
                         await Task.Run(CheckAllGrids);
-                        if (counter % 20 == 0)
+                        if (counter % 5 == 0)
                         {
                             await Task.Run(() => _npcStationsPowerFix.RefillPowerStations());
                         }
 
-                        await Task.Run(() => { _onlineReward.RewardOnline(); });
+                        await Task.Run(() =>
+                        {
+                            try
+                            {
+                                _onlineReward.RewardOnline();
+                            }
+                            catch (Exception e)
+                            {
+                                Log.Error("Async exception " + e);
+                            }
+                        });
                         await PhysicsProfilerMonitor.__instance.Profile();
                     }
                     catch (Exception e)
@@ -136,34 +153,42 @@ namespace SentisOptimisationsPlugin.AllGridsActions
 
         private void CheckAllGrids()
         {
-            foreach (var grid in new HashSet<MyCubeGrid>(myCubeGrids))
+            try
             {
-                if (CancellationTokenSource.Token.IsCancellationRequested)
-                    break;
-                if (grid == null)
+                foreach (var grid in new HashSet<MyCubeGrid>(myCubeGrids))
                 {
-                    continue;
-                }
-                SentisOptimisationsPlugin._limiter.CheckGrid(grid);
-                if (SentisOptimisationsPlugin.Config.AutoRestoreFromVoxel)
-                {
-                    FallInVoxelDetector.CheckAndSavePos(grid);
-                }
+                    if (CancellationTokenSource.Token.IsCancellationRequested)
+                        break;
+                    if (grid == null)
+                    {
+                        continue;
+                    }
+                    SentisOptimisationsPlugin._limiter.CheckGrid(grid);
+                    if (SentisOptimisationsPlugin.Config.AutoRestoreFromVoxel)
+                    {
+                        FallInVoxelDetector.CheckAndSavePos(grid);
+                    }
 
-                if (SentisOptimisationsPlugin.Config.AutoRenameGrids)
-                {
-                    _autoRenamer.CheckAndRename(grid);
-                }
+                    if (SentisOptimisationsPlugin.Config.AutoRenameGrids)
+                    {
+                        _autoRenamer.CheckAndRename(grid);
+                    }
 
-                if (SentisOptimisationsPlugin.Config.DisableNoOwner)
-                {
-                    CheckNobodyOwner(grid);
-                }
-                if (SentisOptimisationsPlugin.Config.PvEZoneEnabled)
-                {
-                    _pvEGridChecker.CheckGridIsPvE(grid);
+                    if (SentisOptimisationsPlugin.Config.DisableNoOwner)
+                    {
+                        CheckNobodyOwner(grid);
+                    }
+                    if (SentisOptimisationsPlugin.Config.PvEZoneEnabled)
+                    {
+                        _pvEGridChecker.CheckGridIsPvE(grid);
+                    }
                 }
             }
+            catch (Exception e)
+            {
+                Log.Error(e);
+            }
+
         }
 
         private void CheckNobodyOwner(MyCubeGrid grid)

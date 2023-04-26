@@ -3,6 +3,7 @@ using System.Reflection;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Blocks;
 using Torch.Managers.PatchManager;
+using VRage.Scripting.CompilerMethods;
 
 namespace FixTurrets.Perfomance
 {
@@ -46,6 +47,13 @@ namespace FixTurrets.Perfomance
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));  
             
             ctx.GetPattern(MethodMyCryoChamberUpdateAfterSimulation100).Prefixes.Add(
+                typeof(OtherPerfPatch).GetMethod(nameof(Disabled),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
+            var MethodModPerfCounterEnterMethod = typeof(ModPerfCounter).GetMethod
+                (nameof(ModPerfCounter.EnterMethod), BindingFlags.Instance | BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+            
+            ctx.GetPattern(MethodModPerfCounterEnterMethod).Prefixes.Add(
                 typeof(OtherPerfPatch).GetMethod(nameof(Disabled),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
         }

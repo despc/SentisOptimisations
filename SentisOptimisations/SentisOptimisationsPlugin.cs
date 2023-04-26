@@ -56,6 +56,7 @@ namespace SentisOptimisationsPlugin
         public static SentisOptimisationsPlugin Instance { get; private set; }
 
         private AllGridsObserver _allGridsObserver = new AllGridsObserver();
+        private SendReplicablesAsync _replicablesAsync = new SendReplicablesAsync();
         public static ShieldApi SApi = new ShieldApi();
 
         public override void Init(ITorchBase torch)
@@ -104,6 +105,7 @@ namespace SentisOptimisationsPlugin
             {
                 _limiter.OnUnloading();
                 _allGridsObserver.OnUnloading();
+                _replicablesAsync.OnUnloading();
             }
             else
             {
@@ -112,10 +114,10 @@ namespace SentisOptimisationsPlugin
                 DamagePatch.Init();
                 _limiter.OnLoaded();
                 _allGridsObserver.OnLoaded();
+                _replicablesAsync.OnLoaded();
                 InitShieldApi();
                 Communication.RegisterHandlers();
                 PvECore.Init();
-                ProfilerConfig.Instance.Enabled = false;
             }
         }
 
@@ -421,6 +423,7 @@ namespace SentisOptimisationsPlugin
         {
             _config.Save(Path.Combine(StoragePath, "SentisOptimisations.cfg"));
             _allGridsObserver.CancellationTokenSource.Cancel();
+            _replicablesAsync.CancellationTokenSource.Cancel();
             base.Dispose();
         }
     }
