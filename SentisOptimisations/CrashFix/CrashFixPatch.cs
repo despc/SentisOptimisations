@@ -10,6 +10,7 @@ using NAPI;
 using NLog.Fluent;
 using Sandbox.Game.Entities.Blocks;
 using SentisOptimisations;
+using SpaceEngineers.Game.EntityComponents.Blocks;
 using Torch.Managers.PatchManager;
 using VRage.Network;
 using VRage.Scripting;
@@ -42,10 +43,17 @@ namespace SentisOptimisationsPlugin.CrashFix
 
             var MethodSetDetailedInfo = typeof(MyProgrammableBlock).GetMethod
                 ("SetDetailedInfo", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
-
+            
+            var MethodUpdateWaypointPositions = typeof(MyOffensiveCombatCircleOrbit).GetMethod
+                ("UpdateWaypointPositions", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
+            
+                
             var finalizer = typeof(CrashFixPatch).GetMethod(nameof(SuppressExceptionFinalizer),
                 BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic);
             harmony.Patch(MethodSetDetailedInfo, finalizer: new HarmonyMethod(finalizer));
+            harmony.Patch(MethodUpdateWaypointPositions, finalizer: new HarmonyMethod(finalizer));
+            
+            
         }
 
 

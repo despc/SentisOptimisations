@@ -98,6 +98,8 @@ namespace SentisOptimisationsPlugin
         
         //Slowdown
         private bool _slowdownEnabled = true;
+        private bool _fixVoxelFreeze = false;
+        private int _voxelSaveLogTreshold = 5;
         
         private ObservableCollection<ConfigShipInMarket> configShipsInMarket = new ObservableCollection<ConfigShipInMarket>();
 
@@ -121,6 +123,21 @@ namespace SentisOptimisationsPlugin
             get => _slowdownEnabled;
             set => SetValue(ref _slowdownEnabled, value);
         }
+        
+        [DisplayTab(Name = "Fix Voxel Freeze Enabled", GroupName = "Slowdown", Tab = "Slowdown", Order = 1, Description = "Fix Voxel Freeze Enabled")]
+        public bool FixVoxelFreeze
+        {
+            get => _fixVoxelFreeze;
+            set => SetValue(ref _fixVoxelFreeze, value);
+        }
+        
+        [DisplayTab(Name = "Voxel Save Log Treshold", GroupName = "Slowdown", Tab = "Slowdown", Order = 1, Description = "Voxel Save Log Treshold")]
+        public int VoxelSaveLogTreshold
+        {
+            get => _voxelSaveLogTreshold;
+            set => SetValue(ref _voxelSaveLogTreshold, value);
+        }
+
 
         [DisplayTab(Name = "Conveyor cache enabled", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Conveyor cache enabled")]
         public bool ConveyorCacheEnabled

@@ -11,6 +11,7 @@ namespace SentisOptimisations
 
         public const BindingFlags StaticFlags = BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public;
         
+        public const BindingFlags all = BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
         public static MethodInfo GetMethod(this Type type, string name, BindingFlags flags)
         {
             return type.GetMethod(name, flags) ?? throw new Exception($"Couldn't find method {name} on {type}");
@@ -55,7 +56,24 @@ namespace SentisOptimisations
             FieldInfo field = instance.GetType().GetField(fieldName, bindFlags);
             return field.GetValue(instance);
         }
-        
+        public static FieldInfo EasyField(this Type type, string name, bool needThrow = true)
+        {
+            var ms = type.GetFields(all);
+            foreach (var t in ms)
+            {
+                if (t.Name == name) { return t; }
+            }
+
+            SentisOptimisationsPlugin.SentisOptimisationsPlugin.Log.Error("Field not found: " + name);
+            foreach (var t in ms)
+            {
+                SentisOptimisationsPlugin.SentisOptimisationsPlugin.Log.Error(type.Name + " -> " + t.Name);
+                if (t.Name == name) { return t; }
+            }
+
+            if (needThrow) throw new Exception("Field " + name + " not found");
+            return null;
+        }
         public static object GetPrivateStaticField(Type type, string fieldName)
         {
             BindingFlags bindFlags = BindingFlags.Public | BindingFlags.NonPublic
