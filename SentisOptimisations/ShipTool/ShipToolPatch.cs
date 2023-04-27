@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Threading.Tasks;
 using NAPI;
 using NLog;
+using NLog.Fluent;
 using Sandbox;
 using Sandbox.Definitions;
 using Sandbox.Engine.Physics;
@@ -35,6 +36,7 @@ namespace SentisOptimisationsPlugin.ShipTool
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
         public static Dictionary<long, int> Cooldowns = new Dictionary<long, int>();
+        public static Dictionary<long, int> NobodyToOff = new Dictionary<long, int>();
         public static readonly Random r = new Random();
         public static void Patch(PatchContext ctx)
         {
@@ -228,22 +230,47 @@ namespace SentisOptimisationsPlugin.ShipTool
 
         private static bool ActivateCommonPatch(MyShipToolBase __instance)
         {
-            var blockId = __instance.EntityId;
-
-            if (SentisOptimisationsPlugin.Config.SlowdownEnabled && MySandboxGame.Static.SimulationFrameCounter > 6000)
+            try
             {
-                var myUpdateTiersPlayerPresence = __instance.CubeGrid.PlayerPresenceTier;
-                if (myUpdateTiersPlayerPresence == MyUpdateTiersPlayerPresence.Tier1)
+                var blockId = __instance.EntityId;
+
+                if (SentisOptimisationsPlugin.Config.SlowdownEnabled &&
+                    MySandboxGame.Static.SimulationFrameCounter > 6000)
                 {
-                    if (NeedSkip(blockId, 30)) return false;
+                    var myUpdateTiersPlayerPresence = __instance.CubeGrid.PlayerPresenceTier;
+                    if (myUpdateTiersPlayerPresence == MyUpdateTiersPlayerPresence.Tier1)
+                    {
+                        if (NeedSkip(blockId, 30)) return false;
+                    }
+                    else if (myUpdateTiersPlayerPresence == MyUpdateTiersPlayerPresence.Tier2)
+                    {
+                        int nobodyToOffCount = 0;
+                        if (NobodyToOff.TryGetValue(blockId, out nobodyToOffCount))
+                        {
+                            NobodyToOff[blockId] = nobodyToOffCount++;
+                            if (nobodyToOffCount > 5000)
+                            {
+                                __instance.Enabled = false;
+                                NobodyToOff.Remove(blockId);
+                                return false;
+                            }
+                        }
+                        else
+                        {
+                            NobodyToOff[blockId] = 0;
+                        }
+
+                        if (NeedSkip(blockId, 300)) return false;
+                    }
                 }
-                else if (myUpdateTiersPlayerPresence == MyUpdateTiersPlayerPresence.Tier2)
-                {
-                    if (NeedSkip(blockId, 300)) return false;
-                }
+
+                DoActivateCommon(__instance);
+            }
+            catch (Exception e)
+            {
+                Log.Error("DoActivateCommon exception ", e);
             }
 
-            DoActivateCommon(__instance);
             return false;
         }
 

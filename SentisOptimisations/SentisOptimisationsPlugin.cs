@@ -7,6 +7,7 @@ using System.Windows.Controls;
 using Havok;
 using NAPI;
 using NLog;
+using Profiler;
 using Sandbox;
 using Sandbox.Definitions;
 using Sandbox.Engine.Multiplayer;
@@ -69,6 +70,7 @@ namespace SentisOptimisationsPlugin
             Instance = this;
             Log.Info("Init SentisOptimisationsPlugin");
             MyFakes.ENABLE_SCRAP = false;
+            MyFakes.INACTIVE_THRUSTER_DMG = false;
             MySimpleProfiler.ENABLE_SIMPLE_PROFILER = false;
             SetupConfig();
             SessionManager = Torch.Managers.GetManager<TorchSessionManager>();
@@ -124,6 +126,7 @@ namespace SentisOptimisationsPlugin
                 InitShieldApi();
                 Communication.RegisterHandlers();
                 PvECore.Init();
+                ProfilerConfig.Instance.Enabled = false;
             }
         }
 
@@ -144,20 +147,6 @@ namespace SentisOptimisationsPlugin
         {
             try {
             
-            // var conveyourCache = ConveyorPatch.ConveyerCacheGrids;
-            // var cachedGrids = conveyourCache.Count;
-            // var totalCacheCount = 0;
-            // var uncachedCalls = ConveyorPatch.UncachedCalls;
-            // foreach (var keyValuePair in conveyourCache)
-            // {
-            //     var dictionary = keyValuePair.Value;
-            //     if (dictionary == null)
-            //     {
-            //         continue;
-            //     }
-            //     totalCacheCount = totalCacheCount + dictionary.Count;
-            // }
-            
                 ListReader<MyClusterTree.MyCluster> clusters = MyPhysics.Clusters.GetClusters();
                 var myPhysics = MySession.Static.GetComponent<MyPhysics>();
                 int active = 0;
@@ -174,12 +163,9 @@ namespace SentisOptimisationsPlugin
                 Instance.UpdateUI((x) =>
                 {
                     var gui = x as ConfigGUI;
-                    // gui.CacheStatistic.Text =
-                    //     $"Cached grids: {cachedGrids} ||  Total cache size: {totalCacheCount} ||  Uncached calls: {uncachedCalls}";
                     gui.ClustersStatistic.Text =
                         $"Count: {clustersCount}, Active: {active}";
                 });
-                // ConveyorPatch.UncachedCalls = 0;
             }
             catch (Exception e)
             {
@@ -215,7 +201,7 @@ namespace SentisOptimisationsPlugin
         public override void Update()
         {
             FrameExecutor.Update();
-            if (MySandboxGame.Static.SimulationFrameCounter % 500 == 0)
+            if (MySandboxGame.Static.SimulationFrameCounter % 600 == 0)
             {
                 Task.Run(UpdateGui);
                 foreach (var keyValuePair in new Dictionary<long, long>(SafezonePatch.entitiesInSZ))
@@ -229,12 +215,12 @@ namespace SentisOptimisationsPlugin
                     }
 
                     var time = keyValuePair.Value;
-                    if (time > 10)
+                    if (time > 5)
                     {
                         Log.Error("Entity in sz " + entityId + "   " + displayName + " time - " + time);
                         if (gridsInSZ.ContainsKey(entityId))
                         {
-                            if (gridsInSZ[entityId] > 3)
+                            if (gridsInSZ[entityId] > 2)
                             {
                                 if (entityById is MyCubeGrid)
                                 {
