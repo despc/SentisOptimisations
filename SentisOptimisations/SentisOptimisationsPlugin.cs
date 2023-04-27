@@ -4,11 +4,9 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Controls;
-using HarmonyLib;
 using Havok;
 using NAPI;
 using NLog;
-using Profiler;
 using Sandbox;
 using Sandbox.Definitions;
 using Sandbox.Engine.Multiplayer;
@@ -59,6 +57,13 @@ namespace SentisOptimisationsPlugin
         private SendReplicablesAsync _replicablesAsync = new SendReplicablesAsync();
         public static ShieldApi SApi = new ShieldApi();
 
+        void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
+        {
+            Log.Error(e);
+            Log.Error("handled. {0}", e);
+            Log.Error("Terminating " + e.IsTerminating);
+       }
+        
         public override void Init(ITorchBase torch)
         {
             Instance = this;
@@ -74,7 +79,8 @@ namespace SentisOptimisationsPlugin
             var configOverrideModIds = Config.OverrideModIds;
             SessionManager.SessionStateChanged += SessionManager_SessionStateChanged;
             ReflectionUtils.SetPrivateStaticField(typeof(MyCubeBlockDefinition), nameof(MyCubeBlockDefinition.PCU_CONSTRUCTION_STAGE_COST), 0);
-             
+            AppDomain.CurrentDomain.UnhandledException += new UnhandledExceptionEventHandler(CurrentDomain_UnhandledException);
+
             if (string.IsNullOrEmpty(configOverrideModIds))
             {
                 foreach (var modId in configOverrideModIds.Split(','))

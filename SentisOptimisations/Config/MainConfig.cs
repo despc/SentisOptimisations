@@ -79,6 +79,7 @@ namespace SentisOptimisationsPlugin
         private bool _disableTurretUpdate = false;
         private bool _enableOnlyEarthSpawn = false;
         private int _noDamageFromVoxelsBeforeSpeed = 30;
+        private bool _noDamageFromVoxelsIfNobodyNear = true;
         private int _minimumMassForKineticDamage = 5000;
         private int _raycastLimit = -1;
         
@@ -364,6 +365,13 @@ namespace SentisOptimisationsPlugin
         {
             get => _noDamageFromVoxelsBeforeSpeed;
             set => SetValue(ref _noDamageFromVoxelsBeforeSpeed, value);
+        }
+        
+        [DisplayTab(Name = "No Damage From Voxels If Nobody Near", GroupName = "Tweaks", Tab = "Tweaks", Order = 0, Description = "No Damage From Voxels If Nobody Near")]
+        public bool NoDamageFromVoxelsIfNobodyNear
+        {
+            get => _noDamageFromVoxelsIfNobodyNear;
+            set => SetValue(ref _noDamageFromVoxelsIfNobodyNear, value);
         }
 
         [DisplayTab(Name = "Include connected grids", GroupName = "PCU limiter", Tab = "PCU limiter", Order = 0, Description = "Include grinds connected with CONNECTOR")]
