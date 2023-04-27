@@ -17,7 +17,6 @@ namespace SentisOptimisationsPlugin.AllGridsActions
         public static FallInVoxelDetector FallInVoxelDetector = new FallInVoxelDetector();
         private GridAutoRenamer _autoRenamer = new GridAutoRenamer();
         private OnlineReward _onlineReward = new OnlineReward();
-        private AsteroidReverter _asteroidReverter = new AsteroidReverter();
         private PvEGridChecker _pvEGridChecker = new PvEGridChecker();
         private NpcStationsPowerFix _npcStationsPowerFix = new NpcStationsPowerFix();
         public static HashSet<MyEntity> entitiesToShipTools = new HashSet<MyEntity>();
@@ -108,18 +107,7 @@ namespace SentisOptimisationsPlugin.AllGridsActions
                     {
                         counter++;
                         await Task.Delay(30000);
-                        await Task.Run(() =>
-                        {
-                            try
-                            {
-                                _asteroidReverter.CheckAndRestore(new HashSet<IMyVoxelMap>(myVoxelMaps));
-                            }
-                            catch (Exception e)
-                            {
-                                Log.Error(e);
-                            }
-                            
-                        });
+
                         await Task.Run(CheckAllGrids);
                         if (counter % 5 == 0)
                         {

@@ -30,47 +30,47 @@ namespace SentisOptimisationsPlugin
         public static readonly Random r = new Random();
         public static void Patch(PatchContext ctx)
         {
-            var MethodCheckIsWorking = typeof(MyThrust).GetMethod
-                ("CheckIsWorking", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
-
-            ctx.GetPattern(MethodCheckIsWorking).Prefixes.Add(
-                typeof(Slowdowns).GetMethod(nameof(CheckIsWorkingPatched),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-            
-            var MethodSensorAfterSimulation10 = typeof(MySensorBlock).GetMethod
-                ("UpdateAfterSimulation10", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
-
-            ctx.GetPattern(MethodSensorAfterSimulation10).Prefixes.Add(
-                typeof(Slowdowns).GetMethod(nameof(MySensorBlockUpdatePatched),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-            
-            var GasGeneratorUpdateAfterSimulation100 = typeof(MyGasGenerator).GetMethod
-                ("UpdateAfterSimulation100", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
-
-            ctx.GetPattern(GasGeneratorUpdateAfterSimulation100).Prefixes.Add(
-                typeof(Slowdowns).GetMethod(nameof(MyGasGeneratorUpdatePatched),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-            
-            var MyShipControllerUpdateAfterSimulation = typeof(MyShipController).GetMethod
-                ("UpdateAfterSimulation", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
-
-            ctx.GetPattern(MyShipControllerUpdateAfterSimulation).Prefixes.Add(
-                typeof(Slowdowns).GetMethod(nameof(MyShipControllerUpdatePatched),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-            
-            var MyBatteryBlockUpdateAfterSimulation = typeof(MyBatteryBlock).GetMethod
-                ("UpdateAfterSimulation100", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
-
-            ctx.GetPattern(MyBatteryBlockUpdateAfterSimulation).Prefixes.Add(
-                typeof(Slowdowns).GetMethod(nameof(MyBatteryBlockUpdatePatched),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-            
-            var MyConveyorConnectorUpdateAfterSimulation = typeof(MyConveyorConnector).GetMethod
-                ("UpdateBeforeSimulation100", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
-
-            ctx.GetPattern(MyConveyorConnectorUpdateAfterSimulation).Prefixes.Add(
-                typeof(Slowdowns).GetMethod(nameof(MyConveyorConnectorPatched),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            // var MethodCheckIsWorking = typeof(MyThrust).GetMethod
+            //     ("CheckIsWorking", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+            //
+            // ctx.GetPattern(MethodCheckIsWorking).Prefixes.Add(
+            //     typeof(Slowdowns).GetMethod(nameof(CheckIsWorkingPatched),
+            //         BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            //
+            // var MethodSensorAfterSimulation10 = typeof(MySensorBlock).GetMethod
+            //     ("UpdateAfterSimulation10", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
+            //
+            // ctx.GetPattern(MethodSensorAfterSimulation10).Prefixes.Add(
+            //     typeof(Slowdowns).GetMethod(nameof(MySensorBlockUpdatePatched),
+            //         BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            //
+            // var GasGeneratorUpdateAfterSimulation100 = typeof(MyGasGenerator).GetMethod
+            //     ("UpdateAfterSimulation100", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
+            //
+            // ctx.GetPattern(GasGeneratorUpdateAfterSimulation100).Prefixes.Add(
+            //     typeof(Slowdowns).GetMethod(nameof(MyGasGeneratorUpdatePatched),
+            //         BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            //
+            // var MyShipControllerUpdateAfterSimulation = typeof(MyShipController).GetMethod
+            //     ("UpdateAfterSimulation", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
+            //
+            // ctx.GetPattern(MyShipControllerUpdateAfterSimulation).Prefixes.Add(
+            //     typeof(Slowdowns).GetMethod(nameof(MyShipControllerUpdatePatched),
+            //         BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            //
+            // var MyBatteryBlockUpdateAfterSimulation = typeof(MyBatteryBlock).GetMethod
+            //     ("UpdateAfterSimulation100", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
+            //
+            // ctx.GetPattern(MyBatteryBlockUpdateAfterSimulation).Prefixes.Add(
+            //     typeof(Slowdowns).GetMethod(nameof(MyBatteryBlockUpdatePatched),
+            //         BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            //
+            // var MyConveyorConnectorUpdateAfterSimulation = typeof(MyConveyorConnector).GetMethod
+            //     ("UpdateBeforeSimulation100", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
+            //
+            // ctx.GetPattern(MyConveyorConnectorUpdateAfterSimulation).Prefixes.Add(
+            //     typeof(Slowdowns).GetMethod(nameof(MyConveyorConnectorPatched),
+            //         BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
 
         }
 

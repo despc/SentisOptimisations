@@ -34,7 +34,6 @@
     </PropertyGroup>
     <ItemGroup>
       <Compile Include="AllGridsActions\AllGridsObserver.cs" />
-      <Compile Include="AllGridsActions\AsteroidReverter.cs" />
       <Compile Include="AllGridsActions\FallInVoxelDetector.cs" />
       <Compile Include="AllGridsActions\GridAutoRenamer.cs" />
       <Compile Include="AllGridsActions\NpcStationsPowerFix.cs" />
@@ -74,14 +73,11 @@
       <Compile Include="Perfomance\Slowdowns.cs" />
       <Compile Include="Production\RefineryPatchs.cs" />
       <Compile Include="RemovePluginPatch.cs" />
-      <Compile Include="ParallelPatch.cs" />
       <Compile Include="Shipyard\Dto\ConvertSyncRequest.cs" />
       <Compile Include="Perfomance\ExplosionsPatch.cs" />
       <Compile Include="Perfomance\GasTankOptimisations.cs" />
       <Compile Include="Perfomance\Limits\PhysicsProfilerMonitor.cs" />
       <Compile Include="Perfomance\Limits\Punisher.cs" />
-      <Compile Include="Perfomance\OtherPerfPatch.cs" />
-      <Compile Include="Perfomance\ParallelUpdateTweaks.cs" />
       <Compile Include="Perfomance\PBFix.cs" />
       <Compile Include="Perfomance\SafezonePatch.cs" />
       <Compile Include="Perfomance\WelderOptimization.cs" />
