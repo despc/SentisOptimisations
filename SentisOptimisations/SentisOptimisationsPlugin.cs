@@ -138,19 +138,19 @@ namespace SentisOptimisationsPlugin
         {
             try {
             
-            var conveyourCache = ConveyorPatch.ConveyerCacheGrids;
-            var cachedGrids = conveyourCache.Count;
-            var totalCacheCount = 0;
-            var uncachedCalls = ConveyorPatch.UncachedCalls;
-            foreach (var keyValuePair in conveyourCache)
-            {
-                var dictionary = keyValuePair.Value;
-                if (dictionary == null)
-                {
-                    continue;
-                }
-                totalCacheCount = totalCacheCount + dictionary.Count;
-            }
+            // var conveyourCache = ConveyorPatch.ConveyerCacheGrids;
+            // var cachedGrids = conveyourCache.Count;
+            // var totalCacheCount = 0;
+            // var uncachedCalls = ConveyorPatch.UncachedCalls;
+            // foreach (var keyValuePair in conveyourCache)
+            // {
+            //     var dictionary = keyValuePair.Value;
+            //     if (dictionary == null)
+            //     {
+            //         continue;
+            //     }
+            //     totalCacheCount = totalCacheCount + dictionary.Count;
+            // }
             
                 ListReader<MyClusterTree.MyCluster> clusters = MyPhysics.Clusters.GetClusters();
                 var myPhysics = MySession.Static.GetComponent<MyPhysics>();
@@ -168,12 +168,12 @@ namespace SentisOptimisationsPlugin
                 Instance.UpdateUI((x) =>
                 {
                     var gui = x as ConfigGUI;
-                    gui.CacheStatistic.Text =
-                        $"Cached grids: {cachedGrids} ||  Total cache size: {totalCacheCount} ||  Uncached calls: {uncachedCalls}";
+                    // gui.CacheStatistic.Text =
+                    //     $"Cached grids: {cachedGrids} ||  Total cache size: {totalCacheCount} ||  Uncached calls: {uncachedCalls}";
                     gui.ClustersStatistic.Text =
                         $"Count: {clustersCount}, Active: {active}";
                 });
-                ConveyorPatch.UncachedCalls = 0;
+                // ConveyorPatch.UncachedCalls = 0;
             }
             catch (Exception e)
             {

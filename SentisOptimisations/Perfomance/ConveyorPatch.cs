@@ -1,21 +1,12 @@
-using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Reflection;
-using NAPI;
 using NLog;
-using Sandbox.Game;
-using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Cube;
-using Sandbox.Game.GameSystems;
-using Sandbox.Game.GameSystems.Conveyors;
 using Sandbox.ModAPI;
 using SpaceEngineers.Game.Entities.Blocks;
 using Torch.Managers.PatchManager;
-using VRage.Algorithms;
 using VRage.Game;
-using VRage.Game.ModAPI;
-using VRage.Utils;
 
 namespace SentisOptimisationsPlugin
 {
@@ -23,10 +14,6 @@ namespace SentisOptimisationsPlugin
     public static class ConveyorPatch
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
-
-        // public static Dictionary<CashedEntry, bool> ConveyerCache = new Dictionary<CashedEntry, bool>();
-        public static ConcurrentDictionary<long, ConcurrentDictionary<CashedEntry, bool>> ConveyerCacheGrids = new ConcurrentDictionary<long, ConcurrentDictionary<CashedEntry, bool>>();
-        public static long UncachedCalls = 0;
         public static void Patch(PatchContext ctx)
         {
             var MethodOnBlockAdded = typeof(MyCubeGridSystems).GetMethod
@@ -36,295 +23,7 @@ namespace SentisOptimisationsPlugin
             ctx.GetPattern(MethodOnBlockAdded).Prefixes.Add(
                 typeof(ConveyorPatch).GetMethod(nameof(MethodOnBlockAddedPatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-            
-            
-            var MethodUpdateLines = typeof(MyGridConveyorSystem).GetMethod
-                (nameof(MyGridConveyorSystem.UpdateLines), BindingFlags.Instance | BindingFlags.Public);
-            
-
-            ctx.GetPattern(MethodUpdateLines).Prefixes.Add(
-                typeof(ConveyorPatch).GetMethod(nameof(MethodUpdateLinesPatched),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-            
-            
-            var MethodComputeCanTransfer = typeof(MyGridConveyorSystem).GetMethod
-                (nameof(MyGridConveyorSystem.ComputeCanTransfer), BindingFlags.Static | BindingFlags.Public);
-            
-            ctx.GetPattern(MethodComputeCanTransfer).Prefixes.Add(
-                typeof(ConveyorPatch).GetMethod(nameof(ComputeCanTransferPrefix),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-            
-            ctx.GetPattern(MethodComputeCanTransfer).Suffixes.Add(
-                typeof(ConveyorPatch).GetMethod(nameof(ComputeCanTransferSuffix),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-            
-            var MethodCanTransferTo = typeof(MyInventory).GetMethod
-                ("CanTransferTo", BindingFlags.Instance | BindingFlags.NonPublic);
-            
-            ctx.GetPattern(MethodCanTransferTo).Prefixes.Add(
-                typeof(ConveyorPatch).GetMethod(nameof(CanTransferToPrefix),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-            
-            ctx.GetPattern(MethodCanTransferTo).Suffixes.Add(
-                typeof(ConveyorPatch).GetMethod(nameof(CanTransferToSuffix),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-            
-            
-            //Sandbox.Game.GameSystems.MyGridConveyorSystem.CanTransfer(IMyConveyorEndpointBlock, IMyConveyorEndpointBlock, MyDefinitionId, Boolean, Boolean)
         }
-
-        private static void MethodUpdateLinesPatched(
-            MyGridConveyorSystem __instance)
-        {
-            try
-            {
-                ConcurrentDictionary<CashedEntry, bool> gridCache;
-                if (ConveyerCacheGrids.TryGetValue(__instance.ResourceSink.Grid.EntityId, out gridCache))
-                {
-                    gridCache.Clear();
-                }
-            }
-            catch (Exception e)
-            {
-                
-            }
-
-        }
-
-        private static bool CanTransferToPrefix(
-                    MyInventory __instance, MyInventory dstInventory, MyDefinitionId? itemType,
-            ref bool __result)
-        {
-            if (!SentisOptimisationsPlugin.Config.ConveyorCacheEnabled)
-            {
-                return true;
-            }
-            IMyConveyorEndpointBlock owner1 = __instance.Owner as IMyConveyorEndpointBlock;
-            IMyConveyorEndpointBlock owner2 = dstInventory.Owner as IMyConveyorEndpointBlock;
-            var startBlock = owner1 as IMyCubeBlock;
-            if (startBlock == null)
-            {
-                return false;
-            }
-
-            var endBlock = owner2 as IMyCubeBlock;
-            if (endBlock == null)
-            {
-                return false;
-            }
-            var cashedEntity = new CashedEntry(startBlock.EntityId, endBlock.EntityId, itemType);
-            ConcurrentDictionary<CashedEntry, bool> cacheByGrid;
-
-            if (ConveyerCacheGrids.TryGetValue(endBlock.CubeGrid.EntityId, out cacheByGrid))
-            {
-                bool cachedResult;
-                if (cacheByGrid.TryGetValue(cashedEntity, out cachedResult))
-                {
-                    __result = cachedResult;
-                    return false;
-                }
-            }
-            return true;
-        }
-        
-        private static void CanTransferToSuffix(
-            MyInventory __instance, MyInventory dstInventory, MyDefinitionId? itemType,
-            ref bool __result)
-        {
-            if (!SentisOptimisationsPlugin.Config.ConveyorCacheEnabled)
-            {
-                return;
-            }
-            UncachedCalls++;
-            IMyConveyorEndpointBlock owner1 = __instance.Owner as IMyConveyorEndpointBlock;
-            IMyConveyorEndpointBlock owner2 = dstInventory.Owner as IMyConveyorEndpointBlock;
-            var startBlock = owner1 as IMyCubeBlock;
-            if (startBlock == null)
-            {
-                return;
-            }
-
-            var endBlock = owner2 as IMyCubeBlock;
-            if (endBlock == null)
-            {
-                return;
-            }
-            var cashedEntity = new CashedEntry(startBlock.EntityId, endBlock.EntityId, itemType);
-            ConcurrentDictionary<CashedEntry, bool> cacheByGrid;
-            if (ConveyerCacheGrids.TryGetValue(endBlock.CubeGrid.EntityId, out cacheByGrid))
-            {
-                cacheByGrid[cashedEntity] = __result;
-                return;
-            }
-
-            cacheByGrid = new ConcurrentDictionary<CashedEntry, bool>();
-            cacheByGrid[cashedEntity] = __result;
-            ConveyerCacheGrids[endBlock.CubeGrid.EntityId] = cacheByGrid;
-        }
-        
-        
-                private static bool CanTransferTo2Prefix(
-                    MyInventory __instance, MyInventory dstInventory, MyDefinitionId? itemType,
-            ref bool __result)
-        {
-            if (!SentisOptimisationsPlugin.Config.ConveyorCacheEnabled)
-            {
-                return true;
-            }
-            IMyConveyorEndpointBlock owner1 = __instance.Owner as IMyConveyorEndpointBlock;
-            IMyConveyorEndpointBlock owner2 = dstInventory.Owner as IMyConveyorEndpointBlock;
-            var startBlock = owner1 as IMyCubeBlock;
-            if (startBlock == null)
-            {
-                return false;
-            }
-
-            var endBlock = owner2 as IMyCubeBlock;
-            if (endBlock == null)
-            {
-                return false;
-            }
-            var cashedEntity = new CashedEntry(startBlock.EntityId, endBlock.EntityId, itemType);
-            ConcurrentDictionary<CashedEntry, bool> cacheByGrid;
-
-            if (ConveyerCacheGrids.TryGetValue(endBlock.CubeGrid.EntityId, out cacheByGrid))
-            {
-                bool cachedResult;
-                if (cacheByGrid.TryGetValue(cashedEntity, out cachedResult))
-                {
-                    __result = cachedResult;
-                    return false;
-                }
-            }
-            return true;
-        }
-        
-        private static void CanTransferTo2Suffix(
-            MyInventory __instance, MyInventory dstInventory, MyDefinitionId? itemType,
-            ref bool __result)
-        {
-            if (!SentisOptimisationsPlugin.Config.ConveyorCacheEnabled)
-            {
-                return;
-            }
-            UncachedCalls++;
-            IMyConveyorEndpointBlock owner1 = __instance.Owner as IMyConveyorEndpointBlock;
-            IMyConveyorEndpointBlock owner2 = dstInventory.Owner as IMyConveyorEndpointBlock;
-            var startBlock = owner1 as IMyCubeBlock;
-            if (startBlock == null)
-            {
-                return;
-            }
-
-            var endBlock = owner2 as IMyCubeBlock;
-            if (endBlock == null)
-            {
-                return;
-            }
-            var cashedEntity = new CashedEntry(startBlock.EntityId, endBlock.EntityId, itemType);
-            ConcurrentDictionary<CashedEntry, bool> cacheByGrid;
-            if (ConveyerCacheGrids.TryGetValue(endBlock.CubeGrid.EntityId, out cacheByGrid))
-            {
-                cacheByGrid[cashedEntity] = __result;
-                return;
-            }
-
-            cacheByGrid = new ConcurrentDictionary<CashedEntry, bool>();
-            cacheByGrid[cashedEntity] = __result;
-            ConveyerCacheGrids[endBlock.CubeGrid.EntityId] = cacheByGrid;
-        }
-        
-        
-        private static bool ComputeCanTransferPrefix(
-            IMyConveyorEndpointBlock start,
-            IMyConveyorEndpointBlock end,
-            MyDefinitionId? itemId,
-            ref bool __result)
-        {
-            if (!SentisOptimisationsPlugin.Config.ConveyorCacheEnabled)
-            {
-                return true;
-            }
-
-            try
-            {
-                var startBlock = start as IMyCubeBlock;
-                if (startBlock == null)
-                {
-                    return false;
-                }
-
-                var endBlock = end as IMyCubeBlock;
-                if (endBlock == null)
-                {
-                    return false;
-                }
-
-                var cashedEntity = new CashedEntry(startBlock.EntityId, endBlock.EntityId, itemId);
-                ConcurrentDictionary<CashedEntry, bool> cacheByGrid;
-
-                if (ConveyerCacheGrids.TryGetValue(endBlock.CubeGrid.EntityId, out cacheByGrid))
-                {
-                    bool cachedResult;
-                    if (cacheByGrid.TryGetValue(cashedEntity, out cachedResult))
-                    {
-                        __result = cachedResult;
-                        return false;
-                    }
-                }
-            }
-            catch (Exception e)
-            {
-                Log.Error(e);
-            }
-
-            return true;
-        }
-
-        private static void ComputeCanTransferSuffix(
-            IMyConveyorEndpointBlock start,
-            IMyConveyorEndpointBlock end,
-            MyDefinitionId? itemId,
-            ref bool __result)
-        {
-            if (!SentisOptimisationsPlugin.Config.ConveyorCacheEnabled)
-            {
-                return;
-            }
-
-            try
-            {
-                UncachedCalls++;
-                var startBlock = start as IMyCubeBlock;
-                if (startBlock == null)
-                {
-                    return;
-                }
-
-                var endBlock = end as IMyCubeBlock;
-                if (endBlock == null)
-                {
-                    return;
-                }
-
-                var cashedEntity = new CashedEntry(startBlock.EntityId, endBlock.EntityId, itemId);
-                ConcurrentDictionary<CashedEntry, bool> cacheByGrid;
-                if (ConveyerCacheGrids.TryGetValue(endBlock.CubeGrid.EntityId, out cacheByGrid))
-                {
-                    cacheByGrid[cashedEntity] = __result;
-                    return;
-                }
-
-                cacheByGrid = new ConcurrentDictionary<CashedEntry, bool>();
-                cacheByGrid[cashedEntity] = __result;
-                ConveyerCacheGrids[endBlock.CubeGrid.EntityId] = cacheByGrid;
-            }
-            catch (Exception e)
-            {
-                Log.Error(e);
-            }
-        }
-        
 
         private static void MethodOnBlockAddedPatched(MyCubeGridSystems __instance, MySlimBlock block)
         {
@@ -343,6 +42,7 @@ namespace SentisOptimisationsPlugin
                                 VoxelsPatch.Protectors = new HashSet<IMyUpgradeModule>();
                                 return;
                             }
+
                             VoxelsPatch.Protectors = (HashSet<IMyUpgradeModule>)fieldProtectors.GetValue(null);
                         }
                     }
@@ -396,6 +96,7 @@ namespace SentisOptimisationsPlugin
                         {
                             return false;
                         }
+
                         return ((CashedEntry)obj).StartBlockEntityId == this.StartBlockEntityId &&
                                ((CashedEntry)obj).EndBlockEntityId == this.EndBlockEntityId;
                     }

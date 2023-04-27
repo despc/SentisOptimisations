@@ -89,11 +89,11 @@ namespace SentisOptimisationsPlugin
                 if (SentisOptimisationsPlugin.Config.SlowdownEnabled && MySandboxGame.Static.SimulationFrameCounter > 6000)
                 {
                     var myUpdateTiersPlayerPresence = __instance.CubeGrid.PlayerPresenceTier;
-                    if (myUpdateTiersPlayerPresence == MyUpdateTiersPlayerPresence.Tier1)
-                    {
-                        if (NeedSkip(blockId, 30)) return false;
-                    }
-                    else if (myUpdateTiersPlayerPresence == MyUpdateTiersPlayerPresence.Tier2)
+                    // if (myUpdateTiersPlayerPresence == MyUpdateTiersPlayerPresence.Tier1)
+                    // {
+                    //     if (NeedSkip(blockId, 30)) return false;
+                    // } else
+                    if (myUpdateTiersPlayerPresence == MyUpdateTiersPlayerPresence.Tier2)
                     {
                         if (NeedSkip(blockId, 300)) return false;
                     }  

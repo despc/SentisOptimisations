@@ -28,15 +28,6 @@ namespace SentisOptimisationsPlugin
     public class AdminCommands : CommandModule
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
-
-        [Command("refresh_asters", ".", null)]
-        [Permission(MyPromoteLevel.Moderator)]
-        public void RefreshAsters()
-        {
-            Task.Run(() => { DoRefreshAsters(); });
-        }
-        
-        
         
         [Command("gs", ".", null)]
         [Permission(MyPromoteLevel.Moderator)]
@@ -370,14 +361,6 @@ namespace SentisOptimisationsPlugin
             while (flag);
             return str;
         }
-
-        public void DoRefreshAsters()
-        {
-            foreach (var myVoxelMap in MyEntities.GetEntities().OfType<IMyVoxelMap>())
-            {
-                AsteroidReverter.DoRestoreSavedAsteroid(myVoxelMap);
-            }
-        }
-
+        
     }
 }
