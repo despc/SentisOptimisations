@@ -71,30 +71,51 @@ namespace SentisOptimisationsPlugin
             float separatingVelocity,
             MyEntity otherEntity)
         {
-            if (otherEntity is MyVoxelBase &&
-                separatingVelocity < SentisOptimisationsPlugin.Config.NoDamageFromVoxelsBeforeSpeed)
+            var cubeGrid = (__instance.Entity as MyCubeGrid);
+            if (cubeGrid == null)
             {
-                if (separatingVelocity < 5)
+                return true;
+            }
+
+            if (otherEntity is MyVoxelBase)
+            {
+                if (cubeGrid.PlayerPresenceTier != MyUpdateTiersPlayerPresence.Normal ||
+                    !SentisOptimisationsPlugin.Config.NoDamageFromVoxelsIfNobodyNear)
                 {
-                    var myCubeGrid = (MyCubeGrid)__instance.Entity;
-                    if (contactInfo.ContainsKey(myCubeGrid.EntityId))
-                    {
-                        contactInfo[myCubeGrid.EntityId] = contactInfo[myCubeGrid.EntityId] + 1;
-                    }
-                    else
-                    {
-                        contactInfo[myCubeGrid.EntityId] = 1;
-                    }
+                    return false;
                 }
 
-                return false;
+                if (separatingVelocity < SentisOptimisationsPlugin.Config.NoDamageFromVoxelsBeforeSpeed)
+                {
+                    if (separatingVelocity < 5)
+                    {
+                        try
+                        {
+                            if (contactInfo.ContainsKey(cubeGrid.EntityId))
+                            {
+                                contactInfo[cubeGrid.EntityId] = contactInfo[cubeGrid.EntityId] + 1;
+                            }
+                            else
+                            {
+                                contactInfo[cubeGrid.EntityId] = 1;
+                            }
+                        }
+                        catch (Exception e)
+                        {
+                            //do nothing
+                        }
+                    }
+
+                    return false;
+                }
             }
+
 
             if (SentisOptimisationsPlugin.Config.PvEZoneEnabled)
             {
-                if (PvECore.EntitiesInZone.Contains(((MyCubeGrid)__instance.Entity).EntityId))
+                if (PvECore.EntitiesInZone.Contains(cubeGrid.EntityId))
                 {
-                    if (SentisOptimisationsPlugin.Config.EnableDamageFromNPC 
+                    if (SentisOptimisationsPlugin.Config.EnableDamageFromNPC
                         && otherEntity is MyCubeGrid && ((MyCubeGrid)otherEntity).isNpcGrid())
                     {
                         return true;
@@ -103,7 +124,7 @@ namespace SentisOptimisationsPlugin
                 }
             }
 
-            if (((MyCubeGrid)__instance.Entity).IsStatic)
+            if (cubeGrid.IsStatic)
             {
                 return SentisOptimisationsPlugin.Config.StaticRamming;
             }
