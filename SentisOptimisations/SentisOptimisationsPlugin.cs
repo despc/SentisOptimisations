@@ -64,7 +64,7 @@ namespace SentisOptimisationsPlugin
             Log.Error("handled. {0}", e);
             Log.Error("Terminating " + e.IsTerminating);
        }
-        
+
         public override void Init(ITorchBase torch)
         {
             Instance = this;
@@ -82,7 +82,14 @@ namespace SentisOptimisationsPlugin
             SessionManager.SessionStateChanged += SessionManager_SessionStateChanged;
             ReflectionUtils.SetPrivateStaticField(typeof(MyCubeBlockDefinition), nameof(MyCubeBlockDefinition.PCU_CONSTRUCTION_STAGE_COST), 0);
             AppDomain.CurrentDomain.UnhandledException += new UnhandledExceptionEventHandler(CurrentDomain_UnhandledException);
-
+            //
+            // AppDomain.CurrentDomain.FirstChanceException += (sender, eventArgs) =>
+            // {
+            //     var e = eventArgs.Exception;
+            //     Log.Error(e);
+            //     Log.Error(e.StackTrace);
+            // };
+            //
             if (string.IsNullOrEmpty(configOverrideModIds))
             {
                 foreach (var modId in configOverrideModIds.Split(','))
@@ -220,7 +227,7 @@ namespace SentisOptimisationsPlugin
                         Log.Error("Entity in sz " + entityId + "   " + displayName + " time - " + time);
                         if (gridsInSZ.ContainsKey(entityId))
                         {
-                            if (gridsInSZ[entityId] > 2)
+                            if (gridsInSZ[entityId] > 1)
                             {
                                 if (entityById is MyCubeGrid)
                                 {
