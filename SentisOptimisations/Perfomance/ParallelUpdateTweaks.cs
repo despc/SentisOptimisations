@@ -37,6 +37,13 @@ namespace FixTurrets.Perfomance
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
 
             
+            var MethodRenderUpdate = typeof(MyThrust).GetMethod
+                ("RenderUpdate", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+
+            ctx.GetPattern(MethodRenderUpdate).Prefixes.Add(
+                typeof(ParallelUpdateTweaks).GetMethod(nameof(Disabled),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
             var MethodUpdateHeadAndWeapon = typeof(MyCharacter).GetMethod
                 ("UpdateHeadAndWeapon", BindingFlags.Instance | BindingFlags.NonPublic);
 
