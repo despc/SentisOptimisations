@@ -30,6 +30,7 @@ namespace SentisOptimisationsPlugin
         private bool _enableCheckBeacon = true;
         
         //optimisations
+        private bool _asyncSync = false;
         private bool _gasTankOptimisation = true;
         private bool _safeZoneSubGridOptimisation = true;
         private int _safeZonePhysicsThreshold = 10; // детект сварки динамики в сз, автоперевод в статику если грид обрабатывается больше N мс
@@ -399,6 +400,13 @@ namespace SentisOptimisationsPlugin
         {
             get => _gasTankOptimisation;
             set => SetValue(ref _gasTankOptimisation, value);
+        } 
+        
+        [DisplayTab(Name = "Async Sync", GroupName = "Performance", Tab = "Performance", Order = 15, Description = "Async Sync")]
+        public bool AsyncSync
+        {
+            get => _asyncSync;
+            set => SetValue(ref _asyncSync, value);
         }
         
         
