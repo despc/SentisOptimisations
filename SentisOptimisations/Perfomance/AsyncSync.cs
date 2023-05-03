@@ -3,11 +3,15 @@ using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Reflection;
+using HarmonyLib;
 using NAPI;
 using NLog;
+using Sandbox.Game.Entities;
+using SentisOptimisationsPlugin.CrashFix;
 using Torch.Managers.PatchManager;
 using VRage;
 using VRage.Collections;
+using VRage.Game.Entity;
 using VRage.Library;
 using VRage.Library.Collections;
 using VRage.Library.Utils;
@@ -42,9 +46,12 @@ namespace SentisOptimisationsPlugin
             //     typeof(AsyncSync).GetMethod(nameof(ApplyDirtyGroupsPatched),
             //         BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
             //
-            // var MethodFilterStateSync = typeof(MyReplicationServer).GetMethod(
-            //     "FilterStateSync",
-            //     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            var MethodFilterStateSync = typeof(MyReplicationServer).GetMethod(
+                "FilterStateSync",
+                BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            var finalizer = typeof(CrashFixPatch).GetMethod(nameof(CrashFixPatch.SuppressExceptionFinalizer),
+                BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            CrashFixPatch.harmony.Patch(MethodFilterStateSync, finalizer: new HarmonyMethod(finalizer));
             // ctx.GetPattern(MethodFilterStateSync).Prefixes.Add(
             //     typeof(AsyncSync).GetMethod(nameof(FilterStateSyncPatched),
             //         BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
@@ -52,8 +59,72 @@ namespace SentisOptimisationsPlugin
             // var assembly = typeof(MyReplicationServer).Assembly;
             // var myClientType = assembly.GetType("VRage.Network.MyClient");
             // MethodSendStateSync = myClientType.getMethod("SendStateSync", BindingFlags.Instance | BindingFlags.Public);
+            
+            // var assembly = typeof(MyCubeGrid).Assembly;
+            // var MyEntityInventoryStateGroupType = assembly.GetType("Sandbox.Game.Replication.StateGroups.MyEntityInventoryStateGroup");
+            // var MethodCalculateAddsAndRemovals = MyEntityInventoryStateGroupType.getMethod("CalculateAddsAndRemovals", BindingFlags.Instance | BindingFlags.NonPublic);
+            //
+            // ctx.GetPattern(MethodCalculateAddsAndRemovals).Prefixes.Add(
+            //     typeof(AsyncSync).GetMethod(nameof(CalculateAddsAndRemovalsPatched),
+            //         BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
         }
 
+
+        // private static bool CalculateAddsAndRemovalsPatched(Object __instance, Object clientData,
+        //     ref Object delta,
+        //     List<MyPhysicalInventoryItem> items)
+        // {
+        //     if (!SentisOptimisationsPlugin.Config.AsyncSync)
+        //     {
+        //         return true;
+        //     }
+        //     
+        //     delta = new MyEntityInventoryStateGroup.InventoryDeltaInformation()
+        //     {
+        //         HasChanges = false
+        //     };
+        //     int key = 0;
+        //     foreach (MyPhysicalInventoryItem physicalInventoryItem in items)
+        //     {
+        //         MyEntityInventoryStateGroup.ClientInvetoryData clientInvetoryData;
+        //         if (clientData.ClientItemsSorted.TryGetValue(physicalInventoryItem.ItemId, out clientInvetoryData))
+        //         {
+        //             if (clientInvetoryData.Item.Content.TypeId == physicalInventoryItem.Content.TypeId && clientInvetoryData.Item.Content.SubtypeId == physicalInventoryItem.Content.SubtypeId)
+        //             {
+        //                 this.m_foundDeltaItems.Add(physicalInventoryItem.ItemId);
+        //                 MyFixedPoint myFixedPoint1 = physicalInventoryItem.Amount;
+        //                 if (physicalInventoryItem.Content is MyObjectBuilder_GasContainerObject content)
+        //                     myFixedPoint1 = (MyFixedPoint) content.GasLevel;
+        //                 if (clientInvetoryData.Amount != myFixedPoint1)
+        //                 {
+        //                     MyFixedPoint myFixedPoint2 = myFixedPoint1 - clientInvetoryData.Amount;
+        //                     if (delta.ChangedItems == null)
+        //                         delta.ChangedItems = new Dictionary<uint, MyFixedPoint>();
+        //                     delta.ChangedItems[physicalInventoryItem.ItemId] = myFixedPoint2;
+        //                     delta.HasChanges = true;
+        //                 }
+        //             }
+        //         }
+        //         else
+        //         {
+        //             if (delta.NewItems == null)
+        //                 delta.NewItems = new SortedDictionary<int, MyPhysicalInventoryItem>();
+        //             delta.NewItems[key] = physicalInventoryItem;
+        //             delta.HasChanges = true;
+        //         }
+        //         ++key;
+        //     }
+        //     foreach (KeyValuePair<uint, MyEntityInventoryStateGroup.ClientInvetoryData> keyValuePair in clientData.ClientItemsSorted)
+        //     {
+        //         if (delta.RemovedItems == null)
+        //             delta.RemovedItems = new List<uint>();
+        //         if (!this.m_foundDeltaItems.Contains(keyValuePair.Key))
+        //         {
+        //             delta.RemovedItems.Add(keyValuePair.Key);
+        //             delta.HasChanges = true;
+        //         }
+        //     }
+        // }
 
         private static bool FilterStateSyncPatched(MyReplicationServer __instance, Object client)
         {

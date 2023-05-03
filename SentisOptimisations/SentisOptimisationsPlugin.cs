@@ -7,6 +7,7 @@ using System.Windows.Controls;
 using Havok;
 using NAPI;
 using NLog;
+using Optimizer.Optimizations;
 using Profiler;
 using Sandbox;
 using Sandbox.Definitions;
@@ -118,7 +119,6 @@ namespace SentisOptimisationsPlugin
         {
             if (newState == TorchSessionState.Unloading)
             {
-                _limiter.OnUnloading();
                 _allGridsObserver.OnUnloading();
                 _replicablesAsync.OnUnloading();
             }
@@ -127,12 +127,12 @@ namespace SentisOptimisationsPlugin
                 if (newState != TorchSessionState.Loaded)
                     return;
                 DamagePatch.Init();
-                _limiter.OnLoaded();
                 _allGridsObserver.OnLoaded();
                 _replicablesAsync.OnLoaded();
                 InitShieldApi();
                 Communication.RegisterHandlers();
                 PvECore.Init();
+                WelderOptimization.AsyncWeldLoopInit();
                 ProfilerConfig.Instance.Enabled = false;
             }
         }

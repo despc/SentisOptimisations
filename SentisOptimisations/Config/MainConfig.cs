@@ -42,6 +42,7 @@ namespace SentisOptimisationsPlugin
         private bool _welderSelfWelding = true;
         private bool _welderFasterSearch = true;
         private bool _asyncWeld = true;
+        private bool _asyncWeldAdvanced = true;
         private bool _welderSkipCreativeWelding = true;
         
         //fixes
@@ -432,6 +433,9 @@ namespace SentisOptimisationsPlugin
         
         [DisplayTab(Name = "Async weld", GroupName = "Welder Tweaks (WIP)", Tab = "Welder Optimizations", Order = 8, Description = "Async weld")]
         public bool AsyncWeld { get => _asyncWeld; set => SetValue(ref _asyncWeld, value); }
+        
+        [DisplayTab(Name = "Async weld Advanced", GroupName = "Welder Tweaks (WIP)", Tab = "Welder Optimizations", Order = 8, Description = "Async weld Advanced")]
+        public bool AsyncWeldAdvanced { get => _asyncWeldAdvanced; set => SetValue(ref _asyncWeldAdvanced, value); }
         
     }
 }
