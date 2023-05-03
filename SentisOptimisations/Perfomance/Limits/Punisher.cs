@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using NLog;
 using Sandbox.Engine.Multiplayer;
+using Sandbox.Engine.Physics;
 using Sandbox.Game;
 using Sandbox.Game.Entities;
 using Sandbox.Game.World;
@@ -70,7 +71,6 @@ namespace SentisOptimisationsPlugin
                 ConvertToStatic((MyCubeGrid) grid);
                 return;
             }
-            
             ChatUtils.SendTo(grid.BigOwners[0],
                 "Attention. Grid " + grid.DisplayName + " has a HUGE impact on server performance");
             MyVisualScriptLogicProvider.ShowNotification(
@@ -108,6 +108,8 @@ namespace SentisOptimisationsPlugin
         {
             if (!myCubeGrid.IsStatic)
             {
+                BoundingSphereD sphere = new BoundingSphereD(myCubeGrid.PositionComp.GetPosition(), 50000);
+                MyPhysics.Clusters.ReorderClusters(BoundingBoxD.CreateFromSphere(sphere));
                 myCubeGrid.Physics?.SetSpeeds(Vector3.Zero, Vector3.Zero);
                 myCubeGrid.ConvertToStatic();
                 PlayerCommands.SyncConvert(myCubeGrid, true);

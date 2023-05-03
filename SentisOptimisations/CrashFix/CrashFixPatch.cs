@@ -9,6 +9,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using NAPI;
 using NLog.Fluent;
 using Sandbox.Game.Entities.Blocks;
+using Sandbox.Game.Replication.StateGroups;
 using SentisOptimisations;
 using SpaceEngineers.Game.EntityComponents.Blocks;
 using Torch.Managers.PatchManager;
@@ -21,7 +22,7 @@ namespace SentisOptimisationsPlugin.CrashFix
     [PatchShim]
     public static class CrashFixPatch
     {
-        private static Harmony harmony = new Harmony("CrashFixPatch");
+        public static Harmony harmony = new Harmony("CrashFixPatch");
         public static void Patch(PatchContext ctx)
         {
             
@@ -46,18 +47,19 @@ namespace SentisOptimisationsPlugin.CrashFix
             
             var MethodUpdateWaypointPositions = typeof(MyOffensiveCombatCircleOrbit).GetMethod
                 ("UpdateWaypointPositions", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
-            
+            var MethodNotify = typeof(MyPropertySyncStateGroup).GetMethod
+                ("Notify", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
                 
             var finalizer = typeof(CrashFixPatch).GetMethod(nameof(SuppressExceptionFinalizer),
-                BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic);
+                BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
             harmony.Patch(MethodSetDetailedInfo, finalizer: new HarmonyMethod(finalizer));
             harmony.Patch(MethodUpdateWaypointPositions, finalizer: new HarmonyMethod(finalizer));
-            
+            harmony.Patch(MethodNotify, finalizer: new HarmonyMethod(finalizer));
             
         }
 
 
-        private static Exception SuppressExceptionFinalizer(Exception __exception)
+        public static Exception SuppressExceptionFinalizer(Exception __exception)
         {
             if (__exception != null)
             {
