@@ -63,7 +63,7 @@ namespace SentisOptimisationsPlugin.CrashFix
         {
             if (__exception != null)
             {
-                SentisOptimisationsPlugin.Log.Error(__exception);
+                SentisOptimisationsPlugin.Log.Error("SuppressException ", __exception);
             }
             return null;
         }

@@ -20,12 +20,6 @@ namespace SentisOptimisationsPlugin
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
         static HashSet<long> gridsOverlimit = new HashSet<long>();
 
-        public void OnLoaded()
-        {
-            MyCubeGrids.BlockBuilt += MyCubeGrids_BlockBuilt;
-            MyCubeGrids.BlockFunctional += MyCubeGrids_BlockFunctional;
-            MyCubeGrids.BlockDestroyed += MyCubeGridsOnBlockDestroyed;
-        }
 
         public void CheckGrid(MyCubeGrid grid)
         {
@@ -242,11 +236,6 @@ namespace SentisOptimisationsPlugin
             isLimitNotReached = gridPcu <= maxPcu;
             return isLimitNotReached;
         }
-
-        public void OnUnloading()
-        {
-            MyCubeGrids.BlockBuilt -= MyCubeGrids_BlockBuilt;
-            MyCubeGrids.BlockDestroyed -= MyCubeGridsOnBlockDestroyed;
-        }
+        
     }
 }

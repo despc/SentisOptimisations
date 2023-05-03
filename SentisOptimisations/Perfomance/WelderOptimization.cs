@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Threading;
 using NAPI;
 using Sandbox;
 using Sandbox.Definitions;
@@ -17,6 +18,7 @@ using Torch.Managers.PatchManager;
 using VRage;
 using VRage.Game;
 using VRage.Game.Entity;
+using VRage.Game.ModAPI;
 using VRageMath;
 using Task = System.Threading.Tasks.Task;
 
@@ -25,6 +27,7 @@ namespace Optimizer.Optimizations
     [PatchShim]
     public class WelderOptimization
     {
+        public static Queue<Action> AsynActions = new Queue<Action>();
         public static void Patch(PatchContext ctx)
         {
             var MethodActivate = typeof(MyShipWelder).GetMethod
@@ -32,10 +35,106 @@ namespace Optimizer.Optimizations
 
             ctx.GetPattern(MethodActivate).Prefixes.Add(
                 typeof(WelderOptimization).GetMethod(nameof(Activate),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            // string name,
+            //     BindingFlags bindingAttr,
+            // Binder binder,
+            //     Type[] types,
+            // ParameterModifier[] modifiers
+            var MethodIncreaseMountLevel = typeof(MySlimBlock).GetMethod(
+                "VRage.Game.ModAPI.IMySlimBlock.IncreaseMountLevel",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
             
+            ctx.GetPattern(MethodIncreaseMountLevel).Prefixes.Add(
+                typeof(WelderOptimization).GetMethod(nameof(IncreaseMountLevelPatched),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
         }
 
+        private static bool IncreaseMountLevelPatched(MySlimBlock __instance, float welderMountAmount,
+            long welderOwnerPlayerId,
+            VRage.Game.ModAPI.IMyInventory outputInventory,
+            float maxAllowedBoneMovement,
+            bool isHelping,
+            MyOwnershipShareModeEnum share)
+        {
+            if (!SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.AsyncWeldAdvanced)
+            {
+                return true;
+            }
+
+            Action increaseMountLevelAction = () =>
+            {
+                __instance.IncreaseMountLevel(welderMountAmount, welderOwnerPlayerId,
+                    outputInventory as MyInventoryBase, maxAllowedBoneMovement, isHelping, share);
+            };
+
+            lock (AsynActions)
+            {
+               AsynActions.Enqueue(increaseMountLevelAction);
+            }
+            return false;
+        }
+
+        public static void AsyncWeldLoopInit()
+        {
+            Task.Run(() =>
+            {
+                try
+                {
+                    while (true)
+                    {
+                        Thread.Sleep(1);
+                        Action pendingAction = null;
+                        var runInFrame = -1;
+                        lock (AsynActions)
+                        {
+                            if (AsynActions.Count > 0)
+                            {
+                                pendingAction = AsynActions.Dequeue();
+                                var asynActionsCount = (16 - AsynActions.Count);
+                                if (asynActionsCount < 1)
+                                {
+                                    runInFrame = -1;
+                                }
+                                else
+                                {
+                                    runInFrame = MySession.Static.GameplayFrameCounter + asynActionsCount;
+                                }
+                                
+                            }
+                        }
+
+                        if (pendingAction != null)
+                        {
+                            try
+                            {
+                                
+                                MyAPIGateway.Utilities.InvokeOnGameThread(() =>
+                                {
+                                    try
+                                    {
+                                        pendingAction();
+                                    }
+                                    catch
+                                    {
+                                    }
+                                }, StartAt:runInFrame);
+                            }
+                            catch
+                            {
+                            }
+                        }
+                    }
+                }
+                catch
+                {
+                    //
+                }
+            });
+        }
+        
+        
+        
         private static bool Activate(MyShipWelder __instance, ref bool __result, HashSet<MySlimBlock> targets)
         {
             __result = false; //it affects only sound;
