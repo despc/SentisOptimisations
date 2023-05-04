@@ -52,6 +52,11 @@ namespace SentisOptimisationsPlugin
             var finalizer = typeof(CrashFixPatch).GetMethod(nameof(CrashFixPatch.SuppressExceptionFinalizer),
                 BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
             CrashFixPatch.harmony.Patch(MethodFilterStateSync, finalizer: new HarmonyMethod(finalizer));
+            
+            var MethodRefreshReplicable = typeof(MyReplicationServer).GetMethod(
+                "RefreshReplicable",
+                BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            CrashFixPatch.harmony.Patch(MethodRefreshReplicable, finalizer: new HarmonyMethod(finalizer));
             // ctx.GetPattern(MethodFilterStateSync).Prefixes.Add(
             //     typeof(AsyncSync).GetMethod(nameof(FilterStateSyncPatched),
             //         BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));

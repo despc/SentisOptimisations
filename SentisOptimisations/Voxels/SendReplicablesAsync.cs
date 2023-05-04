@@ -45,7 +45,18 @@ namespace SentisOptimisationsPlugin
                         {
                             continue;
                         }
-                        var dequeue = _queue.Dequeue();
+
+                        AsyncSync.ISendToClientWrapper dequeue = null;
+
+                        while (_queue.Count > 0 && dequeue == null)
+                        {
+                            dequeue = _queue.Dequeue();
+                        }
+                        
+                        if (dequeue == null)
+                        {
+                            return;
+                        }
                         dequeue.DoSendToClient();
                     }
                     catch (Exception e)
