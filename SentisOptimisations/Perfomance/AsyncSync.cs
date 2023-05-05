@@ -6,12 +6,10 @@ using System.Reflection;
 using HarmonyLib;
 using NAPI;
 using NLog;
-using Sandbox.Game.Entities;
 using SentisOptimisationsPlugin.CrashFix;
 using Torch.Managers.PatchManager;
 using VRage;
 using VRage.Collections;
-using VRage.Game.Entity;
 using VRage.Library;
 using VRage.Library.Collections;
 using VRage.Library.Utils;
@@ -32,6 +30,14 @@ namespace SentisOptimisationsPlugin
         
         public static void Patch(PatchContext ctx)
         {
+            //
+            // var MethodSendDirtyBlockLimit = typeof(MyPlayerCollection).GetMethod(
+            //     nameof(MyPlayerCollection.SendDirtyBlockLimit),
+            //     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            // ctx.GetPattern(MethodSendDirtyBlockLimit).Prefixes.Add(
+            //     typeof(AsyncSync).GetMethod(nameof(SendDirtyBlockLimitPatched),
+            //         BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+                
             var MethodSendStreamingEntry = typeof(MyReplicationServer).GetMethod(
                 "SendStreamingEntry",
                 BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
@@ -128,6 +134,90 @@ namespace SentisOptimisationsPlugin
         //             delta.RemovedItems.Add(keyValuePair.Key);
         //             delta.HasChanges = true;
         //         }
+        //     }
+        // }
+
+        // private static bool SendDirtyBlockLimitPatched(MyPlayerCollection __instance, MyBlockLimits blockLimit,
+        //     List<EndpointId> playersToSendTo)
+        // {
+        //     foreach (MyBlockLimits.MyTypeLimitData myTypeLimitData in
+        //              (IEnumerable<MyBlockLimits.MyTypeLimitData>)blockLimit.BlockTypeBuilt.Values)
+        //     {
+        //         if (Interlocked.CompareExchange(ref myTypeLimitData.Dirty, 0, 1) > 0)
+        //         {
+        //             foreach (EndpointId targetEndpoint in playersToSendTo)
+        //                 MyMultiplayer.RaiseStaticEvent<MyBlockLimits.MyTypeLimitData>(
+        //                     (Func<IMyEventOwner, Action<MyBlockLimits.MyTypeLimitData>>)(x =>
+        //                     {
+        //                         var action = new Action<MyBlockLimits.MyTypeLimitData>(
+        //                             delegate(MyBlockLimits.MyTypeLimitData data)
+        //                             {
+        //                                 MyPlayerCollection.SetIdentityBlockTypesBuilt(data);
+        //                             });
+        //                         return action;
+        //                     }), myTypeLimitData, targetEndpoint);
+        //         }
+        //     }
+        //
+        //     foreach (MyBlockLimits.MyGridLimitData myGridLimitData in
+        //              (IEnumerable<MyBlockLimits.MyGridLimitData>)blockLimit.BlocksBuiltByGrid.Values)
+        //     {
+        //         if (Interlocked.CompareExchange(ref myGridLimitData.Dirty, 0, 1) > 0)
+        //         {
+        //             foreach (EndpointId targetEndpoint in playersToSendTo)
+        //                 MyMultiplayer.RaiseStaticEvent<MyBlockLimits.MyGridLimitData, int, int, int, int>(
+        //                     (Func<IMyEventOwner, Action<MyBlockLimits.MyGridLimitData, int, int, int, int>>)(x =>
+        //                         new Action<MyBlockLimits.MyGridLimitData, int, int, int, int>(MyPlayerCollection
+        //                             .SetIdentityGridBlocksBuilt)), myGridLimitData, blockLimit.PCU, blockLimit.PCUBuilt,
+        //                     blockLimit.BlocksBuilt, blockLimit.TransferedDelta, targetEndpoint);
+        //         }
+        //
+        //         if (Interlocked.CompareExchange(ref myGridLimitData.NameDirty, 0, 1) > 0)
+        //         {
+        //             foreach (EndpointId targetEndpoint in playersToSendTo)
+        //                 MyMultiplayer.RaiseStaticEvent<long, string>(
+        //                     (Func<IMyEventOwner, Action<long, string>>)(x =>
+        //                         new Action<long, string>(MyBlockLimits.SetGridNameFromServer)),
+        //                     myGridLimitData.EntityId, myGridLimitData.GridName, targetEndpoint);
+        //         }
+        //     }
+        //
+        //     if (blockLimit.CompareExchangePCUDirty())
+        //     {
+        //         foreach (EndpointId targetEndpoint in playersToSendTo)
+        //             MyMultiplayer.RaiseStaticEvent<int, int>(
+        //                 (Func<IMyEventOwner, Action<int, int>>)(x =>
+        //                     new Action<int, int>(MyPlayerCollection.SetPCU_Client)), blockLimit.PCU,
+        //                 blockLimit.TransferedDelta, targetEndpoint);
+        //     }
+        //
+        //     label_36:
+        //     long key;
+        //     MyBlockLimits.MyGridLimitData myGridLimitData1;
+        //     do
+        //     {
+        //         key = blockLimit.GridsRemoved.Keys.ElementAtOrDefault<long>(0);
+        //         if (key == 0L)
+        //             goto label_42;
+        //     } while (!blockLimit.GridsRemoved.TryRemove(key, out myGridLimitData1));
+        //
+        //     goto label_38;
+        //     label_42:
+        //     return;
+        //     label_38:
+        //     using (List<EndpointId>.Enumerator enumerator = playersToSendTo.GetEnumerator())
+        //     {
+        //         while (enumerator.MoveNext())
+        //         {
+        //             EndpointId current = enumerator.Current;
+        //             MyMultiplayer.RaiseStaticEvent<MyBlockLimits.MyGridLimitData, int, int, int, int>(
+        //                 (Func<IMyEventOwner, Action<MyBlockLimits.MyGridLimitData, int, int, int, int>>)(x =>
+        //                     new Action<MyBlockLimits.MyGridLimitData, int, int, int, int>(MyPlayerCollection
+        //                         .SetIdentityGridBlocksBuilt)), myGridLimitData1, blockLimit.PCU, blockLimit.PCUBuilt,
+        //                 blockLimit.BlocksBuilt, blockLimit.TransferedDelta, current);
+        //         }
+        //
+        //         goto label_36;
         //     }
         // }
 

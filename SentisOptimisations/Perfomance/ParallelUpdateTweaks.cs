@@ -1,8 +1,11 @@
 using System;
 using System.Reflection;
+using HarmonyLib;
 using NLog;
 using Sandbox.Game.Entities;
+using Sandbox.Game.Entities.Blocks;
 using Sandbox.Game.Entities.Character;
+using SentisOptimisationsPlugin.CrashFix;
 using Torch.Managers.PatchManager;
 
 namespace FixTurrets.Perfomance
@@ -50,6 +53,13 @@ namespace FixTurrets.Perfomance
             ctx.GetPattern(MethodUpdateHeadAndWeapon).Prefixes.Add(
                 typeof(ParallelUpdateTweaks).GetMethod(nameof(Disabled),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
+            var MethodSetDefaultTexture = typeof(MyTextPanelComponent).GetMethod
+                (nameof(MyTextPanelComponent.SetDefaultTexture), BindingFlags.Instance | BindingFlags.Public);
+
+            var finalizer = typeof(CrashFixPatch).GetMethod(nameof(CrashFixPatch.SuppressExceptionFinalizer),
+                BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            CrashFixPatch.harmony.Patch(MethodSetDefaultTexture, finalizer: new HarmonyMethod(finalizer));
         }
 
         private static bool MethodThrustUpdateBeforeSimulationPatched(Object __instance)
