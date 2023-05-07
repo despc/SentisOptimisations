@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using HarmonyLib;
 using NAPI;
@@ -63,6 +64,11 @@ namespace SentisOptimisationsPlugin
                 "RefreshReplicable",
                 BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
             CrashFixPatch.harmony.Patch(MethodRefreshReplicable, finalizer: new HarmonyMethod(finalizer));
+            
+            var MethodRemoveClientReplicable = typeof(MyReplicationServer).GetMethod(
+                "RemoveClientReplicable",
+                BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            CrashFixPatch.harmony.Patch(MethodRemoveClientReplicable, finalizer: new HarmonyMethod(finalizer));
             // ctx.GetPattern(MethodFilterStateSync).Prefixes.Add(
             //     typeof(AsyncSync).GetMethod(nameof(FilterStateSyncPatched),
             //         BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
@@ -73,14 +79,9 @@ namespace SentisOptimisationsPlugin
             
             // var assembly = typeof(MyCubeGrid).Assembly;
             // var MyEntityInventoryStateGroupType = assembly.GetType("Sandbox.Game.Replication.StateGroups.MyEntityInventoryStateGroup");
-            // var MethodCalculateAddsAndRemovals = MyEntityInventoryStateGroupType.getMethod("CalculateAddsAndRemovals", BindingFlags.Instance | BindingFlags.NonPublic);
-            //
-            // ctx.GetPattern(MethodCalculateAddsAndRemovals).Prefixes.Add(
-            //     typeof(AsyncSync).GetMethod(nameof(CalculateAddsAndRemovalsPatched),
-            //         BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+
         }
-
-
+        
         // private static bool CalculateAddsAndRemovalsPatched(Object __instance, Object clientData,
         //     ref Object delta,
         //     List<MyPhysicalInventoryItem> items)
@@ -371,6 +372,12 @@ namespace SentisOptimisationsPlugin
             {
                 var sendToClientWrapper = new SendToClientWrapper(__instance, client, entry);
                 SendReplicablesAsync._queue.Enqueue(sendToClientWrapper);
+            }
+            catch (ArgumentException ex)
+            {
+                Log.Error("ArgumentException " + SendReplicablesAsync._queue.Count(), ex);
+                Log.Error("Clean async queue ");
+                SendReplicablesAsync._queue.Clear();
             }
             catch (Exception ex)
             {

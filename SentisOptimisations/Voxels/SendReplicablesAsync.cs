@@ -16,7 +16,7 @@ namespace SentisOptimisationsPlugin
     public class SendReplicablesAsync
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
-        public static Queue<AsyncSync.ISendToClientWrapper> _queue = new Queue<AsyncSync.ISendToClientWrapper>();
+        public static Queue<AsyncSync.ISendToClientWrapper> _queue = new Queue<AsyncSync.ISendToClientWrapper>(2048);
        
         public CancellationTokenSource CancellationTokenSource { get; set; }
 
