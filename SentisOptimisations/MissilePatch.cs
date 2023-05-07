@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -73,6 +74,116 @@ namespace SentisOptimisationsPlugin
             ctx.GetPattern(CalculateStoredExplosiveDamageMethod).Prefixes.Add(
                 typeof(MissilePatch).GetMethod(nameof(CalculateStoredExplosiveDamageMethodPatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+        }
+
+        private static void GetBlocksInsideSpheres(MyCubeGrid grid,
+            ref BoundingSphereD sphere1,
+            ref BoundingSphereD sphere2,
+            ref BoundingSphereD sphere3,
+            HashSet<MySlimBlock> blocks1,
+            HashSet<MySlimBlock> blocks2,
+            HashSet<MySlimBlock> blocks3,
+            bool respectDeformationRatio,
+            float detectionBlockHalfSize,
+            ref MatrixD invWorldGrid)
+        {
+            ConcurrentDictionary<Vector3I, MyCube> m_cubes = (ConcurrentDictionary<Vector3I, MyCube>)grid.easyGetField("m_cubes");
+            HashSet<MyCubeBlock> m_processedBlocks = new HashSet<MyCubeBlock>();
+            blocks1.Clear();
+            blocks2.Clear();
+            blocks3.Clear();
+            m_processedBlocks.Clear();
+            Vector3D result;
+            Vector3D.Transform(ref sphere3.Center, ref invWorldGrid, out result);
+            Vector3I vector3I1 = Vector3I.Round((result - sphere3.Radius) * (double)grid.GridSizeR);
+            Vector3I vector3I2 = Vector3I.Round((result + sphere3.Radius) * (double)grid.GridSizeR);
+            Vector3 vector3 = new Vector3(detectionBlockHalfSize);
+            BoundingSphereD sphere4 = new BoundingSphereD(result, sphere1.Radius);
+            BoundingSphereD sphere5 = new BoundingSphereD(result, sphere2.Radius);
+            BoundingSphereD sphere6 = new BoundingSphereD(result, sphere3.Radius);
+            if ((vector3I2.X - vector3I1.X) * (vector3I2.Y - vector3I1.Y) * (vector3I2.Z - vector3I1.Z) <
+                m_cubes.Count)
+            {
+                Vector3I key = new Vector3I();
+                for (key.X = vector3I1.X; key.X <= vector3I2.X; ++key.X)
+                {
+                    for (key.Y = vector3I1.Y; key.Y <= vector3I2.Y; ++key.Y)
+                    {
+                        for (key.Z = vector3I1.Z; key.Z <= vector3I2.Z; ++key.Z)
+                        {
+                            MyCube myCube;
+                            if (m_cubes.TryGetValue(key, out myCube))
+                            {
+                                MySlimBlock cubeBlock = myCube.CubeBlock;
+                                if (cubeBlock.FatBlock == null || !m_processedBlocks.Contains(cubeBlock.FatBlock))
+                                {
+                                    m_processedBlocks.Add(cubeBlock.FatBlock);
+                                    if (respectDeformationRatio)
+                                    {
+                                        sphere4.Radius = sphere1.Radius * (double)cubeBlock.DeformationRatio;
+                                        sphere5.Radius = sphere2.Radius * (double)cubeBlock.DeformationRatio;
+                                        sphere6.Radius = sphere3.Radius * (double)cubeBlock.DeformationRatio;
+                                    }
+
+                                    BoundingBox boundingBox = cubeBlock.FatBlock == null
+                                        ? new BoundingBox(cubeBlock.Position * grid.GridSize - vector3,
+                                            cubeBlock.Position * grid.GridSize + vector3)
+                                        : new BoundingBox(cubeBlock.Min * grid.GridSize - grid.GridSizeHalf,
+                                            cubeBlock.Max * grid.GridSize + grid.GridSizeHalf);
+                                    if (boundingBox.Intersects((BoundingSphere)sphere6))
+                                    {
+                                        if (boundingBox.Intersects((BoundingSphere)sphere5))
+                                        {
+                                            if (boundingBox.Intersects((BoundingSphere)sphere4))
+                                                blocks1.Add(cubeBlock);
+                                            else
+                                                blocks2.Add(cubeBlock);
+                                        }
+                                        else
+                                            blocks3.Add(cubeBlock);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            else
+            {
+                foreach (MyCube myCube in (IEnumerable<MyCube>)m_cubes.Values)
+                {
+                    MySlimBlock cubeBlock = myCube.CubeBlock;
+                    if (cubeBlock.FatBlock == null || !m_processedBlocks.Contains(cubeBlock.FatBlock))
+                    {
+                        m_processedBlocks.Add(cubeBlock.FatBlock);
+                        if (respectDeformationRatio)
+                        {
+                            sphere4.Radius = sphere1.Radius * (double)cubeBlock.DeformationRatio;
+                            sphere5.Radius = sphere2.Radius * (double)cubeBlock.DeformationRatio;
+                            sphere6.Radius = sphere3.Radius * (double)cubeBlock.DeformationRatio;
+                        }
+
+                        BoundingBox boundingBox = cubeBlock.FatBlock == null
+                            ? new BoundingBox(cubeBlock.Position * grid.GridSize - vector3,
+                                cubeBlock.Position * grid.GridSize + vector3)
+                            : new BoundingBox(cubeBlock.Min * grid.GridSize - grid.GridSizeHalf,
+                                cubeBlock.Max * grid.GridSize + grid.GridSizeHalf);
+                        if (boundingBox.Intersects((BoundingSphere)sphere6))
+                        {
+                            if (boundingBox.Intersects((BoundingSphere)sphere5))
+                            {
+                                if (boundingBox.Intersects((BoundingSphere)sphere4))
+                                    blocks1.Add(cubeBlock);
+                                else
+                                    blocks2.Add(cubeBlock);
+                            }
+                            else
+                                blocks3.Add(cubeBlock);
+                        }
+                    }
+                }
+            }
+            
         }
 
         private static bool CalculateStoredExplosiveDamageMethodPatched(MyCubeBlock __instance, 
@@ -541,7 +652,7 @@ namespace SentisOptimisationsPlugin
                     HashSet<MySlimBlock> m_explodedBlocksInner = new HashSet<MySlimBlock>();
                     HashSet<MySlimBlock> m_explodedBlocksExact = new HashSet<MySlimBlock>();
                     HashSet<MySlimBlock> m_explodedBlocksOuter = new HashSet<MySlimBlock>();
-                    Node.GetBlocksInsideSpheres(ref sphere1, ref sphere2, ref sphere3, m_explodedBlocksInner,
+                    GetBlocksInsideSpheres(Node, ref sphere1, ref sphere2, ref sphere3, m_explodedBlocksInner,
                         m_explodedBlocksExact, m_explodedBlocksOuter, false, detectionBlockHalfSize,
                         ref invWorldGrid);
                     m_explodedBlocksInner.UnionWith((IEnumerable<MySlimBlock>) m_explodedBlocksExact);
