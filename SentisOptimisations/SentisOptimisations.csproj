@@ -56,19 +56,6 @@
       <Compile Include="DamagePatch.cs" />
       <Compile Include="FixShip\FixShipLogic.cs" />
       <Compile Include="FixShip\MessageType.cs" />
-      <Compile Include="FixShip\NanobotBuildAndRepairSystem\Localization.cs" />
-      <Compile Include="FixShip\NanobotBuildAndRepairSystem\Logging.cs" />
-      <Compile Include="FixShip\NanobotBuildAndRepairSystem\NanobotBuildAndRepairSystemBlock.cs" />
-      <Compile Include="FixShip\NanobotBuildAndRepairSystem\NanobotBuildAndRepairSystemLocalization.cs" />
-      <Compile Include="FixShip\NanobotBuildAndRepairSystem\NanobotBuildAndRepairSystemMod.cs" />
-      <Compile Include="FixShip\NanobotBuildAndRepairSystem\NanobotBuildAndRepairSystemPriorityHandling.cs" />
-      <Compile Include="FixShip\NanobotBuildAndRepairSystem\NanobotBuildAndRepairSystemSynchronization.cs" />
-      <Compile Include="FixShip\NanobotBuildAndRepairSystem\NanobotBuildAndRepairSystemTerminal.cs" />
-      <Compile Include="FixShip\NanobotBuildAndRepairSystem\PriorityHandling.cs" />
-      <Compile Include="FixShip\NanobotBuildAndRepairSystem\Utils.cs" />
-      <Compile Include="FixShip\NanobotBuildAndRepairSystem\UtilsInventory.cs" />
-      <Compile Include="FixShip\NanobotBuildAndRepairSystem\UtilsProductionBlock.cs" />
-      <Compile Include="FixShip\NanobotBuildAndRepairSystem\UtilsSynchronization.cs" />
       <Compile Include="GUI\ConfigGUI.cs">
         <DependentUpon>ConfigGUI.xaml</DependentUpon>
       </Compile>
