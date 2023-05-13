@@ -69,6 +69,11 @@ namespace SentisOptimisationsPlugin
                 "RemoveClientReplicable",
                 BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
             CrashFixPatch.harmony.Patch(MethodRemoveClientReplicable, finalizer: new HarmonyMethod(finalizer));
+            
+            var MethodAddClientReplicable = typeof(MyReplicationServer).GetMethod(
+                "AddClientReplicable",
+                BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            CrashFixPatch.harmony.Patch(MethodAddClientReplicable, finalizer: new HarmonyMethod(finalizer));
             // ctx.GetPattern(MethodFilterStateSync).Prefixes.Add(
             //     typeof(AsyncSync).GetMethod(nameof(FilterStateSyncPatched),
             //         BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));

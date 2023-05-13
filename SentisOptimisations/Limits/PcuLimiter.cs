@@ -73,7 +73,7 @@ namespace SentisOptimisationsPlugin
             }
 
 
-            var subGrids = GridUtils.GetSubGrids((IMyCubeGrid)cube);
+            var subGrids = GridUtils.GetSubGrids((IMyCubeGrid)cube, SentisOptimisationsPlugin.Config.IncludeConnectedGrids);
             foreach (var myCubeGrid in subGrids)
             {
                 if (gridsOverlimit.Contains(myCubeGrid.EntityId))
@@ -147,7 +147,7 @@ namespace SentisOptimisationsPlugin
                 ((IMyFunctionalBlock)mySlimBlock.FatBlock).Enabled = false;
             }
 
-            var subGrids = GridUtils.GetSubGrids((IMyCubeGrid)cube);
+            var subGrids = GridUtils.GetSubGrids((IMyCubeGrid)cube,SentisOptimisationsPlugin.Config.IncludeConnectedGrids);
             foreach (var myCubeGrid in subGrids)
             {
                 gridsOverlimit.Add(myCubeGrid.EntityId);
@@ -170,6 +170,7 @@ namespace SentisOptimisationsPlugin
         {
             return mySlimBlock.FatBlock is MyReactor ||
                    mySlimBlock.FatBlock is MySurvivalKit ||
+                   mySlimBlock.FatBlock is MyBatteryBlock ||
                    mySlimBlock.FatBlock is MyJumpDrive ||
                    mySlimBlock.FatBlock is MyProjectorBase ||
                    mySlimBlock.FatBlock is MyShipConnector ||
@@ -195,11 +196,11 @@ namespace SentisOptimisationsPlugin
 
         private static bool IsLimitNotReached(MyCubeGrid cube)
         {
-            var gridPcu = GridUtils.GetPCU((IMyCubeGrid)cube, true);
+            var gridPcu = GridUtils.GetPCU((IMyCubeGrid)cube, true, SentisOptimisationsPlugin.Config.IncludeConnectedGrids);
             var maxPcu = cube.IsStatic
                 ? SentisOptimisationsPlugin.Config.MaxStaticGridPCU
                 : SentisOptimisationsPlugin.Config.MaxDinamycGridPCU;
-            var subGrids = GridUtils.GetSubGrids((IMyCubeGrid)cube);
+            var subGrids = GridUtils.GetSubGrids((IMyCubeGrid)cube, SentisOptimisationsPlugin.Config.IncludeConnectedGrids);
             foreach (var myCubeGrid in subGrids)
             {
                 if (myCubeGrid.IsStatic)
