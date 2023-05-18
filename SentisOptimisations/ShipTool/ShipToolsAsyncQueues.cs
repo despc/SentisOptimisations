@@ -22,7 +22,10 @@ public class ShipToolsAsyncQueues
 
     public void EnqueueAction(Action action)
     {
-        AsynActions.Enqueue(action);
+        lock (AsynActions)
+        {
+            AsynActions.Enqueue(action);
+        }
     }
 
     public void OnUnloading()
@@ -39,21 +42,19 @@ public class ShipToolsAsyncQueues
             {
                 try
                 {
-                    if (AsynActions.Count == 0)
-                    {
-                        Thread.Sleep(10);
-                        continue;
-                    }
-
                     Action dequeue = null;
-
-                    while (AsynActions.Count > 0 && dequeue == null)
+                    lock (AsynActions)
                     {
-                        dequeue = AsynActions.Dequeue();
+                        while (AsynActions.Count > 0 && dequeue == null)
+                        {
+                            dequeue = AsynActions.Dequeue();
+                        }
                     }
+
 
                     if (dequeue == null)
                     {
+                        Thread.Sleep(160);
                         continue;
                     }
 
