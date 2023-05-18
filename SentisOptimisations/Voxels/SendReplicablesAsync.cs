@@ -55,7 +55,7 @@ namespace SentisOptimisationsPlugin
                         
                         if (dequeue == null)
                         {
-                            return;
+                            continue;
                         }
                         dequeue.DoSendToClient();
                     }

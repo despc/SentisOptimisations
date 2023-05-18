@@ -15,6 +15,7 @@ using Sandbox.Game.Entities.Cube;
 using Sandbox.Game.Multiplayer;
 using Sandbox.Game.Weapons;
 using Sandbox.Game.Weapons.Guns;
+using Sandbox.Game.World;
 using Sandbox.Game.WorldEnvironment;
 using Sandbox.Game.WorldEnvironment.Modules;
 using Sandbox.ModAPI;
@@ -38,6 +39,7 @@ namespace SentisOptimisationsPlugin.ShipTool
         public static Dictionary<long, int> Cooldowns = new Dictionary<long, int>();
         public static Dictionary<long, int> NobodyToOff = new Dictionary<long, int>();
         public static readonly Random r = new Random();
+        
         public static void Patch(PatchContext ctx)
         {
 
@@ -274,7 +276,7 @@ namespace SentisOptimisationsPlugin.ShipTool
             return false;
         }
 
-        private static async void DoActivateCommon(MyShipToolBase __instance)
+        private static void DoActivateCommon(MyShipToolBase __instance)
         {
             BoundingSphere m_detectorSphere =
                 (BoundingSphere)__instance.easyGetField("m_detectorSphere", typeof(MyShipToolBase));
@@ -285,18 +287,24 @@ namespace SentisOptimisationsPlugin.ShipTool
                 (double)m_detectorSphere.Radius * 0.5);
             
             __instance.easySetField("m_isActivatedOnSomething", false, typeof(MyShipToolBase));
-            List<MyEntity> topEntities;
             bool flag = false;
             if (SentisOptimisationsPlugin.Config.AsyncWeld)
             {
-                topEntities = await Task.Run(() => GetTopEntitiesInSphereAsync(boundingSphereD));
-                var entitiesInContactAsync= await Task.Run(() => GetEntitiesInContact(__instance, topEntities, ref flag));
-                ProcessEntitiesInContact(__instance, boundingSphereD, flag, entitiesInContactAsync, sphere);
-                topEntities.Clear();
+                var shipToolsAsyncQueues = SentisOptimisationsPlugin.Instance.ShipToolsAsyncQueues;
+                var runInFrame = MySession.Static.GameplayFrameCounter + r.Next(10, 60);
+                shipToolsAsyncQueues.EnqueueAction(() =>
+                {
+                    List<MyEntity> topEntities = GetTopEntitiesInSphereAsync(boundingSphereD);
+                    var entitiesInContactAsync = GetEntitiesInContact(__instance, topEntities, ref flag);
+                    MyAPIGateway.Utilities.InvokeOnGameThread(() =>
+                    {
+                        ProcessEntitiesInContact(__instance, boundingSphereD, flag, entitiesInContactAsync, sphere);
+                    }, StartAt: runInFrame);
+                });
                 return;
             }
 
-            topEntities = MyEntities.GetTopMostEntitiesInSphere(ref boundingSphereD);
+            var topEntities = MyEntities.GetTopMostEntitiesInSphere(ref boundingSphereD);
             var entitiesInContactSync = GetEntitiesInContact(__instance, topEntities, ref flag);
             ProcessEntitiesInContact(__instance,  boundingSphereD, flag, entitiesInContactSync, sphere);
             topEntities.Clear();
@@ -395,9 +403,16 @@ namespace SentisOptimisationsPlugin.ShipTool
         private static async void CollectTargetBlocksAsyncAndCallActivate(MyShipToolBase myShipToolBase,
             BoundingSphereD boundingSphereD, HashSet<MyEntity> entitiesInContact)
         {
-            var resultBlocksToActivateOnAsync = await Task.Run(() => Action(new HashSet<MyEntity>(entitiesInContact)));
-
-            HashSet<MySlimBlock> Action(HashSet<MyEntity> entitiesInContactAsync)
+            var shipToolsAsyncQueues = SentisOptimisationsPlugin.Instance.ShipToolsAsyncQueues;
+            var asynActionsCount = shipToolsAsyncQueues.AsynActions.Count;
+            var runInFrame = MySession.Static.GameplayFrameCounter + asynActionsCount + 1;
+            shipToolsAsyncQueues.EnqueueAction(() =>
+            {
+                var resultBlocksToActivateOnAsync = CollectBlocks(new HashSet<MyEntity>(entitiesInContact));
+                MyAPIGateway.Utilities.InvokeOnGameThread(() => CallActivate(myShipToolBase, resultBlocksToActivateOnAsync));
+            });
+            
+            HashSet<MySlimBlock> CollectBlocks(HashSet<MyEntity> entitiesInContactAsync)
             {
                 var blocksToActivateOnAsync = new HashSet<MySlimBlock>();
                 try
@@ -421,8 +436,6 @@ namespace SentisOptimisationsPlugin.ShipTool
 
                 return blocksToActivateOnAsync;
             }
-
-            MyAPIGateway.Utilities.InvokeOnGameThread(() => CallActivate(myShipToolBase, resultBlocksToActivateOnAsync));
         }
 
         private static void CheckEnvironment(MyShipToolBase __instance, BoundingSphereD boundingSphereD, bool flag)
