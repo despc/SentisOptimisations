@@ -46,12 +46,12 @@ namespace SentisOptimisationsPlugin
                 typeof(AsyncSync).GetMethod(nameof(SendStreamingEntryPatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
 
-            // var MethodApplyDirtyGroups = typeof(MyReplicationServer).GetMethod(
-            //     "ApplyDirtyGroups",
-            //     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
-            // ctx.GetPattern(MethodApplyDirtyGroups).Prefixes.Add(
-            //     typeof(AsyncSync).GetMethod(nameof(ApplyDirtyGroupsPatched),
-            //         BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            var MethodApplyDirtyGroups = typeof(MyReplicationServer).GetMethod(
+                "ApplyDirtyGroups",
+                BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            ctx.GetPattern(MethodApplyDirtyGroups).Prefixes.Add(
+                typeof(AsyncSync).GetMethod(nameof(ApplyDirtyGroupsPatched),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
             //
             var MethodFilterStateSync = typeof(MyReplicationServer).GetMethod(
                 "FilterStateSync",
@@ -362,7 +362,10 @@ namespace SentisOptimisationsPlugin
         private static void ProcessDirtyGroups(MyReplicationServer __instance)
         {
             var sendToClientWrapper2 = new SendToClientWrapper2(__instance);
-            SendReplicablesAsync._queue.Enqueue(sendToClientWrapper2);
+            lock (SendReplicablesAsync._queue)
+            {
+                SendReplicablesAsync._queue.Enqueue(sendToClientWrapper2);
+            }
         }
 
         private static bool SendStreamingEntryPatched(MyReplicationServer __instance,
@@ -376,7 +379,11 @@ namespace SentisOptimisationsPlugin
             try
             {
                 var sendToClientWrapper = new SendToClientWrapper(__instance, client, entry);
-                SendReplicablesAsync._queue.Enqueue(sendToClientWrapper);
+                lock (SendReplicablesAsync._queue)
+                {
+                    SendReplicablesAsync._queue.Enqueue(sendToClientWrapper);
+                }
+                
             }
             catch (ArgumentException ex)
             {

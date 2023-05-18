@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Reflection;
 using System.Threading;
+using System.Threading.Tasks;
 using NAPI;
 using Sandbox;
 using Sandbox.Definitions;
@@ -20,14 +21,15 @@ using VRage.Game;
 using VRage.Game.Entity;
 using VRage.Game.ModAPI;
 using VRageMath;
-using Task = System.Threading.Tasks.Task;
 
 namespace Optimizer.Optimizations
 {
     [PatchShim]
     public class WelderOptimization
     {
+        private static Random r = new Random();
         public static Queue<Action> AsynActions = new Queue<Action>();
+
         public static void Patch(PatchContext ctx)
         {
             var MethodActivate = typeof(MyShipWelder).GetMethod
@@ -35,7 +37,7 @@ namespace Optimizer.Optimizations
 
             ctx.GetPattern(MethodActivate).Prefixes.Add(
                 typeof(WelderOptimization).GetMethod(nameof(Activate),
-            BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
             // string name,
             //     BindingFlags bindingAttr,
             // Binder binder,
@@ -44,7 +46,7 @@ namespace Optimizer.Optimizations
             var MethodIncreaseMountLevel = typeof(MySlimBlock).GetMethod(
                 "VRage.Game.ModAPI.IMySlimBlock.IncreaseMountLevel",
                 BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            
+
             ctx.GetPattern(MethodIncreaseMountLevel).Prefixes.Add(
                 typeof(WelderOptimization).GetMethod(nameof(IncreaseMountLevelPatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
@@ -52,7 +54,7 @@ namespace Optimizer.Optimizations
 
         private static bool IncreaseMountLevelPatched(MySlimBlock __instance, float welderMountAmount,
             long welderOwnerPlayerId,
-            VRage.Game.ModAPI.IMyInventory outputInventory,
+            IMyInventory outputInventory,
             float maxAllowedBoneMovement,
             bool isHelping,
             MyOwnershipShareModeEnum share)
@@ -70,8 +72,9 @@ namespace Optimizer.Optimizations
 
             lock (AsynActions)
             {
-               AsynActions.Enqueue(increaseMountLevelAction);
+                AsynActions.Enqueue(increaseMountLevelAction);
             }
+
             return false;
         }
 
@@ -83,7 +86,7 @@ namespace Optimizer.Optimizations
                 {
                     while (true)
                     {
-                        Thread.Sleep(1);
+                        Thread.Sleep(2);
                         Action pendingAction = null;
                         var runInFrame = -1;
                         lock (AsynActions)
@@ -91,16 +94,8 @@ namespace Optimizer.Optimizations
                             if (AsynActions.Count > 0)
                             {
                                 pendingAction = AsynActions.Dequeue();
-                                var asynActionsCount = (16 - AsynActions.Count);
-                                if (asynActionsCount < 1)
-                                {
-                                    runInFrame = -1;
-                                }
-                                else
-                                {
-                                    runInFrame = MySession.Static.GameplayFrameCounter + asynActionsCount;
-                                }
-                                
+
+                                runInFrame = MySession.Static.GameplayFrameCounter + r.Next(1, AsynActions.Count * 5);
                             }
                         }
 
@@ -108,7 +103,6 @@ namespace Optimizer.Optimizations
                         {
                             try
                             {
-                                
                                 MyAPIGateway.Utilities.InvokeOnGameThread(() =>
                                 {
                                     try
@@ -118,7 +112,7 @@ namespace Optimizer.Optimizations
                                     catch
                                     {
                                     }
-                                }, StartAt:runInFrame);
+                                }, StartAt: runInFrame);
                             }
                             catch
                             {
@@ -132,9 +126,8 @@ namespace Optimizer.Optimizations
                 }
             });
         }
-        
-        
-        
+
+
         private static bool Activate(MyShipWelder __instance, ref bool __result, HashSet<MySlimBlock> targets)
         {
             __result = false; //it affects only sound;
@@ -143,7 +136,7 @@ namespace Optimizer.Optimizations
                 return true;
             }
 
-            var def = (MyShipWelderDefinition)__instance.BlockDefinition;
+            var def = (MyShipWelderDefinition) __instance.BlockDefinition;
             if (def.SensorRadius < 0.01f) //NanobotOptimization
             {
                 return false;
@@ -203,11 +196,12 @@ namespace Optimizer.Optimizations
             }
 
             m_missingComponents.Clear();
-            
+
             if (SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.AsyncWeld)
             {
                 var targetsToThread = new HashSet<MySlimBlock>(targets);
-                var shipToolsAsyncQueues = SentisOptimisationsPlugin.SentisOptimisationsPlugin.Instance.ShipToolsAsyncQueues;
+                var shipToolsAsyncQueues =
+                    SentisOptimisationsPlugin.SentisOptimisationsPlugin.Instance.ShipToolsAsyncQueues;
                 shipToolsAsyncQueues.EnqueueAction(() =>
                 {
                     try
@@ -261,8 +255,9 @@ namespace Optimizer.Optimizations
                     {
                         bool? flag2 = block.ComponentStack.WillFunctionalityRise(weldAmount);
                         if (flag2 == null || !flag2.Value || MySession.Static.CheckLimitsAndNotify(
-                            MySession.Static.LocalPlayerId, block.BlockDefinition.BlockPairName,
-                            block.BlockDefinition.PCU - MyCubeBlockDefinition.PCU_CONSTRUCTION_STAGE_COST, 0, 0, null))
+                                MySession.Static.LocalPlayerId, block.BlockDefinition.BlockPairName,
+                                block.BlockDefinition.PCU - MyCubeBlockDefinition.PCU_CONSTRUCTION_STAGE_COST, 0, 0,
+                                null))
                         {
                             canWeld = true;
                         }
@@ -271,15 +266,19 @@ namespace Optimizer.Optimizations
                     if (canWeld)
                     {
                         MyAPIGateway.Utilities.InvokeOnGameThread(() => Action(block));
+
                         void Action(MySlimBlock blockToWeld)
                         {
                             try
                             {
                                 blockToWeld.MoveItemsToConstructionStockpile(inventory);
                                 blockToWeld.MoveUnneededItemsFromConstructionStockpile(inventory);
-                                if (blockToWeld.HasDeformation || blockToWeld.MaxDeformation > 0.0001f || !blockToWeld.IsFullIntegrity)
+                                if (blockToWeld.HasDeformation || blockToWeld.MaxDeformation > 0.0001f ||
+                                    !blockToWeld.IsFullIntegrity)
                                 {
-                                    blockToWeld.IncreaseMountLevel(weldAmount, welder.OwnerId, inventory, maxAllowedBoneMovement, welder.HelpOthers, welder.IDModule.ShareMode, false, false);
+                                    blockToWeld.IncreaseMountLevel(weldAmount, welder.OwnerId, inventory,
+                                        maxAllowedBoneMovement, welder.HelpOthers, welder.IDModule.ShareMode, false,
+                                        false);
 
                                     weldedAnyThing = true;
                                 }
@@ -289,8 +288,6 @@ namespace Optimizer.Optimizations
                                 SentisOptimisationsPlugin.SentisOptimisationsPlugin.Log.Error(e);
                             }
                         }
-
-                       
                     }
                 }
             }
@@ -321,7 +318,8 @@ namespace Optimizer.Optimizations
 
             if (SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.AsyncWeld)
             {
-                var shipToolsAsyncQueues = SentisOptimisationsPlugin.SentisOptimisationsPlugin.Instance.ShipToolsAsyncQueues;
+                var shipToolsAsyncQueues =
+                    SentisOptimisationsPlugin.SentisOptimisationsPlugin.Instance.ShipToolsAsyncQueues;
                 shipToolsAsyncQueues.EnqueueAction(() =>
                 {
                     try
@@ -381,14 +379,14 @@ namespace Optimizer.Optimizations
             foreach (MyWelder.ProjectionRaycastData projectionRaycastData in array)
             {
                 if (welder.IsWithinWorldLimits(projectionRaycastData.cubeProjector,
-                    projectionRaycastData.hitCube.BlockDefinition.BlockPairName,
-                    flag3
-                        ? projectionRaycastData.hitCube.BlockDefinition.PCU
-                        : MyCubeBlockDefinition.PCU_CONSTRUCTION_STAGE_COST) && (MySession.Static.CreativeMode ||
-                    inventory.ContainItems(new MyFixedPoint?(1),
-                        projectionRaycastData.hitCube
-                            .BlockDefinition.Components[0]
-                            .Definition.Id, MyItemFlags.None)))
+                        projectionRaycastData.hitCube.BlockDefinition.BlockPairName,
+                        flag3
+                            ? projectionRaycastData.hitCube.BlockDefinition.PCU
+                            : MyCubeBlockDefinition.PCU_CONSTRUCTION_STAGE_COST) && (MySession.Static.CreativeMode ||
+                        inventory.ContainItems(new MyFixedPoint?(1),
+                            projectionRaycastData.hitCube
+                                .BlockDefinition.Components[0]
+                                .Definition.Id, MyItemFlags.None)))
                 {
                     MyWelder.ProjectionRaycastData invokedBlock = projectionRaycastData;
 
@@ -464,7 +462,6 @@ namespace Optimizer.Optimizations
 
                         void Action(HashSet<MySlimBlock> blocksInThread)
                         {
-                            
                             list.Clear();
                             foreach (MySlimBlock mySlimBlock in blocksInThread)
                             {
@@ -472,6 +469,7 @@ namespace Optimizer.Optimizations
                                 {
                                     break;
                                 }
+
                                 if (myCubeGrid.Projector.CanBuild(mySlimBlock, true) == BuildCheckResult.OK)
                                 {
                                     MySlimBlock cubeBlock = myCubeGrid.GetCubeBlock(mySlimBlock.Position);
@@ -491,7 +489,6 @@ namespace Optimizer.Optimizations
                             {
                                 //...
                             }
-                            
                         }
                     }
 

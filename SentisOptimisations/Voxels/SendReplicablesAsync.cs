@@ -3,13 +3,6 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using NLog;
-using Sandbox.Game.Entities;
-using Sandbox.Game.Entities.Character;
-using Sandbox.Game.WorldEnvironment;
-using Sandbox.ModAPI;
-using VRage.Game.Entity;
-using VRage.Game.ModAPI;
-using VRage.Network;
 
 namespace SentisOptimisationsPlugin
 {
@@ -41,16 +34,13 @@ namespace SentisOptimisationsPlugin
                     try
                     {
                         Thread.Sleep(1);
-                        if (_queue.Count == 0)
-                        {
-                            continue;
-                        }
-
                         AsyncSync.ISendToClientWrapper dequeue = null;
-
-                        while (_queue.Count > 0 && dequeue == null)
+                        lock (_queue)
                         {
-                            dequeue = _queue.Dequeue();
+                            while (_queue.Count > 0 && dequeue == null)
+                            {
+                                dequeue = _queue.Dequeue();
+                            }
                         }
                         
                         if (dequeue == null)
