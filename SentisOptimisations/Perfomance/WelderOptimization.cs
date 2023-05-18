@@ -207,18 +207,17 @@ namespace Optimizer.Optimizations
             if (SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.AsyncWeld)
             {
                 var targetsToThread = new HashSet<MySlimBlock>(targets);
-                Task.Run(() =>
+                var shipToolsAsyncQueues = SentisOptimisationsPlugin.SentisOptimisationsPlugin.Instance.ShipToolsAsyncQueues;
+                shipToolsAsyncQueues.EnqueueAction(() =>
                 {
                     try
                     {
-                        return Weld(welder, targetsToThread, inventory, num, WeldProjectionsWithWelding);
+                        Weld(welder, targetsToThread, inventory, num, WeldProjectionsWithWelding);
                     }
                     catch (Exception e)
                     {
                         SentisOptimisationsPlugin.SentisOptimisationsPlugin.Log.Error("Async exception " + e);
                     }
-
-                    return false;
                 });
                 return;
             }
@@ -322,17 +321,18 @@ namespace Optimizer.Optimizations
 
             if (SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.AsyncWeld)
             {
-                Task.Run(() =>
+                var shipToolsAsyncQueues = SentisOptimisationsPlugin.SentisOptimisationsPlugin.Instance.ShipToolsAsyncQueues;
+                shipToolsAsyncQueues.EnqueueAction(() =>
                 {
                     try
                     {
-                        return FindProjectedBlocks(welder, DoWeldProjections);
+                        var projectedBlocks = FindProjectedBlocks(welder, DoWeldProjections);
+                        DoWeldProjections(welder, projectedBlocks);
                     }
                     catch (Exception e)
                     {
                         SentisOptimisationsPlugin.SentisOptimisationsPlugin.Log.Error("Async exception " + e);
                     }
-                    return new List<MyWelder.ProjectionRaycastData>();
                 });
                 return;
             }

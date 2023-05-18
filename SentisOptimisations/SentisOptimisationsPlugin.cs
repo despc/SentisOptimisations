@@ -23,6 +23,7 @@ using Sandbox.ModAPI;
 using SentisOptimisation.PveZone;
 using SentisOptimisations;
 using SentisOptimisationsPlugin.AllGridsActions;
+using SentisOptimisationsPlugin.ShipTool;
 using SOPlugin.GUI;
 using Torch;
 using Torch.API;
@@ -57,6 +58,7 @@ namespace SentisOptimisationsPlugin
 
         private AllGridsObserver _allGridsObserver = new AllGridsObserver();
         private SendReplicablesAsync _replicablesAsync = new SendReplicablesAsync();
+        public ShipToolsAsyncQueues ShipToolsAsyncQueues = new ShipToolsAsyncQueues();
         public static ShieldApi SApi = new ShieldApi();
 
         void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
@@ -121,6 +123,7 @@ namespace SentisOptimisationsPlugin
             {
                 _allGridsObserver.OnUnloading();
                 _replicablesAsync.OnUnloading();
+                ShipToolsAsyncQueues.OnUnloading();
             }
             else
             {
@@ -129,6 +132,7 @@ namespace SentisOptimisationsPlugin
                 DamagePatch.Init();
                 _allGridsObserver.OnLoaded();
                 _replicablesAsync.OnLoaded();
+                ShipToolsAsyncQueues.OnLoaded();
                 InitShieldApi();
                 Communication.RegisterHandlers();
                 PvECore.Init();
