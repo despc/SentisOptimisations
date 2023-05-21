@@ -292,6 +292,10 @@ namespace SentisOptimisationsPlugin.ShipTool
             {
                 var shipToolsAsyncQueues = SentisOptimisationsPlugin.Instance.ShipToolsAsyncQueues;
                 var runInFrame = MySession.Static.GameplayFrameCounter + r.Next(10, 60);
+                if (!__instance.CubeGrid.IsStatic)
+                {
+                    runInFrame = -1;
+                }
                 shipToolsAsyncQueues.EnqueueAction(() =>
                 {
                     List<MyEntity> topEntities = GetTopEntitiesInSphereAsync(boundingSphereD);
