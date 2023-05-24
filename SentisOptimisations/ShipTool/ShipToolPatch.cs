@@ -288,14 +288,10 @@ namespace SentisOptimisationsPlugin.ShipTool
             
             __instance.easySetField("m_isActivatedOnSomething", false, typeof(MyShipToolBase));
             bool flag = false;
-            if (SentisOptimisationsPlugin.Config.AsyncWeld)
+            if (SentisOptimisationsPlugin.Config.AsyncWeld && __instance.CubeGrid.LinearVelocity.Length() < 5)
             {
                 var shipToolsAsyncQueues = SentisOptimisationsPlugin.Instance.ShipToolsAsyncQueues;
                 var runInFrame = MySession.Static.GameplayFrameCounter + r.Next(10, 60);
-                if (!__instance.CubeGrid.IsStatic)
-                {
-                    runInFrame = -1;
-                }
                 shipToolsAsyncQueues.EnqueueAction(() =>
                 {
                     List<MyEntity> topEntities = GetTopEntitiesInSphereAsync(boundingSphereD);
