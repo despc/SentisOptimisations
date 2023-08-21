@@ -38,11 +38,6 @@ namespace Optimizer.Optimizations
             ctx.GetPattern(MethodActivate).Prefixes.Add(
                 typeof(WelderOptimization).GetMethod(nameof(Activate),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-            // string name,
-            //     BindingFlags bindingAttr,
-            // Binder binder,
-            //     Type[] types,
-            // ParameterModifier[] modifiers
             var MethodIncreaseMountLevel = typeof(MySlimBlock).GetMethod(
                 "VRage.Game.ModAPI.IMySlimBlock.IncreaseMountLevel",
                 BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
@@ -95,7 +90,7 @@ namespace Optimizer.Optimizations
                             {
                                 pendingAction = AsynActions.Dequeue();
 
-                                runInFrame = MySession.Static.GameplayFrameCounter + r.Next(1, AsynActions.Count * 5);
+                                runInFrame = MySession.Static.GameplayFrameCounter + r.Next(1, AsynActions.Count);
                             }
                         }
 
@@ -421,7 +416,6 @@ namespace Optimizer.Optimizations
             }
         }
 
-        // Token: 0x060019BA RID: 6586 RVA: 0x0007BD0C File Offset: 0x00079F0C
         private static List<MyWelder.ProjectionRaycastData> FindProjectedBlocks(MyShipWelder welder,
             Action<MyShipWelder, List<MyWelder.ProjectionRaycastData>> callback = null)
         {

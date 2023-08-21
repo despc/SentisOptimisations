@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Reflection;
 using Havok;
@@ -18,15 +17,11 @@ using VRageMath;
 namespace SentisOptimisationsPlugin
 {
     [PatchShim]
-    public static class VoxelsPatch
+    public static class VoxelProtectorPatch
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
         public static HashSet<IMyUpgradeModule> Protectors = null;
-        public static FieldInfo fieldm_cachedData = typeof(MyStorageBase)
-            .GetField("m_cachedData", BindingFlags.Instance | BindingFlags.NonPublic);
-        //id вокселя, тик удаления кэша
-        public static ConcurrentDictionary<long, ulong> CacheNeedUpdateDict = new ConcurrentDictionary<long,ulong>();
 
         public static void Patch(PatchContext ctx)
         {
@@ -35,7 +30,7 @@ namespace SentisOptimisationsPlugin
                 BindingFlags.Static | BindingFlags.NonPublic);
 
             ctx.GetPattern(MethodMakeCraterInternal).Prefixes.Add(
-                typeof(VoxelsPatch).GetMethod(nameof(PatchMakeCraterInternal),
+                typeof(VoxelProtectorPatch).GetMethod(nameof(PatchMakeCraterInternal),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
 
             var MethodCutOutShapeWithProperties = typeof(MyVoxelGenerator).GetMethod(
@@ -43,7 +38,7 @@ namespace SentisOptimisationsPlugin
                 BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
 
             ctx.GetPattern(MethodCutOutShapeWithProperties).Prefixes.Add(
-                typeof(VoxelsPatch).GetMethod(nameof(PatchCutOutShape),
+                typeof(VoxelProtectorPatch).GetMethod(nameof(PatchCutOutShape),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
             
             var MethodCutOutShapeWithPropertiesAsync = typeof(MyVoxelBase).GetMethod(
@@ -51,7 +46,7 @@ namespace SentisOptimisationsPlugin
                 BindingFlags.Instance | BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
 
             ctx.GetPattern(MethodCutOutShapeWithPropertiesAsync).Prefixes.Add(
-                typeof(VoxelsPatch).GetMethod(nameof(PatchCutOutShape),
+                typeof(VoxelProtectorPatch).GetMethod(nameof(PatchCutOutShape),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
 
             var type = typeof(MyVoxelBase).Assembly.GetType("Sandbox.Game.MyExplosion");
@@ -61,7 +56,7 @@ namespace SentisOptimisationsPlugin
                 BindingFlags.Instance | BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
             
             ctx.GetPattern(MethodCCutOutVoxelMap).Prefixes.Add(
-                typeof(VoxelsPatch).GetMethod(nameof(PatchCutOutVoxelMap),
+                typeof(VoxelProtectorPatch).GetMethod(nameof(PatchCutOutVoxelMap),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
             
             
@@ -70,7 +65,7 @@ namespace SentisOptimisationsPlugin
                 BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
 
             ctx.GetPattern(MethodCutOutShape).Prefixes.Add(
-                typeof(VoxelsPatch).GetMethod(nameof(PatchCutOutShape),
+                typeof(VoxelProtectorPatch).GetMethod(nameof(PatchCutOutShape),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
 
             var MethodBreakLogicHandler = typeof(MyGridPhysics).GetMethod(
@@ -78,7 +73,7 @@ namespace SentisOptimisationsPlugin
                 BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
 
             ctx.GetPattern(MethodBreakLogicHandler).Prefixes.Add(
-                typeof(VoxelsPatch).GetMethod(nameof(PatchBreakLogicHandler),
+                typeof(VoxelProtectorPatch).GetMethod(nameof(PatchBreakLogicHandler),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
             
             var MethodRequestCutOut = typeof(MyShipMiningSystem).GetMethod(
@@ -86,7 +81,7 @@ namespace SentisOptimisationsPlugin
                 BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
 
             ctx.GetPattern(MethodRequestCutOut).Prefixes.Add(
-                typeof(VoxelsPatch).GetMethod(nameof(PatchRequestCutOut),
+                typeof(VoxelProtectorPatch).GetMethod(nameof(PatchRequestCutOut),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
         }
 
