@@ -9,7 +9,7 @@ using Torch.Managers.PatchManager;
 namespace SentisOptimisationsPlugin
 {
     [PatchShim]
-    public static class ConveyorPatch
+    public static class FindVoxelProtectorsPatch
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
@@ -20,13 +20,13 @@ namespace SentisOptimisationsPlugin
 
 
             ctx.GetPattern(MethodOnBlockAdded).Prefixes.Add(
-                typeof(ConveyorPatch).GetMethod(nameof(MethodOnBlockAddedPatched),
+                typeof(FindVoxelProtectorsPatch).GetMethod(nameof(MethodOnBlockAddedPatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
         }
 
         private static void MethodOnBlockAddedPatched(MyCubeGridSystems __instance, MySlimBlock block)
         {
-            if (VoxelsPatch.Protectors == null)
+            if (VoxelProtectorPatch.Protectors == null)
             {
                 if (block.FatBlock is MyUpgradeModule)
                 {
@@ -38,11 +38,11 @@ namespace SentisOptimisationsPlugin
                             if (fieldProtectors == null)
                             {
                                 Log.Error("No voxel protector support");
-                                VoxelsPatch.Protectors = new HashSet<IMyUpgradeModule>();
+                                VoxelProtectorPatch.Protectors = new HashSet<IMyUpgradeModule>();
                                 return;
                             }
 
-                            VoxelsPatch.Protectors = (HashSet<IMyUpgradeModule>)fieldProtectors.GetValue(null);
+                            VoxelProtectorPatch.Protectors = (HashSet<IMyUpgradeModule>)fieldProtectors.GetValue(null);
                         }
                     }
                 }

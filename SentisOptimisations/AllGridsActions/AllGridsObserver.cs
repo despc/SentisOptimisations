@@ -19,7 +19,6 @@ namespace SentisOptimisationsPlugin.AllGridsActions
         private OnlineReward _onlineReward = new OnlineReward();
         private PvEGridChecker _pvEGridChecker = new PvEGridChecker();
         private NpcStationsPowerFix _npcStationsPowerFix = new NpcStationsPowerFix();
-        private WCSafeZoneWorkAround _wcSafeZoneWorkAround = new WCSafeZoneWorkAround();
         public static HashSet<MyEntity> entitiesToShipTools = new HashSet<MyEntity>();
         public static HashSet<MySafeZone> safezones = new HashSet<MySafeZone>();
         public static HashSet<MyCubeGrid> myCubeGrids = new HashSet<MyCubeGrid>();
@@ -125,18 +124,6 @@ namespace SentisOptimisationsPlugin.AllGridsActions
                         {
                             await Task.Run(() => _npcStationsPowerFix.RefillPowerStations());
                         }
-
-                        await Task.Run(() =>
-                        {
-                            try
-                            {
-                                _wcSafeZoneWorkAround.ResizeSZ(safezones);
-                            }
-                            catch (Exception e)
-                            {
-                                Log.Error("Async SZ exception " + e);
-                            }
-                        });
                         await Task.Run(() =>
                         {
                             try

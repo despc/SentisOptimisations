@@ -242,13 +242,6 @@ namespace SentisOptimisationsPlugin
             set => SetValue(ref _enableCheckBeacon, value);
         }
         
-        [DisplayTab(Name = "Enabled Only Earth Spawn", GroupName = "Other", Tab = "Other", Order = 0, Description = "Enabled Only Earth Spawn")]
-        public bool EnableOnlyEarthSpawn
-        {
-            get => _enableOnlyEarthSpawn;
-            set => SetValue(ref _enableOnlyEarthSpawn, value);
-        }
-        
         [DisplayTab(Name = "Safe zone subgrid optimisation", GroupName = "Safe zone", Tab = "Safe zone", Order = 0, Description = "Safe zone subgrid optimisation")]
         public bool SafeZoneSubGridOptimisation
         {
@@ -410,14 +403,6 @@ namespace SentisOptimisationsPlugin
             get => _gridSystemOptimisations;
             set => SetValue(ref _gridSystemOptimisations, value);
         } 
-        
-        [DisplayTab(Name = "Async Sync", GroupName = "Performance", Tab = "Performance", Order = 15, Description = "Async Sync")]
-        public bool AsyncSync
-        {
-            get => _asyncSync;
-            set => SetValue(ref _asyncSync, value);
-        }
-        
         
          //=================================================================================================
 

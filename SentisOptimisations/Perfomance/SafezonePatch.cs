@@ -272,32 +272,7 @@ namespace SentisOptimisationsPlugin
             {
                 return true;
             }
-            
-            // if (SentisOptimisationsPlugin.Config.SlowdownEnabled)
-            // {
-            //     var myCubeGrid = entity as MyCubeGrid;
-            //     if (myCubeGrid != null)
-            //     {
-            //         var myUpdateTiersPlayerPresence = myCubeGrid.PlayerPresenceTier;
-            //         if (myUpdateTiersPlayerPresence == MyUpdateTiersPlayerPresence.Tier1)
-            //         {
-            //             if (NeedSkip(myCubeGrid.EntityId, 10))
-            //             {
-            //                 __result = true;
-            //                 return false;
-            //             }
-            //         }
-            //         else if (myUpdateTiersPlayerPresence == MyUpdateTiersPlayerPresence.Tier2)
-            //         {
-            //             if (NeedSkip(myCubeGrid.EntityId, 100))
-            //             {
-            //                 __result = true;
-            //                 return false;
-            //             }
-            //         }   
-            //     }
-            //     
-            // }
+         
             
             try
             {

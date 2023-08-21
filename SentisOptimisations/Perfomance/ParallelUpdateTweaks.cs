@@ -14,7 +14,6 @@ namespace FixTurrets.Perfomance
     public class ParallelUpdateTweaks
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
-        public static readonly Random r = new Random();
 
         private static Type MyThrusterBlockThrustComponentType =
             typeof(MyParallelEntityUpdateOrchestrator).Assembly.GetType(
