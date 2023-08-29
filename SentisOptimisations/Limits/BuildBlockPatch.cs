@@ -74,15 +74,7 @@ namespace SentisOptimisationsPlugin
                 CheckBeacon(__instance);
             });
             
-            
-            //
-            // if (pcu <= maxPcu)
-            // {
-            //     return true;
-            // }
-            
-            //SentisOptimisationsPlugin._limiter.LimitReached(__instance, identityId);
-            return false;
+            return true;
         }
 
         private static void CheckBeacon(MyCubeGrid grid)
