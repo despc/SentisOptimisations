@@ -49,6 +49,12 @@ namespace SentisOptimisationsPlugin
         //fixes
         private bool _removeEntityPhantomPatch = false;  //фикс краша из за гонки при входе/выходе из сз нескольких гридов/сабгридов одновременно
         
+        
+        //NPC
+        private String _pathToGrids = "C:\\SE\\Arrakis\\NPC";
+        private String _guardiansNpcNames = "MKB_9000.sbc,MKB_9000.sbc";
+        private int _guardDistanceSpawn = 300;
+        
         //other
         private String _pathToAsters = "C:\\Asteroids";
         private String _pathToGarage = "D:\\torch-server\\GARAGE";
@@ -196,6 +202,16 @@ namespace SentisOptimisationsPlugin
 
         [DisplayTab(Name = "Path to Garage", GroupName = "Other", Tab = "Other", Order = 0, Description = "Path to Garage")]
         public String PathToGarage { get => _pathToGarage; set => SetValue(ref _pathToGarage, value); }
+        
+        
+        [DisplayTab(Name = "Path to Grids Blueprints", GroupName = "NPC", Tab = "NPC", Order = 0, Description = "Path to Grids Blueprints")]
+        public String PathToGrids { get => _pathToGrids; set => SetValue(ref _pathToGrids, value); }
+        
+        [DisplayTab(Name = "Guardians NPC names", GroupName = "NPC", Tab = "NPC", Order = 0, Description = "Guardians NPC names")]
+        public String GuardiansNpcNames { get => _guardiansNpcNames; set => SetValue(ref _guardiansNpcNames, value); }
+        
+        [DisplayTab(Name = "Guardians spawn distance", GroupName = "NPC", Tab = "NPC", Order = 0, Description = "Guardians spawn distance")]
+        public int GuardDistanceSpawn { get => _guardDistanceSpawn; set => SetValue(ref _guardDistanceSpawn, value); }
         
         [DisplayTab(Name = "Contract escort multiplier", GroupName = "Contracts", Tab = "Contracts", Order = 0, Description = "Contract escort reward multiplier")]
         public double ContractEscortMultiplier
