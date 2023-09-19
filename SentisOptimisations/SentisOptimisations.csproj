@@ -55,6 +55,8 @@
       <Compile Include="DamagePatch.cs" />
       <Compile Include="FixShip\FixShipLogic.cs" />
       <Compile Include="FixShip\MessageType.cs" />
+      <Compile Include="GridSpawner\SpawnDelegate.cs" />
+      <Compile Include="GridSpawner\NPCSpawner.cs" />
       <Compile Include="GUI\ConfigGUI.cs">
         <DependentUpon>ConfigGUI.xaml</DependentUpon>
       </Compile>
@@ -72,6 +74,7 @@
       <Compile Include="Perfomance\AsyncSync.cs" />
       <Compile Include="Production\RefineryPatchs.cs" />
       <Compile Include="RemovePluginPatch.cs" />
+      <Compile Include="Rep\ReputationPatch.cs" />
       <Compile Include="ShipTool\ShipToolsAsyncQueues.cs" />
       <Compile Include="Shipyard\Dto\ConvertSyncRequest.cs" />
       <Compile Include="Perfomance\ExplosionsPatch.cs" />
@@ -104,6 +107,7 @@
       <Compile Include="Shipyard\ShipyardLogic\Shipyard.cs" />
       <Compile Include="SentisOptimisationsPlugin.cs" />
       <Compile Include="TurretPatchs.cs" />
+      <Compile Include="Tweaks\MedkitPatches.cs" />
       <Compile Include="Utils\BlockUtils.cs" />
       <Compile Include="Utils\ChatUtils.cs" />
       <Compile Include="Utils\ConfigUtils.cs" />
