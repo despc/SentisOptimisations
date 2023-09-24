@@ -67,50 +67,11 @@ namespace SentisOptimisationsPlugin
                             var currentRep = MyAPIGateway.Session.Factions.GetReputationBetweenPlayerAndFaction(
                                 playerIdentityId,
                                 attackedFaction.FactionId);
-                            var repChance = currentRep % 50;
                             if (currentRep <= -1498)
                             {
                                 return;
                             }
-
-                            if (repChance == 0 || repChance == 1)
-                            {
-                                if (currentRep <= -500)
-                                {
-                                    var factionMember = attackedFaction.Members.First();
-                                    var player = PlayerUtils.GetPlayer(playerIdentityId);
-                                    var guardNames = SentisOptimisationsPlugin.Config.GuardiansNpcNames.Split(',');
-                                    var gridName = guardNames[Random.Next(0, guardNames.Length)];
-                                    string gridFullPath = Path.Combine(SentisOptimisationsPlugin.Config.PathToGrids,
-                                        gridName);
-                                    NPCSpawner.DoSpawnGrids(factionMember.Value.PlayerId, gridFullPath,
-                                        NPCSpawner.SpawnPosition(player.GetPosition()).Value);
-                                }
-
-                                if (currentRep <= -1000)
-                                {
-                                    var factionMember = attackedFaction.Members.First();
-                                    var player = PlayerUtils.GetPlayer(playerIdentityId);
-                                    var guardNames = SentisOptimisationsPlugin.Config.GuardiansNpcNames.Split(',');
-                                    var gridName = guardNames[Random.Next(0, guardNames.Length)];
-                                    string gridFullPath = Path.Combine(SentisOptimisationsPlugin.Config.PathToGrids,
-                                        gridName);
-                                    NPCSpawner.DoSpawnGrids(factionMember.Value.PlayerId, gridFullPath,
-                                        NPCSpawner.SpawnPosition(player.GetPosition()).Value);
-                                }
-
-                                if (currentRep <= -1500)
-                                {
-                                    var factionMember = attackedFaction.Members.First();
-                                    var player = PlayerUtils.GetPlayer(playerIdentityId);
-                                    var guardNames = SentisOptimisationsPlugin.Config.GuardiansNpcNames.Split(',');
-                                    var gridName = guardNames[Random.Next(0, guardNames.Length)];
-                                    string gridFullPath = Path.Combine(SentisOptimisationsPlugin.Config.PathToGrids,
-                                        gridName);
-                                    NPCSpawner.DoSpawnGrids(factionMember.Value.PlayerId, gridFullPath,
-                                        NPCSpawner.SpawnPosition(player.GetPosition()).Value);
-                                }
-                            }
+                            SpawnGuards(playerIdentityId, attackedFaction, currentRep);
                         }
                         catch (Exception e)
                         {
@@ -141,6 +102,38 @@ namespace SentisOptimisationsPlugin
                         return;
                     __instance.AddFactionPlayerReputation(playerIdentityId, playerFaction1.FactionId,
                         reputationDamageDelta, false);
+                }
+            }
+        }
+
+        private static void SpawnGuards(long playerIdentityId, MyFaction attackedFaction, int currentRep)
+        {
+            var factionMember = attackedFaction.Members.First();
+            var player = PlayerUtils.GetPlayer(playerIdentityId);
+            if (player == null)
+            {
+                return;
+            }
+            var repChance = currentRep % 100;
+            if (repChance == 0 || repChance == 1)
+            {
+                var playerPos = player.GetPosition();
+               
+                if (currentRep <= -500)
+                {
+                    var spawnPosition = NPCSpawner.SpawnPosition(playerPos);
+                    if (!spawnPosition.HasValue)
+                    {
+                        Log.Warn("Cant find guard spawn position");
+                        return;
+                    }
+                    
+                    var guardNames = SentisOptimisationsPlugin.Config.GuardiansNpcNames.Split(',');
+                    var gridName = guardNames[Random.Next(0, guardNames.Length)];
+                    string gridFullPath = Path.Combine(SentisOptimisationsPlugin.Config.PathToGrids,
+                        gridName);
+                    NPCSpawner.DoSpawnGrids(factionMember.Value.PlayerId, gridFullPath,
+                        spawnPosition.Value);
                 }
             }
         }
