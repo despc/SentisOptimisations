@@ -7,13 +7,12 @@ using HarmonyLib;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NAPI;
-using NLog.Fluent;
+using Sandbox.Game;
 using Sandbox.Game.Entities.Blocks;
 using Sandbox.Game.Replication.StateGroups;
 using SentisOptimisations;
 using SpaceEngineers.Game.EntityComponents.Blocks;
 using Torch.Managers.PatchManager;
-using VRage.Network;
 using VRage.Scripting;
 using VRage.Sync;
 
@@ -49,12 +48,16 @@ namespace SentisOptimisationsPlugin.CrashFix
                 ("UpdateWaypointPositions", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
             var MethodNotify = typeof(MyPropertySyncStateGroup).GetMethod
                 ("Notify", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
+            
+            var MethodMyExplosionsUpdateBeforeSimulation = typeof(MyExplosions).GetMethod
+                ("UpdateBeforeSimulation", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
                 
             var finalizer = typeof(CrashFixPatch).GetMethod(nameof(SuppressExceptionFinalizer),
                 BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
             harmony.Patch(MethodSetDetailedInfo, finalizer: new HarmonyMethod(finalizer));
             harmony.Patch(MethodUpdateWaypointPositions, finalizer: new HarmonyMethod(finalizer));
             harmony.Patch(MethodNotify, finalizer: new HarmonyMethod(finalizer));
+            harmony.Patch(MethodMyExplosionsUpdateBeforeSimulation, finalizer: new HarmonyMethod(finalizer));
             
         }
 
