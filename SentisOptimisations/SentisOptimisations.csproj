@@ -7,9 +7,9 @@
         <ProjectGuid>{669A88DE-B622-4E5F-9BFA-AA6755444906}</ProjectGuid>
         <OutputType>Library</OutputType>
         <AppDesignerFolder>Properties</AppDesignerFolder>
-        <RootNamespace>FixTurrets</RootNamespace>
+        <RootNamespace>SentisOptimisations</RootNamespace>
         <AssemblyName>SentisOptimisations</AssemblyName>
-        <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+        <TargetFrameworkVersion>v4.8.1</TargetFrameworkVersion>
         <FileAlignment>512</FileAlignment>
         <LangVersion>latest</LangVersion>
     </PropertyGroup>
@@ -33,81 +33,46 @@
         <WarningLevel>4</WarningLevel>
     </PropertyGroup>
     <ItemGroup>
-      <Compile Include="AllGridsActions\AllGridsObserver.cs" />
-      <Compile Include="AllGridsActions\FallInVoxelDetector.cs" />
-      <Compile Include="AllGridsActions\GridAutoRenamer.cs" />
-      <Compile Include="AllGridsActions\NpcStationsPowerFix.cs" />
-      <Compile Include="AllGridsActions\OnlineReward.cs" />
-      <Compile Include="AllGridsActions\PvEGridChecker.cs" />
+      <Compile Include="AllGridsActions\AllGridsProcessor.cs" />
       <Compile Include="Anticheat\FuckRamPatch.cs" />
       <Compile Include="Anticheat\HydrogenPatch.cs" />
       <Compile Include="Anticheat\KEEN_ColorChangeExploitFix.cs" />
       <Compile Include="Anticheat\TorchPatch.cs" />
       <Compile Include="Api\ShieldApi.cs" />
-      <Compile Include="Char\CharPatch.cs" />
-      <Compile Include="Cleanup\CleanupPatch.cs" />
-      <Compile Include="Commands\AdminCommands.cs" />
-      <Compile Include="Commands\PlayerCommands.cs" />
-      <Compile Include="Config\ConfigShipInMarket.cs" />
+      <Compile Include="Communication\Communication.cs" />
+      <Compile Include="Communication\Dto\ConvertSyncRequest.cs" />
+      <Compile Include="Communication\Dto\FixShipRequest.cs" />
+      <Compile Include="Communication\Dto\GUI\GuiGridsRequest.cs" />
+      <Compile Include="Communication\Dto\GUI\GuiGridsResponse.cs" />
+      <Compile Include="Communication\Dto\MessageType.cs" />
+      <Compile Include="Communication\CommunicationUtils.cs" />
       <Compile Include="Config\MainConfig.cs" />
       <Compile Include="CrashFix\CrashFixPatch.cs" />
-      <Compile Include="ContractPricePatch.cs" />
-      <Compile Include="DamagePatch.cs" />
-      <Compile Include="FixShip\FixShipLogic.cs" />
-      <Compile Include="FixShip\MessageType.cs" />
-      <Compile Include="GridSpawner\SpawnDelegate.cs" />
-      <Compile Include="GridSpawner\NPCSpawner.cs" />
       <Compile Include="GUI\ConfigGUI.cs">
         <DependentUpon>ConfigGUI.xaml</DependentUpon>
       </Compile>
       <Compile Include="GUI\DisplayTab.cs" />
       <Compile Include="GUI\FilteredGrid.cs" />
-      <Compile Include="Limits\BuildBlockPatch.cs" />
-      <Compile Include="Limits\RaycastPatch.cs" />
-      <Compile Include="Limits\PcuLimiter.cs" />
-      <Compile Include="MissilePatch.cs" />
-      <Compile Include="NoScrapPatch.cs" />
-      <Compile Include="NPC\NpcPatches.cs" />
+      <Compile Include="Observer\EntitiesObserver.cs" />
+      <Compile Include="Observer\Utils\SearchEntitiesUtils.cs" />
       <Compile Include="Perfomance\FindVoxelProtectorsPatch.cs" />
       <Compile Include="Perfomance\GridSystemUpdatePatch.cs" />
       <Compile Include="Perfomance\ParallelUpdateTweaks.cs" />
       <Compile Include="Perfomance\AsyncSync.cs" />
-      <Compile Include="Production\RefineryPatchs.cs" />
-      <Compile Include="RemovePluginPatch.cs" />
-      <Compile Include="Rep\ReputationPatch.cs" />
       <Compile Include="ShipTool\ShipToolsAsyncQueues.cs" />
-      <Compile Include="Shipyard\Dto\ConvertSyncRequest.cs" />
-      <Compile Include="Perfomance\ExplosionsPatch.cs" />
       <Compile Include="Perfomance\GasTankOptimisations.cs" />
       <Compile Include="Perfomance\Limits\PhysicsProfilerMonitor.cs" />
       <Compile Include="Perfomance\Limits\Punisher.cs" />
       <Compile Include="Perfomance\PBFix.cs" />
       <Compile Include="Perfomance\SafezonePatch.cs" />
       <Compile Include="Perfomance\WelderOptimization.cs" />
-      <Compile Include="PVEZONE\DamageHandler.cs" />
-      <Compile Include="PVEZONE\MyDrillDamageFix.cs" />
-      <Compile Include="PVEZONE\PvECore.cs" />
       <Compile Include="Shared\Action2.cs" />
       <Compile Include="Shared\Ext2.cs" />
       <Compile Include="Shared\FrameExecutor.cs" />
       <Compile Include="Shared\SharpUtils.cs" />
       <Compile Include="Shared\Voxels.cs" />
       <Compile Include="ShipTool\ShipToolPatch.cs" />
-      <Compile Include="Shipyard\Communication.cs" />
-      <Compile Include="Shipyard\Dto\CancelSellRequest.cs" />
-      <Compile Include="Shipyard\Dto\ClientBuyRequest.cs" />
-      <Compile Include="Shipyard\Dto\FillListRequest.cs" />
-      <Compile Include="Shipyard\Dto\FillListResponse.cs" />
-      <Compile Include="Shipyard\Dto\FixShipRequest.cs" />
-      <Compile Include="Shipyard\Dto\GridForList.cs" />
-      <Compile Include="Shipyard\Dto\GUI\GuiGridsRequest.cs" />
-      <Compile Include="Shipyard\Dto\GUI\GuiGridsResponse.cs" />
-      <Compile Include="Shipyard\Dto\MessageType.cs" />
-      <Compile Include="Shipyard\Dto\StartSellRequest.cs" />
-      <Compile Include="Shipyard\ShipyardLogic\Shipyard.cs" />
       <Compile Include="SentisOptimisationsPlugin.cs" />
-      <Compile Include="TurretPatchs.cs" />
-      <Compile Include="Tweaks\MedkitPatches.cs" />
       <Compile Include="Utils\BlockUtils.cs" />
       <Compile Include="Utils\ChatUtils.cs" />
       <Compile Include="Utils\ConfigUtils.cs" />

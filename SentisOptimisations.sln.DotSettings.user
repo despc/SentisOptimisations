@@ -1,0 +1,67 @@
+﻿<wpf:ResourceDictionary xml:space="preserve" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:s="clr-namespace:System;assembly=mscorlib" xmlns:ss="urn:shemas-jetbrains-com:settings-storage-xaml" xmlns:wpf="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=C_003A_005CProgram_0020Files_0020_0028x86_0029_005CReference_0020Assemblies_005CMicrosoft_005CFramework_005C_002ENETFramework_005Cv4_002E6_002E1_005Cmscorlib_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=C_003A_005CProgram_0020Files_0020_0028x86_0029_005CReference_0020Assemblies_005CMicrosoft_005CFramework_005C_002ENETFramework_005Cv4_002E6_002E1_005CSystem_002ECore_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=C_003A_005CProgram_0020Files_0020_0028x86_0029_005CReference_0020Assemblies_005CMicrosoft_005CFramework_005C_002ENETFramework_005Cv4_002E6_002E1_005CSystem_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=C_003A_005CProgram_0020Files_0020_0028x86_0029_005CReference_0020Assemblies_005CMicrosoft_005CFramework_005C_002ENETFramework_005Cv4_002E6_002E1_005CSystem_002ENet_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=C_003A_005CProgram_0020Files_0020_0028x86_0029_005CReference_0020Assemblies_005CMicrosoft_005CFramework_005C_002ENETFramework_005Cv4_002E6_002E1_005CSystem_002EXml_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=C_003A_005CProgram_0020Files_0020_0028x86_0029_005CSteam_005Csteamapps_005Ccommon_005CSpaceEngineers_005CBin64_005CHavokWrapper_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=C_003A_005CProgram_0020Files_0020_0028x86_0029_005CSteam_005Csteamapps_005Ccommon_005CSpaceEngineers_005CBin64_005CHavok_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=C_003A_005CProgram_0020Files_0020_0028x86_0029_005CSteam_005Csteamapps_005Ccommon_005CSpaceEngineers_005CBin64_005CMicrosoft_002ECodeAnalysis_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=C_003A_005CProgram_0020Files_0020_0028x86_0029_005CSteam_005Csteamapps_005Ccommon_005CSpaceEngineers_005CBin64_005Cmscorlib_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=C_003A_005CProgram_0020Files_0020_0028x86_0029_005CSteam_005Csteamapps_005Ccommon_005CSpaceEngineers_005CBin64_005CProtoBuf_002ENet_002ECore_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=C_003A_005CProgram_0020Files_0020_0028x86_0029_005CSteam_005Csteamapps_005Ccommon_005CSpaceEngineers_005CBin64_005CProtoBuf_002ENet_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=C_003A_005CProgram_0020Files_0020_0028x86_0029_005CSteam_005Csteamapps_005Ccommon_005CSpaceEngineers_005CBin64_005CSandbox_002ECommon_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=C_003A_005CProgram_0020Files_0020_0028x86_0029_005CSteam_005Csteamapps_005Ccommon_005CSpaceEngineers_005CBin64_005CSandbox_002EGame_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=C_003A_005CProgram_0020Files_0020_0028x86_0029_005CSteam_005Csteamapps_005Ccommon_005CSpaceEngineers_005CBin64_005CSpaceEngineers_002EGame_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=C_003A_005CProgram_0020Files_0020_0028x86_0029_005CSteam_005Csteamapps_005Ccommon_005CSpaceEngineers_005CBin64_005CSpaceEngineers_002EObjectBuilders_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=C_003A_005CProgram_0020Files_0020_0028x86_0029_005CSteam_005Csteamapps_005Ccommon_005CSpaceEngineers_005CBin64_005CVRage_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=C_003A_005CProgram_0020Files_0020_0028x86_0029_005CSteam_005Csteamapps_005Ccommon_005CSpaceEngineers_005CBin64_005CVRage_002EGame_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=C_003A_005CProgram_0020Files_0020_0028x86_0029_005CSteam_005Csteamapps_005Ccommon_005CSpaceEngineers_005CBin64_005CVRage_002EMath_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=C_003A_005CProgram_0020Files_0020_0028x86_0029_005CSteam_005Csteamapps_005Ccommon_005CSpaceEngineers_005CBin64_005CVRage_002EScripting_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=C_003A_005Ctorch_002Dserver_005CDedicatedServer64_005CMicrosoft_002ECodeAnalysis_002ECSharp_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=C_003A_005Ctorch_002Dserver_005CDedicatedServer64_005CMicrosoft_002ECodeAnalysis_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=C_003A_005Ctorch_002Dserver_005CDedicatedServer64_005CSystem_002ECollections_002EImmutable_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=C_003A_005Ctorch_002Dserver_005CPlugins_005Cprofiler_002Dv3_002E1_002E0_002E28_002D25_002Dg9393be6_0020_00281_0029_005CProfiler_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=C_003A_005Ctorch_002Dserver_005CPlugins_005CTorch_0020Monitor_005CTorchMonitor_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=C_003A_005CUsers_005Cidesp_005CDownloads_005CDePatch_002D1_002E18_002E65_005CDePatch_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=C_003A_005CUsers_005Cidesp_005CRiderProjects_005CFixTurrets_005CSentisOptimisations_005CDependency_005C0Harmony_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=C_003A_005CUsers_005Cidesp_005CRiderProjects_005CFixTurrets_005CSentisOptimisations_005Clib_005C0Harmony_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=C_003A_005CUsers_005Cidesp_005CRiderProjects_005CFixTurrets_005CSentisOptimisations_005Clib_005CInfluxDb_002EClient_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=C_003A_005CUsers_005Cidesp_005CRiderProjects_005CFixTurrets_005CSentisOptimisations_005Clib_005CInfluxDb_002ETorch_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=C_003A_005CUsers_005Cidesp_005CRiderProjects_005CFixTurrets_005CSentisOptimisations_005Clib_005CProfiler_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=D_003A_005Ctorch_002Dserver_005CDedicatedServer64_005CHavokWrapper_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=D_003A_005Ctorch_002Dserver_005CDedicatedServer64_005CSandbox_002ECommon_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=D_003A_005Ctorch_002Dserver_005CDedicatedServer64_005CSandbox_002EGame_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=D_003A_005Ctorch_002Dserver_005CDedicatedServer64_005CSpaceEngineers_002EGame_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=D_003A_005Ctorch_002Dserver_005CDedicatedServer64_005CSystem_002ELinq_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=D_003A_005Ctorch_002Dserver_005CDedicatedServer64_005CVRage_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=D_003A_005Ctorch_002Dserver_005CDedicatedServer64_005CVRage_002ELibrary_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=D_003A_005Ctorch_002Dserver_005CDedicatedServer64_005CVRage_002EMath_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=D_003A_005Ctorch_002Dserver_005CDedicatedServer64_005CVRage_002ENetwork_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=D_003A_005Ctorch_002Dserver_005CDedicatedServer64_005CVRage_002EPlatform_002EWindows_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=D_003A_005Ctorch_002Dserver_005CDedicatedServer64_005CVRage_002ERemoteClient_002ECore_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=D_003A_005Ctorch_002Dserver_005CNLog_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=D_003A_005Ctorch_002Dserver_005CTorch_002EAPI_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=D_003A_005Ctorch_002Dserver_005CTorch_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=D_003A_005Ctorch_002Dserver_005CTorch_002EServer_002Eexe/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/CodeStyle/Naming/CSharpNaming/ApplyAutoDetectedRules/@EntryValue">False</s:Boolean>
+	<s:String x:Key="/Default/Environment/AssemblyExplorer/XmlDocument/@EntryValue">&lt;AssemblyExplorer&gt;&#xD;
+  &lt;Assembly Path="C:\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\Sandbox.Game.dll" /&gt;&#xD;
+  &lt;Assembly Path="C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8\mscorlib.dll" /&gt;&#xD;
+  &lt;Assembly Path="C:\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\mscorlib.dll" /&gt;&#xD;
+  &lt;Assembly Path="C:\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\VRage.Game.dll" /&gt;&#xD;
+  &lt;Assembly Path="C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8\System.Core.dll" /&gt;&#xD;
+  &lt;Assembly Path="D:\torch-server\DedicatedServer64\VRage.Library.dll" /&gt;&#xD;
+  &lt;Assembly Path="C:\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\NLog.dll" /&gt;&#xD;
+  &lt;Assembly Path="D:\torch-server\Torch.API.dll" /&gt;&#xD;
+  &lt;Assembly Path="C:\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\VRage.Library.dll" /&gt;&#xD;
+  &lt;Assembly Path="D:\torch-server\DedicatedServer64\Sandbox.Common.dll" /&gt;&#xD;
+  &lt;Assembly Path="C:\Users\idesp\Downloads\DePatch-1.18.65\DePatch.dll" /&gt;&#xD;
+  &lt;Assembly Path="D:\torch-server\DedicatedServer64\VRage.Platform.Windows.dll" /&gt;&#xD;
+  &lt;Assembly Path="C:\Users\idesp\RiderProjects\FixTurrets\SentisOptimisations\lib\InfluxDb.Torch.dll" /&gt;&#xD;
+  &lt;Assembly Path="C:\Users\idesp\RiderProjects\FixTurrets\SentisOptimisations\lib\Profiler.dll" /&gt;&#xD;
+  &lt;Assembly Path="D:\torch-server\DedicatedServer64\SpaceEngineers.Game.dll" /&gt;&#xD;
+  &lt;Assembly Path="C:\torch-server\Plugins\profiler-v3.1.0.28-25-g9393be6 (1)\Profiler.dll" /&gt;&#xD;
+  &lt;Assembly Path="c:\torch-server\dedicatedserver64\HavokWrapper.dll" /&gt;&#xD;
+  &lt;Assembly Path="C:\Users\idesp\RiderProjects\FixTurrets\SentisOptimisations\bin\Debug\Profiler.dll" /&gt;&#xD;
+&lt;/AssemblyExplorer&gt;</s:String></wpf:ResourceDictionary>

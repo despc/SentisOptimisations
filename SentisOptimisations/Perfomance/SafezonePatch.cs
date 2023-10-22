@@ -26,7 +26,7 @@ namespace SentisOptimisationsPlugin
     [PatchShim]
     public static class SafezonePatch
     {
-        public static Dictionary<long, long> entitiesInSZ = new Dictionary<long, long>();
+        public static Dictionary<long, GridInSzInfo> EntitiesInSZ = new Dictionary<long, GridInSzInfo>();
         public static Dictionary<long, int> Cooldowns = new Dictionary<long, int>();
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
         public static readonly Random r = new Random();
@@ -81,19 +81,23 @@ namespace SentisOptimisationsPlugin
                 ReflectionUtils.InvokeInstanceMethod(__instance.GetType(), __instance, "RemoveEntityPhantom",
                     new object[] {body, entity});
                 stopwatch.Stop();
+                if (entity is not MyCubeGrid)
+                {
+                    return false;
+                }
                 var stopwatchElapsedMilliseconds = stopwatch.ElapsedMilliseconds;
                 if (stopwatchElapsedMilliseconds < SentisOptimisationsPlugin.Config.SafeZonePhysicsThreshold)
                 {
                     return false;
                 }
 
-                if (entitiesInSZ.ContainsKey(entity.EntityId))
+                if (EntitiesInSZ.ContainsKey(entity.EntityId))
                 {
-                    entitiesInSZ[entity.EntityId] = entitiesInSZ[entity.EntityId] + stopwatchElapsedMilliseconds;
+                    EntitiesInSZ[entity.EntityId].DDosTimeMs += stopwatchElapsedMilliseconds;
                 }
                 else
                 {
-                    entitiesInSZ[entity.EntityId] = stopwatchElapsedMilliseconds;
+                    EntitiesInSZ[entity.EntityId] = new GridInSzInfo((MyCubeGrid) entity, stopwatchElapsedMilliseconds);
                 }
             }
             catch (Exception e)
@@ -286,7 +290,7 @@ namespace SentisOptimisationsPlugin
                     return false;
                 }
 
-                MyEntity topMostParent = entity.GetTopMostParent((System.Type) null);
+                MyEntity topMostParent = entity.GetTopMostParent((Type) null);
                 MyIDModule component;
                 if (topMostParent is IMyComponentOwner<MyIDModule> myComponentOwner &&
                     myComponentOwner.GetComponent(out component))
@@ -416,5 +420,17 @@ namespace SentisOptimisationsPlugin
         }
         private  static Dictionary<string, SubgridCheckResult> enumStringMapping = new Dictionary<string, SubgridCheckResult>();
         private  static Dictionary<object, SubgridCheckResult> enumMapping = new Dictionary<object, SubgridCheckResult>();
+    }
+    
+    public class GridInSzInfo
+    {
+        public MyCubeGrid MyCubeGrid;
+        public long DDosTimeMs;
+
+        public GridInSzInfo(MyCubeGrid myCubeGrid, long dDosTimeMs)
+        {
+            MyCubeGrid = myCubeGrid;
+            this.DDosTimeMs = dDosTimeMs;
+        }
     }
 }

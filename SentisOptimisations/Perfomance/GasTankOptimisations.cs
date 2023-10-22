@@ -1,11 +1,8 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using Sandbox.Definitions;
-using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Blocks;
 using SpaceEngineers.Game.Entities.Blocks;
-using SpaceEngineers.Game.World;
 using Torch.Managers.PatchManager;
 
 namespace SentisOptimisationsPlugin

@@ -47,12 +47,12 @@ namespace SentisOptimisationsPlugin
                 return;
             }
 
-            var profilerEnabled = ProfilerConfig.Instance.Enabled;
-            bool needDisable = !profilerEnabled;
-            if (!profilerEnabled)
-            {
-                ProfilerConfig.Instance.Enabled = true;
-            }
+            // var profilerEnabled = ProfilerConfig.Instance.Enabled;
+            // bool needDisable = !profilerEnabled;
+            // if (!profilerEnabled)
+            // {
+            //     ProfilerConfig.Instance.Enabled = true;
+            // }
             using (var profiler = new PhysicsProfiler())
             using (ProfilerResultQueue.Profile(profiler))
             {
@@ -70,10 +70,10 @@ namespace SentisOptimisationsPlugin
                 var result = profiler.GetResult();
                 ProcessResult(result);
             }
-            if (needDisable)
-            {
-                ProfilerConfig.Instance.Enabled = false;
-            }
+            // if (needDisable)
+            // {
+            //     ProfilerConfig.Instance.Enabled = false;
+            // }
         }
 
         void ProcessResult(BaseProfilerResult<HkWorld> result)
@@ -111,6 +111,7 @@ namespace SentisOptimisationsPlugin
         {
             var grids = PhysicsUtils.GetEntities(world)
                 .Where(e => e is IMyCubeGrid)
+                .Where(e => !e.Physics.IsStatic)
                 .Cast<IMyCubeGrid>()
                 .Where(e => PhysicsUtils.IsTopMostParent<IMyCubeGrid>((MyEntity) e))
                 .ToArray();

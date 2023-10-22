@@ -16,6 +16,7 @@ using Torch.Commands;
 using Torch.Managers.PatchManager;
 using VRage.Game;
 using VRage.Game.Components;
+using VRage.Game.Definitions;
 using VRage.Game.ModAPI;
 using VRage.ModAPI;
 
@@ -488,7 +489,7 @@ namespace NAPI
 
         public static void RegisterGuids(List<Guid> addGuids)
         {
-            var def = MyDefinitionManager.Static.GetEntityComponentDefinitions<VRage.Game.Definitions.MyModStorageComponentDefinition>();
+            var def = MyDefinitionManager.Static.GetEntityComponentDefinitions<MyModStorageComponentDefinition>();
             var guids = def.FirstOrDefault().RegisteredStorageGuids.ToList();
             guids.AddList(addGuids);
             def.FirstOrDefault().RegisteredStorageGuids = guids.ToArray();

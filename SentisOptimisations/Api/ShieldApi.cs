@@ -1,12 +1,11 @@
-﻿using Sandbox.ModAPI;
-using System;
+﻿using System;
+using System.Collections.Generic;
+using Sandbox.ModAPI;
+using VRage;
+using VRage.Game.Entity;
 using VRage.Game.ModAPI;
 using VRage.ModAPI;
 using VRageMath;
-using System.Collections.Generic;
-using Sandbox.Game.Entities;
-using VRage;
-using VRage.Game.Entity;
 
 namespace SentisOptimisationsPlugin
 {

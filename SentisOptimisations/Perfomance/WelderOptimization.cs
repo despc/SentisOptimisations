@@ -83,14 +83,11 @@ namespace Optimizer.Optimizations
                     {
                         Thread.Sleep(2);
                         Action pendingAction = null;
-                        var runInFrame = -1;
                         lock (AsynActions)
                         {
                             if (AsynActions.Count > 0)
                             {
                                 pendingAction = AsynActions.Dequeue();
-
-                                runInFrame = MySession.Static.GameplayFrameCounter + r.Next(1, AsynActions.Count);
                             }
                         }
 
@@ -107,7 +104,7 @@ namespace Optimizer.Optimizations
                                     catch
                                     {
                                     }
-                                }, StartAt: runInFrame);
+                                });
                             }
                             catch
                             {
