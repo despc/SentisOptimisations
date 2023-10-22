@@ -134,7 +134,7 @@ namespace SOPlugin.GUI
                     if (descriptor?.EditorType != null)
                     {
                         valueControl = (FrameworkElement)Activator.CreateInstance(descriptor.EditorType);
-                        valueControl.SetBinding(FrameworkElement.DataContextProperty, property.Name);
+                        valueControl.SetBinding(DataContextProperty, property.Name);
                     }
                     else if (property.GetSetMethod() == null && !(propertyType.IsGenericType && typeof(ICollection).IsAssignableFrom(propertyType.GetGenericTypeDefinition())) || descriptor?.ReadOnly == true)
                     {
@@ -154,7 +154,7 @@ namespace SOPlugin.GUI
                         if (isFlags)
                         {
                             var button = new Button { Content = "Edit Flags" };
-                            button.SetBinding(Button.DataContextProperty, property.Name);
+                            button.SetBinding(DataContextProperty, property.Name);
                             button.Click += EditFlags;
                             valueControl = button;
                         }
@@ -167,7 +167,7 @@ namespace SOPlugin.GUI
                     else if (propertyType.IsGenericType && propertyType.GetGenericTypeDefinition() == typeof(Dictionary<,>))
                     {
                         var button = new Button { Content = "Edit Collection" };
-                        button.SetBinding(Button.DataContextProperty, property.Name);
+                        button.SetBinding(DataContextProperty, property.Name);
                         button.Click += (sender, args) => EditDictionary(((Button)sender).DataContext);
 
                         valueControl = button;
@@ -175,14 +175,14 @@ namespace SOPlugin.GUI
                     else if (propertyType.IsGenericType && propertyType.GetGenericTypeDefinition() == typeof(SerializableDictionary<,>))
                     {
                         var button = new Button { Content = "Edit Collection" };
-                        button.SetBinding(Button.DataContextProperty, $"{property.Name}.Dictionary");
+                        button.SetBinding(DataContextProperty, $"{property.Name}.Dictionary");
                         button.Click += (sender, args) => EditDictionary(((Button)sender).DataContext);
                         valueControl = button;
                     }
                     else if (propertyType.IsGenericType && typeof(ICollection).IsAssignableFrom(propertyType.GetGenericTypeDefinition()))
                     {
                         var button = new Button { Content = "Edit Collection" };
-                        button.SetBinding(Button.DataContextProperty, property.Name);
+                        button.SetBinding(DataContextProperty, property.Name);
 
                         var gt = propertyType.GetGenericArguments()[0];
 
@@ -208,7 +208,7 @@ namespace SOPlugin.GUI
                     else
                     {
                         var button = new Button { Content = "Edit Object" };
-                        button.SetBinding(Button.DataContextProperty, property.Name);
+                        button.SetBinding(DataContextProperty, property.Name);
                         button.Click += (sender, args) => EditObject(((Button)sender).DataContext);
                         valueControl = button;
                     }

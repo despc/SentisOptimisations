@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Controls;
 using Havok;
@@ -14,13 +13,11 @@ using Sandbox.Definitions;
 using Sandbox.Engine.Multiplayer;
 using Sandbox.Engine.Physics;
 using Sandbox.Engine.Utils;
-using Sandbox.Engine.Voxels;
 using Sandbox.Game;
 using Sandbox.Game.Entities;
-using Sandbox.Game.GameSystems;
 using Sandbox.Game.World;
 using Sandbox.ModAPI;
-using SentisOptimisation.PveZone;
+using SentisGameplayImprovements.AllGridsActions;
 using SentisOptimisations;
 using SentisOptimisationsPlugin.AllGridsActions;
 using SentisOptimisationsPlugin.ShipTool;
@@ -30,13 +27,9 @@ using Torch.API;
 using Torch.API.Managers;
 using Torch.API.Plugins;
 using Torch.API.Session;
-using Torch.Commands;
-using Torch.Commands.Permissions;
 using Torch.Session;
 using VRage;
 using VRage.Collections;
-using VRage.Game.ModAPI;
-using VRage.Game.Voxels;
 using VRage.Network;
 using VRageMath;
 using VRageMath.Spatial;
@@ -46,27 +39,17 @@ namespace SentisOptimisationsPlugin
     public class SentisOptimisationsPlugin : TorchPluginBase, IWpfPlugin
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
-        public static PcuLimiter _limiter = new PcuLimiter();
-        public static Dictionary<long,long> stuckGrids = new Dictionary<long, long>();
-        public static Dictionary<long,long> gridsInSZ = new Dictionary<long, long>();
+        public static Dictionary<long, long> gridsInSZ = new Dictionary<long, long>();
         private static TorchSessionManager SessionManager;
         private static Persistent<MainConfig> _config;
         public static MainConfig Config => _config.Data;
-        public static Random _random = new Random();
         public UserControl _control = null;
         public static SentisOptimisationsPlugin Instance { get; private set; }
 
-        private AllGridsObserver _allGridsObserver = new AllGridsObserver();
+        private AllGridsProcessor _allGridsProcessor = new AllGridsProcessor();
         private SendReplicablesAsync _replicablesAsync = new SendReplicablesAsync();
         public ShipToolsAsyncQueues ShipToolsAsyncQueues = new ShipToolsAsyncQueues();
         public static ShieldApi SApi = new ShieldApi();
-
-        void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
-        {
-            Log.Error(e);
-            Log.Error("handled. {0}", e);
-            Log.Error("Terminating " + e.IsTerminating);
-       }
 
         public override void Init(ITorchBase torch)
         {
@@ -79,40 +62,13 @@ namespace SentisOptimisationsPlugin
             SessionManager = Torch.Managers.GetManager<TorchSessionManager>();
             if (SessionManager == null)
                 return;
-            MyEntities.OnEntityAdd += _allGridsObserver.MyEntitiesOnOnEntityAdd;
-            MyEntities.OnEntityRemove += _allGridsObserver.MyEntitiesOnOnEntityRemove;
-            var configOverrideModIds = Config.OverrideModIds;
-            SessionManager.SessionStateChanged += SessionManager_SessionStateChanged;
-            ReflectionUtils.SetPrivateStaticField(typeof(MyCubeBlockDefinition), nameof(MyCubeBlockDefinition.PCU_CONSTRUCTION_STAGE_COST), 0);
-            AppDomain.CurrentDomain.UnhandledException += new UnhandledExceptionEventHandler(CurrentDomain_UnhandledException);
-            //
-            // AppDomain.CurrentDomain.FirstChanceException += (sender, eventArgs) =>
-            // {
-            //     var e = eventArgs.Exception;
-            //     Log.Error(e);
-            //     Log.Error(e.StackTrace);
-            // };
-            //
-            if (string.IsNullOrEmpty(configOverrideModIds))
-            {
-                foreach (var modId in configOverrideModIds.Split(','))
-                {
-                    if (string.IsNullOrEmpty(configOverrideModIds))
-                    {
-                        try
-                        {
-                            var modIdL = Convert.ToUInt64(modId);
-                            SessionManager.AddOverrideMod(modIdL);
-                        }
-                        catch (Exception e)
-                        {
-                            Log.Warn("Skip wrong modId " + modId);
-                        }
-                    }
-                }
-            }
-        }
 
+            MyEntities.OnEntityAdd += EntitiesObserver.MyEntitiesOnOnEntityAdd;
+            MyEntities.OnEntityRemove += EntitiesObserver.MyEntitiesOnOnEntityRemove;
+            SessionManager.SessionStateChanged += SessionManager_SessionStateChanged;
+            ReflectionUtils.SetPrivateStaticField(typeof(MyCubeBlockDefinition),
+                nameof(MyCubeBlockDefinition.PCU_CONSTRUCTION_STAGE_COST), 0);
+        }
 
 
         private void SessionManager_SessionStateChanged(
@@ -121,7 +77,7 @@ namespace SentisOptimisationsPlugin
         {
             if (newState == TorchSessionState.Unloading)
             {
-                _allGridsObserver.OnUnloading();
+                _allGridsProcessor.OnUnloading();
                 _replicablesAsync.OnUnloading();
                 ShipToolsAsyncQueues.OnUnloading();
             }
@@ -129,13 +85,10 @@ namespace SentisOptimisationsPlugin
             {
                 if (newState != TorchSessionState.Loaded)
                     return;
-                DamagePatch.Init();
-                _allGridsObserver.OnLoaded();
+                _allGridsProcessor.OnLoaded();
                 _replicablesAsync.OnLoaded();
                 ShipToolsAsyncQueues.OnLoaded();
                 InitShieldApi();
-                Communication.RegisterHandlers();
-                PvECore.Init();
                 WelderOptimization.AsyncWeldLoopInit();
                 ProfilerConfig.Instance.Enabled = false;
             }
@@ -153,24 +106,25 @@ namespace SentisOptimisationsPlugin
                 Log.Error(e);
             }
         }
-        
+
         public void UpdateGui()
         {
-            try {
-            
+            try
+            {
                 ListReader<MyClusterTree.MyCluster> clusters = MyPhysics.Clusters.GetClusters();
                 var myPhysics = MySession.Static.GetComponent<MyPhysics>();
                 int active = 0;
                 foreach (MyClusterTree.MyCluster myCluster in clusters)
                 {
-                    if (myCluster.UserData is HkWorld userData && (bool)myPhysics.easyCallMethod("IsClusterActive", new object[]{myCluster.ClusterId, userData.CharacterRigidBodies.Count}))
+                    if (myCluster.UserData is HkWorld userData && (bool) myPhysics.easyCallMethod("IsClusterActive",
+                            new object[] {myCluster.ClusterId, userData.CharacterRigidBodies.Count}))
                     {
                         active++;
                     }
                 }
-                
+
                 var clustersCount = clusters.Count;
-                
+
                 Instance.UpdateUI((x) =>
                 {
                     var gui = x as ConfigGUI;
@@ -183,7 +137,7 @@ namespace SentisOptimisationsPlugin
                 Log.Error(e, "WTF?");
             }
         }
-        
+
         public void UpdateUI(Action<UserControl> action)
         {
             try
@@ -208,167 +162,98 @@ namespace SentisOptimisationsPlugin
                 Log.Error(e, "Cant UpdateUI");
             }
         }
-        
+
         public override void Update()
         {
             FrameExecutor.Update();
             if (MySandboxGame.Static.SimulationFrameCounter % 600 == 0)
             {
                 Task.Run(UpdateGui);
-                foreach (var keyValuePair in new Dictionary<long, long>(SafezonePatch.entitiesInSZ))
-                {
-                    var entityId = keyValuePair.Key;
-                    var entityById = MyEntities.GetEntityById(entityId);
-                    var displayName = "";
-                    if (entityById != null)
-                    {
-                        displayName = entityById.DisplayName;  
-                    }
+                Task.Run(DetectSZDDos);
+            }
+        }
 
-                    var time = keyValuePair.Value;
-                    if (time > 5)
+        private static void DetectSZDDos()
+        {
+            foreach (var keyValuePair in new Dictionary<long, GridInSzInfo>(SafezonePatch.EntitiesInSZ))
+            {
+                var entityId = keyValuePair.Key;
+                var cubeGrid = keyValuePair.Value.MyCubeGrid;
+                var displayName = "";
+                if (cubeGrid != null)
+                {
+                    displayName = cubeGrid.DisplayName;
+                }
+
+                var time = keyValuePair.Value.DDosTimeMs;
+                if (time > 5)
+                {
+                    Log.Error("Entity in sz " + entityId + "   " + displayName + " time - " + time);
+                    if (gridsInSZ.ContainsKey(entityId))
                     {
-                        Log.Error("Entity in sz " + entityId + "   " + displayName + " time - " + time);
-                        if (gridsInSZ.ContainsKey(entityId))
+                        if (gridsInSZ[entityId] > 1)
                         {
-                            if (gridsInSZ[entityId] > 1)
+                            try
                             {
-                                if (entityById is MyCubeGrid)
+                                if (!cubeGrid.IsStatic)
                                 {
+                                    MyAPIGateway.Utilities.InvokeOnGameThread(() =>
+                                    {
+                                        cubeGrid.Physics?.SetSpeeds(Vector3.Zero, Vector3.Zero);
+                                        cubeGrid.ConvertToStatic();
+                                    });
+                                    CommunicationUtils.SyncConvert(cubeGrid, true);
                                     try
                                     {
-                                        var myCubeGrid = ((MyCubeGrid)entityById);
-                                        if (!myCubeGrid.IsStatic)
+                                        MyMultiplayer.RaiseEvent(cubeGrid,
+                                            x => x.ConvertToStatic, default);
+                                        foreach (var player in MySession.Static.Players.GetOnlinePlayers())
                                         {
-                                            myCubeGrid.Physics?.SetSpeeds(Vector3.Zero, Vector3.Zero);
-                                            myCubeGrid.ConvertToStatic();
-                                            PlayerCommands.SyncConvert(myCubeGrid, true);
-                                            try
-                                            {
-                                                MyMultiplayer.RaiseEvent<MyCubeGrid>(myCubeGrid, (MyCubeGrid x) => new Action(x.ConvertToStatic), default(EndpointId));
-                                                foreach (var player in MySession.Static.Players.GetOnlinePlayers())
-                                                {
-                                                    MyMultiplayer.RaiseEvent<MyCubeGrid>(myCubeGrid, (MyCubeGrid x) => new Action(x.ConvertToStatic), new EndpointId(player.Id.SteamId));
-                                                }
-                                            }
-                                            catch (Exception ex)
-                                            {
-                                                Log.Error(ex, "()Exception in RaiseEvent.");
-                                            }
-                                            if (myCubeGrid.BigOwners.Count > 0)
-                                            {
-                                           
-                                                ChatUtils.SendTo(myCubeGrid.BigOwners[0], "Структура " + displayName + " конвертирована в статику в связи с дудосом");
-                                                MyVisualScriptLogicProvider.ShowNotification("Структура " + displayName + " конвертирована в статику в связи с дудосом", 10000,
-                                                    "Red",
-                                                    myCubeGrid.BigOwners[0]);  
-                                            }
-                                            Log.Error("Grid " + displayName + " Converted To Static");
-                                            gridsInSZ[entityId] = 0;
-                                            continue; 
+                                            MyMultiplayer.RaiseEvent(cubeGrid,
+                                                x => x.ConvertToStatic,
+                                                new EndpointId(player.Id.SteamId));
                                         }
                                     }
-                                    catch (Exception e)
+                                    catch (Exception ex)
                                     {
-                                        Log.Error(e);
+                                        Log.Error(ex, "()Exception in RaiseEvent.");
                                     }
-                                    
-                                }
-                                Log.Error("Anything else fck sz " + entityId + "   " + displayName + " time - " + time);
-                                gridsInSZ[entityId] = 0;
-                                continue;
-                            }
-                            gridsInSZ[entityId] = gridsInSZ[entityId] + 1; 
-                            
-                        }
-                        else
-                        {
-                            gridsInSZ[entityId] = 1;
-                        }
-                    }
-                }
-                SafezonePatch.entitiesInSZ.Clear();
-            }
 
-            if (MySandboxGame.Static.SimulationFrameCounter % 120 == 0)
-            {
-                foreach (var keyValuePair in DamagePatch.contactInfo)
-                {
-                    var entityId = keyValuePair.Key;
-                    var entityById = MyEntities.GetEntityById(entityId);
-                    if (!(entityById is MyCubeGrid))
-                    {
-                        continue;
-                    }
-
-                    var contactCount = keyValuePair.Value;
-                    if (contactCount > 50)
-                    {
-                        Log.Error("Entity  " + entityById.DisplayName + " position " +
-                                  entityById.PositionComp.GetPosition() + " contact count - " + contactCount);
-                    }
-
-                    if (contactCount < 800)
-                    {
-                        continue;
-                    }
-
-                    if (stuckGrids.ContainsKey(entityId))
-                    {
-                        if (stuckGrids[entityId] > 5)
-                        {
-                            var myCubeGrid = ((MyCubeGrid) entityById);
-                            if (!Vector3.IsZero(
-                                MyGravityProviderSystem.CalculateNaturalGravityInPoint(entityById.WorldMatrix
-                                    .Translation)))
-                            {
-                                myCubeGrid.Physics?.SetSpeeds(Vector3.Zero, Vector3.Zero);
-                                myCubeGrid.ConvertToStatic();
-                                try
-                                {
-                                    MyMultiplayer.RaiseEvent<MyCubeGrid>(myCubeGrid, (MyCubeGrid x) => new Action(x.ConvertToStatic), default(EndpointId));
-                                    foreach (var player in MySession.Static.Players.GetOnlinePlayers())
+                                    if (cubeGrid.BigOwners.Count > 0)
                                     {
-                                        MyMultiplayer.RaiseEvent<MyCubeGrid>(myCubeGrid, (MyCubeGrid x) => new Action(x.ConvertToStatic), new EndpointId(player.Id.SteamId));
+                                        ChatUtils.SendTo(cubeGrid.BigOwners[0],
+                                            "Структура " + displayName + " конвертирована в статику в связи с дудосом");
+                                        MyVisualScriptLogicProvider.ShowNotification(
+                                            "Структура " + displayName + " конвертирована в статику в связи с дудосом",
+                                            10000,
+                                            "Red",
+                                            cubeGrid.BigOwners[0]);
                                     }
-                                }
-                                catch (Exception ex)
-                                {
-                                    Log.Error(ex, "()Exception in RaiseEvent.");
+
+                                    Log.Error("Grid " + displayName + " Converted To Static");
+                                    gridsInSZ[entityId] = 0;
+                                    continue;
                                 }
                             }
-                            else
+                            catch (Exception e)
                             {
-                                try
-                                {
-                                    Log.Info("Teleport stuck grid " + myCubeGrid.DisplayName);
-                                    MatrixD worldMatrix = myCubeGrid.WorldMatrix;
-                                    var position = myCubeGrid.PositionComp.GetPosition();
-
-                                    var garbageLocation = new Vector3D(position.X + _random.Next(-10000, 10000),
-                                        position.Y + _random.Next(-10000, 10000),
-                                        position.Z + _random.Next(-10000, 10000));
-                                    worldMatrix.Translation = garbageLocation;
-                                    myCubeGrid.Teleport(worldMatrix, (object) null, false);
-                                }
-                                catch (Exception e)
-                                {
-                                    Log.Error("Exception in time try teleport entity to garbage", e);
-                                }
+                                Log.Error(e);
                             }
 
-                            stuckGrids.Remove(entityId);
+                            gridsInSZ[entityId] = 0;
                             continue;
                         }
 
-                        stuckGrids[entityId] = stuckGrids[entityId] + 1;
-                        continue;
+                        gridsInSZ[entityId] += 1;
                     }
-                    stuckGrids[entityId] = 1;
+                    else
+                    {
+                        gridsInSZ[entityId] = 1;
+                    }
                 }
-
-                DamagePatch.contactInfo.Clear();
             }
+
+            SafezonePatch.EntitiesInSZ.Clear();
         }
 
         public UserControl GetControl()
@@ -377,6 +262,7 @@ namespace SentisOptimisationsPlugin
             {
                 _control = new ConfigGUI();
             }
+
             return _control;
         }
 
@@ -385,47 +271,9 @@ namespace SentisOptimisationsPlugin
             _config = Persistent<MainConfig>.Load(Path.Combine(StoragePath, "SentisOptimisations.cfg"));
         }
 
-        public class TestCommands : CommandModule
-        {
-            [Command("fix-asters", "Fix astersCommand")]
-            [Permission(MyPromoteLevel.Moderator)]
-            public void FixAsters()
-            {
-                var myVoxelMaps = MyEntities.GetEntities().OfType<IMyVoxelMap>().ToArray<IMyVoxelMap>();
-                for (int i = 0; i < myVoxelMaps.Count(); i++)
-                {
-                    try
-                    {
-                        
-                        var voxelMap = myVoxelMaps[i];
-                        if (voxelMap.Name == null)
-                        {
-                            continue;
-                        }
-                        if (!voxelMap.Name.Contains("Field"))
-                        {
-                            continue;
-                        }
-                        Vector3D position = voxelMap.GetPosition();
-                        byte[] storageData;
-                        voxelMap.Storage.Save(out storageData);
-                        IMyStorage storage = MyAPIGateway.Session.VoxelMaps.CreateStorage(storageData) as IMyStorage;
-                        voxelMap.PositionComp.SetPosition(Vector3D.Zero);
-                        var addVoxelMap = MyWorldGenerator.AddVoxelMap(voxelMap.Name + "new", (MyStorageBase) storage, position);
-                        addVoxelMap.PositionComp.SetPosition(position);
-                        Log.Error("refresh voxels " + voxelMap.DisplayName);
-                    }
-                    catch (Exception e)
-                    {
-                        Log.Error("Exception ", e);
-                    }
-                }
-            }
-        }
         public override void Dispose()
         {
             _config.Save(Path.Combine(StoragePath, "SentisOptimisations.cfg"));
-            _allGridsObserver.CancellationTokenSource.Cancel();
             _replicablesAsync.CancellationTokenSource.Cancel();
             base.Dispose();
         }

@@ -2,10 +2,8 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Reflection;
-using System.Threading.Tasks;
 using NAPI;
 using NLog;
-using NLog.Fluent;
 using Sandbox;
 using Sandbox.Definitions;
 using Sandbox.Engine.Physics;
@@ -19,8 +17,8 @@ using Sandbox.Game.World;
 using Sandbox.Game.WorldEnvironment;
 using Sandbox.Game.WorldEnvironment.Modules;
 using Sandbox.ModAPI;
+using SentisGameplayImprovements.AllGridsActions;
 using SentisOptimisations;
-using SentisOptimisationsPlugin.AllGridsActions;
 using SpaceEngineers.Game.Entities.Blocks;
 using Torch.Managers.PatchManager;
 using VRage.Game;
@@ -383,7 +381,7 @@ namespace SentisOptimisationsPlugin.ShipTool
             try
             {
                 List<MyEntity> entitiesInSphereAsync = new List<MyEntity>();
-                foreach (var entity in new HashSet<MyEntity>(AllGridsObserver.entitiesToShipTools))
+                foreach (var entity in new HashSet<MyEntity>(EntitiesObserver.EntitiesToShipTools))
                 {
                     if (entity.PositionComp.WorldAABB.Intersects(boundingSphereD))
                     {

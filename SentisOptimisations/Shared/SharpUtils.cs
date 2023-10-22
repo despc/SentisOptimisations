@@ -1,8 +1,8 @@
-﻿using Sandbox.ModAPI;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Text.RegularExpressions;
+using Sandbox.ModAPI;
 using VRage;
 using VRage.Game.ModAPI;
 

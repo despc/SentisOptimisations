@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using NAPI;
 
 namespace NAPI
 {
@@ -97,7 +96,7 @@ namespace NAPI
                 {
                     timer--; return;
                 }
-                FrameExecutor.removeFrameLogic(this);
+                removeFrameLogic(this);
                 action.run(k);
             }
         }

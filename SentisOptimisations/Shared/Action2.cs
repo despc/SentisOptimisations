@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace NAPI
+﻿namespace NAPI
 {
     public interface Action2<T, K>
     {

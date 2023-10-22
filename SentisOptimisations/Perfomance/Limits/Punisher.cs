@@ -112,7 +112,7 @@ namespace SentisOptimisationsPlugin
                 MyPhysics.Clusters.ReorderClusters(BoundingBoxD.CreateFromSphere(sphere));
                 myCubeGrid.Physics?.SetSpeeds(Vector3.Zero, Vector3.Zero);
                 myCubeGrid.ConvertToStatic();
-                PlayerCommands.SyncConvert(myCubeGrid, true);
+                CommunicationUtils.SyncConvert(myCubeGrid, true);
                 try
                 {
                     MyMultiplayer.RaiseEvent<MyCubeGrid>(myCubeGrid, (MyCubeGrid x) => new Action(x.ConvertToStatic),

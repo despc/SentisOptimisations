@@ -1,10 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using Sandbox.ModAPI;
-using SentisOptimisationsPlugin.FixShip;
-using SentisOptimisationsPlugin.ShipyardLogic;
-using VRage.ModAPI;
-using VRageMath;
 
 namespace SentisOptimisationsPlugin
 {
@@ -30,27 +25,9 @@ namespace SentisOptimisationsPlugin
         Array.Copy((Array) bytes, 1, (Array) data, 0, data.Length);
         switch (messageType)
         {
-          case MessageType.FixShip:
-            FixShip(data);
-            break;
-          case MessageType.BuyReq:
-            OnClientBuy(data);
-            break;
-          case MessageType.SellReq:
-            OnStartSellGrid(data);
-            break;
-          // case MessageType.SelectGridReq:
-          //   OnSelectGrid(data);
-          //   break;
-          case MessageType.SetGridListReq:
-            Shipyard.OnListRequest(data);
-            break;
-          case MessageType.ListForGuiReq:
-            Shipyard.OnListRequestForGui(data);
-            break;
-          case MessageType.CancelSellReq:
-            Shipyard.OnCancelSell(data);
-            break;
+          // case MessageType.FixShip:
+          //   FixShip(data);
+          //   break;          
         }
       }
       catch (Exception ex)
@@ -59,35 +36,7 @@ namespace SentisOptimisationsPlugin
       }
     }
 
-    private static void OnClientBuy(byte[] data)
-    {
-      ClientBuyRequest clientBuyRequest = MyAPIGateway.Utilities.SerializeFromBinary<ClientBuyRequest>(data);
-      if (clientBuyRequest.SteamId <= 0UL)
-        return;
-      Shipyard.OnClientBuy(clientBuyRequest);
-    }
     
-    private static void FixShip(byte[] data)
-    {
-      FixShipRequest request = MyAPIGateway.Utilities.SerializeFromBinary<FixShipRequest>(data);
-      var requestGridId = request.gridId;
-      var owner = request.owner;
-      if (owner == 0)
-      {
-        return;
-      }
-      FixShipLogic.DoFixShip(requestGridId, owner);
-
-    }
-    
-    private static void OnStartSellGrid(byte[] data)
-    {
-      StartSellRequest sellRequest = MyAPIGateway.Utilities.SerializeFromBinary<StartSellRequest>(data);
-
-      Shipyard.OnStartSell(sellRequest);
-      
-    }
-
     public static void BroadcastToClients(MessageType type, byte[] data)
     {
       byte[] newData = new byte[data.Length + 1];
