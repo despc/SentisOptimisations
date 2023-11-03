@@ -90,7 +90,6 @@ namespace SentisOptimisationsPlugin
                 ShipToolsAsyncQueues.OnLoaded();
                 InitShieldApi();
                 WelderOptimization.AsyncWeldLoopInit();
-                ProfilerConfig.Instance.Enabled = false;
             }
         }
 
