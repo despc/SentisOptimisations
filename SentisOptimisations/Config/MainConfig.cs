@@ -36,6 +36,15 @@ namespace SentisOptimisationsPlugin
         private bool _slowdownEnabled = true;
         private bool _fixVoxelFreeze = false;
         
+        //Freezer
+        private bool _freezerEnabled = true;
+        private int _freezeDistance = 10000;
+        private bool _freezeNpc = false;
+        private bool _freezeSignals = false;
+        private bool _enableDebugLogs = true;
+        private string _antifreezeBlockSubtypes = "LargeBlockSmallContainer_admin2:LargeBlockSmallContainer_admin";
+        private int _minWakeUpIntervalInSec = 600;
+        
         [DisplayTab(Name = "Slowdown Enabled", GroupName = "Slowdown", Tab = "Slowdown", Order = 0, Description = "Slowdown Enabled")]
         public bool SlowdownEnabled
         {
@@ -149,5 +158,27 @@ namespace SentisOptimisationsPlugin
         [DisplayTab(Name = "Async weld Advanced", GroupName = "Welder Tweaks (WIP)", Tab = "Welder Optimizations", Order = 8, Description = "Async weld Advanced")]
         public bool AsyncWeldAdvanced { get => _asyncWeldAdvanced; set => SetValue(ref _asyncWeldAdvanced, value); }
         
+        
+        ///Freezer
+        [DisplayTab(Name = "Enable Freezer", GroupName = "Freezer", Tab = "Freezer", Order = 0, Description = "Enable Freezer")]
+        public bool FreezerEnabled { get => _freezerEnabled; set => SetValue(ref _freezerEnabled, value); }
+        
+        [DisplayTab(Name = "Freeze distance", GroupName = "Freezer", Tab = "Freezer", Order = 1, Description = "Freeze distance")]
+        public int FreezeDistance { get => _freezeDistance; set => SetValue(ref _freezeDistance, value); }
+        
+        [DisplayTab(Name = "Freeze NPC", GroupName = "Freezer", Tab = "Freezer", Order = 2, Description = "Freeze NPC")]
+        public bool FreezeNpc { get => _freezeNpc; set => SetValue(ref _freezeNpc, value); }
+        
+        [DisplayTab(Name = "Freeze Signals", GroupName = "Freezer", Tab = "Freezer", Order = 3, Description = "Freeze Signals")]
+        public bool FreezeSignals { get => _freezeSignals; set => SetValue(ref _freezeSignals, value); }
+        
+        [DisplayTab(Name = "Antifreeze blocks subtypes", GroupName = "Freezer", Tab = "Freezer", Order = 4, Description = "Antifreeze blocks subtypes")]
+        public string AntifreezeBlocksSubtypes { get => _antifreezeBlockSubtypes; set => SetValue(ref _antifreezeBlockSubtypes, value); }
+        
+        [DisplayTab(Name = "Min WakeUp Interval In Sec", GroupName = "Freezer", Tab = "Freezer", Order = 5, Description = "Min WakeUp Interval In Sec")]
+        public int MinWakeUpIntervalInSec { get => _minWakeUpIntervalInSec; set => SetValue(ref _minWakeUpIntervalInSec, value); }
+        
+        [DisplayTab(Name = "Debug logs", GroupName = "Freezer", Tab = "Freezer", Order = 6, Description = "Debug logs")]
+        public bool EnableDebugLogs { get => _enableDebugLogs; set => SetValue(ref _enableDebugLogs, value); }
     }
 }

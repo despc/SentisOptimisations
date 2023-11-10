@@ -189,5 +189,6 @@ namespace SentisOptimisations
             }
             return MySession.Static.Players.IdentityIsNpc(identityId);
         }
+
     }
 }

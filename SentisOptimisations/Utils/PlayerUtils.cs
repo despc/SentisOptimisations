@@ -119,6 +119,11 @@ namespace SentisOptimisations
 
             return result;
         }
+        
+        public static bool IsAnyPlayersInRadius(Vector3D point, float radius)
+        {
+            return GetAllPlayersInRadius(point, radius).Count > 0;
+        }
 
         public static bool IsAdmin(IMyPlayer player) => player != null &&
                                                         (player.PromoteLevel == MyPromoteLevel.Owner ||

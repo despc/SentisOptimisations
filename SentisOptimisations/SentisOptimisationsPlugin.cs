@@ -20,6 +20,7 @@ using Sandbox.ModAPI;
 using SentisGameplayImprovements.AllGridsActions;
 using SentisOptimisations;
 using SentisOptimisationsPlugin.AllGridsActions;
+using SentisOptimisationsPlugin.Freezer;
 using SentisOptimisationsPlugin.ShipTool;
 using SOPlugin.GUI;
 using Torch;
@@ -129,6 +130,8 @@ namespace SentisOptimisationsPlugin
                     var gui = x as ConfigGUI;
                     gui.ClustersStatistic.Text =
                         $"Count: {clustersCount}, Active: {active}";
+                    gui.FreezerStatistic.Text =
+                        $"Total grids: {EntitiesObserver.MyCubeGrids.Count}, Frozen: {FreezeLogic.FrozenGrids.Count}";
                 });
             }
             catch (Exception e)

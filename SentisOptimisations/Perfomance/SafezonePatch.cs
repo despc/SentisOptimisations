@@ -343,8 +343,8 @@ namespace SentisOptimisationsPlugin
                 if (topMostParent is MyCubeGrid nodeInGroup)
                 {
                     MyGroupsBase<MyCubeGrid> groups = MyCubeGridGroups.Static.GetGroups(GridLinkTypeEnum.Mechanical);
-                   SubgridCheckResult subgridCheckResult1 = SubgridCheckResult.NOT_SAFE;
-                    
+                    SubgridCheckResult subgridCheckResult1 = SubgridCheckResult.NOT_SAFE;
+
                     foreach (MyCubeGrid groupNode in groups.GetGroupNodes(nodeInGroup))
                     {
                         object result = ReflectionUtils.InvokeInstanceMethod(typeof(MySafeZone), __instance, "IsSubGridSafe", new []{groupNode});
