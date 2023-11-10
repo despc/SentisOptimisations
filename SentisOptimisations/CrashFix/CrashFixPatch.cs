@@ -10,6 +10,7 @@ using NAPI;
 using Sandbox.Game;
 using Sandbox.Game.Entities.Blocks;
 using Sandbox.Game.Replication.StateGroups;
+using Sandbox.Game.Weapons;
 using SentisOptimisations;
 using SpaceEngineers.Game.EntityComponents.Blocks;
 using Torch.Managers.PatchManager;
@@ -51,6 +52,9 @@ namespace SentisOptimisationsPlugin.CrashFix
             
             var MethodMyExplosionsUpdateBeforeSimulation = typeof(MyExplosions).GetMethod
                 ("UpdateBeforeSimulation", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
+            
+            var MethodMyAngleGrinderGrind = typeof(MyAngleGrinder).GetMethod
+                ("Grind", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
                 
             var finalizer = typeof(CrashFixPatch).GetMethod(nameof(SuppressExceptionFinalizer),
                 BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
@@ -58,6 +62,7 @@ namespace SentisOptimisationsPlugin.CrashFix
             harmony.Patch(MethodUpdateWaypointPositions, finalizer: new HarmonyMethod(finalizer));
             harmony.Patch(MethodNotify, finalizer: new HarmonyMethod(finalizer));
             harmony.Patch(MethodMyExplosionsUpdateBeforeSimulation, finalizer: new HarmonyMethod(finalizer));
+            harmony.Patch(MethodMyAngleGrinderGrind, finalizer: new HarmonyMethod(finalizer));
             
         }
 

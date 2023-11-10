@@ -3,6 +3,7 @@ using NLog;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Character;
 using Sandbox.Game.WorldEnvironment;
+using SentisOptimisationsPlugin.Freezer;
 using VRage.Game.Entity;
 using VRage.Game.ModAPI;
 
@@ -32,6 +33,7 @@ namespace SentisGameplayImprovements.AllGridsActions
             if (entity is MyCubeGrid)
             {
                 MyCubeGrids.Remove((MyCubeGrid) entity);
+                FreezeLogic.FrozenGrids.Remove(entity.EntityId);
                 return;
             }
 
