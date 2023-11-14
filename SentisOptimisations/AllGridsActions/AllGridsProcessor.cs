@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using NLog;
+using Sandbox;
 using Sandbox.Game.Entities;
 using Sandbox.ModAPI;
 using SentisGameplayImprovements.AllGridsActions;
@@ -65,7 +66,7 @@ namespace SentisOptimisationsPlugin.AllGridsActions
                 {
                     try
                     {
-                        await Task.Delay(1000);
+                        await Task.Delay(2000);
                         var gridsList = new HashSet<IMyCubeGrid>(EntitiesObserver.MyCubeGrids);
                         while (gridsList.Count > 0)
                         {
@@ -73,7 +74,8 @@ namespace SentisOptimisationsPlugin.AllGridsActions
                             HashSet<IMyCubeGrid> grids = new HashSet<IMyCubeGrid>();
                             MyAPIGateway.GridGroups.GetGroup(grid, GridLinkTypeEnum.Physical, grids);
                             grids.ForEach(cubeGrid => gridsList.Remove(cubeGrid));
-
+                            var cpuLoad = MySandboxGame.Static.CPULoad;
+                            _freezeLogic.UpdateCpuLoad(cpuLoad);
                             _freezeLogic.CheckGridGroup(grids.Select(cubeGrid => (MyCubeGrid)cubeGrid).ToHashSet());
                         }
                     }

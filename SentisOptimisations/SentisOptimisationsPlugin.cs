@@ -1,13 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Controls;
 using Havok;
 using NAPI;
 using NLog;
 using Optimizer.Optimizations;
-using Profiler;
 using Sandbox;
 using Sandbox.Definitions;
 using Sandbox.Engine.Multiplayer;
@@ -57,7 +57,6 @@ namespace SentisOptimisationsPlugin
             Instance = this;
             Log.Info("Init SentisOptimisationsPlugin");
             MyFakes.ENABLE_SCRAP = false;
-            MyFakes.INACTIVE_THRUSTER_DMG = false;
             MySimpleProfiler.ENABLE_SIMPLE_PROFILER = false;
             SetupConfig();
             SessionManager = Torch.Managers.GetManager<TorchSessionManager>();
@@ -125,12 +124,14 @@ namespace SentisOptimisationsPlugin
 
                 var clustersCount = clusters.Count;
 
-                Instance.UpdateUI((x) =>
+                Instance.UpdateUI(x =>
                 {
                     var gui = x as ConfigGUI;
                     gui.ClustersStatistic.Text =
                         $"Count: {clustersCount}, Active: {active}";
+                    var avgCpuLoad = FreezeLogic.CpuLoads.Count > 0 ? FreezeLogic.CpuLoads.Average() : 0.0;
                     gui.FreezerStatistic.Text =
+                        $"Avg CPU Load: {Math.Round((decimal)avgCpuLoad, 2)}% " +
                         $"Total grids: {EntitiesObserver.MyCubeGrids.Count}, Frozen: {FreezeLogic.FrozenGrids.Count}";
                 });
             }
@@ -170,8 +171,11 @@ namespace SentisOptimisationsPlugin
             FrameExecutor.Update();
             if (MySandboxGame.Static.SimulationFrameCounter % 600 == 0)
             {
-                Task.Run(UpdateGui);
                 Task.Run(DetectSZDDos);
+            }
+            if (MySandboxGame.Static.SimulationFrameCounter % 300 == 0)
+            {
+                Task.Run(UpdateGui);
             }
         }
 

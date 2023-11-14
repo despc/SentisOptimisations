@@ -42,8 +42,10 @@ namespace SentisOptimisationsPlugin
         private bool _freezeNpc = false;
         private bool _freezeSignals = false;
         private bool _enableDebugLogs = true;
+        private bool _freezePhysics = false;
         private string _antifreezeBlockSubtypes = "LargeBlockSmallContainer_admin2:LargeBlockSmallContainer_admin";
         private int _minWakeUpIntervalInSec = 600;
+        private int _delayBeforeFreezeSec = 5;
         
         [DisplayTab(Name = "Slowdown Enabled", GroupName = "Slowdown", Tab = "Slowdown", Order = 0, Description = "Slowdown Enabled")]
         public bool SlowdownEnabled
@@ -180,5 +182,11 @@ namespace SentisOptimisationsPlugin
         
         [DisplayTab(Name = "Debug logs", GroupName = "Freezer", Tab = "Freezer", Order = 6, Description = "Debug logs")]
         public bool EnableDebugLogs { get => _enableDebugLogs; set => SetValue(ref _enableDebugLogs, value); }
+        
+        [DisplayTab(Name = "Delay before freeze in sec", GroupName = "Freezer", Tab = "Freezer", Order = 7, Description = "Delay before freeze in sec")]
+        public int DelayBeforeFreezeSec { get => _delayBeforeFreezeSec; set => SetValue(ref _delayBeforeFreezeSec, value); }
+        
+        // [DisplayTab(Name = "Freeze Physics", GroupName = "Freezer", Tab = "Freezer", Order = 7, Description = "Freeze Physics")]
+        // public bool FreezePhysics { get => _freezePhysics; set => SetValue(ref _freezePhysics, value); }
     }
 }
