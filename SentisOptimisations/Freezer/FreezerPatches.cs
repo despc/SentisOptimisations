@@ -1,7 +1,6 @@
 ﻿using System.Reflection;
 using Sandbox;
 using Sandbox.Game.Entities.Cube;
-using SentisOptimisationsPlugin.CrashFix;
 using Torch.Managers.PatchManager;
 
 namespace SentisOptimisationsPlugin.Freezer;
@@ -27,6 +26,11 @@ public static class FreezerPatches
         if (FreezeLogic.LastUpdateFrames.TryGetValue(gridEntityId, out var lastUpdateFrame))
         {
             __result = (uint)(MySandboxGame.Static.SimulationFrameCounter - lastUpdateFrame);
+            if (SentisOptimisationsPlugin.Config.EnableDebugLogs)
+            {
+                FreezeLogic.Log("Compensate " + __result + " frozen frames of " + __instance.DisplayNameText + " of grid " + __instance.CubeGrid.DisplayName);
+            }
+            
             FreezeLogic.LastUpdateFrames.Remove(gridEntityId);
             return false;
         }

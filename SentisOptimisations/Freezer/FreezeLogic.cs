@@ -2,32 +2,36 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using Sandbox;
 using Sandbox.Game.Entities;
 using Sandbox.ModAPI;
 using SentisOptimisations;
 using VRage.Game.Entity;
 using VRage.Game.Entity.EntityComponents.Interfaces;
+using VRage.Game.ModAPI;
 using VRageMath;
 
 namespace SentisOptimisationsPlugin.Freezer;
 
 public class FreezeLogic
 {
-    private static int _wakeupTimeInSec = 5;
+    private static int _wakeupTimeInSec = 10;
     public static HashSet<long> FrozenGrids = new();
     private Dictionary<long, DateTime> WakeUpDatas = new(); //EntityId:NextWakeUpTime
-    public static Dictionary<long, ulong> LastUpdateFrames = new(); //EntityId:NextWakeUpTime
+    public static Dictionary<long, ulong> LastUpdateFrames = new(); //EntityId:LastUpdateFrame
+    public static List<float> CpuLoads = new();
 
     public void CheckGridGroup(HashSet<MyCubeGrid> grids)
     {
         var anyGrid = grids.FirstElement();
         var gridsPosition = anyGrid.PositionComp.GetPosition();
         Thread.Sleep(16);
+        var isWakeUpTime = IsWakeUpTime(grids);
         if (PlayerUtils.IsAnyPlayersInRadius(gridsPosition, SentisOptimisationsPlugin.Config.FreezeDistance)
-            || IsWakeUpTime(grids))
+            || isWakeUpTime)
         {
-            UnfreezeGrids(grids);
+            UnfreezeGrids(grids, isWakeUpTime);
             return;
         }
 
@@ -47,6 +51,7 @@ public class FreezeLogic
             if (DateTime.Now < data && data < DateTime.Now.AddSeconds(_wakeupTimeInSec))
             {
                 // grids.ForEach(grid => Log("Wake up time, grid - " + grid.DisplayName));
+                
                 return true;
             }
         }
@@ -54,7 +59,7 @@ public class FreezeLogic
         return false;
     }
 
-    private void UnfreezeGrids(HashSet<MyCubeGrid> grids)
+    private void UnfreezeGrids(HashSet<MyCubeGrid> grids, bool isWakeUpTime)
     {
         foreach (var grid in grids)
         {
@@ -63,28 +68,37 @@ public class FreezeLogic
                 continue;
             }
 
+            if (!isWakeUpTime)
+            {
+                WakeUpDatas.Remove(grid.EntityId);
+            }
             if (grid.Parent == null && !grid.IsPreview)
             {
                 Log("Unfreeze grid " + grid.DisplayName);
                 FrozenGrids.Remove(grid.EntityId);
-                MyAPIGateway.Utilities.InvokeOnGameThread(() => { RegisterRecursive(grid); });
+                MyAPIGateway.Utilities.InvokeOnGameThread(() =>
+                {
+                    RegisterRecursive(grid);
+                    grid.PlayerPresenceTier = MyUpdateTiersPlayerPresence.Normal;
+                });
             }
         }
     }
 
     private void FreezeGrids(HashSet<MyCubeGrid> grids)
     {
-        var antifreezeBlocksSubtypes = SentisOptimisationsPlugin.Config.AntifreezeBlocksSubtypes.Split(';');
+        var configAntifreezeBlocksSubtypes = SentisOptimisationsPlugin.Config.AntifreezeBlocksSubtypes;
+        var antifreezeBlocksSubtypes = configAntifreezeBlocksSubtypes.Split(':');
         foreach (var grid in grids)
         {
-            if (grid.GetBlocks().Any(block =>
+            if (!string.IsNullOrEmpty(configAntifreezeBlocksSubtypes) && grid.GetBlocks().Any(block =>
                     Enumerable.Contains(antifreezeBlocksSubtypes, block.BlockDefinition.Id.SubtypeName)))
             {
                 // Log("Found antifreeze block, skip grid " + grid.DisplayName);
                 return;
             }
 
-            if (!SentisOptimisationsPlugin.Config.FreezeSignals && grid.DisplayName.Contains("Container MK-"))
+            if (!SentisOptimisationsPlugin.Config.FreezeSignals && (grid.DisplayName.Contains("Container MK-") || grid.DisplayName.Contains("Container_MK-")))
             {
                 return;
             }
@@ -106,6 +120,10 @@ public class FreezeLogic
                                                SentisOptimisationsPlugin.Config.MinWakeUpIntervalInSec +
                                                minEntityId % SentisOptimisationsPlugin.Config.MinWakeUpIntervalInSec);
             }
+            else
+            {
+                return;
+            }
         }
         else
         {
@@ -114,31 +132,38 @@ public class FreezeLogic
                                                     minEntityId % SentisOptimisationsPlugin.Config
                                                         .MinWakeUpIntervalInSec));
         }
-
-        foreach (var grid in grids)
+        
+        Task.Run(() =>
         {
-            if (FrozenGrids.Contains(grid.EntityId))
+            Thread.Sleep(SentisOptimisationsPlugin.Config.DelayBeforeFreezeSec * 1000);
+            foreach (var grid in grids)
             {
-                continue;
-            }
-
-            if (grid.Parent == null && !grid.IsPreview)
-            {
-                Log("Freeze grid " + grid.DisplayName);
-                MyAPIGateway.Utilities.InvokeOnGameThread(() =>
+                if (grid == null) continue;
+                if (FrozenGrids.Contains(grid.EntityId))
                 {
-                    if (!grid.IsStatic)
-                    {
-                        grid.Physics?.SetSpeeds(Vector3.Zero, Vector3.Zero);
-                    }
+                    continue;
+                }
 
-                    LastUpdateFrames[grid.EntityId] = MySandboxGame.Static.SimulationFrameCounter;
-                    FrozenGrids.Add(grid.EntityId);
+                if (grid.Parent == null && !grid.IsPreview)
+                {
+                    Log("Freeze grid " + grid.DisplayName);
+                    MyAPIGateway.Utilities.InvokeOnGameThread(() =>
+                    {
+                       
+                        if (!grid.IsStatic)
+                        {
+                            grid.Physics?.SetSpeeds(Vector3.Zero, Vector3.Zero);
+                        }
+
+                        LastUpdateFrames[grid.EntityId] = MySandboxGame.Static.SimulationFrameCounter;
+                        FrozenGrids.Add(grid.EntityId);
                     
-                    UnregisterRecursive(grid);
-                });
+                        UnregisterRecursive(grid);
+                    });
+                }
             }
-        }
+        });
+        
     }
 
     private void UnregisterRecursive(MyEntity e)
@@ -160,11 +185,20 @@ public class FreezeLogic
     }
 
 
-    private void Log(string message)
+    public static void Log(string message)
     {
         if (SentisOptimisationsPlugin.Config.EnableDebugLogs)
         {
             SentisOptimisationsPlugin.Log.Warn(message);
         }
+    }
+
+    public void UpdateCpuLoad(float cpuLoad)
+    {
+        if (CpuLoads.Count > 10)
+        {
+            CpuLoads.Remove(0);
+        }
+        CpuLoads.Add(cpuLoad);
     }
 }
