@@ -3,8 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using NAPI;
 using Sandbox;
+using Sandbox.Game.Components;
 using Sandbox.Game.Entities;
+using Sandbox.Game.Entities.Cube;
 using Sandbox.ModAPI;
 using SentisOptimisations;
 using VRage.Game.Entity;
@@ -71,6 +74,22 @@ public class FreezeLogic
             if (!isWakeUpTime)
             {
                 WakeUpDatas.Remove(grid.EntityId);
+            }
+            foreach (var myCubeBlock in grid.GetFatBlocks())
+            {
+                if (myCubeBlock is MyFunctionalBlock)
+                {
+                    var fb = (MyFunctionalBlock)myCubeBlock;
+                    if (!fb.IsWorking)
+                    {
+                        continue;
+                    }
+                    var myTimerComponent = (MyTimerComponent)fb.easyGetField("m_timer", typeof(MyFunctionalBlock));
+                    if (myTimerComponent != null && !myTimerComponent.TimerEnabled)
+                    {
+                        myTimerComponent.Resume();
+                    }
+                }
             }
             if (grid.Parent == null && !grid.IsPreview)
             {
@@ -195,7 +214,7 @@ public class FreezeLogic
 
     public void UpdateCpuLoad(float cpuLoad)
     {
-        if (CpuLoads.Count > 10)
+        if (CpuLoads.Count > 5)
         {
             CpuLoads.Remove(0);
         }

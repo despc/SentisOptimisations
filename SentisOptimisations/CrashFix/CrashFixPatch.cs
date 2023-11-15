@@ -55,6 +55,9 @@ namespace SentisOptimisationsPlugin.CrashFix
             
             var MethodMyAngleGrinderGrind = typeof(MyAngleGrinder).GetMethod
                 ("Grind", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
+            
+            var MethodOnRegisteredToThrustComponent = typeof(Sandbox.Game.Entities.MyThrust).GetMethod
+                ("OnRegisteredToThrustComponent", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
                 
             var finalizer = typeof(CrashFixPatch).GetMethod(nameof(SuppressExceptionFinalizer),
                 BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
@@ -63,6 +66,7 @@ namespace SentisOptimisationsPlugin.CrashFix
             harmony.Patch(MethodNotify, finalizer: new HarmonyMethod(finalizer));
             harmony.Patch(MethodMyExplosionsUpdateBeforeSimulation, finalizer: new HarmonyMethod(finalizer));
             harmony.Patch(MethodMyAngleGrinderGrind, finalizer: new HarmonyMethod(finalizer));
+            harmony.Patch(MethodOnRegisteredToThrustComponent, finalizer: new HarmonyMethod(finalizer));
             
         }
 
