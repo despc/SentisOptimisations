@@ -102,7 +102,7 @@ namespace SentisOptimisationsPlugin.ShipTool
             }
             catch (Exception e)
             {
-                Log.Error("Exception during DrillEnvironmentSector", e);
+                //Log.Error("Exception during DrillEnvironmentSector", e);
             }
 
             return false;

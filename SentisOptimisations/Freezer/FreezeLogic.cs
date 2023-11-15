@@ -7,6 +7,7 @@ using NAPI;
 using Sandbox;
 using Sandbox.Game.Components;
 using Sandbox.Game.Entities;
+using Sandbox.Game.Entities.Blocks;
 using Sandbox.Game.Entities.Cube;
 using Sandbox.ModAPI;
 using SentisOptimisations;
@@ -21,8 +22,9 @@ public class FreezeLogic
 {
     private static int _wakeupTimeInSec = 10;
     public static HashSet<long> FrozenGrids = new();
+    public static HashSet<long> InFreezeQueue = new();
     private Dictionary<long, DateTime> WakeUpDatas = new(); //EntityId:NextWakeUpTime
-    public static Dictionary<long, ulong> LastUpdateFrames = new(); //EntityId:LastUpdateFrame
+    public static Dictionary<long, ulong> LastUpdateFrames = new(); //BlockId:LastUpdateFrame
     public static List<float> CpuLoads = new();
 
     public void CheckGridGroup(HashSet<MyCubeGrid> grids)
@@ -64,42 +66,70 @@ public class FreezeLogic
 
     private void UnfreezeGrids(HashSet<MyCubeGrid> grids, bool isWakeUpTime)
     {
+        var minEntityId = grids.MinBy(grid => grid.EntityId).EntityId;
+        lock (InFreezeQueue)
+        {
+            InFreezeQueue.Remove(minEntityId);
+        }
+        
         foreach (var grid in grids)
         {
             if (!FrozenGrids.Contains(grid.EntityId))
             {
                 continue;
             }
-
+            
             if (!isWakeUpTime)
             {
                 WakeUpDatas.Remove(grid.EntityId);
             }
-            foreach (var myCubeBlock in grid.GetFatBlocks())
-            {
-                if (myCubeBlock is MyFunctionalBlock)
-                {
-                    var fb = (MyFunctionalBlock)myCubeBlock;
-                    if (!fb.IsWorking)
-                    {
-                        continue;
-                    }
-                    var myTimerComponent = (MyTimerComponent)fb.easyGetField("m_timer", typeof(MyFunctionalBlock));
-                    if (myTimerComponent != null && !myTimerComponent.TimerEnabled)
-                    {
-                        myTimerComponent.Resume();
-                    }
-                }
-            }
+
             if (grid.Parent == null && !grid.IsPreview)
             {
                 Log("Unfreeze grid " + grid.DisplayName);
                 FrozenGrids.Remove(grid.EntityId);
+                lock (InFreezeQueue)
+                {
+                    InFreezeQueue.Remove(grid.EntityId);
+                }
+                
+                CompensateFrozenFrames(grid);
+
                 MyAPIGateway.Utilities.InvokeOnGameThread(() =>
                 {
                     RegisterRecursive(grid);
                     grid.PlayerPresenceTier = MyUpdateTiersPlayerPresence.Normal;
                 });
+            }
+        }
+    }
+
+    private static void CompensateFrozenFrames(MyCubeGrid grid)
+    {
+        foreach (var myCubeBlock in grid.GetFatBlocks())
+        {
+            if (!(myCubeBlock is MyFunctionalBlock))
+            {
+                continue;
+            }
+
+            var needToCompensate = NeedToCompensate((MyFunctionalBlock)myCubeBlock);
+            if (needToCompensate)
+            {
+                MyTimerComponent timer =
+                    (MyTimerComponent)myCubeBlock.easyGetField("m_timer", typeof(MyFunctionalBlock));
+                if (timer != null)
+                {
+                    if (LastUpdateFrames.TryGetValue(myCubeBlock.EntityId, out var lastUpdateFrame))
+                    {
+                        var framesAfterFreeze =
+                            (uint)(MySandboxGame.Static.SimulationFrameCounter - lastUpdateFrame);
+                        timer.FramesFromLastTrigger = framesAfterFreeze;
+                        Log("Compensate " + framesAfterFreeze + " frozen frames of " +
+                            myCubeBlock.DisplayNameText + " of grid " + grid.DisplayName);
+                        LastUpdateFrames.Remove(myCubeBlock.EntityId);
+                    }
+                }
             }
         }
     }
@@ -139,7 +169,7 @@ public class FreezeLogic
                                                SentisOptimisationsPlugin.Config.MinWakeUpIntervalInSec +
                                                minEntityId % SentisOptimisationsPlugin.Config.MinWakeUpIntervalInSec);
             }
-            else
+            else if (DateTime.Now < dateTime && dateTime < DateTime.Now.AddSeconds(_wakeupTimeInSec))
             {
                 return;
             }
@@ -151,10 +181,19 @@ public class FreezeLogic
                                                     minEntityId % SentisOptimisationsPlugin.Config
                                                         .MinWakeUpIntervalInSec));
         }
+        lock (InFreezeQueue)
+        {
+            if (InFreezeQueue.Contains(minEntityId))
+            {
+                return;
+            }
+            InFreezeQueue.Add(minEntityId);
+        }
         
         Task.Run(() =>
         {
             Thread.Sleep(SentisOptimisationsPlugin.Config.DelayBeforeFreezeSec * 1000);
+            
             foreach (var grid in grids)
             {
                 if (grid == null) continue;
@@ -163,7 +202,12 @@ public class FreezeLogic
                     continue;
                 }
 
-                if (grid.Parent == null && !grid.IsPreview)
+                var isInQueue = false;
+                lock (InFreezeQueue)
+                {
+                    isInQueue = InFreezeQueue.Contains(minEntityId); 
+                }
+                if (grid.Parent == null && !grid.IsPreview && isInQueue)
                 {
                     Log("Freeze grid " + grid.DisplayName);
                     MyAPIGateway.Utilities.InvokeOnGameThread(() =>
@@ -173,16 +217,38 @@ public class FreezeLogic
                         {
                             grid.Physics?.SetSpeeds(Vector3.Zero, Vector3.Zero);
                         }
-
-                        LastUpdateFrames[grid.EntityId] = MySandboxGame.Static.SimulationFrameCounter;
                         FrozenGrids.Add(grid.EntityId);
-                    
                         UnregisterRecursive(grid);
                     });
                 }
+                foreach (var myCubeBlock in grid.GetFatBlocks())
+                {
+                    if (!(myCubeBlock is MyFunctionalBlock))
+                    {
+                        continue;
+                    }
+                    var needToCompensate = NeedToCompensate((MyFunctionalBlock)myCubeBlock);
+                    if (needToCompensate)
+                    {
+                        LastUpdateFrames[myCubeBlock.EntityId] = MySandboxGame.Static.SimulationFrameCounter;
+                    }
+                }
+            }
+
+            lock (InFreezeQueue)
+            {
+                InFreezeQueue.Remove(minEntityId);
             }
         });
         
+    }
+
+    public static bool NeedToCompensate(MyFunctionalBlock myCubeBlock)
+    {
+        var needToCompensate = myCubeBlock is MyProductionBlock
+                               || myCubeBlock is MyGasGenerator
+                               || myCubeBlock is MyFueledPowerProducer;
+        return needToCompensate;
     }
 
     private void UnregisterRecursive(MyEntity e)

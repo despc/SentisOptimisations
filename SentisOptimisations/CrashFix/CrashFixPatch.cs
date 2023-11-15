@@ -73,10 +73,10 @@ namespace SentisOptimisationsPlugin.CrashFix
 
         public static Exception SuppressExceptionFinalizer(Exception __exception)
         {
-            if (__exception != null)
-            {
-                SentisOptimisationsPlugin.Log.Error("SuppressException ", __exception);
-            }
+            // if (__exception != null)
+            // {
+                // SentisOptimisationsPlugin.Log.Error("SuppressException ", __exception);
+                // }
             return null;
         }
         

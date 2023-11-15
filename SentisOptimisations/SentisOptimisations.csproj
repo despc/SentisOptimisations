@@ -51,7 +51,6 @@
       <Compile Include="CrashFix\CrashFixPatch.cs" />
       <Compile Include="Freezer\DamagePatch.cs" />
       <Compile Include="Freezer\FreezeLogic.cs" />
-      <Compile Include="Freezer\FreezerPatches.cs" />
       <Compile Include="GUI\ConfigGUI.cs">
         <DependentUpon>ConfigGUI.xaml</DependentUpon>
       </Compile>
