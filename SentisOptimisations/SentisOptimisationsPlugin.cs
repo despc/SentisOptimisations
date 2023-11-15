@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using Havok;
 using NAPI;
 using NLog;
@@ -129,7 +130,8 @@ namespace SentisOptimisationsPlugin
                     var gui = x as ConfigGUI;
                     gui.ClustersStatistic.Text =
                         $"Count: {clustersCount}, Active: {active}";
-                    var avgCpuLoad = FreezeLogic.CpuLoads.Count > 0 ? FreezeLogic.CpuLoads.Average() : 0.0;
+                    var cpuLoads = new List<float> (FreezeLogic.CpuLoads);
+                    var avgCpuLoad = cpuLoads.Count > 0 ? cpuLoads.Average() : 0.0;
                     gui.FreezerStatistic.Text =
                         $"Avg CPU Load: {Math.Round((decimal)avgCpuLoad, 2)}% " +
                         $"Total grids: {EntitiesObserver.MyCubeGrids.Count}, Frozen: {FreezeLogic.FrozenGrids.Count}";
