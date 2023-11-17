@@ -277,6 +277,14 @@ public class FreezeLogic
             SentisOptimisationsPlugin.Log.Warn(message);
         }
     }
+    
+    public static void CompensationLogs(string message)
+    {
+        if (SentisOptimisationsPlugin.Config.EnableCompensationLogs)
+        {
+            SentisOptimisationsPlugin.Log.Warn(message);
+        }
+    }
 
     public void UpdateCpuLoad(float cpuLoad)
     {
