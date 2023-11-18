@@ -69,30 +69,21 @@ public static class FreezerPatches
         var myProductionBlock = (MyProductionBlock)entity;
         FreezeLogic.CompensationLogs("Compensated items cant be added to " + myProductionBlock.DisplayNameText +
                                      " inventory, move " + amountToAddToAnotherInventory + " items of " + id.SubtypeName + " to container");
-        AddToAnotherInventoryAsync(amountToAddToAnotherInventory, objectBuilder, myProductionBlock);
-        return true;
-    }
 
-    private static void AddToAnotherInventoryAsync(MyFixedPoint amountToAddToAnotherInventory, MyObjectBuilder_Base objectBuilder,
-        MyProductionBlock myProductionBlock)
-    {
-        Task.Run(() =>
+        foreach (var myCargoContainer in myProductionBlock.CubeGrid.GetFatBlocks<MyCargoContainer>())
         {
-            MyDefinitionId id = objectBuilder.GetId();
-            foreach (var myCargoContainer in myProductionBlock.CubeGrid.GetFatBlocks<MyCargoContainer>())
+            if (myCargoContainer.GetInventory().CanItemsBeAdded(amountToAddToAnotherInventory, id))
             {
-                if (myCargoContainer.GetInventory().CanItemsBeAdded(amountToAddToAnotherInventory, id))
-                {
-                    MyAPIGateway.Utilities.InvokeOnGameThread(() =>
-                    {
-                        myCargoContainer.GetInventory().AddItems(amountToAddToAnotherInventory, objectBuilder);
-                    });
-                    FreezeLogic.CompensationLogs("Move items to " + myCargoContainer.DisplayNameText + " inventory, count - " 
-                                                 + amountToAddToAnotherInventory + " item - " + id.SubtypeName +
-                                                 " on grid " + myProductionBlock.CubeGrid.DisplayName);
-                    return;
-                }
+                myCargoContainer.GetInventory().AddItems(amountToAddToAnotherInventory, objectBuilder);
+
+                FreezeLogic.CompensationLogs("Move items to " + myCargoContainer.DisplayNameText +
+                                             " inventory, count - "
+                                             + amountToAddToAnotherInventory + " item - " + id.SubtypeName +
+                                             " on grid " + myProductionBlock.CubeGrid.DisplayName);
+                break;
             }
-        });
+        }
+
+        return true;
     }
 }
