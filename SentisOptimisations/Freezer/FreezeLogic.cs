@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
-using System.Threading.Tasks;
 using NAPI;
 using Sandbox;
 using Sandbox.Game.Components;
@@ -11,6 +10,7 @@ using Sandbox.Game.Entities.Blocks;
 using Sandbox.Game.Entities.Cube;
 using Sandbox.ModAPI;
 using SentisOptimisations;
+using SentisOptimisations.DelayedLogic;
 using VRage.Game.Entity;
 using VRage.Game.Entity.EntityComponents.Interfaces;
 using VRage.Game.ModAPI;
@@ -56,7 +56,7 @@ public class FreezeLogic
             if (DateTime.Now < data && data < DateTime.Now.AddSeconds(_wakeupTimeInSec))
             {
                 // grids.ForEach(grid => Log("Wake up time, grid - " + grid.DisplayName));
-                
+
                 return true;
             }
         }
@@ -71,14 +71,14 @@ public class FreezeLogic
         {
             InFreezeQueue.Remove(minEntityId);
         }
-        
+
         foreach (var grid in grids)
         {
             if (!FrozenGrids.Contains(grid.EntityId))
             {
                 continue;
             }
-            
+
             if (!isWakeUpTime)
             {
                 WakeUpDatas.Remove(grid.EntityId);
@@ -92,7 +92,7 @@ public class FreezeLogic
                 {
                     InFreezeQueue.Remove(grid.EntityId);
                 }
-                
+
                 CompensateFrozenFrames(grid);
 
                 MyAPIGateway.Utilities.InvokeOnGameThread(() =>
@@ -147,7 +147,8 @@ public class FreezeLogic
                 return;
             }
 
-            if (!SentisOptimisationsPlugin.Config.FreezeSignals && (grid.DisplayName.Contains("Container MK-") || grid.DisplayName.Contains("Container_MK-")))
+            if (!SentisOptimisationsPlugin.Config.FreezeSignals && (grid.DisplayName.Contains("Container MK-") ||
+                                                                    grid.DisplayName.Contains("Container_MK-")))
             {
                 return;
             }
@@ -181,20 +182,30 @@ public class FreezeLogic
                                                     minEntityId % SentisOptimisationsPlugin.Config
                                                         .MinWakeUpIntervalInSec));
         }
+
         lock (InFreezeQueue)
         {
             if (InFreezeQueue.Contains(minEntityId))
             {
                 return;
             }
+
             InFreezeQueue.Add(minEntityId);
         }
-        
-        Task.Run(() =>
+
+        var delayBeforeFreezeSec = SentisOptimisationsPlugin.Config
+            .DelayBeforeFreezeSec;
+
+        var needToFreezeGrids = grids.Where(grid => !FrozenGrids.Contains(grid.EntityId)).ToList();
+
+        if (needToFreezeGrids.Count == 0)
         {
-            Thread.Sleep(SentisOptimisationsPlugin.Config.DelayBeforeFreezeSec * 1000);
-            
-            foreach (var grid in grids)
+            return;
+        }
+
+        DelayedProcessor.Instance.AddDelayedAction(DateTime.Now.AddSeconds(delayBeforeFreezeSec), () =>
+        {
+            foreach (var grid in needToFreezeGrids)
             {
                 if (grid == null) continue;
                 if (FrozenGrids.Contains(grid.EntityId))
@@ -205,28 +216,31 @@ public class FreezeLogic
                 var isInQueue = false;
                 lock (InFreezeQueue)
                 {
-                    isInQueue = InFreezeQueue.Contains(minEntityId); 
+                    isInQueue = InFreezeQueue.Contains(minEntityId);
                 }
+
                 if (grid.Parent == null && !grid.IsPreview && isInQueue)
                 {
                     Log("Freeze grid " + grid.DisplayName);
                     MyAPIGateway.Utilities.InvokeOnGameThread(() =>
                     {
-                       
                         if (!grid.IsStatic)
                         {
                             grid.Physics?.SetSpeeds(Vector3.Zero, Vector3.Zero);
                         }
+
                         FrozenGrids.Add(grid.EntityId);
                         UnregisterRecursive(grid);
                     });
                 }
+
                 foreach (var myCubeBlock in grid.GetFatBlocks())
                 {
                     if (!(myCubeBlock is MyFunctionalBlock))
                     {
                         continue;
                     }
+
                     var needToCompensate = NeedToCompensate((MyFunctionalBlock)myCubeBlock);
                     if (needToCompensate)
                     {
@@ -240,7 +254,6 @@ public class FreezeLogic
                 InFreezeQueue.Remove(minEntityId);
             }
         });
-        
     }
 
     public static bool NeedToCompensate(MyFunctionalBlock myCubeBlock)
@@ -277,7 +290,7 @@ public class FreezeLogic
             SentisOptimisationsPlugin.Log.Warn(message);
         }
     }
-    
+
     public static void CompensationLogs(string message)
     {
         if (SentisOptimisationsPlugin.Config.EnableCompensationLogs)
@@ -292,6 +305,7 @@ public class FreezeLogic
         {
             CpuLoads.Remove(0);
         }
+
         CpuLoads.Add(cpuLoad);
     }
 }

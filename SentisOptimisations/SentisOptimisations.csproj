@@ -49,6 +49,7 @@
       <Compile Include="Communication\CommunicationUtils.cs" />
       <Compile Include="Config\MainConfig.cs" />
       <Compile Include="CrashFix\CrashFixPatch.cs" />
+      <Compile Include="DelayedLogic\DelayedProcessor.cs" />
       <Compile Include="Freezer\DamagePatch.cs" />
       <Compile Include="Freezer\FreezeLogic.cs" />
       <Compile Include="Freezer\FreezerPatches.cs" />

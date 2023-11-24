@@ -2,12 +2,12 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Reflection;
-using System.Threading.Tasks;
 using NAPI;
 using Sandbox.Engine.Physics;
 using Sandbox.Game.Entities;
 using Sandbox.Game.GameSystems;
 using Sandbox.ModAPI;
+using SentisOptimisations.DelayedLogic;
 using Torch.Managers.PatchManager;
 using VRage.Groups;
 
@@ -63,9 +63,8 @@ public static class GridSystemUpdatePatch
 
         var callScheduleTime = DateTime.Now;
         GasUpdateTimes[grid.EntityId] = callScheduleTime;
-        Task.Run(async () =>
+        DelayedProcessor.Instance.AddDelayedAction(DateTime.Now.AddSeconds(5), () =>
         {
-            await Task.Delay(5000);
             var lastGasUpdateTime = GasUpdateTimes[grid.EntityId];
             if (lastGasUpdateTime > callScheduleTime)
             {
@@ -97,9 +96,8 @@ public static class GridSystemUpdatePatch
 
         var callScheduleTime = DateTime.Now;
         ConveyorUpdateTimes[grid.EntityId] = callScheduleTime;
-        Task.Run(async () =>
+        DelayedProcessor.Instance.AddDelayedAction(DateTime.Now.AddSeconds(5), () =>
         {
-            await Task.Delay(5000);
             var lastLinesUpdateTime = ConveyorUpdateTimes[grid.EntityId];
             if (lastLinesUpdateTime > callScheduleTime)
             {
@@ -145,9 +143,8 @@ public static class GridSystemUpdatePatch
 
         var callScheduleTime = DateTime.Now;
         FlagForRecomputationPatchedTimes[grid.EntityId] = callScheduleTime;
-        Task.Run(async () =>
+        DelayedProcessor.Instance.AddDelayedAction(DateTime.Now.AddSeconds(5), () =>
         {
-            await Task.Delay(5000);
             var lastLinesUpdateTime = FlagForRecomputationPatchedTimes[grid.EntityId];
             if (lastLinesUpdateTime > callScheduleTime)
             {
