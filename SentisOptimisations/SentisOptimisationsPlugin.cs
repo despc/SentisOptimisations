@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Controls;
-using System.Windows.Documents;
 using Havok;
 using NAPI;
 using NLog;
@@ -20,6 +19,7 @@ using Sandbox.Game.World;
 using Sandbox.ModAPI;
 using SentisGameplayImprovements.AllGridsActions;
 using SentisOptimisations;
+using SentisOptimisations.DelayedLogic;
 using SentisOptimisationsPlugin.AllGridsActions;
 using SentisOptimisationsPlugin.Freezer;
 using SentisOptimisationsPlugin.ShipTool;
@@ -51,11 +51,13 @@ namespace SentisOptimisationsPlugin
         private AllGridsProcessor _allGridsProcessor = new AllGridsProcessor();
         private SendReplicablesAsync _replicablesAsync = new SendReplicablesAsync();
         public ShipToolsAsyncQueues ShipToolsAsyncQueues = new ShipToolsAsyncQueues();
+        public DelayedProcessor DelayedProcessor = new DelayedProcessor();
         public static ShieldApi SApi = new ShieldApi();
 
         public override void Init(ITorchBase torch)
         {
             Instance = this;
+            DelayedProcessor.Instance = DelayedProcessor;
             Log.Info("Init SentisOptimisationsPlugin");
             MyFakes.ENABLE_SCRAP = false;
             MySimpleProfiler.ENABLE_SIMPLE_PROFILER = false;
@@ -69,6 +71,12 @@ namespace SentisOptimisationsPlugin
             SessionManager.SessionStateChanged += SessionManager_SessionStateChanged;
             ReflectionUtils.SetPrivateStaticField(typeof(MyCubeBlockDefinition),
                 nameof(MyCubeBlockDefinition.PCU_CONSTRUCTION_STAGE_COST), 0);
+
+            foreach (var rule in LogManager.Configuration.LoggingRules)
+            {
+               rule.DisableLoggingForLevel(LogLevel.Debug);
+            }
+            LogManager.ReconfigExistingLoggers();
         }
 
 
@@ -81,6 +89,7 @@ namespace SentisOptimisationsPlugin
                 _allGridsProcessor.OnUnloading();
                 _replicablesAsync.OnUnloading();
                 ShipToolsAsyncQueues.OnUnloading();
+                DelayedProcessor.OnUnloading();
             }
             else
             {
@@ -89,6 +98,7 @@ namespace SentisOptimisationsPlugin
                 _allGridsProcessor.OnLoaded();
                 _replicablesAsync.OnLoaded();
                 ShipToolsAsyncQueues.OnLoaded();
+                DelayedProcessor.OnLoaded();
                 InitShieldApi();
                 WelderOptimization.AsyncWeldLoopInit();
             }
@@ -181,11 +191,11 @@ namespace SentisOptimisationsPlugin
             FrameExecutor.Update();
             if (MySandboxGame.Static.SimulationFrameCounter % 600 == 0)
             {
-                Task.Run(DetectSZDDos);
+                DelayedProcessor.Instance.AddDelayedAction(DateTime.Now, DetectSZDDos);
             }
             if (MySandboxGame.Static.SimulationFrameCounter % 300 == 0)
             {
-                Task.Run(UpdateGui);
+                DelayedProcessor.Instance.AddDelayedAction(DateTime.Now, UpdateGui);
             }
         }
 
