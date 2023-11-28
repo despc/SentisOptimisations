@@ -60,7 +60,7 @@ namespace SentisOptimisationsPlugin.AllGridsActions
         {
             try
             {
-                await Task.Delay(30000);
+                await Task.Delay(180000);
                 Log.Info("Freezer Loop started");
                 while (!CancellationTokenSource.Token.IsCancellationRequested)
                 {
