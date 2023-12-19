@@ -9,6 +9,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using NAPI;
 using Sandbox.Game;
 using Sandbox.Game.Entities.Blocks;
+using Sandbox.Game.Multiplayer;
 using Sandbox.Game.Replication.StateGroups;
 using Sandbox.Game.Weapons;
 using SentisOptimisations;
@@ -45,6 +46,9 @@ namespace SentisOptimisationsPlugin.CrashFix
             var MethodSetDetailedInfo = typeof(MyProgrammableBlock).GetMethod
                 ("SetDetailedInfo", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
             
+            var MethodRemoveIdentity = typeof(MyPlayerCollection).GetMethod
+                ( nameof(MyPlayerCollection.RemoveIdentity), BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
+            
             var MethodUpdateWaypointPositions = typeof(MyOffensiveCombatCircleOrbit).GetMethod
                 ("UpdateWaypointPositions", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
             var MethodNotify = typeof(MyPropertySyncStateGroup).GetMethod
@@ -67,6 +71,7 @@ namespace SentisOptimisationsPlugin.CrashFix
             harmony.Patch(MethodMyExplosionsUpdateBeforeSimulation, finalizer: new HarmonyMethod(finalizer));
             harmony.Patch(MethodMyAngleGrinderGrind, finalizer: new HarmonyMethod(finalizer));
             harmony.Patch(MethodOnRegisteredToThrustComponent, finalizer: new HarmonyMethod(finalizer));
+            harmony.Patch(MethodRemoveIdentity, finalizer: new HarmonyMethod(finalizer));
             
         }
 
