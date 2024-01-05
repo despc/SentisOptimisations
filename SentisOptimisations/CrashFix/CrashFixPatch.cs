@@ -15,6 +15,7 @@ using Sandbox.Game.Weapons;
 using SentisOptimisations;
 using SpaceEngineers.Game.EntityComponents.Blocks;
 using Torch.Managers.PatchManager;
+using VRage.Network;
 using VRage.Scripting;
 using VRage.Sync;
 
@@ -37,8 +38,10 @@ namespace SentisOptimisationsPlugin.CrashFix
             
             var MethodCreateCompilation = typeof(MyScriptCompiler).GetMethod
                 ("CreateCompilation", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
-
-
+            
+            var MethodApplyDirtyGroups = typeof(MyReplicationServer).GetMethod
+                ("ApplyDirtyGroups", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+            
             ctx.GetPattern(MethodCreateCompilation).Prefixes.Add(
                 typeof(CrashFixPatch).GetMethod(nameof(CreateCompilationPatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
@@ -72,6 +75,7 @@ namespace SentisOptimisationsPlugin.CrashFix
             harmony.Patch(MethodMyAngleGrinderGrind, finalizer: new HarmonyMethod(finalizer));
             harmony.Patch(MethodOnRegisteredToThrustComponent, finalizer: new HarmonyMethod(finalizer));
             harmony.Patch(MethodRemoveIdentity, finalizer: new HarmonyMethod(finalizer));
+            harmony.Patch(MethodApplyDirtyGroups, finalizer: new HarmonyMethod(finalizer));
             
         }
 
