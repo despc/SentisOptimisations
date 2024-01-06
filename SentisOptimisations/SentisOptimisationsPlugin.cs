@@ -7,6 +7,7 @@ using System.Windows.Controls;
 using Havok;
 using NAPI;
 using NLog;
+using NLog.Filters;
 using Optimizer.Optimizations;
 using Sandbox;
 using Sandbox.Definitions;
@@ -72,9 +73,22 @@ namespace SentisOptimisationsPlugin
             ReflectionUtils.SetPrivateStaticField(typeof(MyCubeBlockDefinition),
                 nameof(MyCubeBlockDefinition.PCU_CONSTRUCTION_STAGE_COST), 0);
 
+            var stringCondition = "contains('${message}','Invalid triangle')";
+            var stringCondition2 = "contains('${message}','Trying to remove entity with name')";
+            
             foreach (var rule in LogManager.Configuration.LoggingRules)
             {
                rule.DisableLoggingForLevel(LogLevel.Debug);
+               rule.Filters.Add(new ConditionBasedFilter()
+               {
+                   Condition = stringCondition,
+                   Action = FilterResult.Ignore
+               });
+               rule.Filters.Add(new ConditionBasedFilter()
+               {
+                   Condition = stringCondition2,
+                   Action = FilterResult.Ignore
+               });
             }
             LogManager.ReconfigExistingLoggers();
         }
