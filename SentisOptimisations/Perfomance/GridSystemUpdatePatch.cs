@@ -65,22 +65,24 @@ public static class GridSystemUpdatePatch
         GasUpdateTimes[grid.EntityId] = callScheduleTime;
         DelayedProcessor.Instance.AddDelayedAction(DateTime.Now.AddSeconds(5), () =>
         {
-            var lastGasUpdateTime = GasUpdateTimes[grid.EntityId];
-            if (lastGasUpdateTime > callScheduleTime)
+            if (GasUpdateTimes.TryGetValue(grid.EntityId, out var lastGasUpdateTime))
             {
-                return;
-            }
+                if (lastGasUpdateTime > callScheduleTime)
+                {
+                    return;
+                }
 
-            MyAPIGateway.Utilities.InvokeOnGameThread(() =>
-            {
-                try
+                MyAPIGateway.Utilities.InvokeOnGameThread(() =>
                 {
-                    __instance.easyCallMethod("Schedule", new object[] { });
-                }
-                catch
-                {
-                }
-            });
+                    try
+                    {
+                        __instance.easyCallMethod("Schedule", new object[] { });
+                    }
+                    catch
+                    {
+                    }
+                });
+            }
         });
         return false;
     }
@@ -98,23 +100,25 @@ public static class GridSystemUpdatePatch
         ConveyorUpdateTimes[grid.EntityId] = callScheduleTime;
         DelayedProcessor.Instance.AddDelayedAction(DateTime.Now.AddSeconds(5), () =>
         {
-            var lastLinesUpdateTime = ConveyorUpdateTimes[grid.EntityId];
-            if (lastLinesUpdateTime > callScheduleTime)
+            if (ConveyorUpdateTimes.TryGetValue(grid.EntityId, out var lastLinesUpdateTime))
             {
-                return;
-            }
+                if (lastLinesUpdateTime > callScheduleTime)
+                {
+                    return;
+                }
 
-            MyAPIGateway.Utilities.InvokeOnGameThread(() =>
-            {
-                try
+                MyAPIGateway.Utilities.InvokeOnGameThread(() =>
                 {
-                    __instance.easyCallMethod("Schedule", new object[] { });
-                    __instance.NeedsUpdateLines = true;
-                }
-                catch
-                {
-                }
-            });
+                    try
+                    {
+                        __instance.easyCallMethod("Schedule", new object[] { });
+                        __instance.NeedsUpdateLines = true;
+                    }
+                    catch
+                    {
+                    }
+                });
+            }
         });
         return false;
     }
@@ -145,27 +149,30 @@ public static class GridSystemUpdatePatch
         FlagForRecomputationPatchedTimes[grid.EntityId] = callScheduleTime;
         DelayedProcessor.Instance.AddDelayedAction(DateTime.Now.AddSeconds(5), () =>
         {
-            var lastLinesUpdateTime = FlagForRecomputationPatchedTimes[grid.EntityId];
-            if (lastLinesUpdateTime > callScheduleTime)
+            if (FlagForRecomputationPatchedTimes.TryGetValue(grid.EntityId, out var lastLinesUpdateTime))
             {
-                return;
-            }
+                if (lastLinesUpdateTime > callScheduleTime)
+                {
+                    return;
+                }
 
-            MyAPIGateway.Utilities.InvokeOnGameThread(() =>
-            {
-                try
+                MyAPIGateway.Utilities.InvokeOnGameThread(() =>
                 {
-                    MyGroups<MyCubeGrid, MyGridPhysicalHierarchyData>.Group group =
-                        MyGridPhysicalHierarchy.Static.GetGroup(grid);
-                    if (group == null)
-                        return;
-                    foreach (MyGroups<MyCubeGrid, MyGridPhysicalHierarchyData>.Node node in group.Nodes)
-                        node.NodeData.GridSystems.ConveyorSystem.easySetField("m_needsRecomputation", true);
-                }
-                catch
-                {
-                }
-            });
+                    try
+                    {
+                        MyGroups<MyCubeGrid, MyGridPhysicalHierarchyData>.Group group =
+                            MyGridPhysicalHierarchy.Static.GetGroup(grid);
+                        if (group == null)
+                            return;
+                        foreach (MyGroups<MyCubeGrid, MyGridPhysicalHierarchyData>.Node node in group.Nodes)
+                            node.NodeData.GridSystems.ConveyorSystem.easySetField("m_needsRecomputation", true);
+                    }
+                    catch
+                    {
+                    }
+                }); 
+            }
+            
         });
         return false;
     }
