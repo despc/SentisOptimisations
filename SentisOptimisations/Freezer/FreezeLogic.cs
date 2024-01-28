@@ -104,7 +104,7 @@ public class FreezeLogic
 
                         if (gridPhysics != null && SentisOptimisationsPlugin.Config.FreezePhysics)
                         {
-                            gridPhysics.RigidBody.UpdateMotionType(HkMotionType.Dynamic);
+                            gridPhysics.RigidBody.UpdateMotionType(HkMotionType.Box_Inertia);
                             gridPhysics.RigidBody.Quality = HkCollidableQualityType.Moving;
                         }
                     }
@@ -352,7 +352,7 @@ public class FreezeLogic
                             }
                             else
                             {
-                                gridPhysics.RigidBody.UpdateMotionType(HkMotionType.Dynamic);
+                                gridPhysics.RigidBody.UpdateMotionType(HkMotionType.Box_Inertia);
                                 gridPhysics.RigidBody.Quality = HkCollidableQualityType.Moving;
                             }
                         }
