@@ -1,10 +1,12 @@
-﻿using SOPlugin.GUI;
+﻿using SentisOptimisationsPlugin.Freezer;
+using SOPlugin.GUI;
 using Torch;
 
 namespace SentisOptimisationsPlugin
 {
     public class MainConfig : ViewModel
     {
+
         //optimisations
         private bool _gasTankOptimisation = true;
         private bool _gridSystemOptimisations = true;
@@ -189,7 +191,15 @@ namespace SentisOptimisationsPlugin
 
         [DisplayTab(Name = "Compensation logs", GroupName = "Freezer", Tab = "Freezer", Order = 8, Description = "Compensation logs")]
         public bool EnableCompensationLogs { get => _enableCompensationLogs; set => SetValue(ref _enableCompensationLogs, value); }
-        // [DisplayTab(Name = "Freeze Physics", GroupName = "Freezer", Tab = "Freezer", Order = 7, Description = "Freeze Physics")]
-        // public bool FreezePhysics { get => _freezePhysics; set => SetValue(ref _freezePhysics, value); }
+        [DisplayTab(Name = "Freeze Physics", GroupName = "Freezer", Tab = "Freezer", Order = 7, Description = "Freeze Physics")]
+        public bool FreezePhysics
+        {
+            get => _freezePhysics;
+            set
+            {
+                SetValue(ref _freezePhysics, value);
+                FreezeLogic.UpdateFreezePhysics(value);
+            }
+        }
     }
 }

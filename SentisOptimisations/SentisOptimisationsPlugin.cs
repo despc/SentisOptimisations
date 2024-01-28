@@ -207,10 +207,6 @@ namespace SentisOptimisationsPlugin
             {
                 DelayedProcessor.Instance.AddDelayedAction(DateTime.Now, DetectSZDDos);
             }
-            if (MySandboxGame.Static.SimulationFrameCounter % 300 == 0)
-            {
-                DelayedProcessor.Instance.AddDelayedAction(DateTime.Now, UpdateGui);
-            }
         }
 
         private static void DetectSZDDos()

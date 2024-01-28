@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Reflection;
+using Sandbox.Engine.Physics;
 using Sandbox.Game;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Cube;
@@ -7,6 +8,7 @@ using Sandbox.Game.Entities.Inventory;
 using Torch.Managers.PatchManager;
 using VRage;
 using VRage.Game;
+using VRage.Game.Components;
 using VRage.ModAPI;
 using VRage.ObjectBuilders;
 
@@ -26,6 +28,56 @@ public static class FreezerPatches
         ctx.GetPattern(MethodAddItems).Prefixes.Add(
             typeof(FreezerPatches).GetMethod(nameof(AddItemsPatched),
                 BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+        
+        var MethodOnMotionDynamic = typeof(MyPhysicsBody).GetMethod
+        ("OnMotionDynamic", BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
+
+
+        ctx.GetPattern(MethodOnMotionDynamic).Prefixes.Add(
+            typeof(FreezerPatches).GetMethod(nameof(OnMotionDynamicPatched),
+                BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+        
+        var MethodRefreshCustomInfo = typeof(MyTerminalBlock).GetMethod
+        ("RefreshCustomInfo", BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
+
+
+        ctx.GetPattern(MethodRefreshCustomInfo).Prefixes.Add(
+            typeof(FreezerPatches).GetMethod(nameof(RefreshCustomInfoPatched),
+                BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+    }
+
+    private static bool RefreshCustomInfoPatched(MyTerminalBlock __instance)
+    {
+        if (!SentisOptimisationsPlugin.Config.FreezerEnabled)
+        {
+            return true;
+        }
+
+        var entityId = __instance.CubeGrid.EntityId;
+
+        if (FreezeLogic.FrozenGrids.Contains(entityId))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool OnMotionDynamicPatched(MyPhysicsBody __instance)
+    {
+        if (!SentisOptimisationsPlugin.Config.FreezePhysics)
+        {
+            return true;
+        }
+        IMyEntity entity = __instance.Entity;
+        if (entity == null)
+            return false;
+        if (FreezeLogic.FrozenGrids.Contains(entity.EntityId))
+        {
+            return false;
+        }
+
+        return true;
     }
 
     private static bool AddItemsPatched(MyInventory __instance,

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using Havok;
 using NAPI;
 using Sandbox;
 using Sandbox.Game.Components;
@@ -26,12 +27,12 @@ public class FreezeLogic
     private Dictionary<long, DateTime> WakeUpDatas = new(); //EntityId:NextWakeUpTime
     public static Dictionary<long, ulong> LastUpdateFrames = new(); //BlockId:LastUpdateFrame
     public static List<float> CpuLoads = new();
+    Random random = new Random();
 
     public void CheckGridGroup(HashSet<MyCubeGrid> grids)
     {
         var anyGrid = grids.FirstElement();
         var gridsPosition = anyGrid.PositionComp.GetPosition();
-        Thread.Sleep(16);
         var isWakeUpTime = IsWakeUpTime(grids);
         if (PlayerUtils.IsAnyPlayersInRadius(gridsPosition, SentisOptimisationsPlugin.Config.FreezeDistance)
             || isWakeUpTime)
@@ -92,11 +93,21 @@ public class FreezeLogic
                 {
                     InFreezeQueue.Remove(grid.EntityId);
                 }
-
+             
                 CompensateFrozenFrames(grid);
 
                 MyAPIGateway.Utilities.InvokeOnGameThread(() =>
                 {
+                    if (!grid.IsStatic)
+                    {
+                        var gridPhysics = grid.Physics;
+
+                        if (gridPhysics != null && SentisOptimisationsPlugin.Config.FreezePhysics)
+                        {
+                            gridPhysics.RigidBody.UpdateMotionType(HkMotionType.Dynamic);
+                            gridPhysics.RigidBody.Quality = HkCollidableQualityType.Moving;
+                        }
+                    }
                     RegisterRecursive(grid);
                     grid.PlayerPresenceTier = MyUpdateTiersPlayerPresence.Normal;
                 });
@@ -202,12 +213,12 @@ public class FreezeLogic
         {
             return;
         }
-
+        Thread.Sleep(8);
         DelayedProcessor.Instance.AddDelayedAction(DateTime.Now.AddSeconds(delayBeforeFreezeSec), () =>
         {
             foreach (var grid in needToFreezeGrids)
             {
-                if (grid == null) continue;
+                if (grid == null || grid.Closed || grid.IsPreview) continue;
                 if (FrozenGrids.Contains(grid.EntityId))
                 {
                     continue;
@@ -219,17 +230,27 @@ public class FreezeLogic
                     isInQueue = InFreezeQueue.Contains(minEntityId);
                 }
 
-                if (grid.Parent == null && !grid.IsPreview && isInQueue)
+                if (grid.Parent == null && isInQueue)
                 {
                     Log("Freeze grid " + grid.DisplayName);
                     MyAPIGateway.Utilities.InvokeOnGameThread(() =>
                     {
                         if (!grid.IsStatic)
                         {
-                            grid.Physics?.SetSpeeds(Vector3.Zero, Vector3.Zero);
+                            var gridPhysics = grid.Physics;
+                            if (gridPhysics != null)
+                            {
+                                gridPhysics.SetSpeeds(Vector3.Zero, Vector3.Zero);
+                                if (SentisOptimisationsPlugin.Config.FreezePhysics)
+                                {
+                                    gridPhysics.RigidBody.UpdateMotionType(HkMotionType.Fixed);
+                                    gridPhysics.RigidBody.Quality = HkCollidableQualityType.Fixed;
+                                }
+                            }
                         }
 
                         FrozenGrids.Add(grid.EntityId);
+                        
                         UnregisterRecursive(grid);
                     });
                 }
@@ -301,11 +322,43 @@ public class FreezeLogic
 
     public void UpdateCpuLoad(float cpuLoad)
     {
-        if (CpuLoads.Count > 5)
+        while (CpuLoads.Count > 20)
         {
-            CpuLoads.Remove(0);
+            CpuLoads.RemoveAt(0);
         }
 
         CpuLoads.Add(cpuLoad);
+    }
+
+    public static void UpdateFreezePhysics(bool freezePhysicsEnabled)
+    {
+        DelayedProcessor.Instance.AddDelayedAction(DateTime.Now, () =>
+        {
+            foreach (var frozenGrid in FrozenGrids)
+            {
+                Thread.Sleep(4);
+                MyAPIGateway.Utilities.InvokeOnGameThread(() =>
+                {
+                    MyCubeGrid grid = (MyCubeGrid)MyEntities.GetEntityById(frozenGrid);
+                    if (!grid.IsStatic)
+                    {
+                        var gridPhysics = grid.Physics;
+                        if (gridPhysics != null)
+                        {
+                            if (freezePhysicsEnabled)
+                            {
+                                gridPhysics.RigidBody.UpdateMotionType(HkMotionType.Fixed);
+                                gridPhysics.RigidBody.Quality = HkCollidableQualityType.Fixed;
+                            }
+                            else
+                            {
+                                gridPhysics.RigidBody.UpdateMotionType(HkMotionType.Dynamic);
+                                gridPhysics.RigidBody.Quality = HkCollidableQualityType.Moving;
+                            }
+                        }
+                    }
+                });
+            }
+        });
     }
 }
