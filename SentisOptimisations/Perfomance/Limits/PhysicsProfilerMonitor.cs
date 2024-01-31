@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -81,33 +82,30 @@ namespace SentisOptimisationsPlugin
             foreach (var (world, entity) in result.GetTopEntities(10))
             {
                 // this usually doesn't happen but just in case
-                if (!TryGetHeaviestGrid(world, out var heaviestGrid)) continue;
-                var ownerId = PlayerUtils.GetOwner(heaviestGrid);
-                var faction = MySession.Static.Factions.GetPlayerFaction(ownerId);
-                var factionTag = faction?.Tag ?? "<n/a>";
-                var gridName = heaviestGrid.DisplayName;
+                if (!TryGetHeaviestGridGroup(world, out var heaviestGrids)) continue;
+                
                 var mainMs = entity.MainThreadTime / result.TotalFrameCount;
                 
                 if (mainMs > SentisOptimisationsPlugin.Config.PhysicsMsToPunishImmediately)
                 {
-                    _punisher.PunishPlayerGridImmediately(heaviestGrid);
+                    _punisher.PunishPlayerGridImmediately(heaviestGrids);
                 }
                 
                 if (mainMs > SentisOptimisationsPlugin.Config.PhysicsMsToPunish)
                 {
-                    _punisher.PunishPlayerGrid(heaviestGrid);
+                    _punisher.PunishPlayerGrid(heaviestGrids);
                 }
                 
                 if (mainMs > SentisOptimisationsPlugin.Config.PhysicsMsToAlert)
                 {
-                    _punisher.AlertPlayerGrid(heaviestGrid);
+                    _punisher.AlertPlayerGrid(heaviestGrids);
                 }
 
                 
             }
         }
 
-        static bool TryGetHeaviestGrid(HkWorld world, out IMyCubeGrid heaviestGrid)
+        static bool TryGetHeaviestGridGroup(HkWorld world, out List<IMyCubeGrid> heaviestGridGroup)
         {
             var grids = PhysicsUtils.GetEntities(world)
                 .Where(e => e is IMyCubeGrid)
@@ -118,11 +116,43 @@ namespace SentisOptimisationsPlugin
 
             if (!grids.Any())
             {
-                heaviestGrid = null;
+                heaviestGridGroup = null;
                 return false;
             }
 
-            heaviestGrid = grids.OrderByDescending(g => g.Physics.Mass).First();
+            List<List<IMyCubeGrid>> groups = new List<List<IMyCubeGrid>>();
+            List<IMyCubeGrid> gridsToCollectGroup = new List<IMyCubeGrid>(grids);
+            while (gridsToCollectGroup.Count > 0)
+            {
+                var grid = gridsToCollectGroup[0];
+                List<IMyCubeGrid> group = new List<IMyCubeGrid>();
+                MyAPIGateway.GridGroups.GetGroup(grid, GridLinkTypeEnum.Physical, group);
+                group.ForEach(cubeGrid => gridsToCollectGroup.Remove(cubeGrid));
+                groups.Add(group);
+            }
+            
+            heaviestGridGroup = groups.OrderByDescending(gr =>
+            {
+                float totalMass = 0;
+                foreach (var myCubeGrid in gr)
+                {
+                    if (myCubeGrid.IsStatic)
+                    {
+                        continue;
+                    }
+                    if (myCubeGrid.Physics == null)
+                    {
+                        continue;
+                    }
+
+                    if (myCubeGrid.Physics.RigidBody.GetMotionType() == HkMotionType.Fixed)
+                    {
+                        continue;
+                    }
+                    totalMass += myCubeGrid.Physics.Mass;
+                }
+                return totalMass;
+            }).First();
             return true;
         }
     }

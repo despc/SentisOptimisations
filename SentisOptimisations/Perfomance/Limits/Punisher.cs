@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using NLog;
 using Sandbox.Engine.Multiplayer;
 using Sandbox.Engine.Physics;
@@ -21,86 +22,88 @@ namespace SentisOptimisationsPlugin
 
         private Dictionary<long, int> timeToFixDictionary = new Dictionary<long, int>();
         private Dictionary<long, int> timeToAlarmDictionary = new Dictionary<long, int>();
-        public void AlertPlayerGrid(IMyCubeGrid grid)
+        public void AlertPlayerGrid(List<IMyCubeGrid> grids)
         {
-            if (grid.DisplayName.Contains("@"))
-            {
-                return;
-            }
-            if (grid.BigOwners.Count == 0)
-            {
-                ConvertToStatic((MyCubeGrid) grid);
-            }
+            var minEntityId = grids.MinBy(grid => grid.EntityId).EntityId;
+            string gridNames = string.Join(", ", grids.Select(grid => grid.DisplayName));
+            var ownerId = PlayerUtils.GetOwner(grids);
+            var playerName = PlayerUtils.GetPlayerIdentity(ownerId).DisplayName;
+
             
-            if (timeToAlarmDictionary.ContainsKey(grid.EntityId))
+            if (timeToAlarmDictionary.ContainsKey(minEntityId))
             {
-                timeToAlarmDictionary[grid.EntityId] = timeToAlarmDictionary[grid.EntityId] + 1;
+                timeToAlarmDictionary[minEntityId] = timeToAlarmDictionary[minEntityId] + 1;
             }
             else
             {
-                timeToAlarmDictionary[grid.EntityId] = 1;
+                timeToAlarmDictionary[minEntityId] = 1;
             }
             
-            if (timeToAlarmDictionary[grid.EntityId] > SentisOptimisationsPlugin.Config.PhysicsChecksBeforePunish / 2)
+            if (timeToAlarmDictionary[minEntityId] > SentisOptimisationsPlugin.Config.PhysicsChecksBeforePunish / 2)
             {
-                ChatUtils.SendTo(grid.BigOwners[0],
-                    "Warning. Grid " + grid.DisplayName + " has an increased impact on server performance,\n" +
+                ChatUtils.SendTo(ownerId,
+                    "Warning. Grid(s) " + gridNames + " has an increased impact on server performance,\n" +
                     " when the load increases, the structure will be converted into a station");
                 MyVisualScriptLogicProvider.ShowNotification(
-                    "Warning. Grid " + grid.DisplayName + " has an increased impact on server performance,\n" +
+                    "Warning. Grid(s) " + gridNames + " has an increased impact on server performance,\n" +
                     " when the load increases, the structure will be converted into a station", 5000,
                     "Red",
-                    grid.BigOwners[0]);
-                timeToAlarmDictionary.Remove(grid.EntityId);
+                    ownerId);
+                timeToAlarmDictionary.Remove(minEntityId);
             }
             
             
             
-            Log.Warn("Grid " + grid.DisplayName + " of player " + PlayerUtils.GetOwner(grid) +
+            Log.Warn("Grid(s) " + gridNames + " of player " + playerName +
                      " make some physics problems");
         }
 
-        public void PunishPlayerGrid(IMyCubeGrid grid)
+        public void PunishPlayerGrid(List<IMyCubeGrid> grids)
         {
-            if (grid.DisplayName.Contains("@"))
-            {
-                return;
-            }
-            if (grid.BigOwners.Count == 0)
-            {
-                ConvertToStatic((MyCubeGrid) grid);
-                return;
-            }
-            ChatUtils.SendTo(grid.BigOwners[0],
-                "Attention. Grid " + grid.DisplayName + " has a HUGE impact on server performance");
-            MyVisualScriptLogicProvider.ShowNotification(
-                "Attention. Grid " + grid.DisplayName + " has a HUGE impact on server performance", 10000,
-                "Red",
-                grid.BigOwners[0]);
+            var minEntityId = grids.MinBy(grid => grid.EntityId).EntityId;
+            string gridNames = string.Join(", ", grids.Select(grid => grid.DisplayName));
+            var ownerId = PlayerUtils.GetOwner(grids);
+            var playerName = PlayerUtils.GetPlayerIdentity(ownerId).DisplayName;
             
-            Log.Error("Grid " + grid.DisplayName + " of player " + PlayerUtils.GetOwner(grid) +
+            ChatUtils.SendTo(ownerId,
+                "Attention. Grid(s) " + gridNames + " has a HUGE impact on server performance");
+            MyVisualScriptLogicProvider.ShowNotification(
+                "Attention. Grid(s) " + gridNames + " has a HUGE impact on server performance", 10000,
+                "Red",
+                ownerId);
+
+            
+            Log.Error("Grid " + gridNames + " of player " + playerName +
                       " make lot of physics problems");
 
-            if (timeToFixDictionary.ContainsKey(grid.EntityId))
+            if (timeToFixDictionary.ContainsKey(minEntityId))
             {
-                timeToFixDictionary[grid.EntityId] = timeToFixDictionary[grid.EntityId] + 1;
+                timeToFixDictionary[minEntityId] = timeToFixDictionary[minEntityId] + 1;
             }
             else
             {
-                timeToFixDictionary[grid.EntityId] = 1;
+                timeToFixDictionary[minEntityId] = 1;
             }
             
-            if (timeToFixDictionary[grid.EntityId] > SentisOptimisationsPlugin.Config.PhysicsChecksBeforePunish)
+            if (timeToFixDictionary[minEntityId] > SentisOptimisationsPlugin.Config.PhysicsChecksBeforePunish)
             {
-                ConvertToStatic((MyCubeGrid) grid);
-                timeToFixDictionary.Remove(grid.EntityId);
+                foreach (var grid in grids)
+                {
+                    ConvertToStatic((MyCubeGrid) grid);
+                    timeToFixDictionary.Remove(minEntityId);
+                }
             }
         }
 
-        public void PunishPlayerGridImmediately(IMyCubeGrid grid)
+        public void PunishPlayerGridImmediately(List<IMyCubeGrid> grids)
         {
-            ConvertToStatic((MyCubeGrid) grid);
-            Log.Error("Grid " + grid.DisplayName + " of player " + PlayerUtils.GetOwner(grid) +
+            foreach (var grid in grids)
+            {
+                ConvertToStatic((MyCubeGrid) grid);
+            }
+            string gridNames = string.Join(", ", grids.Select(grid => grid.DisplayName));
+            var ownerId = PlayerUtils.GetOwner(grids);
+            Log.Error("Grid(s) " + gridNames + " of player " + PlayerUtils.GetPlayerIdentity(ownerId).DisplayName +
                       " make lot of physics problems");
         }
 
@@ -108,8 +111,6 @@ namespace SentisOptimisationsPlugin
         {
             if (!myCubeGrid.IsStatic)
             {
-                BoundingSphereD sphere = new BoundingSphereD(myCubeGrid.PositionComp.GetPosition(), 50000);
-                MyPhysics.Clusters.ReorderClusters(BoundingBoxD.CreateFromSphere(sphere));
                 myCubeGrid.Physics?.SetSpeeds(Vector3.Zero, Vector3.Zero);
                 myCubeGrid.ConvertToStatic();
                 CommunicationUtils.SyncConvert(myCubeGrid, true);

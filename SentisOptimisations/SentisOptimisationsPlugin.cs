@@ -138,7 +138,7 @@ namespace SentisOptimisationsPlugin
                 ListReader<MyClusterTree.MyCluster> clusters = MyPhysics.Clusters.GetClusters();
                 var myPhysics = MySession.Static.GetComponent<MyPhysics>();
                 int active = 0;
-                foreach (MyClusterTree.MyCluster myCluster in clusters)
+                foreach (MyClusterTree.MyCluster myCluster in new List<MyClusterTree.MyCluster>(clusters))
                 {
                     if (myCluster.UserData is HkWorld userData && (bool) myPhysics.easyCallMethod("IsClusterActive",
                             new object[] {myCluster.ClusterId, userData.CharacterRigidBodies.Count}))
@@ -160,7 +160,7 @@ namespace SentisOptimisationsPlugin
                         var avgCpuLoad = cpuLoads.Count > 0 ? cpuLoads.Average() : 0.0;
                         gui.FreezerStatistic.Text =
                             $"Avg CPU Load: {Math.Round((decimal)avgCpuLoad, 2)}% " +
-                            $"Total grids: {EntitiesObserver.MyCubeGrids.Count}, Frozen: {FreezeLogic.FrozenGrids.Count}";
+                            $"Total grids: {EntitiesObserver.MyCubeGrids.Count}, Frozen: {FreezeLogic.FrozenGrids.Count}, Frozen physics: {FreezeLogic.FrozenPhysicsGrids.Count}";
                     }
                     catch (Exception e)
                     {
@@ -171,7 +171,7 @@ namespace SentisOptimisationsPlugin
             }
             catch (Exception e)
             {
-                Log.Error(e, "WTF?");
+                //do nothing
             }
         }
 
