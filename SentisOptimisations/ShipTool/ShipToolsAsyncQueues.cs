@@ -57,7 +57,6 @@ public class ShipToolsAsyncQueues
                         Thread.Sleep(160);
                         continue;
                     }
-
                     dequeue.Invoke();
                 }
                 catch (Exception e)

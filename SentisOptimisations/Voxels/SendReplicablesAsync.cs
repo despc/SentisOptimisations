@@ -51,7 +51,7 @@ namespace SentisOptimisationsPlugin
                     }
                     catch (Exception e)
                     {
-                        Log.Error("Send to client loop Error", e);
+                        // Log.Error("Send to client loop Error", e);
                     }
                 }
             }

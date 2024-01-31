@@ -34,6 +34,7 @@ namespace SentisGameplayImprovements.AllGridsActions
             {
                 MyCubeGrids.Remove((MyCubeGrid) entity);
                 FreezeLogic.FrozenGrids.Remove(entity.EntityId);
+                FreezeLogic.FrozenPhysicsGrids.Remove(entity.EntityId);
                 return;
             }
 

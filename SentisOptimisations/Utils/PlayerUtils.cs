@@ -149,5 +149,19 @@ namespace SentisOptimisations
 
         public static bool IsPCULimitIgnored(ulong steamId) => MySession.Static.RemoteAdminSettings[steamId]
             .HasFlag((Enum) AdminSettingsEnum.IgnorePcu);
+
+        public static long GetOwner(List<IMyCubeGrid> grids)
+        {
+            foreach (var myCubeGrid in grids)
+            {
+                var owner = GetOwner(myCubeGrid);
+                if (owner != 0)
+                {
+                    return owner;
+                }
+            }
+
+            return 0;
+        }
     }
 }
