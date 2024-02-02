@@ -111,9 +111,16 @@ namespace SentisOptimisations
             List<IMyPlayer> result = new List<IMyPlayer>();
             foreach (IMyPlayer p in players)
             {
-                if (Vector3D.Distance(p.GetPosition(), point) < radius)
+                try
                 {
-                    result.Add(p);
+                    if (Vector3D.Distance(p.GetPosition(), point) < radius)
+                    {
+                        result.Add(p);
+                    }
+                }
+                catch (Exception e)
+                {
+                    //do nothing
                 }
             }
 
