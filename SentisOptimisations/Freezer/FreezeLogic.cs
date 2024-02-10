@@ -145,6 +145,10 @@ public class FreezeLogic
                     }
                 }
             }
+            else
+            {
+                LastUpdateFrames.Remove(myCubeBlock.EntityId);
+            }
         }
     }
 
@@ -356,9 +360,13 @@ public class FreezeLogic
 
     public static bool NeedToCompensate(MyFunctionalBlock myCubeBlock)
     {
+        if (myCubeBlock == null || !myCubeBlock.IsWorking)
+        {
+            return false;
+        }
+
         var needToCompensate = myCubeBlock is MyProductionBlock
-                               || myCubeBlock is MyGasGenerator
-                               || myCubeBlock is MyFueledPowerProducer;
+                               || myCubeBlock is MyGasTank;
         return needToCompensate;
     }
 

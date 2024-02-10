@@ -1,10 +1,13 @@
 ﻿using System;
 using System.Reflection;
+using NLog.Fluent;
 using Sandbox.Engine.Physics;
 using Sandbox.Game;
 using Sandbox.Game.Entities;
+using Sandbox.Game.Entities.Blocks;
 using Sandbox.Game.Entities.Cube;
 using Sandbox.Game.Entities.Inventory;
+using Sandbox.Game.EntityComponents;
 using Torch.Managers.PatchManager;
 using VRage;
 using VRage.Game;
@@ -28,7 +31,7 @@ public static class FreezerPatches
         ctx.GetPattern(MethodAddItems).Prefixes.Add(
             typeof(FreezerPatches).GetMethod(nameof(AddItemsPatched),
                 BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-        
+
         var MethodOnMotionDynamic = typeof(MyPhysicsBody).GetMethod
         ("OnMotionDynamic", BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
 
@@ -45,7 +48,7 @@ public static class FreezerPatches
             typeof(FreezerPatches).GetMethod(nameof(RefreshCustomInfoPatched),
                 BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
     }
-
+    
     private static bool RefreshCustomInfoPatched(MyTerminalBlock __instance)
     {
         if (!SentisOptimisationsPlugin.Config.FreezerEnabled)
