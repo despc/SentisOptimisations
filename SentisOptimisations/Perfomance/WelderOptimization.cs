@@ -1,15 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
-using System.Threading;
-using System.Threading.Tasks;
 using NAPI;
 using Sandbox;
 using Sandbox.Definitions;
 using Sandbox.Game;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Cube;
-using Sandbox.Game.Multiplayer;
 using Sandbox.Game.Weapons;
 using Sandbox.Game.World;
 using Sandbox.ModAPI;
@@ -19,7 +16,6 @@ using Torch.Managers.PatchManager;
 using VRage;
 using VRage.Game;
 using VRage.Game.Entity;
-using VRage.Game.ModAPI;
 using VRageMath;
 
 namespace Optimizer.Optimizations
@@ -27,8 +23,6 @@ namespace Optimizer.Optimizations
     [PatchShim]
     public class WelderOptimization
     {
-        private static Random r = new Random();
-        public static Queue<Action> AsynActions = new Queue<Action>();
 
         public static void Patch(PatchContext ctx)
         {
@@ -38,87 +32,7 @@ namespace Optimizer.Optimizations
             ctx.GetPattern(MethodActivate).Prefixes.Add(
                 typeof(WelderOptimization).GetMethod(nameof(Activate),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-            var MethodIncreaseMountLevel = typeof(MySlimBlock).GetMethod(
-                "VRage.Game.ModAPI.IMySlimBlock.IncreaseMountLevel",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-
-            ctx.GetPattern(MethodIncreaseMountLevel).Prefixes.Add(
-                typeof(WelderOptimization).GetMethod(nameof(IncreaseMountLevelPatched),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
         }
-
-        private static bool IncreaseMountLevelPatched(MySlimBlock __instance, float welderMountAmount,
-            long welderOwnerPlayerId,
-            IMyInventory outputInventory,
-            float maxAllowedBoneMovement,
-            bool isHelping,
-            MyOwnershipShareModeEnum share)
-        {
-            if (!SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.AsyncWeldAdvanced)
-            {
-                return true;
-            }
-
-            Action increaseMountLevelAction = () =>
-            {
-                __instance.IncreaseMountLevel(welderMountAmount, welderOwnerPlayerId,
-                    outputInventory as MyInventoryBase, maxAllowedBoneMovement, isHelping, share);
-            };
-
-            lock (AsynActions)
-            {
-                AsynActions.Enqueue(increaseMountLevelAction);
-            }
-
-            return false;
-        }
-
-        public static void AsyncWeldLoopInit()
-        {
-            Task.Run(() =>
-            {
-                try
-                {
-                    while (true)
-                    {
-                        Thread.Sleep(2);
-                        Action pendingAction = null;
-                        lock (AsynActions)
-                        {
-                            if (AsynActions.Count > 0)
-                            {
-                                pendingAction = AsynActions.Dequeue();
-                            }
-                        }
-
-                        if (pendingAction != null)
-                        {
-                            try
-                            {
-                                MyAPIGateway.Utilities.InvokeOnGameThread(() =>
-                                {
-                                    try
-                                    {
-                                        pendingAction();
-                                    }
-                                    catch
-                                    {
-                                    }
-                                });
-                            }
-                            catch
-                            {
-                            }
-                        }
-                    }
-                }
-                catch
-                {
-                    //
-                }
-            });
-        }
-
 
         private static bool Activate(MyShipWelder __instance, ref bool __result, HashSet<MySlimBlock> targets)
         {
@@ -239,20 +153,13 @@ namespace Optimizer.Optimizations
                 if (block.CubeGrid.Physics != null && block.CubeGrid.Physics.Enabled)
                 {
                     bool canWeld = false;
-                    if (!SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.WelderTweaksNoLimitsCheck)
+                    bool? flag2 = block.ComponentStack.WillFunctionalityRise(weldAmount);
+                    if (flag2 == null || !flag2.Value || MySession.Static.CheckLimitsAndNotify(
+                            MySession.Static.LocalPlayerId, block.BlockDefinition.BlockPairName,
+                            block.BlockDefinition.PCU - MyCubeBlockDefinition.PCU_CONSTRUCTION_STAGE_COST, 0, 0,
+                            null))
                     {
                         canWeld = true;
-                    }
-                    else
-                    {
-                        bool? flag2 = block.ComponentStack.WillFunctionalityRise(weldAmount);
-                        if (flag2 == null || !flag2.Value || MySession.Static.CheckLimitsAndNotify(
-                                MySession.Static.LocalPlayerId, block.BlockDefinition.BlockPairName,
-                                block.BlockDefinition.PCU - MyCubeBlockDefinition.PCU_CONSTRUCTION_STAGE_COST, 0, 0,
-                                null))
-                        {
-                            canWeld = true;
-                        }
                     }
 
                     if (canWeld)
@@ -356,25 +263,13 @@ namespace Optimizer.Optimizations
             }
 
             bool flag3 = false;
-            if (!SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.WelderSkipCreativeWelding)
-            {
-                flag3 = MySession.Static.CreativeMode;
-                MyPlayer.PlayerId id2;
-                MyPlayer myPlayer;
-                if (MySession.Static.Players.TryGetPlayerId(welder.BuiltBy, out id2) &&
-                    MySession.Static.Players.TryGetPlayerById(id2, out myPlayer))
-                {
-                    flag3 |= MySession.Static.CreativeToolsEnabled(Sync.MyId);
-                }
-            }
 
             foreach (MyWelder.ProjectionRaycastData projectionRaycastData in array)
             {
                 if (welder.IsWithinWorldLimits(projectionRaycastData.cubeProjector,
                         projectionRaycastData.hitCube.BlockDefinition.BlockPairName,
-                        flag3
-                            ? projectionRaycastData.hitCube.BlockDefinition.PCU
-                            : MyCubeBlockDefinition.PCU_CONSTRUCTION_STAGE_COST) && (MySession.Static.CreativeMode ||
+                        projectionRaycastData.hitCube.BlockDefinition.PCU)
+                    && (MySession.Static.CreativeMode ||
                         inventory.ContainItems(new MyFixedPoint?(1),
                             projectionRaycastData.hitCube
                                 .BlockDefinition.Components[0]
