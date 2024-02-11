@@ -8,7 +8,6 @@ using Havok;
 using NAPI;
 using NLog;
 using NLog.Filters;
-using Optimizer.Optimizations;
 using Sandbox;
 using Sandbox.Definitions;
 using Sandbox.Engine.Multiplayer;
@@ -114,7 +113,6 @@ namespace SentisOptimisationsPlugin
                 ShipToolsAsyncQueues.OnLoaded();
                 DelayedProcessor.OnLoaded();
                 InitShieldApi();
-                WelderOptimization.AsyncWeldLoopInit();
             }
         }
 
