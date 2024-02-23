@@ -11,7 +11,7 @@ using Torch.Managers.PatchManager;
 namespace FixTurrets.Perfomance
 {
     [PatchShim]
-    public class ParallelUpdateTweaks
+    public static class ParallelUpdateTweaks
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
