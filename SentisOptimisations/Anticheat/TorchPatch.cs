@@ -6,7 +6,7 @@ using Torch.Managers.PatchManager;
 namespace SentisOptimisationsPlugin
 {
     [PatchShim]
-    public class TorchPatch
+    public static class TorchPatch
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
 

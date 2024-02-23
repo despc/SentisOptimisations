@@ -8,7 +8,7 @@ using Torch.Managers.PatchManager;
 namespace SentisOptimisationsPlugin
 {
     [PatchShim]
-    public class GasTankOptimisations
+    public static class GasTankOptimisations
     {
         private static Dictionary<long, List<double>> _accumulatedTransfer = new();
         private static Dictionary<long, List<float>> _accumulatedTransferVent = new();

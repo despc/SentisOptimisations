@@ -12,7 +12,7 @@ using VRage.Game;
 namespace SentisOptimisationsPlugin
 {
     [PatchShim]
-    public class HydrogenPatch
+    public static class HydrogenPatch
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
 

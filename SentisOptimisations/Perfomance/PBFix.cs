@@ -21,7 +21,7 @@ using VRage.Utils;
 namespace SentisOptimisationsPlugin
 {
     [PatchShim]
-    public class PBFix
+    public static class PBFix
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
 

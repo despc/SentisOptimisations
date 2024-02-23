@@ -21,7 +21,7 @@ using VRageMath;
 namespace Optimizer.Optimizations
 {
     [PatchShim]
-    public class WelderOptimization
+    public static class WelderOptimization
     {
 
         public static void Patch(PatchContext ctx)

@@ -11,7 +11,7 @@ using Torch.Managers.PatchManager;
 namespace SentisOptimisationsPlugin
 {
     [PatchShim]
-    public class FuckRamPatch
+    public static class FuckRamPatch
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
@@ -51,7 +51,6 @@ namespace SentisOptimisationsPlugin
             if (value.Length > 512)
             {
                 Log.Error("DisplayName TOO LONG " + value);
-                Thread.Sleep(15);
                 return false;
             }
             return true;
@@ -62,7 +61,6 @@ namespace SentisOptimisationsPlugin
             if (value.Length > 100240)
             {
                 Log.Error("Storage TOO LONG " + value);
-                Thread.Sleep(15);
                 return false;
             }
             return true;
@@ -73,7 +71,6 @@ namespace SentisOptimisationsPlugin
             if (value.Length > 100240)
             {
                 Log.Error("CustomData TOO LONG " + value);
-                Thread.Sleep(15);
                 return false;
             }
             return true;
