@@ -45,6 +45,7 @@ namespace SentisOptimisationsPlugin
         private string _antifreezeBlockSubtypes = "LargeBlockSmallContainer_admin2:LargeBlockSmallContainer_admin";
         private int _minWakeUpIntervalInSec = 600;
         private int _delayBeforeFreezeSec = 5;
+        private int _delayBeforeFreezerStartSec = 5;
         
         [DisplayTab(Name = "Slowdown Enabled", GroupName = "Slowdown", Tab = "Slowdown", Order = 0, Description = "Slowdown Enabled")]
         public bool SlowdownEnabled
@@ -115,13 +116,6 @@ namespace SentisOptimisationsPlugin
             set => SetValue(ref _enablePhysicsGuard, value);
         }
         
-        [DisplayTab(Name = "Experimental crash fix RemoveEntityPhantom", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Experimental crash fix RemoveEntityPhantom")]
-        public bool RemoveEntityPhantomPatch
-        {
-            get => _removeEntityPhantomPatch;
-            set => SetValue(ref _removeEntityPhantomPatch, value);
-        }
-        
         [DisplayTab(Name = "Gas Tank Optimisation", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Gas Tank Optimisation")]
         public bool GasTankOptimisation
         {
@@ -168,15 +162,18 @@ namespace SentisOptimisationsPlugin
         [DisplayTab(Name = "Min WakeUp Interval In Sec", GroupName = "Freezer", Tab = "Freezer", Order = 5, Description = "Min WakeUp Interval In Sec")]
         public int MinWakeUpIntervalInSec { get => _minWakeUpIntervalInSec; set => SetValue(ref _minWakeUpIntervalInSec, value); }
         
-        [DisplayTab(Name = "Debug logs", GroupName = "Freezer", Tab = "Freezer", Order = 6, Description = "Debug logs")]
+        [DisplayTab(Name = "Debug logs", GroupName = "Freezer", Tab = "Freezer", Order = 9, Description = "Debug logs")]
         public bool EnableDebugLogs { get => _enableDebugLogs; set => SetValue(ref _enableDebugLogs, value); }
         
-        [DisplayTab(Name = "Delay before freeze in sec", GroupName = "Freezer", Tab = "Freezer", Order = 7, Description = "Delay before freeze in sec")]
+        [DisplayTab(Name = "Delay before freeze in sec", GroupName = "Freezer", Tab = "Freezer", Order = 8, Description = "Delay before freeze in sec")]
         public int DelayBeforeFreezeSec { get => _delayBeforeFreezeSec; set => SetValue(ref _delayBeforeFreezeSec, value); }
+        
+        [DisplayTab(Name = "Delay before freezer start in sec", GroupName = "Freezer", Tab = "Freezer", Order = 7, Description = "Delay before freezer start in sec")]
+        public int DelayBeforeFreezerStartSec { get => _delayBeforeFreezerStartSec; set => SetValue(ref _delayBeforeFreezerStartSec, value); }
 
-        [DisplayTab(Name = "Compensation logs", GroupName = "Freezer", Tab = "Freezer", Order = 8, Description = "Compensation logs")]
+        [DisplayTab(Name = "Compensation logs", GroupName = "Freezer", Tab = "Freezer", Order = 10, Description = "Compensation logs")]
         public bool EnableCompensationLogs { get => _enableCompensationLogs; set => SetValue(ref _enableCompensationLogs, value); }
-        [DisplayTab(Name = "Freeze Physics", GroupName = "Freezer", Tab = "Freezer", Order = 7, Description = "Freeze Physics")]
+        [DisplayTab(Name = "Freeze Physics", GroupName = "Freezer", Tab = "Freezer", Order = 6, Description = "Freeze Physics")]
         public bool FreezePhysics
         {
             get => _freezePhysics;

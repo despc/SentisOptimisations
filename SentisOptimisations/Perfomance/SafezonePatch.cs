@@ -110,11 +110,6 @@ namespace SentisOptimisationsPlugin
 
         private static bool MyRemoveEntityPhantomPatched(MySafeZone __instance, HkRigidBody body, IMyEntity entity)
         {
-            if (!SentisOptimisationsPlugin.Config.RemoveEntityPhantomPatch)
-            {
-                return true;
-            }
-
             if (MySandboxGame.Static.SimulationFrameCounter < 1000)
             {
                 return true;
