@@ -6,6 +6,7 @@ using System.Threading;
 using Havok;
 using NAPI;
 using Sandbox;
+using Sandbox.Engine.Physics;
 using Sandbox.Engine.Voxels;
 using Sandbox.Game.Components;
 using Sandbox.Game.Entities;
@@ -76,6 +77,7 @@ public class FreezeLogic
         {
             InFreezeQueue.Remove(minEntityId);
         }
+
         var groupWithFixedGrid = GroupContainsFixedGrid(grids);
         foreach (var grid in grids)
         {
@@ -97,20 +99,22 @@ public class FreezeLogic
                 {
                     InFreezeQueue.Remove(grid.EntityId);
                 }
-             
+
                 CompensateFrozenFrames(grid);
-                FrozenPhysicsGrids.Remove(grid.EntityId);
                 MyAPIGateway.Utilities.InvokeOnGameThread(() =>
                 {
                     if (!grid.IsStatic)
                     {
                         var gridPhysics = grid.Physics;
 
-                        if (gridPhysics != null && SentisOptimisationsPlugin.Config.FreezePhysics && !groupWithFixedGrid)
+                        if (gridPhysics != null && SentisOptimisationsPlugin.Config.FreezePhysics &&
+                            !groupWithFixedGrid)
                         {
-                           DoUnfreezePhysics(grid);
+                            DoUnfreezePhysics(grid);
+                            FrozenPhysicsGrids.Remove(grid.EntityId);
                         }
                     }
+
                     RegisterRecursive(grid);
                     grid.PlayerPresenceTier = MyUpdateTiersPlayerPresence.Normal;
                 });
@@ -187,7 +191,6 @@ public class FreezeLogic
                 needToAwake = true;
                 break;
             }
-            
         }
 
         var minEntityId = grids.MinBy(grid => grid.EntityId).EntityId;
@@ -216,7 +219,7 @@ public class FreezeLogic
                                                             .MinWakeUpIntervalInSec));
             }
         }
-        
+
         lock (InFreezeQueue)
         {
             if (InFreezeQueue.Contains(minEntityId))
@@ -236,61 +239,70 @@ public class FreezeLogic
         {
             return;
         }
+
         Thread.Sleep(8);
         DelayedProcessor.Instance.AddDelayedAction(DateTime.Now.AddSeconds(delayBeforeFreezeSec), () =>
         {
-            foreach (var grid in needToFreezeGrids)
+            try
             {
-                if (grid == null || grid.Closed || grid.IsPreview) continue;
-                if (FrozenGrids.Contains(grid.EntityId))
+                foreach (var grid in new List<MyCubeGrid>(needToFreezeGrids))
                 {
-                    continue;
-                }
-
-                var isInQueue = false;
-                lock (InFreezeQueue)
-                {
-                    isInQueue = InFreezeQueue.Contains(minEntityId);
-                }
-
-                if (grid.Parent == null && isInQueue)
-                {
-                    Log("Freeze grid " + grid.DisplayName);
-                    MyAPIGateway.Utilities.InvokeOnGameThread(() =>
-                    {
-                        if (!grid.IsStatic)
-                        {
-                            var gridPhysics = grid.Physics;
-                            if (gridPhysics != null)
-                            {
-                                gridPhysics.SetSpeeds(Vector3.Zero, Vector3.Zero);
-                                if (SentisOptimisationsPlugin.Config.FreezePhysics && !groupWithFixedGrid)
-                                {
-                                    DoFreezePhysics(grid);
-                                }
-                            }
-                        }
-
-                        FrozenGrids.Add(grid.EntityId);
-                        
-                        UnregisterRecursive(grid);
-                    });
-                }
-
-                foreach (var myCubeBlock in grid.GetFatBlocks())
-                {
-                    if (!(myCubeBlock is MyFunctionalBlock))
+                    if (grid == null || grid.Closed || grid.MarkedForClose || grid.IsPreview) continue;
+                    if (FrozenGrids.Contains(grid.EntityId))
                     {
                         continue;
                     }
 
-                    var needToCompensate = NeedToCompensate((MyFunctionalBlock)myCubeBlock);
-                    if (needToCompensate)
+                    var isInQueue = false;
+                    lock (InFreezeQueue)
                     {
-                        LastUpdateFrames[myCubeBlock.EntityId] = MySandboxGame.Static.SimulationFrameCounter;
+                        isInQueue = InFreezeQueue.Contains(minEntityId);
+                    }
+
+                    if (grid.Parent == null && isInQueue)
+                    {
+                        Log("Freeze grid " + grid.DisplayName);
+                        MyAPIGateway.Utilities.InvokeOnGameThread(() =>
+                        {
+                            if (!grid.IsStatic)
+                            {
+                                var gridPhysics = grid.Physics;
+                                if (gridPhysics != null)
+                                {
+                                    gridPhysics.SetSpeeds(Vector3.Zero, Vector3.Zero);
+                                    if (SentisOptimisationsPlugin.Config.FreezePhysics && !groupWithFixedGrid)
+                                    {
+                                        DoFreezePhysics(grid);
+                                    }
+                                }
+                            }
+
+                            FrozenGrids.Add(grid.EntityId);
+
+                            UnregisterRecursive(grid);
+                        });
+                    }
+
+                    foreach (var myCubeBlock in grid.GetFatBlocks())
+                    {
+                        if (!(myCubeBlock is MyFunctionalBlock))
+                        {
+                            continue;
+                        }
+
+                        var needToCompensate = NeedToCompensate((MyFunctionalBlock)myCubeBlock);
+                        if (needToCompensate)
+                        {
+                            LastUpdateFrames[myCubeBlock.EntityId] = MySandboxGame.Static.SimulationFrameCounter;
+                        }
                     }
                 }
             }
+            catch (Exception e)
+            {
+                //
+            }
+
 
             lock (InFreezeQueue)
             {
@@ -301,59 +313,94 @@ public class FreezeLogic
 
     private static bool GroupContainsFixedGrid(HashSet<MyCubeGrid> grids)
     {
-        return grids.Any(grid =>
+        try
         {
-            if (grid.IsStatic)
+            return grids.Any(grid =>
             {
-                return true;
-            }
+                if (grid.IsStatic)
+                {
+                    return true;
+                }
 
-            if (grid.Physics == null)
-            {
-                return false;
-            }
-            return grid.Physics.Constraints.Any(constraint =>
-            {
-                if (constraint.RigidBodyB == null)
+                if (grid.Physics == null)
                 {
                     return false;
                 }
-                return constraint.RigidBodyB.UserObject is MyVoxelPhysicsBody;
+
+                return new HashSet<HkConstraint>(grid.Physics.Constraints).Any(constraint =>
+                {
+                    if (constraint.RigidBodyB == null)
+                    {
+                        return false;
+                    }
+
+                    return constraint.RigidBodyB.UserObject is MyVoxelPhysicsBody;
+                });
             });
-        });
+        }
+        catch (Exception e)
+        {
+            return true;
+        }
     }
 
     private static void DoFreezePhysics(MyCubeGrid grid)
     {
-        var gridPhysics = grid.Physics;
-
-        if (gridPhysics.Constraints.Any(constraint =>
-                constraint.ConstraintData is HkFixedConstraintData && constraint.Enabled))
+        try
         {
-            return;
+            var gridPhysics = grid.Physics;
+
+            if (new HashSet<HkConstraint>(gridPhysics.Constraints).Any(constraint =>
+                    {
+                        if (!(constraint.ConstraintData is HkFixedConstraintData))
+                        {
+                            return false;
+                        }
+
+                        if (constraint.RigidBodyB == null || constraint.RigidBodyB.UserObject == null)
+                        {
+                            return false;
+                        }
+
+                        if (constraint.RigidBodyB.UserObject is MyPhysicsBody phb)
+                        {
+                            if (phb.Entity is null or MyShipConnector or MyEntitySubpart)
+                            {
+                                return false;
+                            }
+                        }
+
+                        return constraint.ConstraintData is HkFixedConstraintData && constraint.Enabled;
+                    }
+                ))
+            {
+                return;
+            }
+
+            grid.Physics.Gravity = Vector3.Zero;
+            gridPhysics.ConvertToStatic();
+            grid.RaisePhysicsChanged();
+            FrozenPhysicsGrids.Add(grid.EntityId);
         }
-        
-        gridPhysics.ConvertToStatic();
-        grid.RaisePhysicsChanged();
-        FrozenPhysicsGrids.Add(grid.EntityId);
-        // gridPhysics.RigidBody.UpdateMotionType(HkMotionType.Fixed);
-        // gridPhysics.RigidBody.Quality = HkCollidableQualityType.Fixed;
+        catch (Exception e)
+        {
+            //
+        }
     }
-    
+
     private static void DoUnfreezePhysics(MyCubeGrid grid)
     {
         var gridPhysics = grid.Physics;
-        if (gridPhysics.Constraints.Any(constraint =>
-                constraint.ConstraintData is HkFixedConstraintData && constraint.Enabled))
+        if (!FrozenPhysicsGrids.Contains(grid.EntityId))
         {
             return;
         }
-        
+
         gridPhysics.ConvertToDynamic(grid.GridSizeEnum == MyCubeSize.Large, grid.IsClientPredicted);
         gridPhysics.SetSpeeds(Vector3.Zero, Vector3.Zero);
         grid.RaisePhysicsChanged();
         grid.RecalculateGravity();
-        
+
         // gridPhysics.RigidBody.UpdateMotionType(HkMotionType.Box_Inertia);
         // gridPhysics.RigidBody.Quality = HkCollidableQualityType.Moving;
     }
@@ -436,7 +483,8 @@ public class FreezeLogic
                     groups.Add(group);
                 }
 
-                foreach (var group in groups) {
+                foreach (var group in groups)
+                {
                     i += 2;
                     MyAPIGateway.Utilities.InvokeOnGameThread(() =>
                     {
@@ -462,12 +510,13 @@ public class FreezeLogic
                                 }
                                 else
                                 {
-                                    FrozenPhysicsGrids.Remove(myCubeGrid.EntityId);
                                     if (!groupWithFixedGrid)
                                     {
                                         gridPhysics.SetSpeeds(Vector3.Zero, Vector3.Zero);
                                         DoUnfreezePhysics((MyCubeGrid)myCubeGrid);
                                     }
+
+                                    FrozenPhysicsGrids.Remove(myCubeGrid.EntityId);
                                 }
                             }
                         }

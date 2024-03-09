@@ -50,22 +50,25 @@ namespace SentisOptimisations.DelayedLogic
                     try
                     {
                         Thread.Sleep(500);
+                        DateTime firstElement;
                         lock (_lock)
                         {
                             if (_actions.Count == 0)
                             {
                                 continue;
                             }
-
-                            var firstElement = _actions.Keys[0];
+                            
+                            firstElement = _actions.Keys[0];
                             if (firstElement > DateTime.Now)
                             {
                                 continue;
                             }
-
-                            while (firstElement < DateTime.Now)
+                        }
+                        while (firstElement < DateTime.Now)
+                        {
+                            _actions[firstElement].Invoke();
+                            lock (_lock)
                             {
-                                _actions[firstElement].Invoke();
                                 _actions.Remove(firstElement);
                                 if (_actions.Count == 0)
                                 {
@@ -74,7 +77,7 @@ namespace SentisOptimisations.DelayedLogic
 
                                 firstElement = _actions.Keys[0];
                             }
-                        }
+                        } 
                     }
                     catch (Exception e)
                     {
