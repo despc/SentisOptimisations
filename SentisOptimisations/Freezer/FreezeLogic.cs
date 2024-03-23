@@ -31,26 +31,32 @@ public class FreezeLogic
     private Dictionary<long, DateTime> WakeUpDatas = new(); //EntityId:NextWakeUpTime
     public static ConcurrentDictionary<long, ulong> LastUpdateFrames = new(); //BlockId:LastUpdateFrame
     public static List<float> CpuLoads = new();
-    Random random = new Random();
 
     public void CheckGridGroup(HashSet<MyCubeGrid> grids)
     {
-        var anyGrid = grids.FirstElement();
-        var gridsPosition = anyGrid.PositionComp.GetPosition();
-        var isWakeUpTime = IsWakeUpTime(grids);
-        if (PlayerUtils.IsAnyPlayersInRadius(gridsPosition, SentisOptimisationsPlugin.Config.FreezeDistance)
-            || isWakeUpTime)
+        try
         {
-            UnfreezeGrids(grids, isWakeUpTime);
-            return;
-        }
+            var anyGrid = grids.FirstElement();
+            var gridsPosition = anyGrid.PositionComp.GetPosition();
+            var isWakeUpTime = IsWakeUpTime(grids);
+            if (PlayerUtils.IsAnyPlayersInRadius(gridsPosition, SentisOptimisationsPlugin.Config.FreezeDistance)
+                || isWakeUpTime)
+            {
+                UnfreezeGrids(grids, isWakeUpTime);
+                return;
+            }
 
-        if (!SentisOptimisationsPlugin.Config.FreezerEnabled)
+            if (!SentisOptimisationsPlugin.Config.FreezerEnabled)
+            {
+                return;
+            }
+
+            FreezeGrids(grids);
+        }
+        catch (InvalidOperationException e)
         {
-            return;
+            // ignore "Collection was modified"
         }
-
-        FreezeGrids(grids);
     }
 
     private bool IsWakeUpTime(HashSet<MyCubeGrid> grids)

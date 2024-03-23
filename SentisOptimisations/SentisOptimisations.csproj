@@ -36,6 +36,7 @@
       <Compile Include="AllGridsActions\AllGridsProcessor.cs" />
       <Compile Include="Anticheat\FuckRamPatch.cs" />
       <Compile Include="Anticheat\HydrogenPatch.cs" />
+      <Compile Include="Anticheat\InventoryPatch.cs" />
       <Compile Include="Anticheat\KEEN_ColorChangeExploitFix.cs" />
       <Compile Include="Anticheat\TorchPatch.cs" />
       <Compile Include="Api\ShieldApi.cs" />

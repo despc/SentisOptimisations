@@ -64,5 +64,7 @@
   &lt;Assembly Path="C:\torch-server\Plugins\profiler-v3.1.0.28-25-g9393be6 (1)\Profiler.dll" /&gt;&#xD;
   &lt;Assembly Path="c:\torch-server\dedicatedserver64\HavokWrapper.dll" /&gt;&#xD;
   &lt;Assembly Path="C:\Users\idesp\RiderProjects\FixTurrets\SentisOptimisations\bin\Debug\Profiler.dll" /&gt;&#xD;
+  &lt;Assembly Path="C:\Users\idesp\RiderProjects\SEDB-RELOADED\SEDiscordBridge\obj\Debug\SEDiscordBridge.dll" /&gt;&#xD;
+  &lt;Assembly Path="C:\SE\Arrakis\torch-server\DedicatedServer64\VRage.Game.dll" /&gt;&#xD;
 &lt;/AssemblyExplorer&gt;</s:String>
 	<s:Boolean x:Key="/Default/Monitoring/IsToolWindowHidden/@EntryValue">True</s:Boolean></wpf:ResourceDictionary>

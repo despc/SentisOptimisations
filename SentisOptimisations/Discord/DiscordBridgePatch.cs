@@ -53,7 +53,7 @@ namespace SentisOptimisationsPlugin
                 var cpuLoads = new List<float> (FreezeLogic.CpuLoads);
                 var avgCpuLoad = cpuLoads.Count > 0 ? cpuLoads.Average() : 0.0;
 
-                status = status.Replace("{cpu}", "(" + Math.Round((decimal)avgCpuLoad, 2) + "%)");
+                status = status.Replace("{cpu}", "" + Math.Round((decimal)avgCpuLoad, 1) + "%");
             }
             catch (Exception e)
             {
