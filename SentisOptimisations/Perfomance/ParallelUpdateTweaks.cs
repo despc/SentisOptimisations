@@ -5,6 +5,7 @@ using NLog;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Blocks;
 using Sandbox.Game.Entities.Character;
+using Sandbox.Game.EntityComponents;
 using SentisOptimisationsPlugin.CrashFix;
 using Torch.Managers.PatchManager;
 
@@ -59,6 +60,10 @@ namespace FixTurrets.Perfomance
             var finalizer = typeof(CrashFixPatch).GetMethod(nameof(CrashFixPatch.SuppressExceptionFinalizer),
                 BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
             CrashFixPatch.harmony.Patch(MethodSetDefaultTexture, finalizer: new HarmonyMethod(finalizer));
+            
+            var MethodUpdateAutopilot = typeof(MyAutopilotComponent).GetMethod
+                (nameof(MyAutopilotComponent.UpdateAutopilot), BindingFlags.Instance | BindingFlags.Public);
+            CrashFixPatch.harmony.Patch(MethodUpdateAutopilot, finalizer: new HarmonyMethod(finalizer));
         }
 
         private static bool MethodThrustUpdateBeforeSimulationPatched(Object __instance)
