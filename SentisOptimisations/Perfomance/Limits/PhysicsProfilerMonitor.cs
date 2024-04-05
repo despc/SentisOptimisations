@@ -47,6 +47,10 @@ namespace SentisOptimisationsPlugin
             {
                 return;
             }
+            if (SentisOptimisationsPlugin.Instance.AllGridsProcessor.CancellationTokenSource.Token.IsCancellationRequested)
+            {
+                return;
+            }
 
             // var profilerEnabled = ProfilerConfig.Instance.Enabled;
             // bool needDisable = !profilerEnabled;

@@ -48,7 +48,7 @@ namespace SentisOptimisationsPlugin
         public UserControl _control = null;
         public static SentisOptimisationsPlugin Instance { get; private set; }
 
-        private AllGridsProcessor _allGridsProcessor = new AllGridsProcessor();
+        public AllGridsProcessor AllGridsProcessor = new AllGridsProcessor();
         private SendReplicablesAsync _replicablesAsync = new SendReplicablesAsync();
         public ShipToolsAsyncQueues ShipToolsAsyncQueues = new ShipToolsAsyncQueues();
         public DelayedProcessor DelayedProcessor = new DelayedProcessor();
@@ -99,7 +99,7 @@ namespace SentisOptimisationsPlugin
         {
             if (newState == TorchSessionState.Unloading)
             {
-                _allGridsProcessor.OnUnloading();
+                AllGridsProcessor.OnUnloading();
                 _replicablesAsync.OnUnloading();
                 ShipToolsAsyncQueues.OnUnloading();
                 DelayedProcessor.OnUnloading();
@@ -108,7 +108,7 @@ namespace SentisOptimisationsPlugin
             {
                 if (newState != TorchSessionState.Loaded)
                     return;
-                _allGridsProcessor.OnLoaded();
+                AllGridsProcessor.OnLoaded();
                 _replicablesAsync.OnLoaded();
                 ShipToolsAsyncQueues.OnLoaded();
                 DelayedProcessor.OnLoaded();
