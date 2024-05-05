@@ -1,7 +1,11 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using NAPI;
 using Sandbox.Game.Entities.Blocks;
+using Sandbox.ModAPI;
 using SpaceEngineers.Game.Entities.Blocks;
 using Torch.Managers.PatchManager;
 
@@ -10,7 +14,7 @@ namespace SentisOptimisationsPlugin
     [PatchShim]
     public static class GasTankOptimisations
     {
-        private static Dictionary<long, List<double>> _accumulatedTransfer = new();
+        private static ConcurrentDictionary<MyGasTank, List<double>> _accumulatedTransfer = new();
         private static Dictionary<long, List<float>> _accumulatedTransferVent = new();
         public static void Patch(PatchContext ctx)
         {
@@ -32,6 +36,40 @@ namespace SentisOptimisationsPlugin
 
         }
 
+        public static void UpdateTankRemains()
+        {
+            foreach (var at in _accumulatedTransfer)
+            {
+                var tank = at.Key;
+                if (tank == null)
+                {
+                    continue;
+                }
+                var accumulatedTransfers = at.Value;
+                if (accumulatedTransfers.Count < 30)
+                {
+                    var countToAdd = 30 - accumulatedTransfers.Count;
+                    for (int i = 0; i < countToAdd; i++)
+                    {
+                        accumulatedTransfers.Add(0);
+                    }
+
+                    MyAPIGateway.Utilities.InvokeOnGameThread(() =>
+                    {
+                        try
+                        {
+                            tank.easyCallMethod("ExecuteGasTransfer", new object[] { accumulatedTransfers.Sum() });
+                        }
+                        catch (Exception e)
+                        {
+                            //
+                        }
+                        
+                    });
+                    
+                }
+            }
+        }
 
         private static bool MethodExecuteGasTransferPatched(MyGasTank __instance, ref double totalTransfer)
         {
@@ -44,17 +82,18 @@ namespace SentisOptimisationsPlugin
                 return true;
             }
             List<double> accumulatedTransfers;
-            _accumulatedTransfer.TryGetValue(__instance.EntityId, out accumulatedTransfers);
+            _accumulatedTransfer.TryGetValue(__instance, out accumulatedTransfers);
             if (accumulatedTransfers == null)
             {
                 accumulatedTransfers = new List<double>();
-                _accumulatedTransfer[__instance.EntityId] = accumulatedTransfers;
+                _accumulatedTransfer[__instance] = accumulatedTransfers;
             }
             if (accumulatedTransfers.Count >= 30)
             {
                 double sum = accumulatedTransfers.Sum();
                 totalTransfer = sum;
                 accumulatedTransfers.Clear();
+                _accumulatedTransfer.Remove(__instance);
                 return true;
             }
             accumulatedTransfers.Add(totalTransfer);
