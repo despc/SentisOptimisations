@@ -43,6 +43,7 @@ namespace SentisOptimisationsPlugin.AllGridsActions
                     try
                     {
                         await Task.Delay(30000);
+                        await Task.Run(GasTankOptimisations.UpdateTankRemains);
                         await PhysicsProfilerMonitor.__instance.Profile();
                     }
                     catch (Exception e)

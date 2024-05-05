@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using NLog;
+using Sandbox.Engine.Physics;
 using Sandbox.Game;
 using Sandbox.Game.Entities;
+using Sandbox.Game.Entities.Blocks;
 using Sandbox.Game.Multiplayer;
 using Sandbox.Game.Screens.Helpers;
 using Sandbox.Game.World;
@@ -15,6 +17,8 @@ using Torch.Managers;
 using Torch.Utils;
 using VRage.Game;
 using VRage.Game.ModAPI;
+using VRage.ModAPI;
+using VRageMath;
 
 namespace SentisOptimisations.Commands
 {
@@ -47,6 +51,43 @@ namespace SentisOptimisations.Commands
 
         private static readonly FieldInfo GpsDicField =
             typeof(MyGpsCollection).GetField("m_playerGpss", BindingFlags.NonPublic | BindingFlags.Instance);
+
+
+        [Command("set_hydro", "Set hydrogen level of all tanks on grid")]
+        [Permission(MyPromoteLevel.Admin)]
+        public void SetHydroLevel(float newValue = 0.5f)
+        {
+            IMyPlayer player = Context.Player;
+            if (player == null)
+                return;
+            var character = player.Character;
+            Matrix headMatrix = character.GetHeadMatrix(true, true, false);
+            Vector3D vector3D = headMatrix.Translation + headMatrix.Forward * 0.5f;
+            Vector3D worldEnd = headMatrix.Translation + headMatrix.Forward * 5000.5f;
+            List<MyPhysics.HitInfo> mRaycastResult = new List<MyPhysics.HitInfo>();
+
+            MyPhysics.CastRay(vector3D, worldEnd, mRaycastResult, 15);
+
+            foreach (var hitInfo in new HashSet<MyPhysics.HitInfo>(mRaycastResult))
+            {
+                if (hitInfo.HkHitInfo.GetHitEntity() is MyCubeGrid grid)
+                {
+                    // ignore projected grid.
+                    if (grid.IsPreview)
+                        continue;
+
+                    foreach (var myCubeBlock in grid.GetFatBlocks())
+                    {
+                        if (myCubeBlock is MyGasTank)
+                        {
+                            ((MyGasTank)myCubeBlock).ChangeFillRatioAmount(newValue);
+                        }
+                    }
+                    Context.Respond($"Водород для грида {grid.DisplayName} выставлен на {newValue * 100}%");
+                    return;
+                }
+            }
+        }
 
         [Command("ai_npc clean", "Cleans up NPC junk data from the sandbox file")]
         [Permission(MyPromoteLevel.Admin)]

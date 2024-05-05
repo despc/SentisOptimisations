@@ -164,7 +164,7 @@ public class FreezeLogic
                         var framesAfterFreeze =
                             (uint)(MySandboxGame.Static.SimulationFrameCounter - lastUpdateFrame);
                         timer.FramesFromLastTrigger = framesAfterFreeze;
-                        Log("Compensate " + framesAfterFreeze + " frozen frames of " +
+                        CompensationLogs("Compensate " + framesAfterFreeze + " frozen frames of " +
                             myCubeBlock.DisplayNameText + " of grid " + grid.DisplayName);
                         LastUpdateFrames.Remove(myCubeBlock.EntityId);
                     }
@@ -411,8 +411,7 @@ public class FreezeLogic
             return false;
         }
 
-        var needToCompensate = myCubeBlock is MyProductionBlock
-                               || myCubeBlock is MyGasTank;
+        var needToCompensate = myCubeBlock is MyProductionBlock;
         return needToCompensate;
     }
 

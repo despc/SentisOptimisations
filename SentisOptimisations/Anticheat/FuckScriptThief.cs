@@ -66,10 +66,10 @@ namespace SentisOptimisationsPlugin
 
             var requestFromIdentity = player.Identity.IdentityId;
 
-            // if (PlayerUtils.IsAdmin(requestFromIdentity))
-            // {
-            //     return true;
-            // }
+            if (PlayerUtils.IsAdmin(requestFromIdentity))
+            {
+                return true;
+            }
 
             var owner = PlayerUtils.GetOwner(Grid);
             if (owner == 0)
