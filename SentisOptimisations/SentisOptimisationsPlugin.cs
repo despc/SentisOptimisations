@@ -235,23 +235,24 @@ namespace SentisOptimisationsPlugin
                                     {
                                         cubeGrid.Physics?.SetSpeeds(Vector3.Zero, Vector3.Zero);
                                         cubeGrid.ConvertToStatic();
-                                    });
-                                    CommunicationUtils.SyncConvert(cubeGrid, true);
-                                    try
-                                    {
-                                        MyMultiplayer.RaiseEvent(cubeGrid,
-                                            x => x.ConvertToStatic, default);
-                                        foreach (var player in MySession.Static.Players.GetOnlinePlayers())
+                                        try
                                         {
                                             MyMultiplayer.RaiseEvent(cubeGrid,
-                                                x => x.ConvertToStatic,
-                                                new EndpointId(player.Id.SteamId));
+                                                x => x.ConvertToStatic, default);
+                                            foreach (var player in MySession.Static.Players.GetOnlinePlayers())
+                                            {
+                                                MyMultiplayer.RaiseEvent(cubeGrid,
+                                                    x => x.ConvertToStatic,
+                                                    new EndpointId(player.Id.SteamId));
+                                            }
                                         }
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        Log.Error(ex, "()Exception in RaiseEvent.");
-                                    }
+                                        catch (Exception ex)
+                                        {
+                                            Log.Error(ex, "()Exception in RaiseEvent.");
+                                        }
+                                    });
+                                    CommunicationUtils.SyncConvert(cubeGrid, true);
+                                   
 
                                     if (cubeGrid.BigOwners.Count > 0)
                                     {
