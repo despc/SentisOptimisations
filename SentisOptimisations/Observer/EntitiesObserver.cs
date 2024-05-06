@@ -3,6 +3,7 @@ using NLog;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Character;
 using Sandbox.Game.WorldEnvironment;
+using SentisOptimisationsPlugin.AllGridsActions;
 using SentisOptimisationsPlugin.Freezer;
 using VRage.Game.Entity;
 using VRage.Game.ModAPI;

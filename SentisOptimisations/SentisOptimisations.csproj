@@ -34,6 +34,7 @@
     </PropertyGroup>
     <ItemGroup>
       <Compile Include="AllGridsActions\AllGridsProcessor.cs" />
+      <Compile Include="AllGridsActions\WCSafeZoneWorkAround.cs" />
       <Compile Include="Anticheat\FuckRamPatch.cs" />
       <Compile Include="Anticheat\FuckScriptThief.cs" />
       <Compile Include="Anticheat\InventoryPatch.cs" />
