@@ -380,7 +380,6 @@ public class FreezeLogic
         try
         {
             var gridPhysics = grid.Physics;
-            grid.Physics.Gravity = Vector3.Zero;
             gridPhysics.ConvertToStatic();
             FrozenPhysicsGrids.Add(grid.EntityId);
         }
