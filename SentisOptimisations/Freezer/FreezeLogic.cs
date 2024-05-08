@@ -9,7 +9,6 @@ using Sandbox;
 using Sandbox.Engine.Voxels;
 using Sandbox.Game.Components;
 using Sandbox.Game.Entities;
-using Sandbox.Game.Entities.Blocks;
 using Sandbox.Game.Entities.Cube;
 using Sandbox.ModAPI;
 using SentisOptimisations;
@@ -164,8 +163,18 @@ public class FreezeLogic
                         var framesAfterFreeze =
                             (uint)(MySandboxGame.Static.SimulationFrameCounter - lastUpdateFrame);
                         timer.FramesFromLastTrigger = framesAfterFreeze;
-                        CompensationLogs("Compensate " + framesAfterFreeze + " frozen frames of " +
-                            myCubeBlock.DisplayNameText + " of grid " + grid.DisplayName);
+                        try
+                        {
+                            var identityId = PlayerUtils.GetOwner(grid);
+                            var playerName = PlayerUtils.GetPlayerIdentity(identityId).DisplayName;
+                            CompensationLogs($"Compensate {framesAfterFreeze} frozen frames of " +
+                                             $"{myCubeBlock.DisplayNameText} of grid {grid.DisplayName} ({playerName})");
+                        }
+                        catch (Exception e)
+                        {
+                            SentisOptimisationsPlugin.Log.Error(e, "Compensate log exception");
+                        }
+                        
                         LastUpdateFrames.Remove(myCubeBlock.EntityId);
                     }
                 }
@@ -410,7 +419,7 @@ public class FreezeLogic
             return false;
         }
 
-        var needToCompensate = myCubeBlock is MyProductionBlock;
+        var needToCompensate = myCubeBlock is MyProductionBlock && ((MyProductionBlock)myCubeBlock).IsProducing;
         return needToCompensate;
     }
 
