@@ -19,9 +19,6 @@ namespace SentisOptimisationsPlugin
         private bool _welderSelfWelding = true;
         private bool _asyncWeld = true;
         
-        //fixes
-        private bool _removeEntityPhantomPatch = false;  //фикс краша из за гонки при входе/выходе из сз нескольких гридов/сабгридов одновременно
-        
         //physics profile антипалочная защита
         private bool _enablePhysicsGuard = false;
         private float _physicsMsToAlert = 1.5f;
