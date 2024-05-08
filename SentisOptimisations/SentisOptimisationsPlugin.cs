@@ -200,7 +200,6 @@ namespace SentisOptimisationsPlugin
 
         public override void Update()
         {
-            FrameExecutor.Update();
             if (MySandboxGame.Static.SimulationFrameCounter % 600 == 0)
             {
                 DelayedProcessor.Instance.AddDelayedAction(DateTime.Now, DetectSZDDos);

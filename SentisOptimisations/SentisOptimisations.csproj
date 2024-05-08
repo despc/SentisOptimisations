@@ -74,9 +74,7 @@
       <Compile Include="Perfomance\PBFix.cs" />
       <Compile Include="Perfomance\SafezonePatch.cs" />
       <Compile Include="Perfomance\WelderOptimization.cs" />
-      <Compile Include="Shared\Action2.cs" />
       <Compile Include="Shared\Ext2.cs" />
-      <Compile Include="Shared\FrameExecutor.cs" />
       <Compile Include="Shared\SharpUtils.cs" />
       <Compile Include="Shared\Voxels.cs" />
       <Compile Include="ShipTool\ShipToolPatch.cs" />
