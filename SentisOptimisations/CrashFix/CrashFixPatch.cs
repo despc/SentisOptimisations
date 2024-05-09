@@ -9,10 +9,12 @@ using Microsoft.CodeAnalysis.CSharp;
 using NAPI;
 using Sandbox.Game;
 using Sandbox.Game.Entities.Blocks;
+using Sandbox.Game.Entities.Cube;
 using Sandbox.Game.Multiplayer;
 using Sandbox.Game.Replication.StateGroups;
 using Sandbox.Game.Weapons;
 using SentisOptimisations;
+using SpaceEngineers.Game.Entities.Blocks;
 using SpaceEngineers.Game.EntityComponents.Blocks;
 using Torch.Managers.PatchManager;
 using VRage.Network;
@@ -30,6 +32,9 @@ namespace SentisOptimisationsPlugin.CrashFix
             
             var MethodPistonInit = typeof(MyPistonBase).GetMethod
                 (nameof(MyPistonBase.Init), BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
+            
+            var MethodAssDoUpdateTimerTick = typeof(MyAssembler).GetMethod
+                (nameof(MyAssembler.DoUpdateTimerTick), BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
 
             
             ctx.GetPattern(MethodPistonInit).Prefixes.Add(
@@ -66,6 +71,9 @@ namespace SentisOptimisationsPlugin.CrashFix
             var MethodOnRegisteredToThrustComponent = typeof(Sandbox.Game.Entities.MyThrust).GetMethod
                 ("OnRegisteredToThrustComponent", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
                 
+            var MethodFleeAwayFromTargetLogic = typeof(MyDefensiveCombatBlock).GetMethod
+                ("FleeAwayFromTargetLogic", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
+
             var finalizer = typeof(CrashFixPatch).GetMethod(nameof(SuppressExceptionFinalizer),
                 BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
             harmony.Patch(MethodSetDetailedInfo, finalizer: new HarmonyMethod(finalizer));
@@ -76,16 +84,18 @@ namespace SentisOptimisationsPlugin.CrashFix
             harmony.Patch(MethodOnRegisteredToThrustComponent, finalizer: new HarmonyMethod(finalizer));
             harmony.Patch(MethodRemoveIdentity, finalizer: new HarmonyMethod(finalizer));
             harmony.Patch(MethodApplyDirtyGroups, finalizer: new HarmonyMethod(finalizer));
+            harmony.Patch(MethodFleeAwayFromTargetLogic, finalizer: new HarmonyMethod(finalizer));
+            harmony.Patch(MethodAssDoUpdateTimerTick, finalizer: new HarmonyMethod(finalizer));
             
         }
 
 
         public static Exception SuppressExceptionFinalizer(Exception __exception)
         {
-            // if (__exception != null)
-            // {
-                // SentisOptimisationsPlugin.Log.Error("SuppressException ", __exception);
-                // }
+            if (__exception != null && SentisOptimisationsPlugin.Config.EnableMainDebugLogs)
+            {
+                SentisOptimisationsPlugin.Log.Error(__exception, "SuppressedException ");
+            }
             return null;
         }
         

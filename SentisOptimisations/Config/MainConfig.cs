@@ -44,6 +44,9 @@ namespace SentisOptimisationsPlugin
         private int _delayBeforeFreezeSec = 5;
         private int _delayBeforeFreezerStartSec = 5;
         
+        //Other
+        private bool _enableMainDebugLogs = false;
+        
         [DisplayTab(Name = "Slowdown Enabled", GroupName = "Slowdown", Tab = "Slowdown", Order = 0, Description = "Slowdown Enabled")]
         public bool SlowdownEnabled
         {
@@ -180,5 +183,9 @@ namespace SentisOptimisationsPlugin
                 FreezeLogic.UpdateFreezePhysics(value);
             }
         }
+        
+        
+        [DisplayTab(Name = "Enable debug logs", GroupName = "Other", Tab = "Other", Order = 9, Description = "Enable debug logs")]
+        public bool EnableMainDebugLogs { get => _enableMainDebugLogs; set => SetValue(ref _enableMainDebugLogs, value); }
     }
 }
