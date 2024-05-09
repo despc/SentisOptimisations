@@ -162,7 +162,19 @@ public class FreezeLogic
                     {
                         var framesAfterFreeze =
                             (uint)(MySandboxGame.Static.SimulationFrameCounter - lastUpdateFrame);
-                        timer.FramesFromLastTrigger = framesAfterFreeze;
+                        MyAPIGateway.Utilities.InvokeOnGameThread(() =>
+                        {
+                            try
+                            {
+                                timer.FramesFromLastTrigger = framesAfterFreeze;
+                                grid.PlayerPresenceTier = MyUpdateTiersPlayerPresence.Tier1;
+                            }
+                            catch (Exception ex)
+                            {
+                                SentisOptimisationsPlugin.Log.Error(ex, "Compensate exception");
+                            }
+                        });
+                        
                         try
                         {
                             var identityId = PlayerUtils.GetOwner(grid);
