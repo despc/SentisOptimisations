@@ -92,12 +92,31 @@ namespace SentisOptimisationsPlugin
                 
                 if (mainMs > SentisOptimisationsPlugin.Config.PhysicsMsToPunishImmediately)
                 {
-                    _punisher.PunishPlayerGridImmediately(heaviestGrids);
+                    MyAPIGateway.Utilities.InvokeOnGameThread(() =>
+                    {
+                        try
+                        {
+                            _punisher.PunishPlayerGridImmediately(heaviestGrids);
+                        }
+                        catch
+                        {
+                        }
+                    });
                 }
                 
                 if (mainMs > SentisOptimisationsPlugin.Config.PhysicsMsToPunish)
                 {
-                    _punisher.PunishPlayerGrid(heaviestGrids);
+                    MyAPIGateway.Utilities.InvokeOnGameThread(() =>
+                    {
+                        try
+                        {
+                            _punisher.PunishPlayerGrid(heaviestGrids);
+                        }
+                        catch
+                        {
+                        }
+                    });
+                    
                 }
                 
                 if (mainMs > SentisOptimisationsPlugin.Config.PhysicsMsToAlert)

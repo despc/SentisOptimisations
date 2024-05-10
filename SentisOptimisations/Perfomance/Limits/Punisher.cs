@@ -63,8 +63,8 @@ namespace SentisOptimisationsPlugin
             var minEntityId = grids.MinBy(grid => grid.EntityId).EntityId;
             string gridNames = string.Join(", ", grids.Select(grid => grid.DisplayName));
             var ownerId = PlayerUtils.GetOwner(grids);
-            var playerName = PlayerUtils.GetPlayerIdentity(ownerId).DisplayName;
-            
+            var playerIdentity = PlayerUtils.GetPlayerIdentity(ownerId);
+            var playerName = playerIdentity == null ? "---" : playerIdentity.DisplayName;
             ChatUtils.SendTo(ownerId,
                 "Attention. Grid(s) " + gridNames + " has a HUGE impact on server performance");
             MyVisualScriptLogicProvider.ShowNotification(
@@ -103,7 +103,9 @@ namespace SentisOptimisationsPlugin
             }
             string gridNames = string.Join(", ", grids.Select(grid => grid.DisplayName));
             var ownerId = PlayerUtils.GetOwner(grids);
-            Log.Error("Grid(s) " + gridNames + " of player " + PlayerUtils.GetPlayerIdentity(ownerId).DisplayName +
+            var playerIdentity = PlayerUtils.GetPlayerIdentity(ownerId);
+            var playerName = playerIdentity == null ? "---" : playerIdentity.DisplayName;
+            Log.Error("Grid(s) " + gridNames + " of player " + playerName +
                       " make lot of physics problems");
         }
 
