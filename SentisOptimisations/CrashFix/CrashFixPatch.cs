@@ -73,6 +73,12 @@ namespace SentisOptimisationsPlugin.CrashFix
                 
             var MethodFleeAwayFromTargetLogic = typeof(MyDefensiveCombatBlock).GetMethod
                 ("FleeAwayFromTargetLogic", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
+            
+            var MethodFlee = typeof(MyDefensiveCombatBlock).GetMethod
+                ("Flee", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
+            
+            var MethodFleeOnWaypointReached = typeof(MyDefensiveCombatBlock).GetMethod
+                ("FleeOnWaypointReached", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
 
             var finalizer = typeof(CrashFixPatch).GetMethod(nameof(SuppressExceptionFinalizer),
                 BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
@@ -86,7 +92,8 @@ namespace SentisOptimisationsPlugin.CrashFix
             harmony.Patch(MethodApplyDirtyGroups, finalizer: new HarmonyMethod(finalizer));
             harmony.Patch(MethodFleeAwayFromTargetLogic, finalizer: new HarmonyMethod(finalizer));
             harmony.Patch(MethodAssDoUpdateTimerTick, finalizer: new HarmonyMethod(finalizer));
-            
+            harmony.Patch(MethodFlee, finalizer: new HarmonyMethod(finalizer));
+            harmony.Patch(MethodFleeOnWaypointReached, finalizer: new HarmonyMethod(finalizer));
         }
 
 
