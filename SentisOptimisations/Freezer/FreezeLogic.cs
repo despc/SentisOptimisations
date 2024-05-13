@@ -17,6 +17,7 @@ using VRage.Game;
 using VRage.Game.Entity;
 using VRage.Game.Entity.EntityComponents.Interfaces;
 using VRage.Game.ModAPI;
+using VRage.ModAPI;
 using VRageMath;
 
 namespace SentisOptimisationsPlugin.Freezer;
@@ -439,6 +440,7 @@ public class FreezeLogic
     {
         MyEntities.UnregisterForUpdate(e);
         (e.GameLogic as IMyGameLogicComponent)?.UnregisterForUpdate();
+        e.Flags |= (EntityFlags)4;
         if (e.Hierarchy == null) return;
 
         foreach (var child in e.Hierarchy.Children) UnregisterRecursive((MyEntity)child.Container.Entity);
@@ -448,6 +450,7 @@ public class FreezeLogic
     {
         MyEntities.RegisterForUpdate(e);
         (e.GameLogic as IMyGameLogicComponent)?.RegisterForUpdate();
+        e.Flags &= ~(EntityFlags)4;
         if (e.Hierarchy == null) return;
 
         foreach (var child in e.Hierarchy.Children) RegisterRecursive((MyEntity)child.Container.Entity);
@@ -472,7 +475,7 @@ public class FreezeLogic
 
     public void UpdateCpuLoad(float cpuLoad)
     {
-        while (CpuLoads.Count > 20)
+        while (CpuLoads.Count > 30)
         {
             CpuLoads.RemoveAt(0);
         }
