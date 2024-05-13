@@ -74,6 +74,7 @@ namespace SentisOptimisationsPlugin
 
             var stringCondition = "contains('${message}','Invalid triangle')";
             var stringCondition2 = "contains('${message}','Trying to remove entity with name')";
+            var stringCondition3 = "contains('${message}','Sound on different thread')";
             
             foreach (var rule in LogManager.Configuration.LoggingRules)
             {
@@ -86,6 +87,11 @@ namespace SentisOptimisationsPlugin
                rule.Filters.Add(new ConditionBasedFilter()
                {
                    Condition = stringCondition2,
+                   Action = FilterResult.Ignore
+               });
+               rule.Filters.Add(new ConditionBasedFilter()
+               {
+                   Condition = stringCondition3,
                    Action = FilterResult.Ignore
                });
             }
