@@ -86,13 +86,10 @@ namespace SentisOptimisationsPlugin.ShipTool
                         var drillEntity = ((MyEntity)__instance.easyGetField("m_drillEntity"));
                         Vector3D vector3D = drillEntity.WorldMatrix.Forward + drillEntity.WorldMatrix.Right;
                         vector3D.Normalize();
-                        double num1 = 10.0;
-                        float num2 = (float) (num1 * num1) * 100f;
                         int itemId = entry.ItemId;
                         Vector3D detectionPoint = entry.DetectionPoint;
                         Vector3D hitnormal = vector3D;
-                        double impactEnergy = (double) num2;
-                        module.BreakAt(itemId, detectionPoint, hitnormal, impactEnergy);
+                        module.BreakAt(itemId, detectionPoint, hitnormal);
                         __instance.easySetField("m_lastContactTime", MySandboxGame.TotalGamePlayTimeInMilliseconds);
                         __instance.easySetField("m_lastItemId", 0);
                     }
@@ -104,7 +101,7 @@ namespace SentisOptimisationsPlugin.ShipTool
             {
                 //Log.Error("Exception during DrillEnvironmentSector", e);
             }
-
+        
             return false;
         }
 
@@ -460,13 +457,13 @@ namespace SentisOptimisationsPlugin.ShipTool
                         Vector3D vector3D = __instance.CubeGrid.WorldMatrix.Right +
                                             __instance.CubeGrid.WorldMatrix.Forward;
                         vector3D.Normalize();
-                        double num1 = 10.0;
-                        float num2 = (float)(num1 * num1) * __instance.CubeGrid.Physics.Mass;
+                        // double num1 = 10.0;
+                        // float num2 = (float)(num1 * num1) * __instance.CubeGrid.Physics.Mass;
                         int itemId = itemFromShapeKey;
                         Vector3D position = (Vector3D)nullable.Value.HkHitInfo.Position;
                         Vector3D hitnormal = vector3D;
-                        double impactEnergy = (double)num2;
-                        module.BreakAt(itemId, position, hitnormal, impactEnergy);
+                        // double impactEnergy = (double)num2;
+                        module.BreakAt(itemId, position, hitnormal);
                     }
                 }
             }
