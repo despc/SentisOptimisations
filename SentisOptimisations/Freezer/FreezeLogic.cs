@@ -179,7 +179,8 @@ public class FreezeLogic
                         try
                         {
                             var identityId = PlayerUtils.GetOwner(grid);
-                            var playerName = PlayerUtils.GetPlayerIdentity(identityId).DisplayName;
+                            var playerIdentity = PlayerUtils.GetPlayerIdentity(identityId);
+                            var playerName = playerIdentity == null ? "---" : playerIdentity.DisplayName;
                             CompensationLogs($"Compensate {framesAfterFreeze} frozen frames of " +
                                              $"{myCubeBlock.DisplayNameText} of grid {grid.DisplayName} ({playerName})");
                         }
@@ -432,7 +433,7 @@ public class FreezeLogic
             return false;
         }
 
-        var needToCompensate = myCubeBlock is MyProductionBlock && ((MyProductionBlock)myCubeBlock).IsProducing;
+        var needToCompensate = myCubeBlock is MyProductionBlock;
         return needToCompensate;
     }
 

@@ -50,7 +50,7 @@ namespace SentisOptimisationsPlugin
             }
             if (value.Length > 512)
             {
-                Log.Error("DisplayName TOO LONG " + value);
+                Log.Error("DisplayName TOO LONG " + value.Substring(0, 500));
                 return false;
             }
             return true;
@@ -60,7 +60,7 @@ namespace SentisOptimisationsPlugin
         {
             if (value.Length > 100240)
             {
-                Log.Error("Storage TOO LONG " + value);
+                Log.Error("Storage TOO LONG " + value.Substring(0, 500));
                 return false;
             }
             return true;
@@ -70,7 +70,7 @@ namespace SentisOptimisationsPlugin
         {
             if (value.Length > 100240)
             {
-                Log.Error("CustomData TOO LONG " + value);
+                Log.Error("CustomData TOO LONG " + value.Substring(0, 500));
                 return false;
             }
             return true;

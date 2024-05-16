@@ -57,7 +57,8 @@ namespace SentisOptimisationsPlugin
             if (Grid.Closed)
                 return false;
 
-            var player = MySession.Static.Players.TryGetPlayerBySteamId(forClient.Id.Value);
+            MyPlayer player;
+            MySession.Static.Players.TryGetPlayerBySteamId(forClient.Id.Value, out player);
             if (player == null || player.Identity == null)
             {
                 Log.Error("cant replicate - player null");
@@ -130,30 +131,6 @@ namespace SentisOptimisationsPlugin
             }));
 
             return false;
-        }
-
-        private static bool SetValueLimitedPatchedStorage(String value)
-        {
-            if (value.Length > 100240)
-            {
-                Log.Error("Storage TOO LONG " + value);
-                Thread.Sleep(15);
-                return false;
-            }
-
-            return true;
-        }
-
-        private static bool SetValueLimitedPatched(String value)
-        {
-            if (value.Length > 100240)
-            {
-                Log.Error("CustomData TOO LONG " + value);
-                Thread.Sleep(15);
-                return false;
-            }
-
-            return true;
         }
     }
 }
