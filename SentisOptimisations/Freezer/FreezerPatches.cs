@@ -87,6 +87,21 @@ public static class FreezerPatches
         var timerFramesFromLastTrigger = timer.FramesFromLastTrigger;
         DelayedProcessor.Instance.AddDelayedAction(DateTime.Now, () =>
         {
+            try
+            {
+                AsyncCollectAssemblerRequiredItems(__instance, timerFramesFromLastTrigger);
+            }
+            catch (Exception e)
+            {
+                //
+            }
+        });
+
+        return false;
+    }
+
+    private static void AsyncCollectAssemblerRequiredItems(MyAssembler __instance, uint timerFramesFromLastTrigger)
+    {
         float num1 = 0.0f;
         List<MyProductionBlock.QueueItem> m_queue =
             (List<MyProductionBlock.QueueItem>)__instance.easyGetField("m_queue");
@@ -134,7 +149,8 @@ public static class FreezerPatches
                     }));
             }
 
-            foreach (MyTuple<MyFixedPoint, MyBlueprintDefinitionBase.Item> requiredComponent in m_requiredComponents)
+            foreach (MyTuple<MyFixedPoint, MyBlueprintDefinitionBase.Item> requiredComponent in
+                     m_requiredComponents)
             {
                 MyAPIGateway.Utilities.InvokeOnGameThread(() =>
                 {
@@ -145,7 +161,8 @@ public static class FreezerPatches
                             __instance.InputInventory.GetItemAmount(obj.Id, MyItemFlags.None, false);
 
                         MyFixedPoint myFixedPoint = (obj.Amount * (timerFramesFromLastTrigger / 60)) - itemAmount;
-                        if (!(myFixedPoint <= 0)){
+                        if (!(myFixedPoint <= 0))
+                        {
                             var fixedPoint = __instance.CubeGrid.GridSystems.ConveyorSystem.PullItem(obj.Id,
                                 new MyFixedPoint?(myFixedPoint),
                                 __instance, __instance.InputInventory, false, false);
@@ -165,9 +182,6 @@ public static class FreezerPatches
         if (remainingTime <= 0.0)
             return;
         __instance.easyCallMethod("GetItemFromOtherAssemblers", new object[] { remainingTime });
-        });
-        
-        return false;
     }
 
     private static bool UpdateProduction(MyAssembler __instance, uint framesFromLastTrigger, bool forceUpdate = false)
@@ -195,7 +209,7 @@ public static class FreezerPatches
             {
                 try
                 {
-                    AsyncUpdateAssemblerRequiredItems(__instance, framesFromLastTrigger, forceUpdate, assemblingCount);
+                    AsyncUpdateAssemblerProduction(__instance, framesFromLastTrigger, forceUpdate, assemblingCount);
                 }
                 catch (Exception e)
                 {
@@ -211,7 +225,7 @@ public static class FreezerPatches
         return false;
     }
 
-    private static void AsyncUpdateAssemblerRequiredItems(MyAssembler __instance, uint framesFromLastTrigger,
+    private static void AsyncUpdateAssemblerProduction(MyAssembler __instance, uint framesFromLastTrigger,
         bool forceUpdate, Dictionary<MyBlueprintDefinitionBase, int> assemblingCount)
     {
         __instance.UpdateCurrentState();
