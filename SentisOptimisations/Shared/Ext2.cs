@@ -68,9 +68,13 @@ namespace NAPI
             return null;
         }
 
-        public static object easyCallMethod(this object instance, String name, object[] args, bool needThrow = true,
+        public static object easyCallMethod(this object instance, String name, object[] args = null, bool needThrow = true,
             Type type = null)
         {
+            if (args == null)
+            {
+                args = new object[] { };
+            }
             if (type != null)
             {
                 return easyMethod(type, name, needThrow).Invoke(instance, args);
