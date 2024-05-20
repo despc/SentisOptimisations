@@ -174,21 +174,7 @@ public class FreezeLogic
                             {
                                 SentisOptimisationsPlugin.Log.Error(ex, "Compensate exception");
                             }
-                        });
-                        
-                        try
-                        {
-                            var identityId = PlayerUtils.GetOwner(grid);
-                            var playerIdentity = PlayerUtils.GetPlayerIdentity(identityId);
-                            var playerName = playerIdentity == null ? "---" : playerIdentity.DisplayName;
-                            CompensationLogs($"Compensate {framesAfterFreeze} frozen frames of " +
-                                             $"{myCubeBlock.DisplayNameText} of grid {grid.DisplayName} ({playerName})");
-                        }
-                        catch (Exception e)
-                        {
-                            SentisOptimisationsPlugin.Log.Error(e, "Compensate log exception");
-                        }
-                        
+                        }, StartAt: (int)(MySandboxGame.Static.SimulationFrameCounter + 120));
                         LastUpdateFrames.Remove(myCubeBlock.EntityId);
                     }
                 }
@@ -433,6 +419,14 @@ public class FreezeLogic
             return false;
         }
 
+        var subtypeName = myCubeBlock.BlockDefinition.Id.SubtypeName;
+        if (!string.IsNullOrEmpty(subtypeName))
+        {
+            if (subtypeName.Contains("Crusher"))
+            {
+                return false;
+            }
+        }
         var needToCompensate = myCubeBlock is MyProductionBlock;
         return needToCompensate;
     }

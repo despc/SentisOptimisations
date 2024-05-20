@@ -10,9 +10,11 @@ using Sandbox.Game.Components;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Cube;
 using Sandbox.Game.Entities.Inventory;
+using Sandbox.Game.EntityComponents;
 using Sandbox.Game.GameSystems.Conveyors;
 using Sandbox.Game.World;
 using Sandbox.ModAPI;
+using SentisOptimisations;
 using SentisOptimisations.DelayedLogic;
 using SpaceEngineers.Game.Entities.Blocks;
 using Torch.Managers.PatchManager;
@@ -29,8 +31,12 @@ namespace SentisOptimisationsPlugin.Freezer;
 [PatchShim]
 public static class FreezerPatches
 {
-    private static PropertyInfo IsProducingProp =
+    private static PropertyInfo IsProducingPropAss =
         typeof(MyAssembler).GetProperty("IsProducing",
+            BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+
+    private static PropertyInfo IsProducingPropRef =
+        typeof(MyRefinery).GetProperty("IsProducing",
             BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
 
     private static PropertyInfo CurrentStateProp =
@@ -43,7 +49,6 @@ public static class FreezerPatches
         ("AddItems",
             BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly, null, CallingConventions.Any,
             new[] { typeof(MyFixedPoint), typeof(MyObjectBuilder_Base), typeof(uint?), typeof(int) }, null);
-
 
         ctx.GetPattern(MethodAddItems).Prefixes.Add(
             typeof(FreezerPatches).GetMethod(nameof(AddItemsPatched),
@@ -65,12 +70,18 @@ public static class FreezerPatches
             typeof(FreezerPatches).GetMethod(nameof(RefreshCustomInfoPatched),
                 BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
 
-        var MethodUpdateProduction = typeof(MyAssembler).GetMethod
+        var MethodUpdateProductionAssembler = typeof(MyAssembler).GetMethod
             ("UpdateProduction", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
-        ctx.GetPattern(MethodUpdateProduction).Prefixes.Add(
-            typeof(FreezerPatches).GetMethod(nameof(UpdateProduction),
+        ctx.GetPattern(MethodUpdateProductionAssembler).Prefixes.Add(
+            typeof(FreezerPatches).GetMethod(nameof(UpdateProductionAssembler),
                 BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-        
+
+        var MethodUpdateProductionRefinery = typeof(MyRefinery).GetMethod
+            ("UpdateProduction", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+        ctx.GetPattern(MethodUpdateProductionRefinery).Prefixes.Add(
+            typeof(FreezerPatches).GetMethod(nameof(UpdateProductionRefinery),
+                BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+
         var MethodGetComponentsFromConveyor = typeof(MyAssembler).GetMethod
             ("GetComponentsFromConveyor", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
         ctx.GetPattern(MethodGetComponentsFromConveyor).Prefixes.Add(
@@ -184,7 +195,184 @@ public static class FreezerPatches
         __instance.easyCallMethod("GetItemFromOtherAssemblers", new object[] { remainingTime });
     }
 
-    private static bool UpdateProduction(MyAssembler __instance, uint framesFromLastTrigger, bool forceUpdate = false)
+
+    private static bool UpdateProductionRefinery(MyRefinery __instance, uint framesFromLastTrigger)
+    {
+        if (framesFromLastTrigger < 3601)
+        {
+            return true;
+        }
+
+        int timeDelta = (int)framesFromLastTrigger * 16;
+        var subtypeName = __instance.BlockDefinition.Id.SubtypeName;
+        if (!string.IsNullOrEmpty(subtypeName))
+        {
+            if (subtypeName.Contains("Crusher"))
+            {
+                return true;
+            }
+        }
+
+        try
+        {
+            bool m_queueNeedsRebuild = (bool)__instance.easyGetField("m_queueNeedsRebuild");
+            if (m_queueNeedsRebuild)
+                __instance.easyCallMethod("RebuildQueue");
+            bool flag = __instance.IsWorking && !__instance.IsQueueEmpty && !__instance.OutputInventory.IsFull;
+            var operationalPowerConsumption =
+                (float)__instance.easyCallMethod("GetOperationalPowerConsumption", null, true, typeof(MyRefinery));
+            float num = !flag
+                ? ((MyProductionBlockDefinition)__instance.BlockDefinition).StandbyPowerConsumption
+                : operationalPowerConsumption;
+            if ((double)__instance.ResourceSink.RequiredInputByType(MyResourceDistributorComponent.ElectricityId) != num)
+                __instance.ResourceSink.SetRequiredInputByType(MyResourceDistributorComponent.ElectricityId, num);
+            if ((!__instance.ResourceSink.IsPoweredByType(MyResourceDistributorComponent.ElectricityId) ||
+                 (double)__instance.ResourceSink.CurrentInputByType(MyResourceDistributorComponent.ElectricityId) <
+                 (double)num) &&
+                !__instance.ResourceSink.IsPowerAvailable(MyResourceDistributorComponent.ElectricityId, num))
+                flag = false;
+            IsProducingPropRef.GetSetMethod(true).Invoke(__instance,
+                new object[]
+                {
+                    flag
+                });
+            // __instance.IsProducing = flag;
+            if (!__instance.IsProducing)
+                return false;
+            ProcessQueueItems(__instance, timeDelta);
+        }
+        catch (Exception e)
+        {
+            SentisOptimisationsPlugin.Log.Error(e, "UpdateProduction compensation exception");
+            return true;
+        }
+
+        return false;
+    }
+
+
+    private static void ProcessQueueItems(MyRefinery __instance, int timeDelta)
+    {
+        __instance.easySetField("m_processingLock", true);
+
+        while (!__instance.IsQueueEmpty && timeDelta > 0)
+        {
+            MyProductionBlock.QueueItem queueItem = __instance.TryGetFirstQueueItem().Value;
+            MyRefineryDefinition instanceMRefineryDef = (MyRefineryDefinition)__instance.BlockDefinition;
+            MyFixedPoint blueprintAmount = (MyFixedPoint)(float)((double)timeDelta *
+                                                                 ((double)instanceMRefineryDef.RefineSpeed +
+                                                                  (double)__instance.UpgradeValues["Productivity"]) *
+                                                                 (double)MySession.Static.RefinerySpeedMultiplier /
+                                                                 ((double)queueItem.Blueprint
+                                                                     .BaseProductionTimeInSeconds * 1000.0));
+            foreach (MyBlueprintDefinitionBase.Item prerequisite in queueItem.Blueprint.Prerequisites)
+            {
+                MyFixedPoint itemAmount =
+                    __instance.InputInventory.GetItemAmount(prerequisite.Id, MyItemFlags.None, false);
+                MyFixedPoint myFixedPoint = blueprintAmount * prerequisite.Amount;
+                if (itemAmount < myFixedPoint)
+                    blueprintAmount = itemAmount * (1f / (float)prerequisite.Amount);
+            }
+
+            if (blueprintAmount == (MyFixedPoint)0)
+            {
+                __instance.easySetField("m_queueNeedsRebuild", true);
+                break;
+            }
+
+            timeDelta -= Math.Max(1,
+                (int)((double)(float)blueprintAmount * (double)queueItem.Blueprint.BaseProductionTimeInSeconds /
+                    (double)instanceMRefineryDef.RefineSpeed * 1000.0));
+            if (timeDelta < 0)
+                timeDelta = 0;
+            ChangeRequirementsToResults(__instance, queueItem.Blueprint, blueprintAmount);
+        }
+
+        IsProducingPropRef.GetSetMethod(true).Invoke(__instance,
+            new object[]
+            {
+                !__instance.IsQueueEmpty
+            });
+        __instance.easySetField("m_processingLock", false);
+    }
+
+
+    private static void ChangeRequirementsToResults(MyRefinery __instance,
+        MyBlueprintDefinitionBase queueItem,
+        MyFixedPoint blueprintAmount)
+    {
+        MyRefineryDefinition m_refineryDef = (MyRefineryDefinition)__instance.BlockDefinition;
+        if (m_refineryDef == null)
+        {
+            MyLog.Default.WriteLine("m_refineryDef shouldn't be null!!!" + (object)__instance);
+        }
+        else
+        {
+            if (MySession.Static == null || queueItem == null || queueItem.Prerequisites == null ||
+                __instance.OutputInventory == null || __instance.InputInventory == null || queueItem.Results == null)
+                return;
+            if (!MySession.Static.CreativeMode)
+                blueprintAmount = MyFixedPoint.Min(__instance.OutputInventory.ComputeAmountThatFits(queueItem),
+                    blueprintAmount);
+            if (blueprintAmount == (MyFixedPoint)0)
+                return;
+            foreach (MyBlueprintDefinitionBase.Item prerequisite in queueItem.Prerequisites)
+            {
+                if (!(MyObjectBuilderSerializerKeen.CreateNewObject((SerializableDefinitionId)prerequisite.Id) is
+                        MyObjectBuilder_PhysicalObject newObject))
+                {
+                    MyLog.Default.WriteLine("obPrerequisite shouldn't be null!!! " + (object)__instance);
+                }
+                else
+                {
+                    __instance.InputInventory.RemoveItemsOfType(
+                        (MyFixedPoint)((float)blueprintAmount * (float)prerequisite.Amount), newObject, false, false);
+                    MyFixedPoint itemAmount =
+                        __instance.InputInventory.GetItemAmount(prerequisite.Id, MyItemFlags.None, false);
+                    if (itemAmount < (MyFixedPoint)0.01f)
+                        __instance.InputInventory.RemoveItemsOfType(itemAmount, prerequisite.Id, MyItemFlags.None,
+                            false);
+                }
+            }
+
+            foreach (MyBlueprintDefinitionBase.Item result in queueItem.Results)
+            {
+                if (!(MyObjectBuilderSerializerKeen.CreateNewObject((SerializableDefinitionId)result.Id) is
+                        MyObjectBuilder_PhysicalObject newObject))
+                {
+                    MyLog.Default.WriteLine("obResult shouldn't be null!!! " + (object)m_refineryDef);
+                }
+                else
+                {
+                    float num = (float)result.Amount * m_refineryDef.MaterialEfficiency *
+                                __instance.UpgradeValues["Effectiveness"];
+                    var amount = ((float)blueprintAmount * num);
+                    // newObject.SubtypeName
+                    try
+                    {
+                        var instanceCubeGrid = __instance.CubeGrid;
+                        var identityId = PlayerUtils.GetOwner(instanceCubeGrid);
+                        var playerIdentity = PlayerUtils.GetPlayerIdentity(identityId);
+                        var playerName = playerIdentity == null ? "---" : playerIdentity.DisplayName;
+                        FreezeLogic.CompensationLogs(
+                            $"Compensate refinery {__instance.CustomName} on grid {instanceCubeGrid.DisplayName} of player {playerName} \n " +
+                            $" Ingot - {newObject.SubtypeName}, count - {amount}");
+                    }
+                    catch (Exception e)
+                    {
+                        SentisOptimisationsPlugin.Log.Error(e, "Compensate log exception");
+                    }
+
+                    __instance.OutputInventory.AddItems((MyFixedPoint)amount, (MyObjectBuilder_Base)newObject);
+                }
+            }
+
+            __instance.easyCallMethod("RemoveFirstQueueItemAnnounce", new Object[] { blueprintAmount, 0.0f });
+        }
+    }
+
+    private static bool UpdateProductionAssembler(MyAssembler __instance, uint framesFromLastTrigger,
+        bool forceUpdate = false)
     {
         if (framesFromLastTrigger < 3601)
         {
@@ -222,6 +410,7 @@ public static class FreezerPatches
             SentisOptimisationsPlugin.Log.Error(e, "UpdateProduction compensation exception");
             return true;
         }
+
         return false;
     }
 
@@ -253,7 +442,7 @@ public static class FreezerPatches
             if (__instance.IsQueueEmpty)
             {
                 __instance.CurrentProgress = 0.0f;
-                IsProducingProp.GetSetMethod(true).Invoke(__instance, new object[] { false });
+                IsProducingPropAss.GetSetMethod(true).Invoke(__instance, new object[] { false });
                 // __instance.IsProducing = false;
                 return;
             }
@@ -267,7 +456,7 @@ public static class FreezerPatches
                 m_currentQueueItem =
                     (MyProductionBlock.QueueItem?)__instance.easyGetField("m_currentQueueItem");
             }
-                        
+
             MyBlueprintDefinitionBase blueprint = m_currentQueueItem.Value.Blueprint;
             var instanceCurrentState = __instance.easyCallMethod("CheckInventory", new object[] { blueprint });
 
@@ -325,7 +514,7 @@ public static class FreezerPatches
         Thread.Sleep(32);
         if (__instance.CurrentState != MyAssembler.StateEnum.Ok || __instance.CurrentItemIndexServer != -1)
             m_currentItemIndex.Value = __instance.CurrentItemIndexServer;
-        IsProducingProp.GetSetMethod(true).Invoke(__instance,
+        IsProducingPropAss.GetSetMethod(true).Invoke(__instance,
             new object[]
             {
                 __instance.IsWorking && !__instance.IsQueueEmpty &&
