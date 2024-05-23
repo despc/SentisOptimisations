@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
-using System.Threading;
 using System.Xml.Serialization;
 using NLog;
 using ParallelTasks;
@@ -12,11 +11,10 @@ using Sandbox.Game.Entities.Cube;
 using Sandbox.Game.Replication;
 using Sandbox.Game.World;
 using SentisOptimisations;
-using Torch;
 using Torch.Managers.PatchManager;
 using VRage;
 using VRage.Game;
-using VRage.Game.Entity;
+using VRage.Game.ModAPI;
 using VRage.Library.Collections;
 using VRage.Network;
 using VRage.ObjectBuilders;
@@ -77,13 +75,14 @@ namespace SentisOptimisationsPlugin
             {
                 return true;
             }
-
-            var myRelationsBetweenPlayers = MyIDModule.GetRelationPlayerPlayer(requestFromIdentity, owner);
-            if (myRelationsBetweenPlayers == MyRelationsBetweenPlayers.Allies ||
-                myRelationsBetweenPlayers == MyRelationsBetweenPlayers.Self)
+            if (owner == requestFromIdentity)
             {
                 return true;
             }
+            
+            IMyFaction ownerFaction = FactionUtils.GetFactionOfPlayer(owner);
+            IMyFaction requestFromFaction = FactionUtils.GetFactionOfPlayer(requestFromIdentity);
+            bool requestFromFactionMember = ownerFaction != null && ownerFaction == requestFromFaction;
 
             stream.WriteBool(false);
             MyObjectBuilder_EntityBase builder;
@@ -101,6 +100,16 @@ namespace SentisOptimisationsPlugin
                     {
                         if (myObjectBuilderCubeBlock is MyObjectBuilder_MyProgrammableBlock)
                         {
+                            var shareMode = myObjectBuilderCubeBlock.ShareMode;
+                            if (shareMode == MyOwnershipShareModeEnum.All)
+                            {
+                                continue;
+                            }
+
+                            if (requestFromFactionMember && shareMode == MyOwnershipShareModeEnum.Faction)
+                            {
+                                continue;
+                            }
                             ((MyObjectBuilder_MyProgrammableBlock) myObjectBuilderCubeBlock).Program =
                                 "You don't need to see this";
                         }
