@@ -7,8 +7,11 @@ using Sandbox.Engine.Physics;
 using Sandbox.Game;
 using Sandbox.Game.Entities;
 using Sandbox.Game.World;
+using Sandbox.ModAPI;
 using SentisOptimisations;
+using SentisOptimisations.DelayedLogic;
 using VRage.Game.ModAPI;
+using VRage.Library.Utils;
 using VRage.Network;
 using VRageMath;
 
@@ -72,7 +75,7 @@ namespace SentisOptimisationsPlugin
                 "Red",
                 ownerId);
 
-            
+
             Log.Error("Grid " + gridNames + " of player " + playerName +
                       " make lot of physics problems");
 
@@ -84,14 +87,38 @@ namespace SentisOptimisationsPlugin
             {
                 timeToFixDictionary[minEntityId] = 1;
             }
-            
+
             if (timeToFixDictionary[minEntityId] > SentisOptimisationsPlugin.Config.PhysicsChecksBeforePunish)
             {
                 foreach (var grid in grids)
                 {
-                    ConvertToStatic((MyCubeGrid) grid);
+                    ConvertToStatic((MyCubeGrid)grid);
                     timeToFixDictionary.Remove(minEntityId);
                 }
+
+                var gridsList = new HashSet<IMyCubeGrid>(grids);
+                DelayedProcessor.Instance.AddDelayedAction(DateTime.Now.AddMilliseconds(MyRandom.Instance.Next(300, 2000)), () =>
+                {
+                    while (gridsList.Count > 0)
+                    {
+                        MyAPIGateway.Utilities.InvokeOnGameThread(() =>
+                        {
+                            try
+                            {
+                                var grid = gridsList.FirstElement();
+                                HashSet<IMyCubeGrid> gridsTmp = new HashSet<IMyCubeGrid>();
+                                MyAPIGateway.GridGroups.GetGroup(grid, GridLinkTypeEnum.Physical, gridsTmp);
+                                gridsTmp.ForEach(cubeGrid => gridsList.Remove(cubeGrid));
+                                var gridToFixship = gridsTmp.FirstElement();
+                                FixShipLogic.FixGroupByGrid((MyCubeGrid)gridToFixship);
+                            }
+                            catch
+                            {
+                            }
+                        });
+
+                    }
+                });
             }
         }
 
@@ -101,6 +128,30 @@ namespace SentisOptimisationsPlugin
             {
                 ConvertToStatic((MyCubeGrid) grid);
             }
+            var gridsList = new HashSet<IMyCubeGrid>(grids);
+            DelayedProcessor.Instance.AddDelayedAction(DateTime.Now.AddMilliseconds(MyRandom.Instance.Next(300, 2000)), () =>
+            {
+                while (gridsList.Count > 0)
+                {
+                    MyAPIGateway.Utilities.InvokeOnGameThread(() =>
+                    {
+                        try
+                        {
+                            var grid = gridsList.FirstElement();
+                            HashSet<IMyCubeGrid> gridsTmp = new HashSet<IMyCubeGrid>();
+                            MyAPIGateway.GridGroups.GetGroup(grid, GridLinkTypeEnum.Physical, gridsTmp);
+                            grids.ForEach(cubeGrid => gridsList.Remove(cubeGrid));
+                            var gridToFixship = gridsTmp.FirstElement();
+                            FixShipLogic.FixGroupByGrid((MyCubeGrid)gridToFixship);
+                        }
+                        catch
+                        {
+                        }
+                    });
+                    
+                }
+            });
+            
             string gridNames = string.Join(", ", grids.Select(grid => grid.DisplayName));
             var ownerId = PlayerUtils.GetOwner(grids);
             var playerIdentity = PlayerUtils.GetPlayerIdentity(ownerId);
@@ -115,7 +166,6 @@ namespace SentisOptimisationsPlugin
             {
                 myCubeGrid.Physics?.SetSpeeds(Vector3.Zero, Vector3.Zero);
                 myCubeGrid.ConvertToStatic();
-                CommunicationUtils.SyncConvert(myCubeGrid, true);
                 try
                 {
                     MyMultiplayer.RaiseEvent<MyCubeGrid>(myCubeGrid, (MyCubeGrid x) => new Action(x.ConvertToStatic),

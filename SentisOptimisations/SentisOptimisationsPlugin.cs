@@ -32,7 +32,7 @@ using Torch.API.Session;
 using Torch.Session;
 using VRage;
 using VRage.Collections;
-using VRage.Network;
+using VRage.Library.Utils;
 using VRageMath;
 using VRageMath.Spatial;
 
@@ -244,20 +244,26 @@ namespace SentisOptimisationsPlugin
                                         {
                                             MyMultiplayer.RaiseEvent(cubeGrid,
                                                 x => x.ConvertToStatic, default);
-                                            foreach (var player in MySession.Static.Players.GetOnlinePlayers())
-                                            {
-                                                MyMultiplayer.RaiseEvent(cubeGrid,
-                                                    x => x.ConvertToStatic,
-                                                    new EndpointId(player.Id.SteamId));
-                                            }
+                                            DelayedProcessor.Instance.AddDelayedAction(
+                                                DateTime.Now.AddMilliseconds(MyRandom.Instance.Next(300, 2000)), () =>
+                                                {
+                                                    MyAPIGateway.Utilities.InvokeOnGameThread(() =>
+                                                    {
+                                                        try
+                                                        {
+                                                            FixShipLogic.FixGroupByGrid(cubeGrid);
+                                                        }
+                                                        catch
+                                                        {
+                                                        }
+                                                    });
+                                                });
                                         }
                                         catch (Exception ex)
                                         {
                                             Log.Error(ex, "()Exception in RaiseEvent.");
                                         }
                                     });
-                                    CommunicationUtils.SyncConvert(cubeGrid, true);
-                                   
 
                                     if (cubeGrid.BigOwners.Count > 0)
                                     {

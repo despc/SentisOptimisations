@@ -97,7 +97,10 @@ namespace SentisOptimisationsPlugin.AllGridsActions
                     }
                     catch (Exception e)
                     {
-                        Log.Error("FreezerLoop Error", e);
+                        if (SentisOptimisationsPlugin.Config.EnableMainDebugLogs)
+                        {
+                            Log.Error("FreezerLoop Error", e);
+                        }
                     }
                 }
             }
