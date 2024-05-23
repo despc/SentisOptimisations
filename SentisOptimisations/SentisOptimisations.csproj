@@ -42,17 +42,11 @@
       <Compile Include="Anticheat\TorchPatch.cs" />
       <Compile Include="Api\ShieldApi.cs" />
       <Compile Include="Commands\AdminCommands.cs" />
-      <Compile Include="Communication\Communication.cs" />
-      <Compile Include="Communication\Dto\ConvertSyncRequest.cs" />
-      <Compile Include="Communication\Dto\FixShipRequest.cs" />
-      <Compile Include="Communication\Dto\GUI\GuiGridsRequest.cs" />
-      <Compile Include="Communication\Dto\GUI\GuiGridsResponse.cs" />
-      <Compile Include="Communication\Dto\MessageType.cs" />
-      <Compile Include="Communication\CommunicationUtils.cs" />
       <Compile Include="Config\MainConfig.cs" />
       <Compile Include="CrashFix\CrashFixPatch.cs" />
       <Compile Include="DelayedLogic\DelayedProcessor.cs" />
       <Compile Include="Discord\DiscordBridgePatch.cs" />
+      <Compile Include="FixShip\FixShipLogic.cs" />
       <Compile Include="Freezer\DamagePatch.cs" />
       <Compile Include="Freezer\FreezeLogic.cs" />
       <Compile Include="Freezer\FreezerPatches.cs" />
@@ -67,6 +61,7 @@
       <Compile Include="Perfomance\GridSystemUpdatePatch.cs" />
       <Compile Include="Perfomance\ParallelUpdateTweaks.cs" />
       <Compile Include="Perfomance\AsyncSync.cs" />
+      <Compile Include="Perfomance\SavePatch.cs" />
       <Compile Include="ShipTool\ShipToolsAsyncQueues.cs" />
       <Compile Include="Perfomance\GasTankOptimisations.cs" />
       <Compile Include="Perfomance\Limits\PhysicsProfilerMonitor.cs" />
