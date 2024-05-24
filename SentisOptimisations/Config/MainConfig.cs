@@ -49,6 +49,11 @@ namespace SentisOptimisationsPlugin
         //Other
         private bool _enableMainDebugLogs = false;
         
+        //Scripts
+        private bool _punishHeavyScripts = false;
+        private float _scriptMaxTime = 2;
+        private int _scriptOvertimeExecTimesBeforePunish = 3;
+        
         [DisplayTab(Name = "Slowdown Enabled", GroupName = "Slowdown", Tab = "Slowdown", Order = 0, Description = "Slowdown Enabled")]
         public bool SlowdownEnabled
         {
@@ -203,5 +208,23 @@ namespace SentisOptimisationsPlugin
         
         [DisplayTab(Name = "Enable debug logs", GroupName = "Other", Tab = "Other", Order = 9, Description = "Enable debug logs")]
         public bool EnableMainDebugLogs { get => _enableMainDebugLogs; set => SetValue(ref _enableMainDebugLogs, value); }
+        
+        //Scripts
+        [DisplayTab(Name = "Enable scripts punish", GroupName = "Scripts", Tab = "Scripts", Order = 0, Description = "Enable Scripts Punish")]
+        public bool EnableScriptsPunish { get => _punishHeavyScripts; set => SetValue(ref _punishHeavyScripts, value); }
+        
+        [DisplayTab(Name = "Scripts max exec time", GroupName = "Scripts", Tab = "Scripts", Order = 1, Description = "Scripts max exec time")]
+        public float ScriptsMaxExecTime
+        {
+            get => _scriptMaxTime;
+            set => SetValue(ref _scriptMaxTime, value);
+        }
+        
+        [DisplayTab(Name = "Scripts overtime exec times before punish", GroupName = "Scripts", Tab = "Scripts", Order = 2, Description = "Scripts overtime exec times before punish")]
+        public int ScriptOvertimeExecTimesBeforePunish
+        {
+            get => _scriptOvertimeExecTimesBeforePunish;
+            set => SetValue(ref _scriptOvertimeExecTimesBeforePunish, value);
+        }
     }
 }
