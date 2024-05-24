@@ -34,7 +34,7 @@ namespace SentisOptimisationsPlugin
 
         private static PropertyInfo gridPropertyInfo =
             MyCubeGridReplicableType.GetProperty("Grid", BindingFlags.Instance | BindingFlags.NonPublic);
-
+        // Sandbox.Game\Sandbox\Game\Replication\MyCharacterReplicable.cs:30
         public static void Patch(PatchContext ctx)
         {
             // MyCubeGridReplicable.Serialize
