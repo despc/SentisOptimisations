@@ -1,11 +1,14 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Reflection;
 using System.Text;
 using System.Threading;
 using NLog;
+using NLog.Fluent;
 using Sandbox;
+using Sandbox.Game;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Blocks;
 using Sandbox.Game.GameSystems;
@@ -27,8 +30,12 @@ namespace SentisOptimisationsPlugin
 
         public static ConcurrentDictionary<long, byte> needUpdateGridBlocksOwnership =
             new ConcurrentDictionary<long, byte>();
+        
+        public static ConcurrentDictionary<MyProgrammableBlock, int> pbOverHeatDict =
+            new ConcurrentDictionary<MyProgrammableBlock, int>();
         public static Dictionary<long, int> Cooldowns = new Dictionary<long, int>();
         public static readonly Random r = new Random();
+        
         public static void Patch(PatchContext ctx)
         {
             var RunSandboxedProgramAction = typeof(MyProgrammableBlock).GetMethod
@@ -210,9 +217,58 @@ namespace SentisOptimisationsPlugin
 
                 m_instance.GridTerminalSystem = m_terminalWrapper;
                 var objects = new Object[] {action, null};
+                Stopwatch sw = new Stopwatch();
+                sw.Start();
                 __result = (MyProgrammableBlock.ScriptTerminationReason) ReflectionUtils.InvokeInstanceMethod(
                     typeof(MyProgrammableBlock),
                     __instance, "RunSandboxedProgramActionCore", objects);
+                var scriptExecTime = sw.ElapsedMilliseconds;
+                if (scriptExecTime > SentisOptimisationsPlugin.Config.ScriptsMaxExecTime && MySandboxGame.Static.SimulationFrameCounter > 10800)
+                {
+                    try
+                    {
+                        var ownerId = PlayerUtils.GetOwner(__instance.CubeGrid);
+                        var playerIdentity = PlayerUtils.GetPlayerIdentity(ownerId);
+                        var playerName = playerIdentity == null ? "---" : playerIdentity.DisplayName;
+                        Log.Warn(
+                            $"Script execution time exceeded {scriptExecTime} ms. \n PB - ({__instance.CustomName}) on - ({__instance.CubeGrid.DisplayName}) Owner - ({playerName})");
+                        if (SentisOptimisationsPlugin.Config.EnableScriptsPunish)
+                        {
+                            var count = 0;
+                            if (pbOverHeatDict.TryGetValue(__instance, out count))
+                            {
+                                count = count + 1;
+                            }
+
+                            if (count > SentisOptimisationsPlugin.Config.ScriptOvertimeExecTimesBeforePunish)
+                            {
+                                __instance.Enabled = false;
+                                var sb = __instance.SlimBlock;
+                                sb.DecreaseMountLevelToDesiredRatio(
+                                    __instance.BlockDefinition.CriticalIntegrityRatio - 0.1f, null);
+                                pbOverHeatDict.Remove(__instance);
+                                Log.Error(
+                                    $"Punish PB {scriptExecTime} ms. \n PB - ({__instance.CustomName}) on - ({__instance.CubeGrid.DisplayName}) Owner - ({playerName})");
+                                ChatUtils.SendTo(ownerId,
+                                    $"Script execution time exceeded PB - ({__instance.CustomName}) on - ({__instance.CubeGrid.DisplayName}) block disabled");
+                                MyVisualScriptLogicProvider.ShowNotification(
+                                    $"Script execution time exceeded PB - ({__instance.CustomName}) on - ({__instance.CubeGrid.DisplayName}) block disabled",
+                                    5000,
+                                    "Red", ownerId);
+                            }
+                            else
+                            {
+                                ChatUtils.SendTo(ownerId,
+                                    $"Script execution time exceeded PB - ({__instance.CustomName}) on - ({__instance.CubeGrid.DisplayName}) will be disabled after {SentisOptimisationsPlugin.Config.ScriptOvertimeExecTimesBeforePunish + 1 - count} times");
+                                pbOverHeatDict[__instance] = count;
+                            }
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        Log.Error(e, "Punish pb exc");
+                    }
+                }
                 response = (string) objects[1];
                 //__result = __instance.RunSandboxedProgramActionCore(action, out response);
                 return false;
