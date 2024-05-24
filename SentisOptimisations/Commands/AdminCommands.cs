@@ -11,6 +11,8 @@ using Sandbox.Game.Multiplayer;
 using Sandbox.Game.Screens.Helpers;
 using Sandbox.Game.World;
 using Sandbox.ModAPI;
+using SentisGameplayImprovements.AllGridsActions;
+using SentisOptimisations.DelayedLogic;
 using Torch.Commands;
 using Torch.Commands.Permissions;
 using Torch.Managers;
@@ -19,6 +21,7 @@ using VRage.Game;
 using VRage.Game.ModAPI;
 using VRage.ModAPI;
 using VRageMath;
+using IMyProjector = Sandbox.ModAPI.Ingame.IMyProjector;
 
 namespace SentisOptimisations.Commands
 {
@@ -87,6 +90,48 @@ namespace SentisOptimisations.Commands
                     return;
                 }
             }
+        }
+
+        [Command("!", "Remove projections from all projectors")]
+        [Permission(MyPromoteLevel.Admin)]
+        public void ClearProjectors()
+        {
+            DelayedProcessor.Instance.AddDelayedAction(DateTime.Now, () =>
+            {
+                foreach (var myCubeGrid in new HashSet<MyCubeGrid>(EntitiesObserver.MyCubeGrids))
+                {
+                    if (myCubeGrid == null || myCubeGrid.Closed || myCubeGrid.MarkedForClose)
+                    {
+                        continue;
+                    }
+                    if (myCubeGrid.IsPreview)
+                    {
+                        continue;
+                    }
+
+                    foreach (var myProjectorBase in myCubeGrid.GetFatBlocks<MyProjectorBase>())
+                    {
+                        if (myProjectorBase.ProjectedGrid != null)
+                        {
+                            MyAPIGateway.Utilities.InvokeOnGameThread((Action)(() =>
+                            {
+                                try
+                                {
+                                    SentisOptimisationsPlugin.SentisOptimisationsPlugin.Log.Info($"Cleaned projector {myProjectorBase.CustomName} on grid {myCubeGrid.DisplayName}");
+                                    myProjectorBase.Enabled = false;
+                                    ((Sandbox.ModAPI.IMyProjector)myProjectorBase).SetProjectedGrid(null);
+                                }
+                                catch (Exception ex)
+                                {
+                                    SentisOptimisationsPlugin.SentisOptimisationsPlugin.Log.Error(ex, "clean projectors error");
+                                }
+                            }));
+                        }
+                    }
+                    
+                }
+                
+            });
         }
 
         [Command("ai_npc clean", "Cleans up NPC junk data from the sandbox file")]
@@ -297,37 +342,6 @@ namespace SentisOptimisations.Commands
 
             MyAPIGateway.Session.Factions
                 .RemoveFaction(faction.FactionId); //Added to remove factions that got through the crack
-        }
-
-        private static int FixGridOwnership(List<long> Ids, bool deleteGrids = true)
-        {
-            if (Ids.Count == 0) return 0;
-            var grids = new List<MyCubeGrid>(MyEntities.GetEntities().OfType<MyCubeGrid>());
-            int count = 0;
-            foreach (var id in Ids)
-            {
-                if (id == 0) continue;
-                foreach (var grid in grids.Where(grid => grid.BigOwners.Contains(id)))
-                {
-                    if (grid.BigOwners.Count > 1)
-                    {
-                        var newOwnerId = grid.BigOwners.FirstOrDefault(x => x != id);
-                        grid.TransferBlocksBuiltByID(id, newOwnerId);
-                        foreach (var gridCubeBlock in grid.CubeBlocks.Where(x => x.OwnerId == id))
-                        {
-                            grid.ChangeOwner(gridCubeBlock.FatBlock, id, newOwnerId);
-                        }
-
-                        grid.RecalculateOwners();
-                        continue;
-                    }
-
-                    if (deleteGrids) grid.Close();
-                    count++;
-                }
-            }
-
-            return count;
         }
 
         private static int FixBlockOwnership()
