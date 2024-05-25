@@ -107,7 +107,7 @@ namespace Optimizer.Optimizations
             {
                 var targetsToThread = new HashSet<MySlimBlock>(targets);
                 var shipToolsAsyncQueues =
-                    SentisOptimisationsPlugin.SentisOptimisationsPlugin.Instance.ShipToolsAsyncQueues;
+                    SentisOptimisationsPlugin.SentisOptimisationsPlugin.Instance.WeldAsyncQueue;
                 shipToolsAsyncQueues.EnqueueAction(() =>
                 {
                     try
@@ -218,7 +218,7 @@ namespace Optimizer.Optimizations
             if (SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.AsyncWeld)
             {
                 var shipToolsAsyncQueues =
-                    SentisOptimisationsPlugin.SentisOptimisationsPlugin.Instance.ShipToolsAsyncQueues;
+                    SentisOptimisationsPlugin.SentisOptimisationsPlugin.Instance.WeldProjectionsQueue;
                 shipToolsAsyncQueues.EnqueueAction(() =>
                 {
                     try

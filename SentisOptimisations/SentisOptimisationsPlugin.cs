@@ -50,7 +50,8 @@ namespace SentisOptimisationsPlugin
 
         public AllGridsProcessor AllGridsProcessor = new AllGridsProcessor();
         private SendReplicablesAsync _replicablesAsync = new SendReplicablesAsync();
-        public ShipToolsAsyncQueues ShipToolsAsyncQueues = new ShipToolsAsyncQueues();
+        public ShipToolsAsyncQueues WeldProjectionsQueue = new ShipToolsAsyncQueues();
+        public ShipToolsAsyncQueues WeldAsyncQueue = new ShipToolsAsyncQueues();
         public DelayedProcessor DelayedProcessor = new DelayedProcessor();
         public static ShieldApi SApi = new ShieldApi();
 
@@ -107,7 +108,8 @@ namespace SentisOptimisationsPlugin
             {
                 AllGridsProcessor.OnUnloading();
                 _replicablesAsync.OnUnloading();
-                ShipToolsAsyncQueues.OnUnloading();
+                WeldProjectionsQueue.OnUnloading();
+                WeldAsyncQueue.OnUnloading();
                 DelayedProcessor.OnUnloading();
             }
             else
@@ -116,7 +118,8 @@ namespace SentisOptimisationsPlugin
                     return;
                 AllGridsProcessor.OnLoaded();
                 _replicablesAsync.OnLoaded();
-                ShipToolsAsyncQueues.OnLoaded();
+                WeldProjectionsQueue.OnLoaded();
+                WeldAsyncQueue.OnLoaded();
                 DelayedProcessor.OnLoaded();
                 InitShieldApi();
             }
