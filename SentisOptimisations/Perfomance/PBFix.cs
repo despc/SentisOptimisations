@@ -36,6 +36,8 @@ namespace SentisOptimisationsPlugin
         public static Dictionary<long, int> Cooldowns = new Dictionary<long, int>();
         public static readonly Random r = new Random();
         
+        public static MethodInfo RunSandboxedProgramActionCoreMethod = typeof(MyProgrammableBlock).GetMethod("RunSandboxedProgramActionCore", 
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
         public static void Patch(PatchContext ctx)
         {
             var RunSandboxedProgramAction = typeof(MyProgrammableBlock).GetMethod
@@ -218,12 +220,11 @@ namespace SentisOptimisationsPlugin
                 m_instance.GridTerminalSystem = m_terminalWrapper;
                 var objects = new Object[] {action, null};
                 Stopwatch sw = new Stopwatch();
+                var currentCpuLoad = MySandboxGame.Static.CPULoad;
                 sw.Start();
-                __result = (MyProgrammableBlock.ScriptTerminationReason) ReflectionUtils.InvokeInstanceMethod(
-                    typeof(MyProgrammableBlock),
-                    __instance, "RunSandboxedProgramActionCore", objects);
+                __result = (MyProgrammableBlock.ScriptTerminationReason)RunSandboxedProgramActionCoreMethod.Invoke(__instance, objects);
                 var scriptExecTime = sw.ElapsedMilliseconds;
-                if (scriptExecTime > SentisOptimisationsPlugin.Config.ScriptsMaxExecTime && MySandboxGame.Static.SimulationFrameCounter > 10800)
+                if (scriptExecTime > SentisOptimisationsPlugin.Config.ScriptsMaxExecTime * (1 + currentCpuLoad / 100) && MySandboxGame.Static.SimulationFrameCounter > 10800)
                 {
                     try
                     {
