@@ -283,9 +283,9 @@ namespace SentisOptimisationsPlugin.ShipTool
             
             __instance.easySetField("m_isActivatedOnSomething", false, typeof(MyShipToolBase));
             bool flag = false;
-            if (SentisOptimisationsPlugin.Config.AsyncWeld && __instance.CubeGrid.LinearVelocity.Length() < 5)
+            if (SentisOptimisationsPlugin.Config.AsyncWeld && __instance.CubeGrid.LinearVelocity.Length() < 1)
             {
-                var shipToolsAsyncQueues = SentisOptimisationsPlugin.Instance.ShipToolsAsyncQueues;
+                var shipToolsAsyncQueues = SentisOptimisationsPlugin.Instance.WeldAsyncQueue;
                 var runInFrame = MySession.Static.GameplayFrameCounter + r.Next(10, 60);
                 shipToolsAsyncQueues.EnqueueAction(() =>
                 {
@@ -398,7 +398,7 @@ namespace SentisOptimisationsPlugin.ShipTool
         private static async void CollectTargetBlocksAsyncAndCallActivate(MyShipToolBase myShipToolBase,
             BoundingSphereD boundingSphereD, HashSet<MyEntity> entitiesInContact)
         {
-            var shipToolsAsyncQueues = SentisOptimisationsPlugin.Instance.ShipToolsAsyncQueues;
+            var shipToolsAsyncQueues = SentisOptimisationsPlugin.Instance.WeldAsyncQueue;
             var asynActionsCount = shipToolsAsyncQueues.AsynActions.Count;
             var runInFrame = MySession.Static.GameplayFrameCounter + asynActionsCount + 1;
             shipToolsAsyncQueues.EnqueueAction(() =>
