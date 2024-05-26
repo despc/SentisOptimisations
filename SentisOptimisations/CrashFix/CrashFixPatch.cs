@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -18,6 +19,7 @@ using SentisOptimisations;
 using SpaceEngineers.Game.Entities.Blocks;
 using SpaceEngineers.Game.EntityComponents.Blocks;
 using Torch.Managers.PatchManager;
+using Torch.Utils;
 using VRage.Network;
 using VRage.Scripting;
 using VRage.Sync;
@@ -27,6 +29,9 @@ namespace SentisOptimisationsPlugin.CrashFix
     [PatchShim]
     public static class CrashFixPatch
     {
+        [ReflectedGetter(Name = "m_clientStates")]
+        private static Func<MyReplicationServer, IDictionary> _clientStates;
+        
         public static Harmony harmony = new Harmony("CrashFixPatch");
         public static void Patch(PatchContext ctx)
         {
@@ -99,6 +104,12 @@ namespace SentisOptimisationsPlugin.CrashFix
             harmony.Patch(MethodFlee, finalizer: new HarmonyMethod(finalizer));
             harmony.Patch(MethodFleeOnWaypointReached, finalizer: new HarmonyMethod(finalizer));
             harmony.Patch(MethodMyCargoContainerInventoryBagReplicableOnSave, finalizer: new HarmonyMethod(finalizer));
+            
+            // var MethodRemoveClient = typeof(MyReplicationServer).GetMethod
+            //     ("RemoveClient", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+            // ctx.GetPattern(MethodRemoveClient).Prefixes.Add(
+            //     typeof(CrashFixPatch).GetMethod(nameof(RemoveClientPatch),
+            //         BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
         }
 
 
@@ -110,6 +121,18 @@ namespace SentisOptimisationsPlugin.CrashFix
             }
             return null;
         }
+        
+        // private static bool RemoveClientPatch(MyReplicationServer __instance, Endpoint endpoint)
+        // {
+        //     Object client;
+        //     var clientDataDict = _clientStates.Invoke(__instance);
+        //     if (!clientDataDict.TryGetValue(endpoint, out client))
+        //         return false;
+        //     while (client.Replicables.Count > 0)
+        //         __instance.RemoveForClient(client.Replicables.FirstPair().Key, client, false);
+        //     __instance.m_clientStates.Remove<Endpoint, MyClient>(endpoint);
+        //     __instance.m_recentClientsStates[endpoint] = this.m_callback.GetUpdateTime() + this.SAVED_CLIENT_DURATION;
+        // }
         
         private static void MethodPistonInitPatched(MyPistonBase __instance)
         {

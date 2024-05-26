@@ -66,6 +66,13 @@ public class FreezeLogic
         {
             if (DateTime.Now < data && data < DateTime.Now.AddSeconds(_wakeupTimeInSec))
             {
+                var cpuLoads = new List<float> (FreezeLogic.CpuLoads);
+                var avgCpuLoad = cpuLoads.Count > 0 ? cpuLoads.Average() : 0.0;
+                if (avgCpuLoad > 70)
+                {
+                    WakeUpDatas[minEntityId] = DateTime.Now.AddSeconds(SentisOptimisationsPlugin.Config.MinWakeUpIntervalInSec);
+                    return false;
+                }
                 // grids.ForEach(grid => Log("Wake up time, grid - " + grid.DisplayName));
 
                 return true;
