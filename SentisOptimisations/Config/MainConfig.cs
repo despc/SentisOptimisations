@@ -48,6 +48,7 @@ namespace SentisOptimisationsPlugin
         
         //Other
         private bool _enableMainDebugLogs = false;
+        private int _charSyncDist = 10000;
         
         //Scripts
         private bool _punishHeavyScripts = false;
@@ -225,6 +226,14 @@ namespace SentisOptimisationsPlugin
         {
             get => _scriptOvertimeExecTimesBeforePunish;
             set => SetValue(ref _scriptOvertimeExecTimesBeforePunish, value);
+        }
+        
+        
+        [DisplayTab(Name = "Players sync distance", GroupName = "Other", Tab = "Other", Order = 2, Description = "Players sync distance")]
+        public int PlayersSyncDistance
+        {
+            get => _charSyncDist;
+            set => SetValue(ref _charSyncDist, value);
         }
     }
 }

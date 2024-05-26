@@ -20,7 +20,6 @@ namespace SentisOptimisationsPlugin.AllGridsActions
 
         public CancellationTokenSource CancellationTokenSource { get; set; }
         private FreezeLogic _freezeLogic = new FreezeLogic();
-        private WCSafeZoneWorkAround _wcSafeZoneWorkAround = new WCSafeZoneWorkAround();
 
         public void OnLoaded()
         {
@@ -47,17 +46,6 @@ namespace SentisOptimisationsPlugin.AllGridsActions
                         await Task.Run(GasTankOptimisations.UpdateTankRemains);
                         await Task.Run(InventoryPatch.RecalculateDirtyInventories);
                         await PhysicsProfilerMonitor.__instance.Profile();
-                        await Task.Run(() =>
-                        {
-                            try
-                            {
-                                _wcSafeZoneWorkAround.ResizeSZ(EntitiesObserver.Safezones);
-                            }
-                            catch (Exception e)
-                            {
-                                Log.Error("Async SZ exception " + e);
-                            }
-                        });
                     }
                     catch (Exception e)
                     {
