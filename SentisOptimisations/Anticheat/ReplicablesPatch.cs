@@ -1,9 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
-using NAPI;
 using NLog;
 using Sandbox.Game.Entities.Character;
 using Sandbox.Game.Replication;
@@ -24,6 +22,8 @@ namespace SentisOptimisationsPlugin
 
         [ReflectedGetter(Name = "m_clientStates")]
         private static Func<MyReplicationServer, IDictionary> _clientStates;
+
+        private static FieldInfo StateField;
         
         [ReflectedGetter(TypeName = "VRage.Network.MyClient, VRage", Name = "Replicables")]
         private static Func<object, MyConcurrentDictionary<IMyReplicable, MyReplicableClientData>> _replicables;
@@ -34,31 +34,99 @@ namespace SentisOptimisationsPlugin
         public static void Patch(PatchContext ctx)
         {
             
-            var MethodGetReplicablesInBox = typeof(MyReplicablesAABB).GetMethod
-                (nameof(MyReplicablesAABB.GetReplicablesInBox), BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
+            // var MethodGetReplicablesInBox = typeof(MyReplicablesAABB).GetMethod
+            //     (nameof(MyReplicablesAABB.GetReplicablesInBox), BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
+            //
+            // ctx.GetPattern(MethodGetReplicablesInBox).Suffixes.Add(
+            //     typeof(ReplicablesPatch).GetMethod(nameof(GetReplicablesInBoxPatched),
+            //         BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
+            // var MethodSendUpdate = typeof(MyReplicationServer).GetMethod
+            //     (nameof(MyReplicationServer.SendUpdate), BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+            //
+            // ctx.GetPattern(MethodSendUpdate).Suffixes.Add(
+            //     typeof(ReplicablesPatch).GetMethod(nameof(SendUpdatePatched),
+            //         BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
 
-            ctx.GetPattern(MethodGetReplicablesInBox).Suffixes.Add(
-                typeof(ReplicablesPatch).GetMethod(nameof(GetReplicablesInBoxPatched),
+            var assembly = typeof(MyReplicationServer).Assembly;
+            var MyClientType = assembly.GetType("VRage.Network.MyClient");
+
+            StateField = MyClientType.GetField("State",
+                BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            
+            var MethodCalculateLayerOfReplicable = MyClientType.GetMethod
+                ("CalculateLayerOfReplicable", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+            
+            ctx.GetPattern(MethodCalculateLayerOfReplicable).Prefixes.Add(
+                typeof(ReplicablesPatch).GetMethod(nameof(CalculateLayerOfReplicablePatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
             
-            var MethodSendUpdate = typeof(MyReplicationServer).GetMethod
-                (nameof(MyReplicationServer.SendUpdate), BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+            var MethodAddReplicableToLayer = typeof(MyReplicationServer).GetMethod
+            ("AddReplicableToLayer", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
             
-            ctx.GetPattern(MethodSendUpdate).Suffixes.Add(
-                typeof(ReplicablesPatch).GetMethod(nameof(SendUpdatePatched),
+            ctx.GetPattern(MethodAddReplicableToLayer).Prefixes.Add(
+                typeof(ReplicablesPatch).GetMethod(nameof(AddReplicableToLayerPatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
         }
 
+         private static bool AddReplicableToLayerPatched(MyReplicationServer __instance, IMyReplicable rep,
+             Object layer, Object client, bool __result)
+        {
+            try
+            {
+                if (SentisOptimisationsPlugin.Config.PlayersSyncDistance < 0)
+                {
+                    return true;
+                }
+                var charReplicable = rep as MyEntityReplicableBaseEvent<MyCharacter>;
+                if (charReplicable != null)
+                {
+                    MyClientStateBase State = (MyClientStateBase) StateField.GetValue(client);
+                    var isAdmin = PlayerUtils.IsAdmin(PlayerUtils.GetPlayer(State.EndpointId.Id.Value));
+                    if (isAdmin)
+                    {
+                        return true;
+                    }
+                
+                    var charPos = charReplicable.Instance?.PositionComp?.GetPosition();
+                    if (charPos != null)
+                    {
+                        if (State.EndpointId.Id.Value == charReplicable.Instance.ControlSteamId)
+                        {
+                            return true;
+                        }
+
+                        if (Vector3D.Distance(State.Position.Value, charPos.Value) >
+                            SentisOptimisationsPlugin.Config.PlayersSyncDistance)
+                        {
+                            __result = false;
+                            return false;
+                        }
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Log.Error(e, "AddReplicableToLayerPatched Exception");
+            }
+
+            return true;
+        }
+         
         private static void SendUpdatePatched(MyReplicationServer __instance)
         {
             try
             {
+                if (SentisOptimisationsPlugin.Config.PlayersSyncDistance < 0)
+                {
+                    return;
+                }
                 var clientDataDict = _clientStates.Invoke(__instance);
                 foreach (Object clientState in clientDataDict.Values)
                 {
                     object clientData = clientState;
 
-                    MyClientStateBase State = (MyClientStateBase)clientData.easyGetField("State");
+                    MyClientStateBase State = (MyClientStateBase) StateField.GetValue(clientData);
                     var isAdmin = PlayerUtils.IsAdmin(PlayerUtils.GetPlayer(State.EndpointId.Id.Value));
                     if (isAdmin)
                     {
@@ -73,11 +141,11 @@ namespace SentisOptimisationsPlugin
                     }
 
                     var clientReplicables = _replicables.Invoke(clientData);
-                    var replicableList = new List<IMyReplicable>(clientReplicables.Count);
 
-                    replicableList.AddRange(from pair in clientReplicables
-                        select pair.Key);
-                    foreach (var myReplicable in replicableList)
+                    var clientReplicablesKeys = clientReplicables.Keys;
+                    Dictionary<IMyReplicable, Object> replicablesToRemove = new Dictionary<IMyReplicable, object>();
+                    
+                    foreach (var myReplicable in clientReplicablesKeys)
                     {
                         var charReplicable = myReplicable as MyEntityReplicableBaseEvent<MyCharacter>;
                         var charPos = charReplicable?.Instance?.PositionComp?.GetPosition();
@@ -91,10 +159,16 @@ namespace SentisOptimisationsPlugin
                             if (Vector3D.Distance(position.Value, charPos.Value) >
                                 SentisOptimisationsPlugin.Config.PlayersSyncDistance)
                             {
-                                _removeForClient.Invoke(__instance, myReplicable, clientData, true);
+                                replicablesToRemove.Add(myReplicable, clientData);
+                                
                             }
                         }
                     }
+                    foreach (var keyValuePair in replicablesToRemove)
+                    {
+                        _removeForClient.Invoke(__instance, keyValuePair.Key, keyValuePair.Value, true); 
+                    }
+                    
                 }
             }
             catch (Exception e)
@@ -103,25 +177,69 @@ namespace SentisOptimisationsPlugin
             }
         }
         
-        private static void GetReplicablesInBoxPatched(MyReplicablesAABB __instance, BoundingBoxD aabb, List<IMyReplicable> list)
+        // private static void GetReplicablesInBoxPatched(MyReplicablesAABB __instance, BoundingBoxD aabb, List<IMyReplicable> list)
+        // {
+        //     if (SentisOptimisationsPlugin.Config.PlayersSyncDistance < 0)
+        //     {
+        //         return;
+        //     }
+        //     List<IMyReplicable> replicablesToFilter = new List<IMyReplicable>();
+        //     foreach (var myReplicable in list)
+        //     {
+        //         var charReplicable = myReplicable as MyEntityReplicableBaseEvent<MyCharacter>;
+        //         var charPos = charReplicable?.Instance?.PositionComp?.GetPosition();
+        //         if (charPos != null)
+        //         {
+        //             if (Vector3D.Distance(aabb.Center, charPos.Value) > SentisOptimisationsPlugin.Config.PlayersSyncDistance)
+        //             {
+        //                 replicablesToFilter.Add(myReplicable);
+        //             }
+        //         }
+        //     }
+        //     foreach (var replicableToFilter in replicablesToFilter)
+        //     {
+        //         list.Remove(replicableToFilter);
+        //     }
+        // }
+        
+        private static bool CalculateLayerOfReplicablePatched(Object __instance, IMyReplicable rep, ref Object __result)
         {
-            List<IMyReplicable> replicablesToFilter = new List<IMyReplicable>();
-            foreach (var myReplicable in list)
+            if (SentisOptimisationsPlugin.Config.PlayersSyncDistance < 0)
             {
-                var charReplicable = myReplicable as MyEntityReplicableBaseEvent<MyCharacter>;
-                var charPos = charReplicable?.Instance?.PositionComp?.GetPosition();
+                return true;
+            }
+            MyClientStateBase State = (MyClientStateBase) StateField.GetValue(__instance);
+            if (!State.Position.HasValue)
+            {
+                __result = null;
+                return false; 
+            }
+            var charReplicable = rep as MyEntityReplicableBaseEvent<MyCharacter>;
+            if (charReplicable != null)
+            {
+                var isAdmin = PlayerUtils.IsAdmin(PlayerUtils.GetPlayer(State.EndpointId.Id.Value));
+                if (isAdmin)
+                {
+                    return true;
+                }
+                
+                var charPos = charReplicable.Instance?.PositionComp?.GetPosition();
                 if (charPos != null)
                 {
-                    if (Vector3D.Distance(aabb.Center, charPos.Value) > SentisOptimisationsPlugin.Config.PlayersSyncDistance)
+                    if (State.EndpointId.Id.Value == charReplicable.Instance.ControlSteamId)
                     {
-                        replicablesToFilter.Add(myReplicable);
+                        return true;
+                    }
+
+                    if (Vector3D.Distance(State.Position.Value, charPos.Value) >
+                        SentisOptimisationsPlugin.Config.PlayersSyncDistance)
+                    {
+                        __result = null;
+                        return false;
                     }
                 }
             }
-            foreach (var replicableToFilter in replicablesToFilter)
-            {
-                list.Remove(replicableToFilter);
-            }
+            return true;
         }
     }
 }

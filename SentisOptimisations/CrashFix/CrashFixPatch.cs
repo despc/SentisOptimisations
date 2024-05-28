@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Text;
@@ -8,6 +10,7 @@ using HarmonyLib;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NAPI;
+using NLog.Fluent;
 using Sandbox.Game;
 using Sandbox.Game.Entities.Blocks;
 using Sandbox.Game.Entities.Cube;
@@ -20,7 +23,10 @@ using SpaceEngineers.Game.Entities.Blocks;
 using SpaceEngineers.Game.EntityComponents.Blocks;
 using Torch.Managers.PatchManager;
 using Torch.Utils;
+using VRage.Collections;
+using VRage.Library.Utils;
 using VRage.Network;
+using VRage.Replication;
 using VRage.Scripting;
 using VRage.Sync;
 
@@ -32,7 +38,20 @@ namespace SentisOptimisationsPlugin.CrashFix
         [ReflectedGetter(Name = "m_clientStates")]
         private static Func<MyReplicationServer, IDictionary> _clientStates;
         
+        [ReflectedGetter(Name = "m_recentClientsStates")]
+        private static Func<MyReplicationServer, ConcurrentDictionary<Endpoint, MyTimeSpan>> _recentClientsStates;
+         
+        [ReflectedGetter(Name = "m_callback")]
+        private static Func<MyReplicationServer, IReplicationServerCallback> _callback;
+        
+        [ReflectedGetter(TypeName = "VRage.Network.MyClient, VRage", Name = "Replicables")]
+        private static Func<object, MyConcurrentDictionary<IMyReplicable, MyReplicableClientData>> _replicables;
+        [ReflectedMethod(Name = "RemoveForClient", OverrideTypeNames = new string[] { null, "VRage.Network.MyClient, VRage", null })]
+        private static Action<MyReplicationServer, IMyReplicable, object, bool> _removeForClient;
+        
         public static Harmony harmony = new Harmony("CrashFixPatch");
+
+        private static Object RemoveClientLock = new Object();
         public static void Patch(PatchContext ctx)
         {
             
@@ -105,11 +124,11 @@ namespace SentisOptimisationsPlugin.CrashFix
             harmony.Patch(MethodFleeOnWaypointReached, finalizer: new HarmonyMethod(finalizer));
             harmony.Patch(MethodMyCargoContainerInventoryBagReplicableOnSave, finalizer: new HarmonyMethod(finalizer));
             
-            // var MethodRemoveClient = typeof(MyReplicationServer).GetMethod
-            //     ("RemoveClient", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
-            // ctx.GetPattern(MethodRemoveClient).Prefixes.Add(
-            //     typeof(CrashFixPatch).GetMethod(nameof(RemoveClientPatch),
-            //         BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            var MethodRemoveClient = typeof(MyReplicationServer).GetMethod
+                ("RemoveClient", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+            ctx.GetPattern(MethodRemoveClient).Prefixes.Add(
+                typeof(CrashFixPatch).GetMethod(nameof(RemoveClientPatch),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
         }
 
 
@@ -119,20 +138,54 @@ namespace SentisOptimisationsPlugin.CrashFix
             {
                 SentisOptimisationsPlugin.Log.Error(__exception, "SuppressedException ");
             }
+
             return null;
         }
-        
-        // private static bool RemoveClientPatch(MyReplicationServer __instance, Endpoint endpoint)
-        // {
-        //     Object client;
-        //     var clientDataDict = _clientStates.Invoke(__instance);
-        //     if (!clientDataDict.TryGetValue(endpoint, out client))
-        //         return false;
-        //     while (client.Replicables.Count > 0)
-        //         __instance.RemoveForClient(client.Replicables.FirstPair().Key, client, false);
-        //     __instance.m_clientStates.Remove<Endpoint, MyClient>(endpoint);
-        //     __instance.m_recentClientsStates[endpoint] = this.m_callback.GetUpdateTime() + this.SAVED_CLIENT_DURATION;
-        // }
+
+        private static bool RemoveClientPatch(MyReplicationServer __instance, Endpoint endpoint)
+        {
+            try
+            {
+                var clientDataDict = _clientStates.Invoke(__instance);
+                if (!clientDataDict.Contains(endpoint))
+                {
+                    return false;
+                }
+
+                Object clientData = clientDataDict[endpoint];
+                var clientReplicables = _replicables.Invoke(clientData);
+                Stopwatch sw = new Stopwatch();
+                sw.Start();
+                SentisOptimisationsPlugin.Log.Info(
+                    $"Client Replicables before cleanup after logout {clientReplicables.Count}");
+                var clentReplicables = new List<IMyReplicable>(clientReplicables.Keys);
+                foreach (var clentReplicable in clentReplicables)
+                {
+                    try
+                    {
+                        _removeForClient.Invoke(__instance, clentReplicable, clientData, false);
+                    }
+                    catch (Exception e)
+                    {
+                        SentisOptimisationsPlugin.Log.Error(e, "Remove For Client exception ");
+                    }
+                }
+
+                SentisOptimisationsPlugin.Log.Info(
+                    $"Client Replicables after cleanup after logout {_replicables.Invoke(clientData).Count} time - {sw.ElapsedMilliseconds}");
+                clientDataDict.Remove(endpoint);
+                var recentClientsStates = _recentClientsStates.Invoke(__instance);
+                var replicationServerCallback = _callback.Invoke(__instance);
+                recentClientsStates[endpoint] =
+                    replicationServerCallback.GetUpdateTime() + MyTimeSpan.FromSeconds(60.0);
+            }
+            catch (Exception e)
+            {
+                SentisOptimisationsPlugin.Log.Error(e, "RemoveClientPatch exception ");
+            }
+
+            return false;
+        }
         
         private static void MethodPistonInitPatched(MyPistonBase __instance)
         {
