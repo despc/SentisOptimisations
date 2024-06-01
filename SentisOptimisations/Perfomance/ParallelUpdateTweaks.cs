@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using HarmonyLib;
 using NLog;
@@ -6,8 +7,12 @@ using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Blocks;
 using Sandbox.Game.Entities.Character;
 using Sandbox.Game.EntityComponents;
+using Sandbox.Game.GameSystems;
 using SentisOptimisationsPlugin.CrashFix;
 using Torch.Managers.PatchManager;
+using Torch.Utils;
+using VRage.Game.Entity;
+using VRage.Network;
 
 namespace FixTurrets.Perfomance
 {
@@ -16,6 +21,9 @@ namespace FixTurrets.Perfomance
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
+        [ReflectedGetter(Name = "m_dataByFuelType")]
+        private static Func<MyEntityThrustComponent, List<MyEntityThrustComponent.FuelTypeData>> _dataByFuelType;
+        
         private static Type MyThrusterBlockThrustComponentType =
             typeof(MyParallelEntityUpdateOrchestrator).Assembly.GetType(
                 "Sandbox.Game.EntityComponents.MyThrusterBlockThrustComponent");
@@ -23,14 +31,16 @@ namespace FixTurrets.Perfomance
         private static MethodInfo GetEntityMethod = MyThrusterBlockThrustComponentType.GetProperty("Entity",
             BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly).GetMethod;
         
+        
+        
         public static void Patch(PatchContext ctx)
         {
             
             var MethodThrustUpdateBeforeSimulation = MyThrusterBlockThrustComponentType.GetMethod
-                ("UpdateBeforeSimulation", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
-            ctx.GetPattern(MethodThrustUpdateBeforeSimulation).Prefixes.Add(
-                typeof(ParallelUpdateTweaks).GetMethod(nameof(MethodThrustUpdateBeforeSimulationPatched),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+                ("UpdateThrusts", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+            // ctx.GetPattern(MethodThrustUpdateBeforeSimulation).Prefixes.Add(
+            //     typeof(ParallelUpdateTweaks).GetMethod(nameof(UpdateThrustsPatched),
+            //         BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
             
             var MethodSoundEmitterUpdate = typeof(MyEntity3DSoundEmitter).GetMethod
                 (nameof(MyEntity3DSoundEmitter.Update), BindingFlags.Instance | BindingFlags.Public);
@@ -66,17 +76,29 @@ namespace FixTurrets.Perfomance
             CrashFixPatch.harmony.Patch(MethodUpdateAutopilot, finalizer: new HarmonyMethod(finalizer));
         }
 
-        private static bool MethodThrustUpdateBeforeSimulationPatched(Object __instance)
+        private static bool UpdateThrustsPatched(MyEntityThrustComponent __instance)
         {
             try
             {
-                MyCubeGrid grid = (MyCubeGrid)GetEntityMethod.Invoke(__instance, new object[] { });
+                MyCubeGrid grid = (MyCubeGrid)__instance.Entity;
 
-                if (grid == null || grid.IsStatic)
+                if (grid == null)
                 {
                     return false;
                 }
 
+                if (grid.IsStatic)
+                {
+                    var fuelTypeDatas = _dataByFuelType.Invoke(__instance);
+                    foreach (var fuelTypeData in fuelTypeDatas)
+                    {
+                        if (fuelTypeData.CurrentRequiredFuelInput > 0.0)
+                        {
+                            fuelTypeData.CurrentRequiredFuelInput = 0;
+                        }
+                    }
+                }
+                return false;
             }
             catch (Exception e)
             {

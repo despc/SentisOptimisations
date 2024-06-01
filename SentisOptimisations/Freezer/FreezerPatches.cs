@@ -614,14 +614,7 @@ public static class FreezerPatches
 
     private static bool RefreshCustomInfoPatched(MyTerminalBlock __instance)
     {
-        if (!SentisOptimisationsPlugin.Config.FreezerEnabled)
-        {
-            return true;
-        }
-
-        var entityId = __instance.CubeGrid.EntityId;
-
-        if (FreezeLogic.FrozenGrids.Contains(entityId))
+        if (((uint)__instance.CubeGrid.Flags & 4) > 0)
         {
             return false;
         }
