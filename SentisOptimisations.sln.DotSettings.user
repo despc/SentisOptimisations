@@ -56,7 +56,6 @@
   &lt;Assembly Path="D:\torch-server\Torch.API.dll" /&gt;&#xD;
   &lt;Assembly Path="C:\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\VRage.Library.dll" /&gt;&#xD;
   &lt;Assembly Path="D:\torch-server\DedicatedServer64\Sandbox.Common.dll" /&gt;&#xD;
-  &lt;Assembly Path="C:\Users\idesp\Downloads\DePatch-1.18.65\DePatch.dll" /&gt;&#xD;
   &lt;Assembly Path="D:\torch-server\DedicatedServer64\VRage.Platform.Windows.dll" /&gt;&#xD;
   &lt;Assembly Path="C:\Users\idesp\RiderProjects\FixTurrets\SentisOptimisations\lib\InfluxDb.Torch.dll" /&gt;&#xD;
   &lt;Assembly Path="C:\Users\idesp\RiderProjects\FixTurrets\SentisOptimisations\lib\Profiler.dll" /&gt;&#xD;
@@ -66,5 +65,7 @@
   &lt;Assembly Path="C:\Users\idesp\RiderProjects\FixTurrets\SentisOptimisations\bin\Debug\Profiler.dll" /&gt;&#xD;
   &lt;Assembly Path="C:\Users\idesp\RiderProjects\SEDB-RELOADED\SEDiscordBridge\obj\Debug\SEDiscordBridge.dll" /&gt;&#xD;
   &lt;Assembly Path="C:\SE\Arrakis\torch-server\DedicatedServer64\VRage.Game.dll" /&gt;&#xD;
+  &lt;Assembly Path="C:\SE\VanillaTest\torch-server\DedicatedServer64\VRage.Scripting.dll" /&gt;&#xD;
+  &lt;Assembly Path="C:\SE\VanillaTest\torch-server\DedicatedServer64\VRage.dll" /&gt;&#xD;
 &lt;/AssemblyExplorer&gt;</s:String>
 	<s:Boolean x:Key="/Default/Monitoring/IsToolWindowHidden/@EntryValue">True</s:Boolean></wpf:ResourceDictionary>

@@ -30,8 +30,12 @@ namespace SentisOptimisationsPlugin
             var minEntityId = grids.MinBy(grid => grid.EntityId).EntityId;
             string gridNames = string.Join(", ", grids.Select(grid => grid.DisplayName));
             var ownerId = PlayerUtils.GetOwner(grids);
-            var playerName = PlayerUtils.GetPlayerIdentity(ownerId).DisplayName;
-
+            var playerIdentity = PlayerUtils.GetPlayerIdentity(ownerId);
+            if (playerIdentity == null)
+            {
+                return;
+            }
+            var playerName = playerIdentity.DisplayName;
             
             if (timeToAlarmDictionary.ContainsKey(minEntityId))
             {
@@ -97,28 +101,28 @@ namespace SentisOptimisationsPlugin
                 }
 
                 var gridsList = new HashSet<IMyCubeGrid>(grids);
-                DelayedProcessor.Instance.AddDelayedAction(DateTime.Now.AddMilliseconds(MyRandom.Instance.Next(300, 2000)), () =>
-                {
-                    while (gridsList.Count > 0)
+                DelayedProcessor.Instance.AddDelayedAction(DateTime.Now.AddMilliseconds(MyRandom.Instance.Next(300, 2000)),
+                    () =>
                     {
-                        MyAPIGateway.Utilities.InvokeOnGameThread(() =>
+                        while (gridsList.Count > 0)
                         {
-                            try
+                            var grid = gridsList.FirstElement();
+                            HashSet<IMyCubeGrid> gridsTmp = new HashSet<IMyCubeGrid>();
+                            MyAPIGateway.GridGroups.GetGroup(grid, GridLinkTypeEnum.Physical, gridsTmp);
+                            grids.ForEach(cubeGrid => gridsList.Remove(cubeGrid));
+                            var gridToFixship = gridsTmp.FirstElement();
+                            MyAPIGateway.Utilities.InvokeOnGameThread(() =>
                             {
-                                var grid = gridsList.FirstElement();
-                                HashSet<IMyCubeGrid> gridsTmp = new HashSet<IMyCubeGrid>();
-                                MyAPIGateway.GridGroups.GetGroup(grid, GridLinkTypeEnum.Physical, gridsTmp);
-                                gridsTmp.ForEach(cubeGrid => gridsList.Remove(cubeGrid));
-                                var gridToFixship = gridsTmp.FirstElement();
-                                FixShipLogic.FixGroupByGrid((MyCubeGrid)gridToFixship);
-                            }
-                            catch
-                            {
-                            }
-                        });
-
-                    }
-                });
+                                try
+                                {
+                                    FixShipLogic.FixGroupByGrid((MyCubeGrid)gridToFixship);
+                                }
+                                catch
+                                {
+                                }
+                            });
+                        }
+                    });
             }
         }
 
@@ -126,31 +130,32 @@ namespace SentisOptimisationsPlugin
         {
             foreach (var grid in grids)
             {
-                ConvertToStatic((MyCubeGrid) grid);
+                ConvertToStatic((MyCubeGrid)grid);
             }
+
             var gridsList = new HashSet<IMyCubeGrid>(grids);
-            DelayedProcessor.Instance.AddDelayedAction(DateTime.Now.AddMilliseconds(MyRandom.Instance.Next(300, 2000)), () =>
-            {
-                while (gridsList.Count > 0)
+            DelayedProcessor.Instance.AddDelayedAction(DateTime.Now.AddMilliseconds(MyRandom.Instance.Next(300, 2000)),
+                () =>
                 {
-                    MyAPIGateway.Utilities.InvokeOnGameThread(() =>
+                    while (gridsList.Count > 0)
                     {
-                        try
+                        var grid = gridsList.FirstElement();
+                        HashSet<IMyCubeGrid> gridsTmp = new HashSet<IMyCubeGrid>();
+                        MyAPIGateway.GridGroups.GetGroup(grid, GridLinkTypeEnum.Physical, gridsTmp);
+                        grids.ForEach(cubeGrid => gridsList.Remove(cubeGrid));
+                        var gridToFixship = gridsTmp.FirstElement();
+                        MyAPIGateway.Utilities.InvokeOnGameThread(() =>
                         {
-                            var grid = gridsList.FirstElement();
-                            HashSet<IMyCubeGrid> gridsTmp = new HashSet<IMyCubeGrid>();
-                            MyAPIGateway.GridGroups.GetGroup(grid, GridLinkTypeEnum.Physical, gridsTmp);
-                            grids.ForEach(cubeGrid => gridsList.Remove(cubeGrid));
-                            var gridToFixship = gridsTmp.FirstElement();
-                            FixShipLogic.FixGroupByGrid((MyCubeGrid)gridToFixship);
-                        }
-                        catch
-                        {
-                        }
-                    });
-                    
-                }
-            });
+                            try
+                            {
+                                FixShipLogic.FixGroupByGrid((MyCubeGrid)gridToFixship);
+                            }
+                            catch
+                            {
+                            }
+                        });
+                    }
+                });
             
             string gridNames = string.Join(", ", grids.Select(grid => grid.DisplayName));
             var ownerId = PlayerUtils.GetOwner(grids);

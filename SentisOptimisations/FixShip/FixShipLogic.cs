@@ -30,7 +30,7 @@ namespace SentisOptimisations
         public static List<MyCubeGrid> FindGroupByGrid(MyCubeGrid grid)
         {
             List<MyCubeGrid> groupNodes =
-                MyCubeGridGroups.Static.GetGroups(GridLinkTypeEnum.Logical).GetGroupNodes(grid);
+                MyCubeGridGroups.Static.GetGroups(GridLinkTypeEnum.Physical).GetGroupNodes(grid);
             return groupNodes;
         }
 
