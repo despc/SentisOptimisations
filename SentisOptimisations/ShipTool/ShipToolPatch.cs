@@ -21,6 +21,7 @@ using SentisGameplayImprovements.AllGridsActions;
 using SentisOptimisations;
 using SpaceEngineers.Game.Entities.Blocks;
 using Torch.Managers.PatchManager;
+using Torch.Utils;
 using VRage.Game;
 using VRage.Game.Entity;
 using VRage.Game.ModAPI;
@@ -38,6 +39,8 @@ namespace SentisOptimisationsPlugin.ShipTool
         public static Dictionary<long, int> NobodyToOff = new Dictionary<long, int>();
         public static readonly Random r = new Random();
         
+        [ReflectedGetter(Name = "m_detectorSphere")]
+        private static Func<MyShipToolBase, BoundingSphere> _detectorSphere;
         public static void Patch(PatchContext ctx)
         {
 
@@ -273,8 +276,7 @@ namespace SentisOptimisationsPlugin.ShipTool
 
         private static void DoActivateCommon(MyShipToolBase __instance)
         {
-            BoundingSphere m_detectorSphere =
-                (BoundingSphere)__instance.easyGetField("m_detectorSphere", typeof(MyShipToolBase));
+            BoundingSphere m_detectorSphere = _detectorSphere.Invoke(__instance);
             BoundingSphereD boundingSphereD = new BoundingSphereD(
                 Vector3D.Transform(m_detectorSphere.Center, __instance.CubeGrid.WorldMatrix),
                 (double)m_detectorSphere.Radius);
@@ -400,7 +402,6 @@ namespace SentisOptimisationsPlugin.ShipTool
         {
             var shipToolsAsyncQueues = SentisOptimisationsPlugin.Instance.WeldAsyncQueue;
             var asynActionsCount = shipToolsAsyncQueues.AsynActions.Count;
-            var runInFrame = MySession.Static.GameplayFrameCounter + asynActionsCount + 1;
             shipToolsAsyncQueues.EnqueueAction(() =>
             {
                 var resultBlocksToActivateOnAsync = CollectBlocks(new HashSet<MyEntity>(entitiesInContact));
@@ -416,6 +417,9 @@ namespace SentisOptimisationsPlugin.ShipTool
                     {
                         if (myEntity is MyCubeGrid myCubeGrid)
                         {
+                            BoundingSphere m_detectorSphere = _detectorSphere.Invoke(myShipToolBase);
+                            BoundingSphereD boundingSphereD = new BoundingSphereD(Vector3D.Transform(m_detectorSphere.Center, myShipToolBase.CubeGrid.WorldMatrix),
+                                (double)m_detectorSphere.Radius);
                             HashSet<MySlimBlock> mTempBlocksBuffer = new HashSet<MySlimBlock>();
                             myCubeGrid.GetBlocksInsideSphere(ref boundingSphereD, mTempBlocksBuffer);
                             blocksToActivateOnAsync.UnionWith(mTempBlocksBuffer);
