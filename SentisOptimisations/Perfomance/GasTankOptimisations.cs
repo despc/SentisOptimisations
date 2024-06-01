@@ -1,11 +1,8 @@
-﻿using System;
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using NAPI;
 using Sandbox.Game.Entities.Blocks;
-using Sandbox.ModAPI;
 using SpaceEngineers.Game.Entities.Blocks;
 using Torch.Managers.PatchManager;
 
@@ -34,41 +31,6 @@ namespace SentisOptimisationsPlugin
                 typeof(GasTankOptimisations).GetMethod(nameof(MethodExecuteGasTransferPatchedVent),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
 
-        }
-
-        public static void UpdateTankRemains()
-        {
-            foreach (var at in _accumulatedTransfer)
-            {
-                var tank = at.Key;
-                if (tank == null)
-                {
-                    continue;
-                }
-                var accumulatedTransfers = at.Value;
-                if (accumulatedTransfers.Count < 30)
-                {
-                    var countToAdd = 30 - accumulatedTransfers.Count;
-                    for (int i = 0; i < countToAdd; i++)
-                    {
-                        accumulatedTransfers.Add(0);
-                    }
-
-                    MyAPIGateway.Utilities.InvokeOnGameThread(() =>
-                    {
-                        try
-                        {
-                            tank.easyCallMethod("ExecuteGasTransfer", new object[] { accumulatedTransfers.Sum() });
-                        }
-                        catch (Exception e)
-                        {
-                            //
-                        }
-                        
-                    });
-                    
-                }
-            }
         }
 
         private static bool MethodExecuteGasTransferPatched(MyGasTank __instance, ref double totalTransfer)
