@@ -54,12 +54,12 @@ namespace SentisOptimisationsPlugin
                 typeof(SafezonePatch).GetMethod(nameof(UpdateBeforeSimulationPatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
             
-            var MyRemoveEntityPhantom = typeof(MySafeZone).GetMethod
-                ("RemoveEntityPhantom", BindingFlags.Instance | BindingFlags.NonPublic);
-
-            ctx.GetPattern(MyRemoveEntityPhantom).Prefixes.Add(
-                typeof(SafezonePatch).GetMethod(nameof(MyRemoveEntityPhantomPatched),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            // var MyRemoveEntityPhantom = typeof(MySafeZone).GetMethod
+            //     ("RemoveEntityPhantom", BindingFlags.Instance | BindingFlags.NonPublic);
+            //
+            // ctx.GetPattern(MyRemoveEntityPhantom).Prefixes.Add(
+            //     typeof(SafezonePatch).GetMethod(nameof(MyRemoveEntityPhantomPatched),
+            //         BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
 
 
             enumStringMapping["NotSafe"] = SubgridCheckResult.NOT_SAFE;
@@ -236,11 +236,17 @@ namespace SentisOptimisationsPlugin
 
         private static bool UpdateBeforeSimulationPatched(MySafeZone __instance)
         {
+            if (!SentisOptimisationsPlugin.Config.SlowdownEnabled)
+            {
+                return true;
+            }
+
             var safeZoneBlockId = __instance.SafeZoneBlockId;
             if (safeZoneBlockId == 0)
             {
                 return true;
             }
+
             MyCubeBlock entity;
             if (!MyEntities.TryGetEntityById<MyCubeBlock>(safeZoneBlockId, out entity))
             {
@@ -248,17 +254,15 @@ namespace SentisOptimisationsPlugin
             }
 
             var entityCubeGrid = entity.CubeGrid;
-            if (SentisOptimisationsPlugin.Config.SlowdownEnabled)
+
+            var myUpdateTiersPlayerPresence = entityCubeGrid.PlayerPresenceTier;
+            if (myUpdateTiersPlayerPresence == MyUpdateTiersPlayerPresence.Tier1)
             {
-                    var myUpdateTiersPlayerPresence = entityCubeGrid.PlayerPresenceTier;
-                    if (myUpdateTiersPlayerPresence == MyUpdateTiersPlayerPresence.Tier1)
-                    {
-                        if (NeedSkip(entityCubeGrid.EntityId, 10)) return false;
-                    }
-                    else if (myUpdateTiersPlayerPresence == MyUpdateTiersPlayerPresence.Tier2)
-                    {
-                        if (NeedSkip(entityCubeGrid.EntityId, 100)) return false;
-                    }   
+                if (NeedSkip(entityCubeGrid.EntityId, 10)) return false;
+            }
+            else if (myUpdateTiersPlayerPresence == MyUpdateTiersPlayerPresence.Tier2)
+            {
+                if (NeedSkip(entityCubeGrid.EntityId, 100)) return false;
             }
 
             return true;
