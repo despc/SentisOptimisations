@@ -35,7 +35,8 @@ namespace SentisOptimisationsPlugin
         
         //Freezer
         private bool _freezerEnabled = true;
-        private int _freezeDistance = 10000;
+        private int _freezeDistanceDynamic = 10000;
+        private int _freezeDistanceStatic = 3000;
         private bool _freezeNpc = false;
         private bool _freezeSignals = false;
         private bool _enableDebugLogs = true;
@@ -169,8 +170,11 @@ namespace SentisOptimisationsPlugin
         [DisplayTab(Name = "Enable Freezer", GroupName = "Freezer", Tab = "Freezer", Order = 0, Description = "Enable Freezer")]
         public bool FreezerEnabled { get => _freezerEnabled; set => SetValue(ref _freezerEnabled, value); }
         
-        [DisplayTab(Name = "Freeze distance", GroupName = "Freezer", Tab = "Freezer", Order = 1, Description = "Freeze distance")]
-        public int FreezeDistance { get => _freezeDistance; set => SetValue(ref _freezeDistance, value); }
+        [DisplayTab(Name = "Freeze distance dynamic", GroupName = "Freezer", Tab = "Freezer", Order = 1, Description = "Freeze distance dynamic")]
+        public int FreezeDistanceDynamic { get => _freezeDistanceDynamic; set => SetValue(ref _freezeDistanceDynamic, value); }
+        
+        [DisplayTab(Name = "Freeze distance static", GroupName = "Freezer", Tab = "Freezer", Order = 1, Description = "Freeze distance static")]
+        public int FreezeDistanceStatic { get => _freezeDistanceStatic; set => SetValue(ref _freezeDistanceStatic, value); }
         
         [DisplayTab(Name = "Freeze NPC", GroupName = "Freezer", Tab = "Freezer", Order = 2, Description = "Freeze NPC")]
         public bool FreezeNpc { get => _freezeNpc; set => SetValue(ref _freezeNpc, value); }
