@@ -10,8 +10,8 @@ using HarmonyLib;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NAPI;
-using NLog.Fluent;
 using Sandbox.Game;
+using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Blocks;
 using Sandbox.Game.Entities.Cube;
 using Sandbox.Game.Multiplayer;
@@ -61,6 +61,8 @@ namespace SentisOptimisationsPlugin.CrashFix
             var MethodAssDoUpdateTimerTick = typeof(MyAssembler).GetMethod
                 (nameof(MyAssembler.DoUpdateTimerTick), BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
 
+            var MethodRefineryDoUpdateTimerTick = typeof(MyRefinery).GetMethod
+                (nameof(MyRefinery.DoUpdateTimerTick), BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
             
             ctx.GetPattern(MethodPistonInit).Prefixes.Add(
                 typeof(CrashFixPatch).GetMethod(nameof(MethodPistonInitPatched),
@@ -93,7 +95,7 @@ namespace SentisOptimisationsPlugin.CrashFix
             var MethodMyAngleGrinderGrind = typeof(MyAngleGrinder).GetMethod
                 ("Grind", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
             
-            var MethodOnRegisteredToThrustComponent = typeof(Sandbox.Game.Entities.MyThrust).GetMethod
+            var MethodOnRegisteredToThrustComponent = typeof(MyThrust).GetMethod
                 ("OnRegisteredToThrustComponent", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
                 
             var MethodFleeAwayFromTargetLogic = typeof(MyDefensiveCombatBlock).GetMethod
@@ -116,6 +118,7 @@ namespace SentisOptimisationsPlugin.CrashFix
             harmony.Patch(MethodMyExplosionsUpdateBeforeSimulation, finalizer: new HarmonyMethod(finalizer));
             harmony.Patch(MethodMyAngleGrinderGrind, finalizer: new HarmonyMethod(finalizer));
             harmony.Patch(MethodOnRegisteredToThrustComponent, finalizer: new HarmonyMethod(finalizer));
+            harmony.Patch(MethodRefineryDoUpdateTimerTick, finalizer: new HarmonyMethod(finalizer));
             harmony.Patch(MethodRemoveIdentity, finalizer: new HarmonyMethod(finalizer));
             harmony.Patch(MethodApplyDirtyGroups, finalizer: new HarmonyMethod(finalizer));
             harmony.Patch(MethodFleeAwayFromTargetLogic, finalizer: new HarmonyMethod(finalizer));
