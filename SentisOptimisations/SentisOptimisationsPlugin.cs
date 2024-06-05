@@ -21,6 +21,7 @@ using SentisGameplayImprovements.AllGridsActions;
 using SentisOptimisations;
 using SentisOptimisations.DelayedLogic;
 using SentisOptimisationsPlugin.AllGridsActions;
+using SentisOptimisationsPlugin.Async;
 using SentisOptimisationsPlugin.Freezer;
 using SentisOptimisationsPlugin.ShipTool;
 using SOPlugin.GUI;
@@ -53,6 +54,7 @@ namespace SentisOptimisationsPlugin
         public ShipToolsAsyncQueues WeldProjectionsQueue = new ShipToolsAsyncQueues();
         public ShipToolsAsyncQueues WeldAsyncQueue = new ShipToolsAsyncQueues();
         public DelayedProcessor DelayedProcessor = new DelayedProcessor();
+        public AsyncUpdater AsyncUpdater = new AsyncUpdater();
         public static ShieldApi SApi = new ShieldApi();
 
         public override void Init(ITorchBase torch)
@@ -62,6 +64,7 @@ namespace SentisOptimisationsPlugin
             Log.Info("Init SentisOptimisationsPlugin");
             MyFakes.ENABLE_SCRAP = false;
             MySimpleProfiler.ENABLE_SIMPLE_PROFILER = false;
+            
             SetupConfig();
             SessionManager = Torch.Managers.GetManager<TorchSessionManager>();
             if (SessionManager == null)
@@ -97,6 +100,7 @@ namespace SentisOptimisationsPlugin
                });
             }
             LogManager.ReconfigExistingLoggers();
+            UpdateEntityWrapper.HarmonyInstance.PatchAll();
         }
 
 
@@ -111,6 +115,7 @@ namespace SentisOptimisationsPlugin
                 WeldProjectionsQueue.OnUnloading();
                 WeldAsyncQueue.OnUnloading();
                 DelayedProcessor.OnUnloading();
+                AsyncUpdater.OnUnloading();
             }
             else
             {
@@ -121,6 +126,7 @@ namespace SentisOptimisationsPlugin
                 WeldProjectionsQueue.OnLoaded();
                 WeldAsyncQueue.OnLoaded();
                 DelayedProcessor.OnLoaded();
+                AsyncUpdater.OnLoaded();
                 InitShieldApi();
             }
         }

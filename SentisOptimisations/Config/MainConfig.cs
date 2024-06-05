@@ -56,6 +56,16 @@ namespace SentisOptimisationsPlugin
         private float _scriptMaxTime = 2;
         private int _scriptOvertimeExecTimesBeforePunish = 3;
         
+        //Async
+        private bool _enableAsyncLogicUpdateMain = false;
+        
+        [DisplayTab(Name = "Async logic enabled", GroupName = "Async logic", Tab = "Async logic", Order = 0, Description = "Async logic enabled")]
+        public bool AsyncLogicUpdateMain
+        {
+            get => _enableAsyncLogicUpdateMain;
+            set => SetValue(ref _enableAsyncLogicUpdateMain, value);
+        }
+        
         [DisplayTab(Name = "Slowdown Enabled", GroupName = "Slowdown", Tab = "Slowdown", Order = 0, Description = "Slowdown Enabled")]
         public bool SlowdownEnabled
         {
