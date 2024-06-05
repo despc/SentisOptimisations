@@ -67,5 +67,6 @@
   &lt;Assembly Path="C:\SE\Arrakis\torch-server\DedicatedServer64\VRage.Game.dll" /&gt;&#xD;
   &lt;Assembly Path="C:\SE\VanillaTest\torch-server\DedicatedServer64\VRage.Scripting.dll" /&gt;&#xD;
   &lt;Assembly Path="C:\SE\VanillaTest\torch-server\DedicatedServer64\VRage.dll" /&gt;&#xD;
+  &lt;Assembly Path="C:\SE\VanillaTest\torch-server\DedicatedServer64\VRage.Library.dll" /&gt;&#xD;
 &lt;/AssemblyExplorer&gt;</s:String>
 	<s:Boolean x:Key="/Default/Monitoring/IsToolWindowHidden/@EntryValue">True</s:Boolean></wpf:ResourceDictionary>

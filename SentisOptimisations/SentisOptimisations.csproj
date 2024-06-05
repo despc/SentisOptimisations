@@ -42,6 +42,14 @@
       <Compile Include="Anticheat\ReplicablesPatch.cs" />
       <Compile Include="Anticheat\TorchPatch.cs" />
       <Compile Include="Api\ShieldApi.cs" />
+      <Compile Include="Async\AsyncUpdater.cs" />
+      <Compile Include="Async\DistributedUpdater.cs" />
+      <Compile Include="Async\EntityUpdateOrchestratorPatch.cs" />
+      <Compile Include="Async\LogicWrappers\MyTextPanelWrapper30.cs" />
+      <Compile Include="Async\LogicWrappers\MyThrustUpdateEntityWrapper10.cs" />
+      <Compile Include="Async\LogicWrappers\MyThrustUpdateEntityWrapper100.cs" />
+      <Compile Include="Async\UpdateEntityWrapper.cs" />
+      <Compile Include="Async\WrapperCollection.cs" />
       <Compile Include="Commands\AdminCommands.cs" />
       <Compile Include="Config\MainConfig.cs" />
       <Compile Include="CrashFix\CrashFixPatch.cs" />
