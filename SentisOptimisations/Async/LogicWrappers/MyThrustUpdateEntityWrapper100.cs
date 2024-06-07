@@ -115,6 +115,10 @@ public class MyThrustUpdateEntityWrapper100 : UpdateEntityWrapper
 
     public static bool DisabledForThrust(MyCubeBlock __instance)
     {
+        if (!SentisOptimisationsPlugin.Config.AsyncLogicUpdateMain)
+        {
+            return true;
+        }
         return !(__instance is MyThrust);
     }
 

@@ -36,6 +36,7 @@ public class FreezeLogic
     {
         try
         {
+            var freezerEnabled = SentisOptimisationsPlugin.Config.FreezerEnabled;
             var anyGrid = grids.FirstElement();
             var gridsPosition = anyGrid.PositionComp.GetPosition();
             var isWakeUpTime = IsWakeUpTime(grids);
@@ -43,15 +44,10 @@ public class FreezeLogic
             var freezeDistance = isAnyGridStatic
                 ? SentisOptimisationsPlugin.Config.FreezeDistanceStatic
                 : SentisOptimisationsPlugin.Config.FreezeDistanceDynamic;
-            if (PlayerUtils.IsAnyPlayersInRadius(gridsPosition, freezeDistance)
+            if (!freezerEnabled || PlayerUtils.IsAnyPlayersInRadius(gridsPosition, freezeDistance)
                 || isWakeUpTime)
             {
                 UnfreezeGrids(grids, isWakeUpTime);
-                return;
-            }
-
-            if (!SentisOptimisationsPlugin.Config.FreezerEnabled)
-            {
                 return;
             }
 

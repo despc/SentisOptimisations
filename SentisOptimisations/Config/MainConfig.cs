@@ -12,8 +12,6 @@ namespace SentisOptimisationsPlugin
         private bool _gridSystemOptimisations = true;
         private bool _safeZoneSubGridOptimisation = true;
         private int _safeZonePhysicsThreshold = 10; // детект сварки динамики в сз, автоперевод в статику если грид обрабатывается больше N мс
-        // private bool _enableAsyncSave = false;
-        private bool _enableAsyncRecalculateInventory = false;
         
         //welders
         private bool _welderTweaksEnabled = true;
@@ -99,20 +97,6 @@ namespace SentisOptimisationsPlugin
         {
             get => _physicsMsToAlert;
             set => SetValue(ref _physicsMsToAlert, value);
-        }
-        
-        // [DisplayTab(Name = "Enable Async Save", GroupName = "Performance", Tab = "Performance", Order = 99, Description = "Enable Async Save")]
-        // public bool EnableAsyncSave
-        // {
-        //     get => _enableAsyncSave;
-        //     set => SetValue(ref _enableAsyncSave, value);
-        // }
-        
-        [DisplayTab(Name = "Enable Async Recalculate Inventory", GroupName = "Performance", Tab = "Performance", Order = 99, Description = "Enable Async Recalculate Inventory")]
-        public bool EnableAsyncRecalculateInventory
-        {
-            get => _enableAsyncRecalculateInventory;
-            set => SetValue(ref _enableAsyncRecalculateInventory, value);
         }
         
         [DisplayTab(Name = "Check Inside Voxel percent", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Check Inside Voxel percent")]
