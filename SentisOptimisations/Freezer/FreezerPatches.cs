@@ -20,6 +20,7 @@ using SpaceEngineers.Game.Entities.Blocks;
 using Torch.Managers.PatchManager;
 using VRage;
 using VRage.Game;
+using VRage.Game.Entity;
 using VRage.ModAPI;
 using VRage.ObjectBuilders;
 using VRage.ObjectBuilders.Private;
@@ -42,6 +43,10 @@ public static class FreezerPatches
     private static PropertyInfo CurrentStateProp =
         typeof(MyAssembler).GetProperty("CurrentState",
             BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+    
+    private static MethodInfo _OutputInventory_ContentsChanged = typeof(MyAssembler).GetMethod("OutputInventory_ContentsChanged",
+        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+    
 
     public static void Patch(PatchContext ctx)
     {
@@ -87,8 +92,40 @@ public static class FreezerPatches
         ctx.GetPattern(MethodGetComponentsFromConveyor).Prefixes.Add(
             typeof(FreezerPatches).GetMethod(nameof(GetComponentsFromConveyorPatch),
                 BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+        
     }
 
+    private static bool FinishDisassembling(MyBlueprintDefinitionBase blueprint, int count, MyAssembler __instance)
+    {
+        var action = delegate(MyInventoryBase @base)
+        {
+            _OutputInventory_ContentsChanged.Invoke(__instance, new object[]{ @base});
+        };
+        
+        if (__instance.RepeatEnabled)
+        {
+            __instance.OutputInventory.ContentsChanged -= new Action<MyInventoryBase>(action);
+        }
+
+
+        Dictionary<MyDefinitionId, MyFixedPoint> itemsToDel = new Dictionary<MyDefinitionId, MyFixedPoint>();
+        
+        if (__instance.RepeatEnabled)
+            __instance.OutputInventory.ContentsChanged += new Action<MyInventoryBase>(action);
+        
+        foreach (MyBlueprintDefinitionBase.Item result in blueprint.Results)
+            __instance.OutputInventory.RemoveItemsOfType(result.Amount * count, result.Id, MyItemFlags.None, false);
+        
+        MyFixedPoint myFixedPoint = (MyFixedPoint) (1f / __instance.GetEfficiencyMultiplierForBlueprint(blueprint));
+        for (int index = 0; index < blueprint.Prerequisites.Length; ++index)
+        {
+            MyBlueprintDefinitionBase.Item prerequisite = blueprint.Prerequisites[index];
+            MyObjectBuilder_PhysicalObject newObject = (MyObjectBuilder_PhysicalObject) MyObjectBuilderSerializerKeen.CreateNewObject(prerequisite.Id.TypeId, prerequisite.Id.SubtypeName);
+            __instance.InputInventory.AddItems(prerequisite.Amount * myFixedPoint * count, (MyObjectBuilder_Base) newObject);
+        }
+        return false;
+    }
+    
     private static bool GetComponentsFromConveyorPatch(MyAssembler __instance)
     {
         if (__instance.InputInventory.VolumeFillFactor >= 0.99)
@@ -374,16 +411,10 @@ public static class FreezerPatches
     private static bool UpdateProductionAssembler(MyAssembler __instance, uint framesFromLastTrigger,
         bool forceUpdate = false)
     {
-        if (framesFromLastTrigger < 3601)
-        {
-            return true;
-        }
-
-        if (__instance.DisassembleEnabled)
-        {
-            return true;
-        }
-
+        // if (framesFromLastTrigger < 200)
+        // {
+        //     return true;
+        // }
         if (__instance is MySurvivalKit)
         {
             return true;
@@ -391,13 +422,12 @@ public static class FreezerPatches
 
         try
         {
-            Dictionary<MyBlueprintDefinitionBase, int> assemblingCount =
-                new Dictionary<MyBlueprintDefinitionBase, int>();
+
             DelayedProcessor.Instance.AddDelayedAction(DateTime.Now, () =>
             {
                 try
                 {
-                    AsyncUpdateAssemblerProduction(__instance, framesFromLastTrigger, forceUpdate, assemblingCount);
+                    AsyncUpdateAssemblerProduction(__instance, framesFromLastTrigger, forceUpdate);
                 }
                 catch (Exception e)
                 {
@@ -415,8 +445,9 @@ public static class FreezerPatches
     }
 
     private static void AsyncUpdateAssemblerProduction(MyAssembler __instance, uint framesFromLastTrigger,
-        bool forceUpdate, Dictionary<MyBlueprintDefinitionBase, int> assemblingCount)
+        bool forceUpdate)
     {
+        Dictionary<MyBlueprintDefinitionBase, int> assemblingCount = new Dictionary<MyBlueprintDefinitionBase, int>();
         __instance.UpdateCurrentState();
         uint? m_realProductionStart =
             (uint?)__instance.easyGetField("m_realProductionStart", typeof(MyProductionBlock));
@@ -507,8 +538,26 @@ public static class FreezerPatches
         {
             var bp = assemblingEntry.Key;
             var count = assemblingEntry.Value;
-            FreezeLogic.CompensationLogs($"Compensate Assembler, build {count} items of {bp.DisplayNameText}");
-            FinishAssembling(bp, count, __instance);
+            if (__instance.DisassembleEnabled)
+            {
+                MyAPIGateway.Utilities.InvokeOnGameThread(() =>
+                {
+                    try
+                    {
+                        // FreezeLogic.CompensationLogs($"Disassembling Assembler, build {count} items of {bp.DisplayNameText} {__instance.CustomName} Grid - {__instance.CubeGrid.DisplayName} ");
+                        FinishDisassembling(bp, count, __instance);
+                    }
+                    catch (Exception e)
+                    {
+                        SentisOptimisationsPlugin.Log.Error(e, "Assembler disasembling exception");
+                    }
+                });
+            }
+            else
+            {
+                FinishAssembling(bp, count, __instance);
+            }
+            
         }
 
         Thread.Sleep(32);
@@ -522,6 +571,7 @@ public static class FreezerPatches
             });
     }
 
+    
     private static void FinishAssembling(MyBlueprintDefinitionBase blueprint, int count, MyAssembler assembler)
     {
         MyFixedPoint myFixedPoint = (MyFixedPoint)(1f / assembler.GetEfficiencyMultiplierForBlueprint(blueprint));
@@ -678,14 +728,13 @@ public static class FreezerPatches
         var amountToAddToAnotherInventory = amount - itemsCountCanBeAdded;
         if (amountToAddToAnotherInventory < 0)
         {
-            SentisOptimisationsPlugin.Log.Error("amountToAddToAnotherInventory - " + amountToAddToAnotherInventory);
             return true;
         }
 
         amount = itemsCountCanBeAdded;
 
         var myProductionBlock = (MyProductionBlock)entity;
-        FreezeLogic.CompensationLogs("Compensated items cant be added to " + myProductionBlock.DisplayNameText +
+        SentisOptimisationsPlugin.Log.Error("Compensated items cant be added to " + myProductionBlock.DisplayNameText +
                                      " inventory, move " + amountToAddToAnotherInventory + " items of " +
                                      id.SubtypeName + " to container");
 

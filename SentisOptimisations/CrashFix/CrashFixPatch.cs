@@ -71,6 +71,9 @@ namespace SentisOptimisationsPlugin.CrashFix
             var MethodCreateCompilation = typeof(MyScriptCompiler).GetMethod
                 ("CreateCompilation", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
             
+            var MethodCreateVoxelMap = typeof(MyPlanet).GetMethod
+                ("CreateVoxelMap", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+            
             var MethodApplyDirtyGroups = typeof(MyReplicationServer).GetMethod
                 ("ApplyDirtyGroups", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
             
@@ -126,6 +129,7 @@ namespace SentisOptimisationsPlugin.CrashFix
             harmony.Patch(MethodFlee, finalizer: new HarmonyMethod(finalizer));
             harmony.Patch(MethodFleeOnWaypointReached, finalizer: new HarmonyMethod(finalizer));
             harmony.Patch(MethodMyCargoContainerInventoryBagReplicableOnSave, finalizer: new HarmonyMethod(finalizer));
+            harmony.Patch(MethodCreateVoxelMap, finalizer: new HarmonyMethod(finalizer));
             
             var MethodRemoveClient = typeof(MyReplicationServer).GetMethod
                 ("RemoveClient", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using HarmonyLib;
+using Microsoft.CodeAnalysis;
 using NLog;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Blocks;
@@ -13,6 +14,7 @@ using Torch.Managers.PatchManager;
 using Torch.Utils;
 using VRage.Game.Entity;
 using VRage.Network;
+using VRage.Scripting.CompilerMethods;
 
 namespace FixTurrets.Perfomance
 {
@@ -45,6 +47,16 @@ namespace FixTurrets.Perfomance
             var MethodSoundEmitterUpdate = typeof(MyEntity3DSoundEmitter).GetMethod
                 (nameof(MyEntity3DSoundEmitter.Update), BindingFlags.Instance | BindingFlags.Public);
 
+
+            var perfCountingRewriter = typeof(ModPerfCounter).Assembly.GetType("VRage.Scripting.Rewriters.PerfCountingRewriter");
+            var MethodRewrite = perfCountingRewriter.GetMethod
+                ("Rewrite", BindingFlags.Static | BindingFlags.Public);
+            
+            ctx.GetPattern(MethodRewrite).Prefixes.Add(
+                typeof(ParallelUpdateTweaks).GetMethod(nameof(RewritePatched),
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            
+            
             ctx.GetPattern(MethodSoundEmitterUpdate).Prefixes.Add(
                 typeof(ParallelUpdateTweaks).GetMethod(nameof(Disabled),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
@@ -110,6 +122,12 @@ namespace FixTurrets.Perfomance
         
         private static bool Disabled()
         {
+            return false;
+        }
+        
+        private static bool RewritePatched(SyntaxTree syntaxTree, ref SyntaxTree __result)
+        {
+            __result = syntaxTree;
             return false;
         }
     }

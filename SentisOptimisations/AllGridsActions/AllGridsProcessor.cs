@@ -44,7 +44,6 @@ namespace SentisOptimisationsPlugin.AllGridsActions
                     try
                     {
                         await Task.Delay(30000);
-                        await Task.Run(InventoryPatch.RecalculateDirtyInventories);
                         await PhysicsProfilerMonitor.__instance.Profile();
                         await Task.Run(() =>
                         {
