@@ -576,17 +576,25 @@ public static class FreezerPatches
     {
         MyFixedPoint myFixedPoint = (MyFixedPoint)(1f / assembler.GetEfficiencyMultiplierForBlueprint(blueprint));
         bool allPrereqExists = true;
-        Dictionary<MyInventory, KeyValuePair<MyFixedPoint?, MyDefinitionId>> inventoriesToRemove =
-            new Dictionary<MyInventory, KeyValuePair<MyFixedPoint?, MyDefinitionId>>();
+        Dictionary<MyInventory, List<KeyValuePair<MyFixedPoint?, MyDefinitionId>>> inventoriesToRemove =
+            new Dictionary<MyInventory, List<KeyValuePair<MyFixedPoint?, MyDefinitionId>>>();
 
         for (int index = 0; index < blueprint.Prerequisites.Length; ++index)
         {
             MyBlueprintDefinitionBase.Item prerequisite = blueprint.Prerequisites[index];
             if (assembler.InputInventory.ContainItems(prerequisite.Amount * myFixedPoint * count, prerequisite.Id))
             {
-                inventoriesToRemove[assembler.InputInventory] =
-                    new KeyValuePair<MyFixedPoint?, MyDefinitionId>(prerequisite.Amount * myFixedPoint * count,
-                        prerequisite.Id);
+                var itemToRemove = new KeyValuePair<MyFixedPoint?, MyDefinitionId>(prerequisite.Amount * myFixedPoint * count,
+                    prerequisite.Id);
+                if (inventoriesToRemove.ContainsKey(assembler.InputInventory))
+                {
+                    inventoriesToRemove[assembler.InputInventory].Add(itemToRemove);
+                }
+                else
+                {
+                    inventoriesToRemove[assembler.InputInventory] = new List<KeyValuePair<MyFixedPoint?, MyDefinitionId>>(){itemToRemove};  
+                }
+                
                 continue;
             }
 
@@ -609,7 +617,10 @@ public static class FreezerPatches
             {
                 foreach (var i2r in inventoriesToRemove)
                 {
-                    i2r.Key.RemoveItemsOfType((MyFixedPoint)i2r.Value.Key, i2r.Value.Value);
+                    foreach (var item in i2r.Value)
+                    {
+                        i2r.Key.RemoveItemsOfType((MyFixedPoint)item.Key, item.Value);   
+                    }
                 }
 
                 foreach (MyBlueprintDefinitionBase.Item result in blueprint.Results)
@@ -617,7 +628,7 @@ public static class FreezerPatches
                     MyObjectBuilder_PhysicalObject newObject =
                         (MyObjectBuilder_PhysicalObject)MyObjectBuilderSerializerKeen.CreateNewObject(result.Id.TypeId,
                             result.Id.SubtypeName);
-                    assembler.OutputInventory.AddItems(result.Amount * count, (MyObjectBuilder_Base)newObject);
+                    assembler.OutputInventory.AddItems(result.Amount * count, newObject);
                     if (MyVisualScriptLogicProvider.NewItemBuilt != null)
                         MyVisualScriptLogicProvider.NewItemBuilt(assembler.EntityId, assembler.CubeGrid.EntityId,
                             assembler.Name, assembler.CubeGrid.Name, newObject.TypeId.ToString(), newObject.SubtypeName,
@@ -633,7 +644,7 @@ public static class FreezerPatches
 
     private static bool HasItemsInOtherBlocks(MyAssembler assembler, MyBlueprintDefinitionBase.Item prerequisite,
         MyFixedPoint myFixedPoint,
-        Dictionary<MyInventory, KeyValuePair<MyFixedPoint?, MyDefinitionId>> inventoriesToRemove, int count)
+        Dictionary<MyInventory, List<KeyValuePair<MyFixedPoint?, MyDefinitionId>>> inventoriesToRemove, int count)
     {
         foreach (var myCubeBlock in assembler.CubeGrid.GetFatBlocks())
         {
@@ -642,9 +653,16 @@ public static class FreezerPatches
                 if (myCubeBlock.GetInventory()
                     .ContainItems(prerequisite.Amount * myFixedPoint * count, prerequisite.Id))
                 {
-                    inventoriesToRemove[myCubeBlock.GetInventory()] =
-                        new KeyValuePair<MyFixedPoint?, MyDefinitionId>(prerequisite.Amount * myFixedPoint * count,
-                            prerequisite.Id);
+                    var itemToRemove = new KeyValuePair<MyFixedPoint?, MyDefinitionId>(prerequisite.Amount * myFixedPoint * count,
+                        prerequisite.Id);
+                    if (inventoriesToRemove.ContainsKey(assembler.InputInventory))
+                    {
+                        inventoriesToRemove[assembler.InputInventory].Add(itemToRemove);
+                    }
+                    else
+                    {
+                        inventoriesToRemove[assembler.InputInventory] = new List<KeyValuePair<MyFixedPoint?, MyDefinitionId>>(){itemToRemove};  
+                    }
                     return true;
                 }
             }
