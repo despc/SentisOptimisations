@@ -411,7 +411,7 @@ public static class FreezerPatches
     private static bool UpdateProductionAssembler(MyAssembler __instance, uint framesFromLastTrigger,
         bool forceUpdate = false)
     {
-        if (framesFromLastTrigger < 200)
+        if (framesFromLastTrigger < 800)
         {
             return true;
         }
