@@ -66,9 +66,7 @@ public class FreezeLogic
         {
             if (DateTime.Now < data && data < DateTime.Now.AddSeconds(_wakeupTimeInSec))
             {
-                var cpuLoads = new List<float> (FreezeLogic.CpuLoads);
-                var avgCpuLoad = cpuLoads.Count > 0 ? cpuLoads.Average() : 0.0;
-                if (avgCpuLoad > 70)
+                if (GetAvgCpuLoad() > 70)
                 {
                     WakeUpDatas[minEntityId] = DateTime.Now.AddSeconds(SentisOptimisationsPlugin.Config.MinWakeUpIntervalInSec);
                     return false;
@@ -547,5 +545,17 @@ public class FreezeLogic
                 }
             });
         });
+    }
+    
+    
+    public static float GetAvgCpuLoad()
+    {
+        float sum = 0;
+        var cpuLoads = CpuLoads;
+        for (var i = 0; i < cpuLoads.Count; i++)
+        {
+            sum += cpuLoads[i];
+        }
+        return (float)Math.Round((decimal)(cpuLoads.Count > 0 ? sum / cpuLoads.Count : 0.0), 1);
     }
 }

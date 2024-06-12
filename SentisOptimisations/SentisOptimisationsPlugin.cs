@@ -164,10 +164,8 @@ namespace SentisOptimisationsPlugin
                         $"Count: {clustersCount}, Active: {active}";
                     try
                     {
-                        var cpuLoads = new List<float> (FreezeLogic.CpuLoads);
-                        var avgCpuLoad = cpuLoads.Count > 0 ? cpuLoads.Average() : 0.0;
                         gui.FreezerStatistic.Text =
-                            $"Avg CPU Load: {Math.Round((decimal)avgCpuLoad, 2)}% " +
+                            $"Avg CPU Load: {FreezeLogic.GetAvgCpuLoad()}% " +
                             $"Total grids: {EntitiesObserver.MyCubeGrids.Count}, Frozen: {FreezeLogic.FrozenGrids.Count}, Frozen physics: {FreezeLogic.FrozenPhysicsGrids.Count}";
                     }
                     catch (Exception e)
