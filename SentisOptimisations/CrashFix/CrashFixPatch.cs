@@ -11,6 +11,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NAPI;
 using Sandbox.Game;
+using Sandbox.Game.AI;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Blocks;
 using Sandbox.Game.Entities.Cube;
@@ -64,6 +65,9 @@ namespace SentisOptimisationsPlugin.CrashFix
             var MethodRefineryDoUpdateTimerTick = typeof(MyRefinery).GetMethod
                 (nameof(MyRefinery.DoUpdateTimerTick), BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
             
+            var MethodAiGotoTarget = typeof(MyAiTargetBase).GetMethod
+                (nameof(MyAiTargetBase.GotoTarget), BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
+            
             ctx.GetPattern(MethodPistonInit).Prefixes.Add(
                 typeof(CrashFixPatch).GetMethod(nameof(MethodPistonInitPatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
@@ -86,6 +90,12 @@ namespace SentisOptimisationsPlugin.CrashFix
             
             var MethodRemoveIdentity = typeof(MyPlayerCollection).GetMethod
                 ( nameof(MyPlayerCollection.RemoveIdentity), BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
+            
+            var MethodOrchestratorDispatchBeforeSimulation = typeof(MyParallelEntityUpdateOrchestrator).GetMethod
+                ("DispatchBeforeSimulation", BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
+            
+            var MethodOrchestratorDispatchAfterSimulation = typeof(MyParallelEntityUpdateOrchestrator).GetMethod
+                ("DispatchAfterSimulation", BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
             
             var MethodUpdateWaypointPositions = typeof(MyOffensiveCombatCircleOrbit).GetMethod
                 ("UpdateWaypointPositions", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
@@ -115,6 +125,9 @@ namespace SentisOptimisationsPlugin.CrashFix
             
             var finalizer = typeof(CrashFixPatch).GetMethod(nameof(SuppressExceptionFinalizer),
                 BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            
+            var finalizerDispatch = typeof(CrashFixPatch).GetMethod(nameof(SuppressDispatchExceptionFinalizer),
+                BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
             harmony.Patch(MethodSetDetailedInfo, finalizer: new HarmonyMethod(finalizer));
             harmony.Patch(MethodUpdateWaypointPositions, finalizer: new HarmonyMethod(finalizer));
             harmony.Patch(MethodNotify, finalizer: new HarmonyMethod(finalizer));
@@ -130,6 +143,9 @@ namespace SentisOptimisationsPlugin.CrashFix
             harmony.Patch(MethodFleeOnWaypointReached, finalizer: new HarmonyMethod(finalizer));
             harmony.Patch(MethodMyCargoContainerInventoryBagReplicableOnSave, finalizer: new HarmonyMethod(finalizer));
             harmony.Patch(MethodCreateVoxelMap, finalizer: new HarmonyMethod(finalizer));
+            harmony.Patch(MethodAiGotoTarget, finalizer: new HarmonyMethod(finalizer));
+            harmony.Patch(MethodOrchestratorDispatchBeforeSimulation, finalizer: new HarmonyMethod(finalizerDispatch));
+            harmony.Patch(MethodOrchestratorDispatchAfterSimulation, finalizer: new HarmonyMethod(finalizerDispatch));
             
             var MethodRemoveClient = typeof(MyReplicationServer).GetMethod
                 ("RemoveClient", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
@@ -146,6 +162,15 @@ namespace SentisOptimisationsPlugin.CrashFix
                 SentisOptimisationsPlugin.Log.Error(__exception, "SuppressedException ");
             }
 
+            return null;
+        }
+        
+        public static Exception SuppressDispatchExceptionFinalizer(Exception __exception)
+        {
+            if (__exception != null)
+            {
+                SentisOptimisationsPlugin.Log.Error(__exception, "SuppressedException ");
+            }
             return null;
         }
 

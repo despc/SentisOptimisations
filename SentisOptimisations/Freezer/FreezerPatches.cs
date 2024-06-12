@@ -411,15 +411,19 @@ public static class FreezerPatches
     private static bool UpdateProductionAssembler(MyAssembler __instance, uint framesFromLastTrigger,
         bool forceUpdate = false)
     {
-        // if (framesFromLastTrigger < 200)
-        // {
-        //     return true;
-        // }
+        if (framesFromLastTrigger < 200)
+        {
+            return true;
+        }
         if (__instance is MySurvivalKit)
         {
             return true;
         }
 
+        if (__instance.BlockDefinition.Id.SubtypeName.Contains("Basic"))
+        {
+            return true;
+        }
         try
         {
 
@@ -582,10 +586,10 @@ public static class FreezerPatches
         for (int index = 0; index < blueprint.Prerequisites.Length; ++index)
         {
             MyBlueprintDefinitionBase.Item prerequisite = blueprint.Prerequisites[index];
-            if (assembler.InputInventory.ContainItems(prerequisite.Amount * myFixedPoint * count, prerequisite.Id))
+            var prerequisiteAmount = prerequisite.Amount * myFixedPoint * count;
+            if (assembler.InputInventory.ContainItems(prerequisiteAmount, prerequisite.Id))
             {
-                var itemToRemove = new KeyValuePair<MyFixedPoint?, MyDefinitionId>(prerequisite.Amount * myFixedPoint * count,
-                    prerequisite.Id);
+                var itemToRemove = new KeyValuePair<MyFixedPoint?, MyDefinitionId>(prerequisiteAmount, prerequisite.Id);
                 if (inventoriesToRemove.ContainsKey(assembler.InputInventory))
                 {
                     inventoriesToRemove[assembler.InputInventory].Add(itemToRemove);
@@ -646,28 +650,47 @@ public static class FreezerPatches
         MyFixedPoint myFixedPoint,
         Dictionary<MyInventory, List<KeyValuePair<MyFixedPoint?, MyDefinitionId>>> inventoriesToRemove, int count)
     {
+        var prerequisiteAmount = prerequisite.Amount * myFixedPoint * count;
         foreach (var myCubeBlock in assembler.CubeGrid.GetFatBlocks())
         {
             if (myCubeBlock.HasInventory)
             {
-                if (myCubeBlock.GetInventory()
-                    .ContainItems(prerequisite.Amount * myFixedPoint * count, prerequisite.Id))
+                for (int i = 0; i < myCubeBlock.InventoryCount; i++)
                 {
-                    var itemToRemove = new KeyValuePair<MyFixedPoint?, MyDefinitionId>(prerequisite.Amount * myFixedPoint * count,
-                        prerequisite.Id);
-                    if (inventoriesToRemove.ContainsKey(assembler.InputInventory))
+                    var myInventory = myCubeBlock.GetInventory(i);
+
+                    var itemAmount = myInventory.GetItemAmount(prerequisite.Id);
+                    if (itemAmount > 0)
                     {
-                        inventoriesToRemove[assembler.InputInventory].Add(itemToRemove);
+                        MyFixedPoint itemsToRemove = 0;
+                        if (itemAmount > prerequisiteAmount)
+                        {
+                            itemsToRemove = prerequisiteAmount;
+                            prerequisiteAmount = 0;
+                        }
+                        else
+                        {
+                            itemsToRemove = itemAmount;
+                            prerequisiteAmount = prerequisiteAmount - itemsToRemove;
+                        }
+                        var itemToRemove = new KeyValuePair<MyFixedPoint?, MyDefinitionId>(itemsToRemove, prerequisite.Id);
+                        if (inventoriesToRemove.ContainsKey(myInventory))
+                        {
+                            inventoriesToRemove[myInventory].Add(itemToRemove);
+                        }
+                        else
+                        {
+                            inventoriesToRemove[myInventory] = new List<KeyValuePair<MyFixedPoint?, MyDefinitionId>>(){itemToRemove};  
+                        }
+
+                        if (prerequisiteAmount <= 0)
+                        {
+                            return true;
+                        }
                     }
-                    else
-                    {
-                        inventoriesToRemove[assembler.InputInventory] = new List<KeyValuePair<MyFixedPoint?, MyDefinitionId>>(){itemToRemove};  
-                    }
-                    return true;
                 }
             }
         }
-
         return false;
     }
 

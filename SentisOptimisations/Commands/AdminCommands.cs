@@ -92,7 +92,7 @@ namespace SentisOptimisations.Commands
             }
         }
 
-        [Command("!", "Remove projections from all projectors")]
+        [Command("clean_projectors", "Remove projections from all projectors")]
         [Permission(MyPromoteLevel.Admin)]
         public void ClearProjectors()
         {
