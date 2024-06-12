@@ -18,6 +18,7 @@ using Sandbox.Game.Entities.Cube;
 using Sandbox.Game.Multiplayer;
 using Sandbox.Game.Replication;
 using Sandbox.Game.Replication.StateGroups;
+using Sandbox.Game.SessionComponents;
 using Sandbox.Game.Weapons;
 using SentisOptimisations;
 using SpaceEngineers.Game.Entities.Blocks;
@@ -120,6 +121,9 @@ namespace SentisOptimisationsPlugin.CrashFix
             var MethodFleeOnWaypointReached = typeof(MyDefensiveCombatBlock).GetMethod
                 ("FleeOnWaypointReached", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
             
+            var MethodCheckIdentitiesTrash = typeof(MySessionComponentTrash).GetMethod
+                ("CheckIdentitiesTrash", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
+            
             var MethodMyCargoContainerInventoryBagReplicableOnSave = typeof(MyCargoContainerInventoryBagReplicable).GetMethod
                 ( nameof(MyCargoContainerInventoryBagReplicable.OnSave), BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
             
@@ -146,6 +150,7 @@ namespace SentisOptimisationsPlugin.CrashFix
             harmony.Patch(MethodAiGotoTarget, finalizer: new HarmonyMethod(finalizer));
             harmony.Patch(MethodOrchestratorDispatchBeforeSimulation, finalizer: new HarmonyMethod(finalizerDispatch));
             harmony.Patch(MethodOrchestratorDispatchAfterSimulation, finalizer: new HarmonyMethod(finalizerDispatch));
+            harmony.Patch(MethodCheckIdentitiesTrash, finalizer: new HarmonyMethod(finalizerDispatch));
             
             var MethodRemoveClient = typeof(MyReplicationServer).GetMethod
                 ("RemoveClient", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
