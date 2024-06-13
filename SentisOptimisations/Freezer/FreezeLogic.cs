@@ -173,7 +173,7 @@ public class FreezeLogic
                             try
                             {
                                 timer.FramesFromLastTrigger = framesAfterFreeze;
-                                grid.PlayerPresenceTier = MyUpdateTiersPlayerPresence.Tier1;
+                                grid.PlayerPresenceTier = MyUpdateTiersPlayerPresence.Normal;
                             }
                             catch (Exception ex)
                             {

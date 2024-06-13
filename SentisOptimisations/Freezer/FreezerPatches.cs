@@ -21,11 +21,12 @@ using Torch.Managers.PatchManager;
 using VRage;
 using VRage.Game;
 using VRage.Game.Entity;
-using VRage.ModAPI;
+using VRage.Game.ModAPI.Ingame;
 using VRage.ObjectBuilders;
 using VRage.ObjectBuilders.Private;
 using VRage.Sync;
 using VRage.Utils;
+using IMyEntity = VRage.ModAPI.IMyEntity;
 
 namespace SentisOptimisationsPlugin.Freezer;
 
@@ -107,14 +108,22 @@ public static class FreezerPatches
             __instance.OutputInventory.ContentsChanged -= new Action<MyInventoryBase>(action);
         }
 
-
-        Dictionary<MyDefinitionId, MyFixedPoint> itemsToDel = new Dictionary<MyDefinitionId, MyFixedPoint>();
+        List<MyProductionBlock.QueueItem> m_queue =
+            (List<MyProductionBlock.QueueItem>)__instance.easyGetField("m_queue");
+        foreach (var queueItem in m_queue)
+        {
+            if (queueItem.Blueprint == blueprint)
+            {
+                __instance.RemoveQueueItemRequest(m_queue.IndexOf(queueItem), count);
+                __instance.easySetField("m_currentQueueItem", new MyProductionBlock.QueueItem?()); 
+                break;
+            }
+        }
+        foreach (MyBlueprintDefinitionBase.Item result in blueprint.Results)
+            __instance.OutputInventory.RemoveItemsOfType(result.Amount * count, result.Id, MyItemFlags.None, false);
         
         if (__instance.RepeatEnabled)
             __instance.OutputInventory.ContentsChanged += new Action<MyInventoryBase>(action);
-        
-        foreach (MyBlueprintDefinitionBase.Item result in blueprint.Results)
-            __instance.OutputInventory.RemoveItemsOfType(result.Amount * count, result.Id, MyItemFlags.None, false);
         
         MyFixedPoint myFixedPoint = (MyFixedPoint) (1f / __instance.GetEfficiencyMultiplierForBlueprint(blueprint));
         for (int index = 0; index < blueprint.Prerequisites.Length; ++index)
@@ -411,10 +420,6 @@ public static class FreezerPatches
     private static bool UpdateProductionAssembler(MyAssembler __instance, uint framesFromLastTrigger,
         bool forceUpdate = false)
     {
-        if (framesFromLastTrigger < 800)
-        {
-            return true;
-        }
         if (__instance is MySurvivalKit)
         {
             return true;
@@ -487,7 +492,8 @@ public static class FreezerPatches
 
             if (!m_currentQueueItem.HasValue)
             {
-                __instance.easySetField("m_currentQueueItem", __instance.TryGetQueueItem(idx));
+                var tryGetQueueItem = __instance.TryGetQueueItem(idx);
+                __instance.easySetField("m_currentQueueItem", tryGetQueueItem);
                 m_currentQueueItem =
                     (MyProductionBlock.QueueItem?)__instance.easyGetField("m_currentQueueItem");
             }
@@ -515,6 +521,10 @@ public static class FreezerPatches
 
                     if (assemblingCount.TryGetValue(blueprint, out var count))
                     {
+                        if (count >= m_currentQueueItem.Value.Amount)
+                        {
+                            break;
+                        }
                         assemblingCount[blueprint] = ++count;
                     }
                     else
@@ -523,8 +533,6 @@ public static class FreezerPatches
                     }
 
                     m_currentItemIndex.Value = __instance.CurrentItemIndexServer;
-                    __instance.RemoveQueueItemRequest(m_queue.IndexOf(m_currentQueueItem.Value), 1);
-                    __instance.easySetField("m_currentQueueItem", new MyProductionBlock.QueueItem?());
 
                     num1 -= num2;
                     __instance.CurrentProgress = 0.0f;
@@ -582,13 +590,37 @@ public static class FreezerPatches
         bool allPrereqExists = true;
         Dictionary<MyInventory, List<KeyValuePair<MyFixedPoint?, MyDefinitionId>>> inventoriesToRemove =
             new Dictionary<MyInventory, List<KeyValuePair<MyFixedPoint?, MyDefinitionId>>>();
-
+        int countWithReqs = count;
         for (int index = 0; index < blueprint.Prerequisites.Length; ++index)
         {
             MyBlueprintDefinitionBase.Item prerequisite = blueprint.Prerequisites[index];
-            var prerequisiteAmount = prerequisite.Amount * myFixedPoint * count;
-            if (assembler.InputInventory.ContainItems(prerequisiteAmount, prerequisite.Id))
+            var itemAmount = assembler.InputInventory.GetItemAmount(prerequisite.Id);
+            
+            int inBlocksResourcesFoundForCount = (int)((float)itemAmount / (float)(prerequisite.Amount * myFixedPoint));
+            if (inBlocksResourcesFoundForCount < count)
             {
+                var countInAnother = GetItemsCountInOtherBlocks(assembler, prerequisite, myFixedPoint, count - inBlocksResourcesFoundForCount);
+                inBlocksResourcesFoundForCount = inBlocksResourcesFoundForCount + countInAnother;
+            }
+            
+            if (inBlocksResourcesFoundForCount < countWithReqs)
+            {
+                countWithReqs = inBlocksResourcesFoundForCount;
+            }
+        }
+        
+        for (int index = 0; index < blueprint.Prerequisites.Length; ++index)
+        {
+            MyBlueprintDefinitionBase.Item prerequisite = blueprint.Prerequisites[index];
+            var itemAmount = assembler.InputInventory.GetItemAmount(prerequisite.Id);
+            int inAssemblerResourcesFoundForCount = (int)((float)itemAmount / (float)(prerequisite.Amount * myFixedPoint));
+            if (inAssemblerResourcesFoundForCount > 0)
+            {
+                if (inAssemblerResourcesFoundForCount > countWithReqs)
+                {
+                    inAssemblerResourcesFoundForCount = countWithReqs;
+                }
+                var prerequisiteAmount = prerequisite.Amount * myFixedPoint * inAssemblerResourcesFoundForCount;
                 var itemToRemove = new KeyValuePair<MyFixedPoint?, MyDefinitionId>(prerequisiteAmount, prerequisite.Id);
                 if (inventoriesToRemove.ContainsKey(assembler.InputInventory))
                 {
@@ -598,13 +630,18 @@ public static class FreezerPatches
                 {
                     inventoriesToRemove[assembler.InputInventory] = new List<KeyValuePair<MyFixedPoint?, MyDefinitionId>>(){itemToRemove};  
                 }
-                
-                continue;
+                if (inAssemblerResourcesFoundForCount == countWithReqs)
+                {
+                    continue;
+                }
             }
 
-            if (HasItemsInOtherBlocks(assembler, prerequisite, myFixedPoint, inventoriesToRemove, count))
+            if (inAssemblerResourcesFoundForCount < countWithReqs)
             {
-                continue;
+                if (HasItemsInOtherBlocks(assembler, prerequisite, myFixedPoint, inventoriesToRemove, countWithReqs - inAssemblerResourcesFoundForCount))
+                {
+                    continue;
+                }
             }
 
             allPrereqExists = false;
@@ -614,7 +651,19 @@ public static class FreezerPatches
         {
             return;
         }
-
+        List<MyProductionBlock.QueueItem> m_queue =
+            (List<MyProductionBlock.QueueItem>)assembler.easyGetField("m_queue");
+        foreach (var queueItem in m_queue)
+        {
+            if (queueItem.Blueprint == blueprint)
+            {
+                assembler.RemoveQueueItemRequest(m_queue.IndexOf(queueItem), countWithReqs);
+                assembler.easySetField("m_currentQueueItem", new MyProductionBlock.QueueItem?()); 
+                break;
+            }
+        }
+        
+        
         MyAPIGateway.Utilities.InvokeOnGameThread(() =>
         {
             try
@@ -629,14 +678,15 @@ public static class FreezerPatches
 
                 foreach (MyBlueprintDefinitionBase.Item result in blueprint.Results)
                 {
+                    
                     MyObjectBuilder_PhysicalObject newObject =
                         (MyObjectBuilder_PhysicalObject)MyObjectBuilderSerializerKeen.CreateNewObject(result.Id.TypeId,
                             result.Id.SubtypeName);
-                    assembler.OutputInventory.AddItems(result.Amount * count, newObject);
+                    assembler.OutputInventory.AddItems(result.Amount * countWithReqs, newObject);
                     if (MyVisualScriptLogicProvider.NewItemBuilt != null)
                         MyVisualScriptLogicProvider.NewItemBuilt(assembler.EntityId, assembler.CubeGrid.EntityId,
                             assembler.Name, assembler.CubeGrid.Name, newObject.TypeId.ToString(), newObject.SubtypeName,
-                            result.Amount.ToIntSafe() * count);
+                            result.Amount.ToIntSafe() * countWithReqs);
                 }
             }
             catch (Exception e)
@@ -646,6 +696,51 @@ public static class FreezerPatches
         });
     }
 
+    private static int GetItemsCountInOtherBlocks(MyAssembler assembler, MyBlueprintDefinitionBase.Item prerequisite,
+        MyFixedPoint myFixedPoint, int count)
+    {
+        var prerequisiteAmount = prerequisite.Amount * myFixedPoint * count;
+        MyFixedPoint inOtherAmount = 0;
+        
+        foreach (var myCubeBlock in assembler.CubeGrid.GetFatBlocks())
+        {
+            if (myCubeBlock.HasInventory)
+            {
+                for (int i = 0; i < myCubeBlock.InventoryCount; i++)
+                {
+                    var myInventory = myCubeBlock.GetInventory(i);
+                    var canTransferToAssembler = ((IMyInventory)myInventory).CanTransferItemTo(assembler.InputInventory, prerequisite.Id);
+                    if (!canTransferToAssembler)
+                    {
+                        continue;
+                    }
+                    var itemAmount = myInventory.GetItemAmount(prerequisite.Id);
+                    if (itemAmount > 0)
+                    {
+                        MyFixedPoint itemsToRemove = 0;
+                        if (itemAmount > prerequisiteAmount)
+                        {
+                            itemsToRemove = prerequisiteAmount;
+                            inOtherAmount += itemsToRemove;
+                            prerequisiteAmount = 0;
+                        }
+                        else
+                        {
+                            itemsToRemove = itemAmount;
+                            inOtherAmount += itemsToRemove;
+                            prerequisiteAmount = prerequisiteAmount - itemsToRemove;
+                        }
+                        if (prerequisiteAmount <= 0)
+                        {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        return (int)((float)inOtherAmount / (float)(prerequisite.Amount * myFixedPoint));
+    }
+    
     private static bool HasItemsInOtherBlocks(MyAssembler assembler, MyBlueprintDefinitionBase.Item prerequisite,
         MyFixedPoint myFixedPoint,
         Dictionary<MyInventory, List<KeyValuePair<MyFixedPoint?, MyDefinitionId>>> inventoriesToRemove, int count)
@@ -785,10 +880,10 @@ public static class FreezerPatches
             {
                 myCargoContainer.GetInventory().AddItems(amountToAddToAnotherInventory, objectBuilder);
 
-                FreezeLogic.CompensationLogs("Move items to " + myCargoContainer.DisplayNameText +
-                                             " inventory, count - "
-                                             + amountToAddToAnotherInventory + " item - " + id.SubtypeName +
-                                             " on grid " + myProductionBlock.CubeGrid.DisplayName);
+                SentisOptimisationsPlugin.Log.Error("Move items to " + myCargoContainer.DisplayNameText +
+                                                    " inventory, count - "
+                                                    + amountToAddToAnotherInventory + " item - " + id.SubtypeName +
+                                                    " on grid " + myProductionBlock.CubeGrid.DisplayName);
                 return true;
             }
         }
