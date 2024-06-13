@@ -21,6 +21,7 @@ using Sandbox.Game.Replication.StateGroups;
 using Sandbox.Game.SessionComponents;
 using Sandbox.Game.Weapons;
 using SentisOptimisations;
+using SpaceEngineers.Game.AI;
 using SpaceEngineers.Game.Entities.Blocks;
 using SpaceEngineers.Game.EntityComponents.Blocks;
 using Torch.Managers.PatchManager;
@@ -65,6 +66,9 @@ namespace SentisOptimisationsPlugin.CrashFix
 
             var MethodRefineryDoUpdateTimerTick = typeof(MyRefinery).GetMethod
                 (nameof(MyRefinery.DoUpdateTimerTick), BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
+            
+            var MethodWolfTargetAttack = typeof(MyWolfTarget).GetMethod
+                (nameof(MyWolfTarget.Attack), BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
             
             var MethodAiGotoTarget = typeof(MyAiTargetBase).GetMethod
                 (nameof(MyAiTargetBase.GotoTarget), BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
@@ -151,6 +155,7 @@ namespace SentisOptimisationsPlugin.CrashFix
             harmony.Patch(MethodOrchestratorDispatchBeforeSimulation, finalizer: new HarmonyMethod(finalizerDispatch));
             harmony.Patch(MethodOrchestratorDispatchAfterSimulation, finalizer: new HarmonyMethod(finalizerDispatch));
             harmony.Patch(MethodCheckIdentitiesTrash, finalizer: new HarmonyMethod(finalizerDispatch));
+            harmony.Patch(MethodWolfTargetAttack, finalizer: new HarmonyMethod(finalizerDispatch));
             
             var MethodRemoveClient = typeof(MyReplicationServer).GetMethod
                 ("RemoveClient", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
