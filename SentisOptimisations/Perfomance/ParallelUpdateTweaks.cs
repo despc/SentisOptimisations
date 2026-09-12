@@ -35,7 +35,9 @@ namespace FixTurrets.Perfomance
         
         
         
-        public static void Patch(PatchContext ctx)
+        public static void Patch(PatchContext ctx) => global::SentisOptimisations.PatchGuard.Run("ParallelUpdateTweaks", ctx, PatchImpl);
+
+        internal static void PatchImpl(PatchContext ctx)
         {
             
             var MethodThrustUpdateBeforeSimulation = MyThrusterBlockThrustComponentType.GetMethod

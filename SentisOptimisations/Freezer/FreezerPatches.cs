@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Threading;
@@ -49,7 +49,9 @@ public static class FreezerPatches
         BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
     
 
-    public static void Patch(PatchContext ctx)
+    public static void Patch(PatchContext ctx) => global::SentisOptimisations.PatchGuard.Run("FreezerPatches", ctx, PatchImpl);
+
+        internal static void PatchImpl(PatchContext ctx)
     {
         var MethodAddItems = typeof(MyInventory).GetMethod
         ("AddItems",

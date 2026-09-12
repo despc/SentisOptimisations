@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Reflection;
@@ -24,7 +24,9 @@ public static class GridSystemUpdatePatch
     private static ConcurrentDictionary<long, DateTime> ConveyorUpdateTimes = new ConcurrentDictionary<long, DateTime>();
     private static ConcurrentDictionary<long, DateTime> FlagForRecomputationPatchedTimes = new ConcurrentDictionary<long, DateTime>();
 
-    public static void Patch(PatchContext ctx)
+    public static void Patch(PatchContext ctx) => global::SentisOptimisations.PatchGuard.Run("GridSystemUpdatePatch", ctx, PatchImpl);
+
+        internal static void PatchImpl(PatchContext ctx)
     {
         var MethodScheduleUpdateGas = typeof(MyGridGasSystem).GetMethod
             ("ScheduleUpdate", BindingFlags.Instance | BindingFlags.NonPublic);

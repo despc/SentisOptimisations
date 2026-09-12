@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -13,7 +13,9 @@ namespace SentisOptimisationsPlugin
     {
         private static ConcurrentDictionary<MyGasTank, List<double>> _accumulatedTransfer = new();
         private static Dictionary<long, List<float>> _accumulatedTransferVent = new();
-        public static void Patch(PatchContext ctx)
+        public static void Patch(PatchContext ctx) => global::SentisOptimisations.PatchGuard.Run("GasTankOptimisations", ctx, PatchImpl);
+
+        internal static void PatchImpl(PatchContext ctx)
         {
             var MethodExecuteGasTransfer = typeof(MyGasTank).GetMethod
                 ("ExecuteGasTransfer", BindingFlags.Instance | BindingFlags.NonPublic);

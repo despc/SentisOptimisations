@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -55,7 +55,9 @@ namespace SentisOptimisationsPlugin.CrashFix
         public static Harmony harmony = new Harmony("CrashFixPatch");
 
         private static Object RemoveClientLock = new Object();
-        public static void Patch(PatchContext ctx)
+        public static void Patch(PatchContext ctx) => global::SentisOptimisations.PatchGuard.Run("CrashFixPatch", ctx, PatchImpl);
+
+        internal static void PatchImpl(PatchContext ctx)
         {
             
             var MethodPistonInit = typeof(MyPistonBase).GetMethod
@@ -245,7 +247,10 @@ namespace SentisOptimisationsPlugin.CrashFix
                 IEnumerable<SyntaxTree> syntaxTrees = (IEnumerable<SyntaxTree>) null;
                 if (scripts != null)
                 {
-                    CSharpParseOptions parseOptions = m_conditionalParseOptions.WithPreprocessorSymbols((IEnumerable<string>) __instance.ConditionalCompilationSymbols);
+                    // ConditionalCompilationSymbols property no longer exists; read the backing field.
+                    var conditionalSymbols = (IEnumerable<string>) ReflectionUtils.GetInstanceField(
+                        typeof(MyScriptCompiler), __instance, "m_conditionalCompilationSymbols");
+                    CSharpParseOptions parseOptions = m_conditionalParseOptions.WithPreprocessorSymbols(conditionalSymbols);
                     syntaxTrees = scripts.Select<Script, SyntaxTree>((Func<Script, SyntaxTree>) (s => CSharpSyntaxTree.ParseText(s.Code, parseOptions, s.Name, Encoding.UTF8)));
                 }
 

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Reflection;
@@ -41,7 +41,9 @@ namespace SentisOptimisationsPlugin.ShipTool
         
         [ReflectedGetter(Name = "m_detectorSphere")]
         private static Func<MyShipToolBase, BoundingSphere> _detectorSphere;
-        public static void Patch(PatchContext ctx)
+        public static void Patch(PatchContext ctx) => global::SentisOptimisations.PatchGuard.Run("ShipToolPatch", ctx, PatchImpl);
+
+        internal static void PatchImpl(PatchContext ctx)
         {
 
             var MethodActivateCommon = typeof(MyShipToolBase).GetMethod(

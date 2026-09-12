@@ -14,7 +14,9 @@ namespace SentisOptimisationsPlugin
     [PatchShim]
     public static class SavePatch
     {
-        public static void Patch(PatchContext ctx)
+        public static void Patch(PatchContext ctx) => global::SentisOptimisations.PatchGuard.Run("SavePatch", ctx, PatchImpl);
+
+        internal static void PatchImpl(PatchContext ctx)
         {
             // var MethodSave = typeof(MyEntities).GetMethod
             //     ("Save", BindingFlags.Static | BindingFlags.NonPublic);

@@ -1,5 +1,3 @@
-﻿/.idea
-/.vs/
-/SentisOptimisations/bin
-/SentisOptimisations/obj
-/FixTurrets.sln.DotSettings.user
+bin/
+obj/
+*.user

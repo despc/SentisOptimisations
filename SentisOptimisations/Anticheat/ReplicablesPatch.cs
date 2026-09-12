@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Reflection;
 using NLog;
@@ -30,7 +30,9 @@ namespace SentisOptimisationsPlugin
         [ReflectedMethod(Name = "RemoveForClient", OverrideTypeNames = new string[] { null, "VRage.Network.MyClient, VRage", null })]
         private static Action<MyReplicationServer, IMyReplicable, object, bool> _removeForClient;
         
-        public static void Patch(PatchContext ctx)
+        public static void Patch(PatchContext ctx) => global::SentisOptimisations.PatchGuard.Run("ReplicablesPatch", ctx, PatchImpl);
+
+        internal static void PatchImpl(PatchContext ctx)
         {
             
             var assembly = typeof(MyReplicationServer).Assembly;
@@ -39,12 +41,15 @@ namespace SentisOptimisationsPlugin
             StateField = MyClientType.GetField("State",
                 BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
             
-            var MethodCalculateLayerOfReplicable = MyClientType.GetMethod
-                ("CalculateLayerOfReplicable", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
-            
-            ctx.GetPattern(MethodCalculateLayerOfReplicable).Prefixes.Add(
-                typeof(ReplicablesPatch).GetMethod(nameof(CalculateLayerOfReplicablePatched),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            // MyClient now has CalculateLayerOfReplicable(rep) and CalculateLayerOfReplicable(rep, Vector3D? secondaryPosition);
+            // GetMethod by name throws AmbiguousMatchException, so patch every declared overload.
+            var calculateLayerPrefix = typeof(ReplicablesPatch).GetMethod(nameof(CalculateLayerOfReplicablePatched),
+                BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic);
+            foreach (var method in MyClientType.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
+            {
+                if (method.Name != "CalculateLayerOfReplicable") continue;
+                ctx.GetPattern(method).Prefixes.Add(calculateLayerPrefix);
+            }
             
             var MethodAddReplicableToLayer = typeof(MyReplicationServer).GetMethod
             ("AddReplicableToLayer", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);

@@ -1,4 +1,4 @@
-﻿using System.Reflection;
+using System.Reflection;
 using NLog;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Cube;
@@ -11,7 +11,9 @@ namespace SentisOptimisationsPlugin.Freezer
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
-        public static void Patch(PatchContext ctx)
+        public static void Patch(PatchContext ctx) => global::SentisOptimisations.PatchGuard.Run("DamagePatch", ctx, PatchImpl);
+
+        internal static void PatchImpl(PatchContext ctx)
         {
             var MethodPerformDeformation = typeof(MyGridPhysics).GetMethod
                 ("PerformDeformation", BindingFlags.Instance | BindingFlags.NonPublic);

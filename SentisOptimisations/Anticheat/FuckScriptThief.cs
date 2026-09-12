@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Xml.Serialization;
@@ -25,7 +25,7 @@ using VRage.Utils;
 namespace SentisOptimisationsPlugin
 {
     [PatchShim]
-    public class FuckScriptThief
+    public static class FuckScriptThief
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
@@ -35,7 +35,9 @@ namespace SentisOptimisationsPlugin
         private static PropertyInfo gridPropertyInfo =
             MyCubeGridReplicableType.GetProperty("Grid", BindingFlags.Instance | BindingFlags.NonPublic);
         // Sandbox.Game\Sandbox\Game\Replication\MyCharacterReplicable.cs:30
-        public static void Patch(PatchContext ctx)
+        public static void Patch(PatchContext ctx) => global::SentisOptimisations.PatchGuard.Run("FuckScriptThief", ctx, PatchImpl);
+
+        internal static void PatchImpl(PatchContext ctx)
         {
             // MyCubeGridReplicable.Serialize
             var Serialize = MyCubeGridReplicableType.GetMethod("Serialize",

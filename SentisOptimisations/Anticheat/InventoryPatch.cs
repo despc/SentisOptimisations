@@ -1,4 +1,4 @@
-﻿using System.Reflection;
+using System.Reflection;
 using Sandbox.Common.ObjectBuilders.Definitions;
 using Sandbox.Game;
 using Torch.Managers.PatchManager;
@@ -12,7 +12,9 @@ namespace SentisOptimisationsPlugin
     [PatchShim]
     public static class InventoryPatch
     {
-        public static void Patch(PatchContext ctx)
+        public static void Patch(PatchContext ctx) => global::SentisOptimisations.PatchGuard.Run("InventoryPatch", ctx, PatchImpl);
+
+        internal static void PatchImpl(PatchContext ctx)
         {
             var TransferItemsFromMethod = typeof(MyInventory).GetMethod
                 ("TransferItemsFrom", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
