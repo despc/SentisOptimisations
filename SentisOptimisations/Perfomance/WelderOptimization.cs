@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
 using NAPI;
@@ -105,25 +105,9 @@ namespace Optimizer.Optimizations
 
             m_missingComponents.Clear();
 
-            if (SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.AsyncWeld)
-            {
-                var targetsToThread = new HashSet<MySlimBlock>(targets);
-                var shipToolsAsyncQueues =
-                    SentisOptimisationsPlugin.SentisOptimisationsPlugin.Instance.WeldAsyncQueue;
-                shipToolsAsyncQueues.EnqueueAction(() =>
-                {
-                    try
-                    {
-                        Weld(welder, targetsToThread, inventory, num, WeldProjectionsWithWelding);
-                    }
-                    catch (Exception e)
-                    {
-                        SentisOptimisationsPlugin.SentisOptimisationsPlugin.Log.Error("Async exception " + e);
-                    }
-                });
-                return;
-            }
-
+            // AsyncWeld v2: the weld itself (IncreaseMountLevel, inventory, conveyors, networking)
+            // must run on the game thread; it already does here. Queuing it on a worker only
+            // created data races, so the inline path is the only path.
             var welded = Weld(welder, targets, inventory, num);
 
             WeldProjectionsWithWelding(welder, welded);
@@ -140,7 +124,7 @@ namespace Optimizer.Optimizations
 
 
         public static bool Weld(MyShipWelder welder, HashSet<MySlimBlock> targets, MyInventory inventory,
-            int foundBlocks, Action<MyShipWelder, bool> callback = null)
+            int foundBlocks)
         {
             float blocksToWeld = Math.Min(4, (foundBlocks > 0) ? foundBlocks : 1);
             float weldAmount = 10 * MySession.Static.WelderSpeedMultiplier * MyShipWelder.WELDER_AMOUNT_PER_SECOND *
@@ -166,10 +150,9 @@ namespace Optimizer.Optimizations
 
                     if (canWeld)
                     {
-                        MyAPIGateway.Utilities.InvokeOnGameThread(() => Action(block));
-
-                        void Action(MySlimBlock blockToWeld)
+                        // already on the game thread: weld directly (was: InvokeOnGameThread per block)
                         {
+                            MySlimBlock blockToWeld = block;
                             try
                             {
                                 blockToWeld.MoveItemsToConstructionStockpile(inventory);
@@ -193,18 +176,6 @@ namespace Optimizer.Optimizations
                 }
             }
 
-            if (SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.AsyncWeld)
-            {
-                try
-                {
-                    callback?.Invoke(welder, weldedAnyThing);
-                }
-                catch (Exception e)
-                {
-                    //...
-                }
-            }
-
 
             return weldedAnyThing;
         }
@@ -217,24 +188,6 @@ namespace Optimizer.Optimizations
             }
 
 
-            if (SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.AsyncWeld)
-            {
-                var shipToolsAsyncQueues =
-                    SentisOptimisationsPlugin.SentisOptimisationsPlugin.Instance.WeldProjectionsQueue;
-                shipToolsAsyncQueues.EnqueueAction(() =>
-                {
-                    try
-                    {
-                        var projectedBlocks = FindProjectedBlocks(welder, DoWeldProjections);
-                        DoWeldProjections(welder, projectedBlocks);
-                    }
-                    catch (Exception e)
-                    {
-                        SentisOptimisationsPlugin.SentisOptimisationsPlugin.Log.Error("Async exception " + e);
-                    }
-                });
-                return;
-            }
 
             var array = FindProjectedBlocks(welder);
             DoWeldProjections(welder, array);
@@ -277,41 +230,27 @@ namespace Optimizer.Optimizations
                                 .BlockDefinition.Components[0]
                                 .Definition.Id, MyItemFlags.None)))
                 {
+                    // game thread already: build the projection inline
                     MyWelder.ProjectionRaycastData invokedBlock = projectionRaycastData;
-
-                    MyAPIGateway.Utilities.InvokeOnGameThread(() =>
+                    try
                     {
-                        try
-                        {
-                            MySandboxGame.Static.Invoke((Action) (() =>
-                            {
-                                try
-                                {
-                                    if (invokedBlock.cubeProjector.Closed ||
-                                        invokedBlock.cubeProjector.CubeGrid.Closed ||
-                                        invokedBlock.hitCube.FatBlock != null && invokedBlock.hitCube.FatBlock.Closed)
-                                        return;
-                                    invokedBlock.cubeProjector.Build(invokedBlock.hitCube, welder.OwnerId,
-                                        welder.EntityId,
-                                        builtBy: welder.BuiltBy);
-                                }
-                                catch (Exception e)
-                                {
-                                    SentisOptimisationsPlugin.SentisOptimisationsPlugin.Log.Error(e);
-                                }
-                            }), "ShipWelder BuildProjection");
-                        }
-                        catch (Exception e)
-                        {
-                            SentisOptimisationsPlugin.SentisOptimisationsPlugin.Log.Error(e);
-                        }
-                    });
+                    if (invokedBlock.cubeProjector.Closed ||
+                        invokedBlock.cubeProjector.CubeGrid.Closed ||
+                        invokedBlock.hitCube.FatBlock != null && invokedBlock.hitCube.FatBlock.Closed)
+                        return;
+                    invokedBlock.cubeProjector.Build(invokedBlock.hitCube, welder.OwnerId,
+                        welder.EntityId,
+                        builtBy: welder.BuiltBy);
+                    }
+                    catch (Exception e)
+                    {
+                        SentisOptimisationsPlugin.SentisOptimisationsPlugin.Log.Error(e);
+                    }
                 }
             }
         }
 
-        private static List<MyWelder.ProjectionRaycastData> FindProjectedBlocks(MyShipWelder welder,
-            Action<MyShipWelder, List<MyWelder.ProjectionRaycastData>> callback = null)
+        private static List<MyWelder.ProjectionRaycastData> FindProjectedBlocks(MyShipWelder welder)
         {
             HashSet<MySlimBlock> m_projectedBlock = new HashSet<MySlimBlock>();
             var w = welder.WorldMatrix;
@@ -328,54 +267,15 @@ namespace Optimizer.Optimizations
                 if (myCubeGrid != null && myCubeGrid.Projector != null)
                 {
                     myCubeGrid.GetBlocksInsideSphere(ref boundingSphereD, m_projectedBlock, false);
-                    if (!SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.AsyncWeld)
+                    foreach (MySlimBlock mySlimBlock in m_projectedBlock)
                     {
-                        foreach (MySlimBlock mySlimBlock in m_projectedBlock)
+                        if (myCubeGrid.Projector.CanBuild(mySlimBlock, true) == BuildCheckResult.OK)
                         {
-                            if (myCubeGrid.Projector.CanBuild(mySlimBlock, true) == BuildCheckResult.OK)
+                            MySlimBlock cubeBlock = myCubeGrid.GetCubeBlock(mySlimBlock.Position);
+                            if (cubeBlock != null)
                             {
-                                MySlimBlock cubeBlock = myCubeGrid.GetCubeBlock(mySlimBlock.Position);
-                                if (cubeBlock != null)
-                                {
-                                    list.Add(new MyWelder.ProjectionRaycastData(BuildCheckResult.OK, cubeBlock,
-                                        myCubeGrid.Projector));
-                                }
-                            }
-                        }
-                    }
-                    else
-                    {
-                        HashSet<MySlimBlock> m_projectedBlockForThread = new HashSet<MySlimBlock>(m_projectedBlock);
-                        MyAPIGateway.Utilities.InvokeOnGameThread(() => Action(m_projectedBlockForThread));
-
-                        void Action(HashSet<MySlimBlock> blocksInThread)
-                        {
-                            list.Clear();
-                            foreach (MySlimBlock mySlimBlock in blocksInThread)
-                            {
-                                if (list.Count > 1)
-                                {
-                                    break;
-                                }
-
-                                if (myCubeGrid.Projector.CanBuild(mySlimBlock, true) == BuildCheckResult.OK)
-                                {
-                                    MySlimBlock cubeBlock = myCubeGrid.GetCubeBlock(mySlimBlock.Position);
-                                    if (cubeBlock != null)
-                                    {
-                                        list.Add(new MyWelder.ProjectionRaycastData(BuildCheckResult.OK, cubeBlock,
-                                            myCubeGrid.Projector));
-                                    }
-                                }
-                            }
-
-                            try
-                            {
-                                callback?.Invoke(welder, list);
-                            }
-                            catch (Exception e)
-                            {
-                                //...
+                                list.Add(new MyWelder.ProjectionRaycastData(BuildCheckResult.OK, cubeBlock,
+                                    myCubeGrid.Projector));
                             }
                         }
                     }

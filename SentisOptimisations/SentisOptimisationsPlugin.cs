@@ -50,8 +50,8 @@ namespace SentisOptimisationsPlugin
 
         public AllGridsProcessor AllGridsProcessor = new AllGridsProcessor();
         private SendReplicablesAsync _replicablesAsync = new SendReplicablesAsync();
-        public ShipToolsAsyncQueues WeldProjectionsQueue = new ShipToolsAsyncQueues();
-        public ShipToolsAsyncQueues WeldAsyncQueue = new ShipToolsAsyncQueues();
+        // AsyncWeld v2: the weld/grind pipeline no longer uses worker-thread queues;
+        // all game-state work runs on the game thread (see ShipToolPatch / WelderOptimization).
         public DelayedProcessor DelayedProcessor = new DelayedProcessor();
         public static ShieldApi SApi = new ShieldApi();
 
@@ -109,8 +109,6 @@ namespace SentisOptimisationsPlugin
             {
                 AllGridsProcessor.OnUnloading();
                 _replicablesAsync.OnUnloading();
-                WeldProjectionsQueue.OnUnloading();
-                WeldAsyncQueue.OnUnloading();
                 DelayedProcessor.OnUnloading();
             }
             else
@@ -119,8 +117,6 @@ namespace SentisOptimisationsPlugin
                     return;
                 AllGridsProcessor.OnLoaded();
                 _replicablesAsync.OnLoaded();
-                WeldProjectionsQueue.OnLoaded();
-                WeldAsyncQueue.OnLoaded();
                 DelayedProcessor.OnLoaded();
                 InitShieldApi();
             }
