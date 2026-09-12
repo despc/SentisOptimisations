@@ -23,7 +23,9 @@ namespace SentisOptimisationsPlugin
 
         public static HashSet<IMyUpgradeModule> Protectors = null;
 
-        public static void Patch(PatchContext ctx)
+        public static void Patch(PatchContext ctx) => global::SentisOptimisations.PatchGuard.Run("VoxelProtectorPatch", ctx, PatchImpl);
+
+        internal static void PatchImpl(PatchContext ctx)
         {
             var MethodMakeCraterInternal = typeof(MyVoxelGenerator).GetMethod(
                 "MakeCraterInternal",

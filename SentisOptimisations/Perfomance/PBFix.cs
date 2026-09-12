@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading;
@@ -38,10 +39,20 @@ namespace SentisOptimisationsPlugin
         
         public static MethodInfo RunSandboxedProgramActionCoreMethod = typeof(MyProgrammableBlock).GetMethod("RunSandboxedProgramActionCore", 
             BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
-        public static void Patch(PatchContext ctx)
+
+        // UpdateProgram(string) is internal and overloaded with UpdateProgram(byte[]), pick it explicitly.
+        static readonly MethodInfo UpdateProgramStringMethod = typeof(MyProgrammableBlock)
+            .GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+            .First(m => m.Name == "UpdateProgram" && m.GetParameters().Length == 1 &&
+                        m.GetParameters()[0].ParameterType == typeof(string));
+
+        public static void Patch(PatchContext ctx) => global::SentisOptimisations.PatchGuard.Run("PBFix", ctx, PatchImpl);
+
+        internal static void PatchImpl(PatchContext ctx)
         {
+            // RunSandboxedProgramAction became internal in modern SE.
             var RunSandboxedProgramAction = typeof(MyProgrammableBlock).GetMethod
-                (nameof(MyProgrammableBlock.RunSandboxedProgramAction), BindingFlags.Instance | BindingFlags.Public);
+                ("RunSandboxedProgramAction", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
 
             ctx.GetPattern(RunSandboxedProgramAction).Prefixes.Add(
                 typeof(PBFix).GetMethod(nameof(RunSandboxedProgramActionPatched),
@@ -73,7 +84,7 @@ namespace SentisOptimisationsPlugin
             if (program != null && program.Contains("double maxCurrentMs = 0.5;"))
             {
                 var newProgram = program.Replace("double maxCurrentMs = 0.5;", "double maxCurrentMs = 0.1;");
-                __instance.UpdateProgram(newProgram);
+                UpdateProgramStringMethod.Invoke(__instance, new object[] { newProgram });
                 return false;
             }
             return true;
@@ -139,7 +150,7 @@ namespace SentisOptimisationsPlugin
                         "m_echoOutput");
                 m_echoOutput.Clear();
                 Assembly m_assembly =
-                    (Assembly) ReflectionUtils.GetInstanceField(typeof(MyProgrammableBlock), __instance, "m_assembly");
+                    (Assembly) ReflectionUtils.GetInstanceField(typeof(MyProgrammableBlock), __instance, "m_currentAssembly");
                 if (m_assembly == (Assembly) null)
                 {
                     response = MyTexts.GetString(MySpaceTexts.ProgrammableBlock_Exception_NoAssembly);
@@ -188,10 +199,10 @@ namespace SentisOptimisationsPlugin
                     (MyGridTerminalSystem) ReflectionUtils.GetInstanceField(typeof(MyGridLogicalGroupData),
                         group.GroupData, "TerminalSystem");
                 //MyGridTerminalSystem terminalSystem = group.GroupData.TerminalSystem;
-                MyProgrammableBlock.MyGridTerminalWrapper m_terminalWrapper =
-                    (MyProgrammableBlock.MyGridTerminalWrapper) ReflectionUtils.GetInstanceField(
-                        typeof(MyProgrammableBlock), __instance, "m_terminalWrapper");
-                ReflectionUtils.InvokeInstanceMethod(typeof(MyProgrammableBlock.MyGridTerminalWrapper),
+                // MyProgrammableBlock.MyGridTerminalWrapper is a private nested type now.
+                object m_terminalWrapper = ReflectionUtils.GetInstanceField(
+                    typeof(MyProgrammableBlock), __instance, "m_terminalWrapper");
+                ReflectionUtils.InvokeInstanceMethod(m_terminalWrapper.GetType(),
                     m_terminalWrapper, "SetInstance", new Object[] {terminalSystem});
                 //m_terminalWrapper.SetInstance(terminalSystem);
                 List<MyCubeGrid> m_groupCache =
@@ -217,7 +228,7 @@ namespace SentisOptimisationsPlugin
                 else
                     MyLog.Default.Critical("Probrammable block terminal system is null! Crash");
 
-                m_instance.GridTerminalSystem = m_terminalWrapper;
+                m_instance.GridTerminalSystem = (IMyGridTerminalSystem) m_terminalWrapper;
                 var objects = new Object[] {action, null};
                 Stopwatch sw = new Stopwatch();
                 var currentCpuLoad = MySandboxGame.Static.CPULoad;

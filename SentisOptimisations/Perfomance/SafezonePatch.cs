@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Reflection;
@@ -30,7 +30,9 @@ namespace SentisOptimisationsPlugin
         public static Dictionary<long, int> Cooldowns = new Dictionary<long, int>();
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
         public static readonly Random r = new Random();
-        public static void Patch(PatchContext ctx)
+        public static void Patch(PatchContext ctx) => global::SentisOptimisations.PatchGuard.Run("SafezonePatch", ctx, PatchImpl);
+
+        internal static void PatchImpl(PatchContext ctx)
         {
             var MethodPhantom_Leave = typeof(MySafeZone).GetMethod
                 ("phantom_Leave", BindingFlags.Instance | BindingFlags.NonPublic);

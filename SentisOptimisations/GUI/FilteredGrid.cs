@@ -14,8 +14,13 @@ using VRage.Serialization;
 
 namespace SOPlugin.GUI
 {
-    partial class FilteredGrid : UserControl
+    public class FilteredGrid : UserControl
     {
+        // Previously generated from FilteredGrid.xaml; now built in managed code.
+        internal ScrollViewer ScrollViewer;
+        internal TextBox TbFilter;
+        internal TextBlock TbDescription;
+
         public static readonly DependencyProperty IgnoreDisplayProperty = DependencyProperty.Register("IgnoreDisplay", typeof(bool), typeof(FilteredGrid));
 
         private Dictionary<Type, Grid> _viewCache = new Dictionary<Type, Grid>();
@@ -25,8 +30,57 @@ namespace SOPlugin.GUI
 
         public FilteredGrid()
         {
-            InitializeComponent();
+            BuildUi();
             DataContextChanged += OnDataContextChanged;
+        }
+
+        private void BuildUi()
+        {
+            var root = new Grid();
+            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Auto) });
+            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Auto), MinHeight = 52 });
+
+            var header = new Grid();
+            header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Auto) });
+            header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            var filterLabel = new TextBlock { Text = "Filter: ", Margin = new Thickness(3) };
+            filterLabel.SetValue(Grid.ColumnProperty, 0);
+            header.Children.Add(filterLabel);
+
+            TbFilter = new TextBox { Margin = new Thickness(3), IsEnabled = false };
+            TbFilter.TextChanged += UpdateFilter;
+            TbFilter.SetValue(Grid.ColumnProperty, 1);
+            header.Children.Add(TbFilter);
+
+            header.SetValue(Grid.RowProperty, 0);
+            root.Children.Add(header);
+
+            ScrollViewer = new ScrollViewer();
+            ScrollViewer.SetValue(Grid.RowProperty, 1);
+            root.Children.Add(ScrollViewer);
+
+            TbDescription = new TextBlock
+            {
+                TextWrapping = TextWrapping.Wrap,
+                Background = new SolidColorBrush(Colors.DarkGray),
+                Padding = new Thickness(2)
+            };
+            TbDescription.SetValue(Grid.RowProperty, 2);
+            root.Children.Add(TbDescription);
+
+            var splitter = new GridSplitter
+            {
+                Height = 2,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Top,
+                ShowsPreview = true
+            };
+            splitter.SetValue(Grid.RowProperty, 2);
+            root.Children.Add(splitter);
+
+            Content = root;
         }
 
         private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)

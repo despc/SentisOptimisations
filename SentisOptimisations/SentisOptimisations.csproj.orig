@@ -1,0 +1,212 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+    <PropertyGroup>
+        <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+        <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+        <ProjectGuid>{669A88DE-B622-4E5F-9BFA-AA6755444906}</ProjectGuid>
+        <OutputType>Library</OutputType>
+        <AppDesignerFolder>Properties</AppDesignerFolder>
+        <RootNamespace>SentisOptimisations</RootNamespace>
+        <AssemblyName>SentisOptimisations</AssemblyName>
+        <TargetFrameworkVersion>v4.8.1</TargetFrameworkVersion>
+        <FileAlignment>512</FileAlignment>
+        <LangVersion>latest</LangVersion>
+    </PropertyGroup>
+    <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+        <PlatformTarget>AnyCPU</PlatformTarget>
+        <DebugSymbols>true</DebugSymbols>
+        <DebugType>full</DebugType>
+        <Optimize>false</Optimize>
+        <OutputPath>bin\Debug\</OutputPath>
+        <DefineConstants>DEBUG;TRACE</DefineConstants>
+        <ErrorReport>prompt</ErrorReport>
+        <WarningLevel>4</WarningLevel>
+    </PropertyGroup>
+    <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+        <PlatformTarget>AnyCPU</PlatformTarget>
+        <DebugType>pdbonly</DebugType>
+        <Optimize>true</Optimize>
+        <OutputPath>bin\Release\</OutputPath>
+        <DefineConstants>TRACE</DefineConstants>
+        <ErrorReport>prompt</ErrorReport>
+        <WarningLevel>4</WarningLevel>
+    </PropertyGroup>
+    <ItemGroup>
+      <Compile Include="AllGridsActions\AllGridsProcessor.cs" />
+      <Compile Include="AllGridsActions\WCSafeZoneWorkAround.cs" />
+      <Compile Include="Anticheat\FuckRamPatch.cs" />
+      <Compile Include="Anticheat\FuckScriptThief.cs" />
+      <Compile Include="Anticheat\InventoryPatch.cs" />
+      <Compile Include="Anticheat\KEEN_ColorChangeExploitFix.cs" />
+      <Compile Include="Anticheat\ReplicablesPatch.cs" />
+      <Compile Include="Anticheat\TorchPatch.cs" />
+      <Compile Include="Api\ShieldApi.cs" />
+      <Compile Include="Commands\AdminCommands.cs" />
+      <Compile Include="Config\MainConfig.cs" />
+      <Compile Include="CrashFix\CrashFixPatch.cs" />
+      <Compile Include="DelayedLogic\DelayedProcessor.cs" />
+      <Compile Include="Discord\DiscordBridgePatch.cs" />
+      <Compile Include="FixShip\FixShipLogic.cs" />
+      <Compile Include="Freezer\DamagePatch.cs" />
+      <Compile Include="Freezer\FreezeLogic.cs" />
+      <Compile Include="Freezer\FreezerPatches.cs" />
+      <Compile Include="GUI\ConfigGUI.cs">
+        <DependentUpon>ConfigGUI.xaml</DependentUpon>
+      </Compile>
+      <Compile Include="GUI\DisplayTab.cs" />
+      <Compile Include="GUI\FilteredGrid.cs" />
+      <Compile Include="Observer\EntitiesObserver.cs" />
+      <Compile Include="Observer\Utils\SearchEntitiesUtils.cs" />
+      <Compile Include="Perfomance\FindVoxelProtectorsPatch.cs" />
+      <Compile Include="Perfomance\GridSystemUpdatePatch.cs" />
+      <Compile Include="Perfomance\ParallelUpdateTweaks.cs" />
+      <Compile Include="Perfomance\AsyncSync.cs" />
+      <Compile Include="Perfomance\SavePatch.cs" />
+      <Compile Include="ShipTool\ShipToolsAsyncQueues.cs" />
+      <Compile Include="Perfomance\GasTankOptimisations.cs" />
+      <Compile Include="Perfomance\Limits\PhysicsProfilerMonitor.cs" />
+      <Compile Include="Perfomance\Limits\Punisher.cs" />
+      <Compile Include="Perfomance\PBFix.cs" />
+      <Compile Include="Perfomance\SafezonePatch.cs" />
+      <Compile Include="Perfomance\WelderOptimization.cs" />
+      <Compile Include="Shared\Ext2.cs" />
+      <Compile Include="Shared\SharpUtils.cs" />
+      <Compile Include="Shared\Voxels.cs" />
+      <Compile Include="ShipTool\ShipToolPatch.cs" />
+      <Compile Include="SentisOptimisationsPlugin.cs" />
+      <Compile Include="Utils\BlockUtils.cs" />
+      <Compile Include="Utils\ChatUtils.cs" />
+      <Compile Include="Utils\ConfigUtils.cs" />
+      <Compile Include="Utils\CreditsUtils.cs" />
+      <Compile Include="Utils\FactionUtils.cs" />
+      <Compile Include="Utils\GridUtils.cs" />
+      <Compile Include="Utils\IdentityUtils.cs" />
+      <Compile Include="Utils\NetworkUtils.cs" />
+      <Compile Include="Utils\NotificationUtils.cs" />
+      <Compile Include="Utils\PhysicsUtils.cs" />
+      <Compile Include="Utils\PlayerUtils.cs" />
+      <Compile Include="Utils\ProjectorUtils.cs" />
+      <Compile Include="Utils\ReflectionUtils.cs" />
+      <Compile Include="Utils\SoundUtils.cs" />
+      <Compile Include="Voxels\SendReplicablesAsync.cs" />
+      <Compile Include="Voxels\VoxelProtectorPatch.cs" />
+    </ItemGroup>
+    <ItemGroup>
+      <Reference Include="0Harmony, Version=2.1.1.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>lib\0Harmony.dll</HintPath>
+      </Reference>
+      <Reference Include="HavokWrapper, Version=0.1.1.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\HavokWrapper.dll</HintPath>
+      </Reference>
+      <Reference Include="Microsoft.CodeAnalysis, Version=2.9.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35">
+        <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\Microsoft.CodeAnalysis.dll</HintPath>
+      </Reference>
+      <Reference Include="Microsoft.CodeAnalysis.CSharp, Version=2.9.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35">
+        <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\Microsoft.CodeAnalysis.CSharp.dll</HintPath>
+      </Reference>
+      <Reference Include="NLog, Version=4.0.0.0, Culture=neutral, PublicKeyToken=5120e14c03d0593c">
+        <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\NLog.dll</HintPath>
+      </Reference>
+      <Reference Include="PresentationCore" />
+      <Reference Include="PresentationFramework" />
+      <Reference Include="Profiler">
+        <HintPath>lib\Profiler.dll</HintPath>
+      </Reference>
+      <Reference Include="ProtoBuf.Net, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\ProtoBuf.Net.dll</HintPath>
+      </Reference>
+      <Reference Include="ProtoBuf.Net.Core, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\ProtoBuf.Net.Core.dll</HintPath>
+      </Reference>
+      <Reference Include="Sandbox.Common, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\Sandbox.Common.dll</HintPath>
+      </Reference>
+      <Reference Include="Sandbox.Game, Version=0.1.1.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\Sandbox.Game.dll</HintPath>
+      </Reference>
+      <Reference Include="Sandbox.Graphics">
+        <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64\Sandbox.Graphics.dll</HintPath>
+      </Reference>
+      <Reference Include="Sandbox.RenderDirect, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\Sandbox.RenderDirect.dll</HintPath>
+      </Reference>
+      <Reference Include="SpaceEngineers.Game, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\SpaceEngineers.Game.dll</HintPath>
+      </Reference>
+      <Reference Include="SpaceEngineers.ObjectBuilders, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\SpaceEngineers.ObjectBuilders.dll</HintPath>
+      </Reference>
+      <Reference Include="System" />
+      <Reference Include="System.Collections.Immutable, Version=1.2.3.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
+        <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\System.Collections.Immutable.dll</HintPath>
+      </Reference>
+      <Reference Include="System.Core" />
+      <Reference Include="System.Data" />
+      <Reference Include="System.Data.DataSetExtensions" />
+      <Reference Include="System.Text.RegularExpressions, Version=4.1.1.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
+        <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\System.Text.RegularExpressions.dll</HintPath>
+      </Reference>
+      <Reference Include="System.Xaml" />
+      <Reference Include="System.Xml" />
+      <Reference Include="System.Xml.Linq" />
+      <Reference Include="Torch">
+        <HintPath>C:\SE\VanillaTest\torch-server\Torch.dll</HintPath>
+      </Reference>
+      <Reference Include="Torch.API">
+        <HintPath>C:\SE\VanillaTest\torch-server\Torch.API.dll</HintPath>
+      </Reference>
+      <Reference Include="VRage, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\VRage.dll</HintPath>
+      </Reference>
+      <Reference Include="VRage.Game, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\VRage.Game.dll</HintPath>
+      </Reference>
+      <Reference Include="VRage.Library, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\VRage.Library.dll</HintPath>
+      </Reference>
+      <Reference Include="VRage.Math">
+        <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\VRage.Math.dll</HintPath>
+      </Reference>
+      <Reference Include="VRage.Network">
+        <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\VRage.Network.dll</HintPath>
+      </Reference>
+      <Reference Include="VRage.Platform.Windows">
+        <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\VRage.Platform.Windows.dll</HintPath>
+      </Reference>
+      <Reference Include="VRage.RemoteClient.Core">
+        <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\VRage.RemoteClient.Core.dll</HintPath>
+      </Reference>
+      <Reference Include="VRage.Render">
+        <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\VRage.Render.dll</HintPath>
+      </Reference>
+      <Reference Include="VRage.Render11">
+        <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\VRage.Render11.dll</HintPath>
+      </Reference>
+      <Reference Include="VRage.Scripting, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\VRage.Scripting.dll</HintPath>
+      </Reference>
+      <Reference Include="WindowsBase" />
+    </ItemGroup>
+    <ItemGroup>
+      <Content Include="manifest.xml" />
+    </ItemGroup>
+    <ItemGroup>
+        <Page Include="GUI\ConfigGUI.xaml">
+            <Generator>MSBuild:Compile</Generator>
+            <SubType>Designer</SubType>
+        </Page>
+        <Page Include="GUI\FilteredGrid.xaml">
+            <Generator>MSBuild:Compile</Generator>
+            <SubType>Designer</SubType>
+        </Page>
+    </ItemGroup>
+    <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+    <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+         Other similar extension points exist, see Microsoft.Common.targets.
+    <Target Name="BeforeBuild">
+    </Target>
+    <Target Name="AfterBuild">
+    </Target>
+    -->
+</Project>

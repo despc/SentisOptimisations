@@ -12,6 +12,7 @@ using Sandbox.Game.Screens.Helpers;
 using Sandbox.Game.World;
 using Sandbox.ModAPI;
 using SentisGameplayImprovements.AllGridsActions;
+using SentisOptimisations;
 using SentisOptimisations.DelayedLogic;
 using Torch.Commands;
 using Torch.Commands.Permissions;
@@ -83,7 +84,9 @@ namespace SentisOptimisations.Commands
                     {
                         if (myCubeBlock is MyGasTank)
                         {
-                            ((MyGasTank)myCubeBlock).ChangeFillRatioAmount(newValue);
+                            // MyGasTank.ChangeFillRatioAmount(double) became internal in modern SE.
+                            ReflectionUtils.InvokeInstanceMethod(typeof(MyGasTank), myCubeBlock,
+                                "ChangeFillRatioAmount", new object[] { newValue });
                         }
                     }
                     Context.Respond($"Водород для грида {grid.DisplayName} выставлен на {newValue * 100}%");

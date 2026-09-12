@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using NAPI;
@@ -24,7 +24,9 @@ namespace Optimizer.Optimizations
     public static class WelderOptimization
     {
 
-        public static void Patch(PatchContext ctx)
+        public static void Patch(PatchContext ctx) => global::SentisOptimisations.PatchGuard.Run("WelderOptimization", ctx, PatchImpl);
+
+        internal static void PatchImpl(PatchContext ctx)
         {
             var MethodActivate = typeof(MyShipWelder).GetMethod
                 ("Activate", BindingFlags.Instance | BindingFlags.NonPublic);
