@@ -110,6 +110,7 @@ namespace SentisOptimisationsPlugin
                 AllGridsProcessor.OnUnloading();
                 _replicablesAsync.OnUnloading();
                 DelayedProcessor.OnUnloading();
+                EntitiesObserver.ClearAll();
             }
             else
             {
@@ -118,6 +119,7 @@ namespace SentisOptimisationsPlugin
                 AllGridsProcessor.OnLoaded();
                 _replicablesAsync.OnLoaded();
                 DelayedProcessor.OnLoaded();
+                EntitiesObserver.PrimeFromAllEntities();
                 InitShieldApi();
             }
         }
