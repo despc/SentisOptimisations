@@ -104,6 +104,10 @@ namespace SentisOptimisations.Tests
         public void SendReplicables_errors_must_be_logged()
         {
             lock (SendReplicablesAsync._queue) SendReplicablesAsync._queue.Clear();
+            // reset the throttle so a previous test's logged error doesn't suppress this one
+            typeof(SendReplicablesAsync)
+                .GetField("_lastErrorLogged", BindingFlags.Static | BindingFlags.NonPublic)
+                ?.SetValue(null, DateTime.MinValue);
             var s = new SendReplicablesAsync();
             s.OnLoaded();
             using var capture = new NLogCapture();

@@ -17,7 +17,7 @@ namespace SentisOptimisationsPlugin
         private bool _welderTweaksEnabled = true;
         private bool _welderCanWeldProjectionsIfWeldedOtherBlocks = false;
         private bool _welderSelfWelding = true;
-        private bool _asyncWeld = true;
+        private bool _asyncWeld = false;
         
         //physics profile антипалочная защита
         private bool _enablePhysicsGuard = false;

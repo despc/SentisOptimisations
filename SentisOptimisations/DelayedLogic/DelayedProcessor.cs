@@ -47,41 +47,28 @@ namespace SentisOptimisations.DelayedLogic
                 Log.Info("DelayedLogic started");
                 while (!CancellationTokenSource.Token.IsCancellationRequested)
                 {
-                    try
+                    Thread.Sleep(500);
+                    var due = new List<KeyValuePair<DateTime, Action>>();
+                    lock (_lock)
                     {
-                        Thread.Sleep(500);
-                        DateTime firstElement;
-                        lock (_lock)
+                        while (_actions.Count > 0 && _actions.Keys[0] <= DateTime.Now)
                         {
-                            if (_actions.Count == 0)
-                            {
-                                continue;
-                            }
-                            
-                            firstElement = _actions.Keys[0];
-                            if (firstElement > DateTime.Now)
-                            {
-                                continue;
-                            }
+                            var key = _actions.Keys[0];
+                            due.Add(new KeyValuePair<DateTime, Action>(key, _actions[key]));
+                            _actions.Remove(key);
                         }
-                        while (firstElement < DateTime.Now)
-                        {
-                            _actions[firstElement].Invoke();
-                            lock (_lock)
-                            {
-                                _actions.Remove(firstElement);
-                                if (_actions.Count == 0)
-                                {
-                                    break;
-                                }
-
-                                firstElement = _actions.Keys[0];
-                            }
-                        } 
                     }
-                    catch (Exception e)
+                    foreach (var kv in due)
                     {
-                        Log.Error("DelayedLogic Error", e);
+                        try
+                        {
+                            kv.Value.Invoke();
+                        }
+                        catch (Exception e)
+                        {
+                            // the action was already removed: a failing action runs once and is dropped
+                            Log.Error("DelayedLogic action failed (dropped)", e);
+                        }
                     }
                 }
             }

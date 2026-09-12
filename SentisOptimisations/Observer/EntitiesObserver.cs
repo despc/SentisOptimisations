@@ -3,10 +3,12 @@ using NLog;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Character;
 using Sandbox.Game.WorldEnvironment;
+using SentisOptimisationsPlugin;
 using SentisOptimisationsPlugin.AllGridsActions;
 using SentisOptimisationsPlugin.Freezer;
 using VRage.Game.Entity;
 using VRage.Game.ModAPI;
+using SentisOptimisations.Utils;
 
 namespace SentisGameplayImprovements.AllGridsActions
 {
@@ -14,11 +16,11 @@ namespace SentisGameplayImprovements.AllGridsActions
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
-        public static HashSet<MyEntity> EntitiesToShipTools = new HashSet<MyEntity>();
-        public static HashSet<MySafeZone> Safezones = new HashSet<MySafeZone>();
-        public static HashSet<MyCubeGrid> MyCubeGrids = new HashSet<MyCubeGrid>();
-        public static HashSet<IMyVoxelMap> VoxelMaps = new HashSet<IMyVoxelMap>();
-        public static HashSet<MyPlanet> Planets = new HashSet<MyPlanet>();
+        public static ConcurrentHashSet<MyEntity> EntitiesToShipTools = new ConcurrentHashSet<MyEntity>();
+        public static ConcurrentHashSet<MySafeZone> Safezones = new ConcurrentHashSet<MySafeZone>();
+        public static ConcurrentHashSet<MyCubeGrid> MyCubeGrids = new ConcurrentHashSet<MyCubeGrid>();
+        public static ConcurrentHashSet<IMyVoxelMap> VoxelMaps = new ConcurrentHashSet<IMyVoxelMap>();
+        public static ConcurrentHashSet<MyPlanet> Planets = new ConcurrentHashSet<MyPlanet>();
 
         public static void MyEntitiesOnOnEntityRemove(MyEntity entity)
         {
@@ -38,6 +40,9 @@ namespace SentisGameplayImprovements.AllGridsActions
                 FreezeLogic.FrozenPhysicsGrids.Remove(entity.EntityId);
                 return;
             }
+
+            GasTankOptimisations.CleanupEntity(entity);
+            PBFix.CleanupEntity(entity);
 
             if (entity is MyPlanet)
             {
