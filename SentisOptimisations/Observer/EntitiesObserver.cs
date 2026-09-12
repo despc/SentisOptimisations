@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using NLog;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Character;
@@ -8,6 +9,7 @@ using SentisOptimisationsPlugin.AllGridsActions;
 using SentisOptimisationsPlugin.Freezer;
 using VRage.Game.Entity;
 using VRage.Game.ModAPI;
+using SentisOptimisations;
 using SentisOptimisations.Utils;
 
 namespace SentisGameplayImprovements.AllGridsActions
@@ -73,6 +75,11 @@ namespace SentisGameplayImprovements.AllGridsActions
                 EntitiesToShipTools.Add(entity);
             }
 
+            if (entity is MySafeZone)
+            {
+                Safezones.Add((MySafeZone) entity);
+            }
+
             if (entity is MyPlanet)
             {
                 Log.Warn("Add planet to list " + entity.DisplayName);
@@ -91,11 +98,51 @@ namespace SentisGameplayImprovements.AllGridsActions
                 VoxelMaps.Add((IMyVoxelMap) entity);
                 return;
             }
+        }
 
-            if (entity is MySafeZone)
+        /// <summary>
+        /// The OnEntityAdd event only fires for entities spawned after subscription; entities
+        /// that were already registered when the session loaded must be collected explicitly,
+        /// otherwise the AABB discovery cache starts empty for a pre-built world.
+        /// </summary>
+        public static void PrimeFromAllEntities()
+        {
+            try
             {
-                Safezones.Add((MySafeZone) entity);
+                var field = typeof(Sandbox.Game.Entities.MyEntities).EasyField("m_entities", false);
+                var all = field?.GetValue(null) as System.Collections.IEnumerable;
+                if (all == null)
+                {
+                    Log.Warn("EntitiesObserver priming skipped: m_entities not found");
+                    return;
+                }
+
+                var added = 0;
+                // MyConcurrentHashSet: safe to enumerate while the game mutates it
+                foreach (var obj in all)
+                {
+                    if (obj is MyEntity entity)
+                    {
+                        MyEntitiesOnOnEntityAdd(entity);
+                        added++;
+                    }
+                }
+
+                Log.Info($"EntitiesObserver primed from world: {added} entities");
             }
+            catch (Exception e)
+            {
+                Log.Error(e, "EntitiesObserver priming failed");
+            }
+        }
+
+        public static void ClearAll()
+        {
+            EntitiesToShipTools.Clear();
+            Safezones.Clear();
+            MyCubeGrids.Clear();
+            VoxelMaps.Clear();
+            Planets.Clear();
         }
     }
 }
