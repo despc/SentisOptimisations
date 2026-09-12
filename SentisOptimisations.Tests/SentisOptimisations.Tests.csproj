@@ -1,0 +1,54 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <IsPackable>false</IsPackable>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <SeRoot Condition="'$(SeRoot)' == ''">C:\SE</SeRoot>
+    <SeDs>$(SeRoot)\DedicatedServer64</SeDs>
+    <NoWarn>CS0618;NU1701;xUnit1026;xUnit1013</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Test the WORKING-TREE source, not the deployed copy -->
+    <ProjectReference Include="..\..\SentisOptimisations\SentisOptimisations\SentisOptimisations.csproj" />
+    <ProjectReference Include="..\..\SentisGameplayImprovements\SentisGameplayImprovements\SentisGameplayImprovements.csproj" />
+    <ProjectReference Include="..\..\SentisAdventures\SentisAdventures\SentisAdventures.csproj" />
+    <Reference Include="Torch"><HintPath>$(SeRoot)\Torch.dll</HintPath><Private>True</Private></Reference>
+    <Reference Include="Torch.API"><HintPath>$(SeRoot)\Torch.API.dll</HintPath><Private>True</Private></Reference>
+    <Reference Include="0Harmony"><HintPath>$(SeRoot)\Plugins\SentisOptimisations\0Harmony.dll</HintPath><Private>True</Private></Reference>
+    <Reference Include="NLog"><HintPath>$(SeRoot)\NLog.dll</HintPath><Private>True</Private></Reference>
+    <Reference Include="Newtonsoft.Json"><HintPath>$(SeRoot)\Newtonsoft.Json.dll</HintPath><Private>True</Private></Reference>
+    <!-- game assemblies: reference for metadata; copied for fusion -->
+    <Reference Include="Sandbox.Common"><HintPath>$(SeDs)\Sandbox.Common.dll</HintPath><Private>True</Private></Reference>
+    <Reference Include="Sandbox.Game"><HintPath>$(SeDs)\Sandbox.Game.dll</HintPath><Private>True</Private></Reference>
+    <Reference Include="SpaceEngineers.Game"><HintPath>$(SeDs)\SpaceEngineers.Game.dll</HintPath><Private>True</Private></Reference>
+    <Reference Include="SpaceEngineers.ObjectBuilders"><HintPath>$(SeDs)\SpaceEngineers.ObjectBuilders.dll</HintPath><Private>True</Private></Reference>
+    <Reference Include="VRage"><HintPath>$(SeDs)\VRage.dll</HintPath><Private>True</Private></Reference>
+    <Reference Include="VRage.Game"><HintPath>$(SeDs)\VRage.Game.dll</HintPath><Private>True</Private></Reference>
+    <Reference Include="VRage.Library"><HintPath>$(SeDs)\VRage.Library.dll</HintPath><Private>True</Private></Reference>
+    <Reference Include="VRage.Math"><HintPath>$(SeDs)\VRage.Math.dll</HintPath><Private>True</Private></Reference>
+    <Reference Include="VRage.Network"><HintPath>$(SeDs)\VRage.Network.dll</HintPath><Private>True</Private></Reference>
+    <Reference Include="VRage.Scripting"><HintPath>$(SeDs)\VRage.Scripting.dll</HintPath><Private>True</Private></Reference>
+    <Reference Include="HavokWrapper"><HintPath>$(SeDs)\HavokWrapper.dll</HintPath><Private>True</Private></Reference>
+    <Reference Include="ProtoBuf.Net"><HintPath>$(SeDs)\ProtoBuf.Net.dll</HintPath><Private>True</Private></Reference>
+    <Reference Include="ProtoBuf.Net.Core"><HintPath>$(SeDs)\ProtoBuf.Net.Core.dll</HintPath><Private>True</Private></Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="PresentationCore" />
+    <Reference Include="PresentationFramework" />
+    <Reference Include="System.Xaml" />
+    <Reference Include="WindowsBase" />
+    <Reference Include="System.Windows.Presentation" />
+  </ItemGroup>
+
+</Project>
