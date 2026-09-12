@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Reflection;
 using System.Text;
@@ -41,6 +41,8 @@ namespace SentisOptimisationsPlugin
 
         private static bool SetValueLimitedPatchedText(object text)
         {
+        try
+        {
             var value = "";
             if (text is StringBuilder)
             {
@@ -56,9 +58,20 @@ namespace SentisOptimisationsPlugin
                 return false;
             }
             return true;
+        
+
+
+            }
+                catch (Exception __guard_e)
+                {
+                    Log.Error("SetValueLimitedPatchedText exception " + __guard_e);
+                    return true;  // fall back to vanilla behavior
+                }
         }
         
         private static bool SetValueLimitedPatchedStorage(String value)
+        {
+        try
         {
             if (value.Length > 100240)
             {
@@ -66,9 +79,20 @@ namespace SentisOptimisationsPlugin
                 return false;
             }
             return true;
+        
+
+
+            }
+                catch (Exception __guard_e)
+                {
+                    Log.Error("SetValueLimitedPatchedStorage exception " + __guard_e);
+                    return true;  // fall back to vanilla behavior
+                }
         }
         
         private static bool SetValueLimitedPatched(String value)
+        {
+        try
         {
             if (value.Length > 100240)
             {
@@ -76,6 +100,15 @@ namespace SentisOptimisationsPlugin
                 return false;
             }
             return true;
+        
+
+
+            }
+                catch (Exception __guard_e)
+                {
+                    Log.Error("SetValueLimitedPatched exception " + __guard_e);
+                    return true;  // fall back to vanilla behavior
+                }
         }
     }
 }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Reflection;
@@ -238,6 +238,8 @@ namespace SentisOptimisationsPlugin
 
         private static bool UpdateBeforeSimulationPatched(MySafeZone __instance)
         {
+        try
+        {
             if (!SentisOptimisationsPlugin.Config.SlowdownEnabled)
             {
                 return true;
@@ -268,6 +270,15 @@ namespace SentisOptimisationsPlugin
             }
 
             return true;
+        
+
+
+            }
+                catch (Exception __guard_e)
+                {
+                    Log.Error("UpdateBeforeSimulationPatched exception " + __guard_e);
+                    return true;  // fall back to vanilla behavior
+                }
         }
 
         private static bool MySafeZoneIsSafePatched(MySafeZone __instance, MyEntity entity, ref bool __result)

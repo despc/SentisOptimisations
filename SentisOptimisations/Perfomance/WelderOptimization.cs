@@ -38,6 +38,8 @@ namespace Optimizer.Optimizations
 
         private static bool Activate(MyShipWelder __instance, ref bool __result, HashSet<MySlimBlock> targets)
         {
+        try
+        {
             __result = false; //it affects only sound;
             if (!SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.WelderTweaksEnabled)
             {
@@ -57,6 +59,15 @@ namespace Optimizer.Optimizations
 
             ActivateInternal(__instance, targets);
             return false;
+        
+
+
+            }
+                catch (Exception __guard_e)
+                {
+                    SentisOptimisationsPlugin.SentisOptimisationsPlugin.Log.Error("Activate exception " + __guard_e);
+                    return true;  // fall back to vanilla behavior
+                }
         }
 
 

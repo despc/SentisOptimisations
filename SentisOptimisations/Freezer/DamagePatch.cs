@@ -1,3 +1,4 @@
+﻿using System;
 using System.Reflection;
 using NLog;
 using Sandbox.Game.Entities;
@@ -26,6 +27,8 @@ namespace SentisOptimisationsPlugin.Freezer
         private static bool PatchPerformDeformation(
             MyGridPhysics __instance)
         {
+        try
+        {
             var cubeGrid = __instance.Entity as MyCubeGrid;
             if (cubeGrid == null)
             {
@@ -38,6 +41,15 @@ namespace SentisOptimisationsPlugin.Freezer
             }
 
             return true;
+        
+
+
+            }
+                catch (Exception __guard_e)
+                {
+                    Log.Error("PatchPerformDeformation exception " + __guard_e);
+                    return true;  // fall back to vanilla behavior
+                }
         }
     }
 }

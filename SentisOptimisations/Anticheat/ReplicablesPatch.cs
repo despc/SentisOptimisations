@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Reflection;
 using NLog;
@@ -105,6 +105,8 @@ namespace SentisOptimisationsPlugin
          
         private static bool CalculateLayerOfReplicablePatched(Object __instance, IMyReplicable rep, ref Object __result)
         {
+        try
+        {
             if (SentisOptimisationsPlugin.Config.PlayersSyncDistance < 0)
             {
                 return true;
@@ -141,6 +143,15 @@ namespace SentisOptimisationsPlugin
                 }
             }
             return true;
+        
+
+
+            }
+                catch (Exception __guard_e)
+                {
+                    Log.Error("CalculateLayerOfReplicablePatched exception " + __guard_e);
+                    return true;  // fall back to vanilla behavior
+                }
         }
     }
 }

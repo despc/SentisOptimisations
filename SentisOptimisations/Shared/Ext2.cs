@@ -6,7 +6,48 @@ namespace NAPI
 {
     public static class Ext2
     {
-        public static FieldInfo easyField(this Type type, String name)
+
+    // Members of a loaded Type never change: cache the (Type, name) resolutions because the
+    // ship-tool/replication hot paths resolve the same members every tick.
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, System.Collections.Concurrent.ConcurrentDictionary<string, FieldInfo>> FieldCache =
+    new System.Collections.Concurrent.ConcurrentDictionary<Type, System.Collections.Concurrent.ConcurrentDictionary<string, FieldInfo>>();
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, System.Collections.Concurrent.ConcurrentDictionary<string, MethodInfo>> MethodCache =
+    new System.Collections.Concurrent.ConcurrentDictionary<Type, System.Collections.Concurrent.ConcurrentDictionary<string, MethodInfo>>();
+
+    public static FieldInfo easyField(this Type type, String name)
+    {
+        var byName = FieldCache.GetOrAdd(type, _ => new System.Collections.Concurrent.ConcurrentDictionary<string, FieldInfo>());
+        FieldInfo cached;
+        if (byName.TryGetValue(name, out cached))
+        {
+            return cached;
+        }
+
+        cached = type.ResolveFieldUncached(name); // throws when not found
+        byName[name] = cached;
+        return cached;
+    }
+
+    public static MethodInfo easyMethod(this Type type, String name, bool needThrow = true)
+    {
+        var byName = MethodCache.GetOrAdd(type, _ => new System.Collections.Concurrent.ConcurrentDictionary<string, MethodInfo>());
+        MethodInfo cached;
+        if (byName.TryGetValue(name, out cached))
+        {
+            return cached;
+        }
+
+        cached = type.ResolveMethodUncached(name, needThrow);
+        if (cached != null)
+        {
+            byName[name] = cached;
+        }
+
+        return cached;
+    }
+
+        private static FieldInfo ResolveFieldUncached(this Type type, String name)
         {
             var fieldInfo = type.GetField(name,
                 BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
@@ -43,13 +84,14 @@ namespace NAPI
             if (type != null)
             {
                 easyField(type, name).SetValue(instance, value);
+         return; // was missing: value applied twice (base type, then derived type)
             }
 
             easyField(instance.GetType(), name).SetValue(instance, value);
         }
 
 
-        public static MethodInfo easyMethod(this Type type, String name, bool needThrow = true)
+        private static MethodInfo ResolveMethodUncached(this Type type, String name, bool needThrow = true)
         {
             var methodInfo = type.GetMethod(name,
                 BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);

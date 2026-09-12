@@ -1,3 +1,4 @@
+﻿using System;
 using System.Reflection;
 using NLog;
 using Torch.Commands;
@@ -24,7 +25,18 @@ namespace SentisOptimisationsPlugin
 
         private static bool PluginsMPatched()
         {
+        try
+        {
             return false;
+        
+
+
+            }
+                catch (Exception __guard_e)
+                {
+                    Log.Error("PluginsMPatched exception " + __guard_e);
+                    return true;  // fall back to vanilla behavior
+                }
         }
     }
 }

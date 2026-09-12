@@ -204,3 +204,68 @@ namespace SentisOptimisations.Tests
         }
     }
 }
+
+namespace SentisOptimisations.Tests
+{
+    // Target for the Ext2 regressions: a private field that is only findable via the BASE type.
+    public class CacheFieldBase
+    {
+        private int _hidden = 0;
+        public int Hidden => _hidden;
+    }
+
+    public class CacheFieldDerived : CacheFieldBase
+    {
+    }
+
+    /// <summary>
+    /// Ext2 (NAPI.Ext2 lives in all three plugin assemblies -> reach it by reflection).
+    /// </summary>
+    public class Ext2CacheTests
+    {
+        private static System.Reflection.MethodInfo Ext2(string name)
+        {
+            var t = typeof(SentisOptimisationsPlugin.SentisOptimisationsPlugin).Assembly.GetType("NAPI.Ext2");
+            var m = t.GetMethod(name);
+            Assert.NotNull(m);
+            return m;
+        }
+
+        [Fact]
+        public void easyField_returns_cached_same_instance()
+        {
+            var easyField = Ext2("easyField");
+            var a = (System.Reflection.FieldInfo)easyField.Invoke(null, new object[] { typeof(CacheFieldBase), "_hidden" });
+            var b = (System.Reflection.FieldInfo)easyField.Invoke(null, new object[] { typeof(CacheFieldBase), "_hidden" });
+            Assert.NotNull(a);
+            Assert.Same(a, b); // cache hit must return the identical FieldInfo
+        }
+
+        [Fact]
+        public void easySetField_with_explicit_type_does_not_apply_twice()
+        {
+            // Regression: with type != null the old code set the field once via the base type and
+            // then AGAIN via instance.GetType() - which cannot see a private base member and threw
+            // (or silently hit a different field). One instance, one value, no exception.
+            var easySetField = Ext2("easySetField");
+            var instance = new CacheFieldDerived();
+            var ex = Record.Exception(() => easySetField.Invoke(null,
+                new object[] { instance, "_hidden", 7, typeof(CacheFieldBase) }));
+            Assert.Null(ex);
+            Assert.Equal(7, ((CacheFieldBase)instance).Hidden);
+        }
+
+        [Fact]
+        public void easyMethod_negative_lookups_are_not_poisoned()
+        {
+            var easyMethod = Ext2("easyMethod");
+            var missing = easyMethod.Invoke(null,
+                new object[] { typeof(CacheFieldDerived), "NoSuchMethodAnywhere", false });
+            Assert.Null(missing);
+            // and a real method still resolves after the miss
+            var found = (System.Reflection.MethodInfo)easyMethod.Invoke(null,
+                new object[] { typeof(CacheFieldDerived), "get_Hidden", true });
+            Assert.NotNull(found);
+        }
+    }
+}

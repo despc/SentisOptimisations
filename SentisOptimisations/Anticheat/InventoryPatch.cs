@@ -1,3 +1,4 @@
+﻿using System;
 using System.Reflection;
 using Sandbox.Common.ObjectBuilders.Definitions;
 using Sandbox.Game;
@@ -27,6 +28,8 @@ namespace SentisOptimisationsPlugin
         private static bool TransferItemsFromPatched(IMyInventory sourceInventory,
             int sourceItemIndex, ref MyFixedPoint? amount, ref bool __result)
         {
+        try
+        {
             if (amount.HasValue && amount.Value <= 0)
             {
                 __result = true;
@@ -49,6 +52,15 @@ namespace SentisOptimisationsPlugin
             }
 
             return true;
+        
+
+
+            }
+                catch (Exception __guard_e)
+                {
+                    global::NLog.LogManager.GetCurrentClassLogger().Error("TransferItemsFromPatched exception " + __guard_e);
+                    return true;  // fall back to vanilla behavior
+                }
         }
     }
 }
