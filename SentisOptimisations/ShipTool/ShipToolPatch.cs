@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Reflection;
@@ -276,6 +276,15 @@ namespace SentisOptimisationsPlugin.ShipTool
             return false;
         }
 
+        // AsyncWeld v2: everything that touches game state runs inline on the game thread.
+        // The speed used to come from running the scan on worker threads, but those scans read
+        // Havok broadphase / conveyor / grid state while the game mutated it (crashes and stale
+        // weld/grind results). The safe and *faster* equivalent used here:
+        //  * entity discovery via the EntitiesObserver AABB cache instead of a physics sphere query
+        //    (falls back to the vanilla query when the cache is not populated);
+        //  * the O(min(volume, cubes)) GetBlocksInsideSpheres replacement patch (already game-thread);
+        //  * the per-block caps in WelderOptimization / ActivateCommon throttling.
+        // No queueing, no InvokeOnGameThread, no 10-60 tick StartAt latency.
         private static void DoActivateCommon(MyShipToolBase __instance)
         {
             BoundingSphere m_detectorSphere = _detectorSphere.Invoke(__instance);
@@ -284,29 +293,35 @@ namespace SentisOptimisationsPlugin.ShipTool
                 (double)m_detectorSphere.Radius);
             BoundingSphereD sphere = new BoundingSphereD(boundingSphereD.Center,
                 (double)m_detectorSphere.Radius * 0.5);
-            
+
             __instance.easySetField("m_isActivatedOnSomething", false, typeof(MyShipToolBase));
             bool flag = false;
-            if (SentisOptimisationsPlugin.Config.AsyncWeld && __instance.CubeGrid.LinearVelocity.Length() < 1)
-            {
-                var shipToolsAsyncQueues = SentisOptimisationsPlugin.Instance.WeldAsyncQueue;
-                var runInFrame = MySession.Static.GameplayFrameCounter + r.Next(10, 60);
-                shipToolsAsyncQueues.EnqueueAction(() =>
-                {
-                    List<MyEntity> topEntities = GetTopEntitiesInSphereAsync(boundingSphereD);
-                    var entitiesInContactAsync = GetEntitiesInContact(__instance, topEntities, ref flag);
-                    MyAPIGateway.Utilities.InvokeOnGameThread(() =>
-                    {
-                        ProcessEntitiesInContact(__instance, boundingSphereD, flag, entitiesInContactAsync, sphere);
-                    }, StartAt: runInFrame);
-                });
-                return;
-            }
 
-            var topEntities = MyEntities.GetTopMostEntitiesInSphere(ref boundingSphereD);
+            var topEntities = GetTopMostEntitiesInSphereFast(ref boundingSphereD);
             var entitiesInContactSync = GetEntitiesInContact(__instance, topEntities, ref flag);
-            ProcessEntitiesInContact(__instance,  boundingSphereD, flag, entitiesInContactSync, sphere);
+            ProcessEntitiesInContact(__instance, boundingSphereD, flag, entitiesInContactSync, sphere);
             topEntities.Clear();
+        }
+
+        /// <summary>
+        /// Game-thread entity discovery: cheap AABB filter over the observed-entity cache, which
+        /// avoids a Havok broadphase query for every active welder/grinder tick.
+        /// </summary>
+        public static List<MyEntity> GetTopMostEntitiesInSphereFast(ref BoundingSphereD sphere)
+        {
+            var observed = EntitiesObserver.EntitiesToShipTools;
+            if (observed.Count == 0)
+                return MyEntities.GetTopMostEntitiesInSphere(ref sphere);
+
+            var result = new List<MyEntity>();
+            foreach (var entity in observed)
+            {
+                if (entity == null || entity.MarkedForClose)
+                    continue;
+                if (entity.PositionComp.WorldAABB.Intersects(sphere))
+                    result.Add(entity);
+            }
+            return result;
         }
 
         private static void ProcessEntitiesInContact(MyShipToolBase __instance,
@@ -321,7 +336,7 @@ namespace SentisOptimisationsPlugin.ShipTool
                 MyCharacter myCharacter = myEntity as MyCharacter;
                 MyCubeGrid myCubeGrid = myEntity as MyCubeGrid;
 
-                if (myCubeGrid != null && !SentisOptimisationsPlugin.Config.AsyncWeld)
+                if (myCubeGrid != null)
                 {
                     HashSet<MySlimBlock> mTempBlocksBuffer = new HashSet<MySlimBlock>();
                     myCubeGrid.GetBlocksInsideSphere(ref boundingSphereD, mTempBlocksBuffer);
@@ -347,11 +362,6 @@ namespace SentisOptimisationsPlugin.ShipTool
                 }
             }
 
-            if (SentisOptimisationsPlugin.Config.AsyncWeld)
-            {
-                CollectTargetBlocksAsyncAndCallActivate(__instance, boundingSphereD, entitiesInContact);
-                return;
-            }
             CallActivate(__instance, blocksToActivateOnSync);
         }
 
@@ -377,67 +387,7 @@ namespace SentisOptimisationsPlugin.ShipTool
             return entitiesInContact;
         }
 
-        private static List<MyEntity> GetTopEntitiesInSphereAsync(BoundingSphereD boundingSphereD)
-        {
-            try
-            {
-                List<MyEntity> entitiesInSphereAsync = new List<MyEntity>();
-                foreach (var entity in new HashSet<MyEntity>(EntitiesObserver.EntitiesToShipTools))
-                {
-                    if (entity.PositionComp.WorldAABB.Intersects(boundingSphereD))
-                    {
-                        entitiesInSphereAsync.Add(entity);
-                    }
-                }
-                return entitiesInSphereAsync;
-            }
-            catch (Exception e)
-            {
-                Log.Error("Async exception " + e);
-            }
 
-            return new List<MyEntity>();
-        }
-
-        private static async void CollectTargetBlocksAsyncAndCallActivate(MyShipToolBase myShipToolBase,
-            BoundingSphereD boundingSphereD, HashSet<MyEntity> entitiesInContact)
-        {
-            var shipToolsAsyncQueues = SentisOptimisationsPlugin.Instance.WeldAsyncQueue;
-            var asynActionsCount = shipToolsAsyncQueues.AsynActions.Count;
-            shipToolsAsyncQueues.EnqueueAction(() =>
-            {
-                var resultBlocksToActivateOnAsync = CollectBlocks(new HashSet<MyEntity>(entitiesInContact));
-                MyAPIGateway.Utilities.InvokeOnGameThread(() => CallActivate(myShipToolBase, resultBlocksToActivateOnAsync));
-            });
-            
-            HashSet<MySlimBlock> CollectBlocks(HashSet<MyEntity> entitiesInContactAsync)
-            {
-                var blocksToActivateOnAsync = new HashSet<MySlimBlock>();
-                try
-                {
-                    foreach (MyEntity myEntity in entitiesInContactAsync)
-                    {
-                        if (myEntity is MyCubeGrid myCubeGrid)
-                        {
-                            BoundingSphere m_detectorSphere = _detectorSphere.Invoke(myShipToolBase);
-                            BoundingSphereD boundingSphereD = new BoundingSphereD(Vector3D.Transform(m_detectorSphere.Center, myShipToolBase.CubeGrid.WorldMatrix),
-                                (double)m_detectorSphere.Radius);
-                            HashSet<MySlimBlock> mTempBlocksBuffer = new HashSet<MySlimBlock>();
-                            myCubeGrid.GetBlocksInsideSphere(ref boundingSphereD, mTempBlocksBuffer);
-                            blocksToActivateOnAsync.UnionWith(mTempBlocksBuffer);
-                        }
-                    }
-
-                    return blocksToActivateOnAsync;
-                }
-                catch (Exception e)
-                {
-                    SentisOptimisationsPlugin.Log.Error(e);
-                }
-
-                return blocksToActivateOnAsync;
-            }
-        }
 
         private static void CheckEnvironment(MyShipToolBase __instance, BoundingSphereD boundingSphereD, bool flag)
         {
