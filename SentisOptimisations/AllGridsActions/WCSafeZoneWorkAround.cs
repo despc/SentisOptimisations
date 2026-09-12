@@ -16,7 +16,7 @@ namespace SentisOptimisationsPlugin.AllGridsActions
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
         private int _cooldown = 1;
 
-        public void ResizeSZ(HashSet<MySafeZone> safezones)
+        public void ResizeSZ(System.Collections.Generic.IEnumerable<MySafeZone> safezones)
         {
             if (_cooldown < 5)
             {

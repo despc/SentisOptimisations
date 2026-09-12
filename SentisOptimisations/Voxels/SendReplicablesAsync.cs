@@ -10,6 +10,7 @@ namespace SentisOptimisationsPlugin
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
         public static Queue<AsyncSync.ISendToClientWrapper> _queue = new Queue<AsyncSync.ISendToClientWrapper>(2048);
+        private static DateTime _lastErrorLogged = DateTime.MinValue;
        
         public CancellationTokenSource CancellationTokenSource { get; set; }
 
@@ -51,7 +52,13 @@ namespace SentisOptimisationsPlugin
                     }
                     catch (Exception e)
                     {
-                        // Log.Error("Send to client loop Error", e);
+                        // throttled: this loop runs every ~1 ms; one line per 5 s is enough
+                        var now = DateTime.Now;
+                        if (now - _lastErrorLogged > TimeSpan.FromSeconds(5))
+                        {
+                            _lastErrorLogged = now;
+                            Log.Error("Send to client loop Error (further errors throttled for 5 s)", e);
+                        }
                     }
                 }
             }

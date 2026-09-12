@@ -12,7 +12,7 @@ namespace SentisOptimisationsPlugin
     public static class GasTankOptimisations
     {
         private static ConcurrentDictionary<MyGasTank, List<double>> _accumulatedTransfer = new();
-        private static Dictionary<long, List<float>> _accumulatedTransferVent = new();
+        private static ConcurrentDictionary<long, List<float>> _accumulatedTransferVent = new();
         public static void Patch(PatchContext ctx) => global::SentisOptimisations.PatchGuard.Run("GasTankOptimisations", ctx, PatchImpl);
 
         internal static void PatchImpl(PatchContext ctx)
@@ -45,23 +45,34 @@ namespace SentisOptimisationsPlugin
             {
                 return true;
             }
-            List<double> accumulatedTransfers;
-            _accumulatedTransfer.TryGetValue(__instance, out accumulatedTransfers);
-            if (accumulatedTransfers == null)
+            var accumulatedTransfers = _accumulatedTransfer.GetOrAdd(__instance, _ => new List<double>());
+            lock (accumulatedTransfers)
             {
-                accumulatedTransfers = new List<double>();
-                _accumulatedTransfer[__instance] = accumulatedTransfers;
+                if (accumulatedTransfers.Count >= 30)
+                {
+                    // flush = everything accumulated PLUS the transfer being made right now
+                    totalTransfer = accumulatedTransfers.Sum() + totalTransfer;
+                    accumulatedTransfers.Clear();
+                    _accumulatedTransfer.TryRemove(__instance, out _);
+                    return true;
+                }
+                accumulatedTransfers.Add(totalTransfer);
+                return false;
             }
-            if (accumulatedTransfers.Count >= 30)
+        }
+
+        /// <summary>Drop per-entity state when an entity is destroyed (called from EntitiesObserver).</summary>
+        public static void CleanupEntity(VRage.Game.Entity.MyEntity entity)
+        {
+            if (entity is MyGasTank tank)
             {
-                double sum = accumulatedTransfers.Sum();
-                totalTransfer = sum;
-                accumulatedTransfers.Clear();
-                _accumulatedTransfer.Remove(__instance);
-                return true;
+                _accumulatedTransfer.TryRemove(tank, out _);
             }
-            accumulatedTransfers.Add(totalTransfer);
-            return false;
+            else if (entity is MyAirVent vent)
+            {
+                List<float> dropped;
+                _accumulatedTransferVent.TryRemove(vent.EntityId, out dropped);
+            }
         }
         
         private static bool MethodExecuteGasTransferPatchedVent(MyAirVent __instance, ref float transferAmount)
@@ -74,22 +85,21 @@ namespace SentisOptimisationsPlugin
             {
                 return true;
             }
-            List<float> accumulatedTransfers;
-            _accumulatedTransferVent.TryGetValue(__instance.EntityId, out accumulatedTransfers);
-            if (accumulatedTransfers == null)
+            var accumulatedTransfers = _accumulatedTransferVent.GetOrAdd(__instance.EntityId, _ => new List<float>());
+            lock (accumulatedTransfers)
             {
-                accumulatedTransfers = new List<float>();
-                _accumulatedTransferVent[__instance.EntityId] = accumulatedTransfers;
+                if (accumulatedTransfers.Count >= 30)
+                {
+                    // flush = everything accumulated PLUS the transfer being made right now
+                    transferAmount = accumulatedTransfers.Sum() + transferAmount;
+                    accumulatedTransfers.Clear();
+                    List<float> dropped;
+                    _accumulatedTransferVent.TryRemove(__instance.EntityId, out dropped);
+                    return true;
+                }
+                accumulatedTransfers.Add(transferAmount);
+                return false;
             }
-            if (accumulatedTransfers.Count >= 30)
-            {
-                float sum = accumulatedTransfers.Sum();
-                transferAmount = sum;
-                accumulatedTransfers.Clear();
-                return true;
-            }
-            accumulatedTransfers.Add(transferAmount);
-            return false;
         }
     }
 }

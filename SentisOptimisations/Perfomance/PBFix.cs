@@ -32,6 +32,13 @@ namespace SentisOptimisationsPlugin
         public static ConcurrentDictionary<long, byte> needUpdateGridBlocksOwnership =
             new ConcurrentDictionary<long, byte>();
         
+        /// <summary>Drop overheat state when a programmable block is destroyed.</summary>
+        public static void CleanupEntity(VRage.Game.Entity.MyEntity entity)
+        {
+            if (entity is Sandbox.Game.Entities.Blocks.MyProgrammableBlock pb)
+                pbOverHeatDict.TryRemove(pb, out _);
+        }
+
         public static ConcurrentDictionary<MyProgrammableBlock, int> pbOverHeatDict =
             new ConcurrentDictionary<MyProgrammableBlock, int>();
         public static Dictionary<long, int> Cooldowns = new Dictionary<long, int>();
