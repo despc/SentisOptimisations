@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Threading;
@@ -802,15 +802,28 @@ public static class FreezerPatches
 
     private static bool RefreshCustomInfoPatched(MyTerminalBlock __instance)
     {
+    try
+    {
         if (((uint)__instance.CubeGrid.Flags & 4) > 0)
         {
             return false;
         }
 
         return true;
+    
+
+
+        }
+            catch (Exception __guard_e)
+            {
+                SentisOptimisationsPlugin.Log.Error("RefreshCustomInfoPatched exception " + __guard_e);
+                return true;  // fall back to vanilla behavior
+            }
     }
 
     private static bool OnMotionDynamicPatched(MyPhysicsBody __instance)
+    {
+    try
     {
         if (!SentisOptimisationsPlugin.Config.FreezePhysics)
         {
@@ -826,11 +839,22 @@ public static class FreezerPatches
         }
 
         return true;
+    
+
+
+        }
+            catch (Exception __guard_e)
+            {
+                SentisOptimisationsPlugin.Log.Error("OnMotionDynamicPatched exception " + __guard_e);
+                return true;  // fall back to vanilla behavior
+            }
     }
 
     private static bool AddItemsPatched(MyInventory __instance,
         ref MyFixedPoint amount,
         MyObjectBuilder_Base objectBuilder)
+    {
+    try
     {
         IMyEntity entity = __instance.Entity;
 
@@ -891,5 +915,14 @@ public static class FreezerPatches
         }
 
         return true;
+    
+
+
+        }
+            catch (Exception __guard_e)
+            {
+                SentisOptimisationsPlugin.Log.Error("AddItemsPatched exception " + __guard_e);
+                return true;  // fall back to vanilla behavior
+            }
     }
 }

@@ -6,6 +6,63 @@ namespace SentisOptimisations
 {
     public static class ReflectionUtils
     {
+
+    // (Type, name) caches: EasyField linearly scanned every field and InvokeInstanceMethod
+            // redid GetMethod on every call; both run on per-tick paths (ship tools, turrets).
+            private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type,
+                System.Collections.Concurrent.ConcurrentDictionary<string, FieldInfo>> _easyFieldCache =
+                new System.Collections.Concurrent.ConcurrentDictionary<Type,
+                    System.Collections.Concurrent.ConcurrentDictionary<string, FieldInfo>>();
+
+            private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type,
+                System.Collections.Concurrent.ConcurrentDictionary<string, MethodInfo>> _methodCache =
+                new System.Collections.Concurrent.ConcurrentDictionary<Type,
+                    System.Collections.Concurrent.ConcurrentDictionary<string, MethodInfo>>();
+
+            public static FieldInfo EasyField(this Type type, string name, bool needThrow = true)
+            {
+                var byName = _easyFieldCache.GetOrAdd(type, _ =>
+                    new System.Collections.Concurrent.ConcurrentDictionary<string, FieldInfo>());
+                FieldInfo cached;
+                if (byName.TryGetValue(name, out cached))
+                {
+                    return cached;
+                }
+
+                cached = type.EasyFieldUncached(name, false);
+                if (cached != null)
+                {
+                    byName[name] = cached;
+                    return cached;
+                }
+
+                if (needThrow)
+                {
+                    throw new Exception("Field " + name + " not found on " + type.Name);
+                }
+
+                return null;
+            }
+
+            internal static object InvokeInstanceMethod(Type type, object instance, string methodName, Object[] args)
+            {
+                var byName = _methodCache.GetOrAdd(type, _ =>
+                    new System.Collections.Concurrent.ConcurrentDictionary<string, MethodInfo>());
+                MethodInfo cached;
+                if (!byName.TryGetValue(methodName, out cached))
+                {
+                    BindingFlags bindFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+                                             | BindingFlags.Static;
+                    cached = type.GetMethod(methodName, bindFlags);
+                    if (cached != null)
+                    {
+                        byName[methodName] = cached;
+                    }
+                }
+
+                return cached.Invoke(instance, args);
+            }
+
         
         public const BindingFlags InstanceFlags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
 
@@ -56,7 +113,7 @@ namespace SentisOptimisations
             FieldInfo field = instance.GetType().GetField(fieldName, bindFlags);
             return field.GetValue(instance);
         }
-        public static FieldInfo EasyField(this Type type, string name, bool needThrow = true)
+        private static FieldInfo EasyFieldUncached(this Type type, string name, bool needThrow = true)
         {
             var ms = type.GetFields(all);
             foreach (var t in ms)
@@ -90,7 +147,7 @@ namespace SentisOptimisations
             field.SetValue(null, value);
         }
         
-        internal static object InvokeInstanceMethod(Type type, object instance, string methodName, Object[] args)
+        private static object InvokeInstanceMethodUncached(Type type, object instance, string methodName, Object[] args)
         {
             BindingFlags bindFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
                                      | BindingFlags.Static;

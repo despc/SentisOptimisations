@@ -110,6 +110,8 @@ namespace SentisOptimisationsPlugin
                 AllGridsProcessor.OnUnloading();
                 _replicablesAsync.OnUnloading();
                 DelayedProcessor.OnUnloading();
+                MyEntities.OnEntityAdd -= EntitiesObserver.MyEntitiesOnOnEntityAdd;
+                MyEntities.OnEntityRemove -= EntitiesObserver.MyEntitiesOnOnEntityRemove;
                 EntitiesObserver.ClearAll();
             }
             else
@@ -119,6 +121,11 @@ namespace SentisOptimisationsPlugin
                 AllGridsProcessor.OnLoaded();
                 _replicablesAsync.OnLoaded();
                 DelayedProcessor.OnLoaded();
+                // re-subscribe (idempotent) for worlds loaded after Init, then seed the cache
+                MyEntities.OnEntityAdd -= EntitiesObserver.MyEntitiesOnOnEntityAdd;
+                MyEntities.OnEntityAdd += EntitiesObserver.MyEntitiesOnOnEntityAdd;
+                MyEntities.OnEntityRemove -= EntitiesObserver.MyEntitiesOnOnEntityRemove;
+                MyEntities.OnEntityRemove += EntitiesObserver.MyEntitiesOnOnEntityRemove;
                 EntitiesObserver.PrimeFromAllEntities();
                 InitShieldApi();
             }

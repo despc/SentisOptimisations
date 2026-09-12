@@ -1,3 +1,4 @@
+﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
 using NLog;
@@ -28,6 +29,8 @@ namespace SentisOptimisationsPlugin
 
         private static void MethodOnBlockAddedPatched(MyCubeGridSystems __instance, MySlimBlock block)
         {
+        try
+        {
             if (VoxelProtectorPatch.Protectors == null)
             {
                 if (block.FatBlock is MyUpgradeModule)
@@ -49,6 +52,15 @@ namespace SentisOptimisationsPlugin
                     }
                 }
             }
+        
+
+
+            }
+                catch (Exception __guard_e)
+                {
+                    Log.Error("MethodOnBlockAddedPatched exception " + __guard_e);
+
+                }
         }
     }
 }

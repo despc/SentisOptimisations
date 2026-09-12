@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -233,7 +233,18 @@ namespace SentisOptimisationsPlugin.CrashFix
         
         private static void MethodPistonInitPatched(MyPistonBase __instance)
         {
+        try
+        {
             __instance.Velocity.ValueChanged += VelocityOnValueChanged;
+        
+
+
+            }
+                catch (Exception __guard_e)
+                {
+                    SentisOptimisationsPlugin.Log.Error("MethodPistonInitPatched exception " + __guard_e);
+
+                }
         }
         
         private static bool CreateCompilationPatched(MyScriptCompiler __instance, string assemblyFileName,

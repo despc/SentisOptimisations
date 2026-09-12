@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -88,6 +88,8 @@ namespace SentisOptimisationsPlugin
         
         private static bool CompileActionPatched(MyProgrammableBlock __instance, string program)
         {
+        try
+        {
             if (program != null && program.Contains("double maxCurrentMs = 0.5;"))
             {
                 var newProgram = program.Replace("double maxCurrentMs = 0.5;", "double maxCurrentMs = 0.1;");
@@ -95,13 +97,33 @@ namespace SentisOptimisationsPlugin
                 return false;
             }
             return true;
+        
+
+
+            }
+                catch (Exception __guard_e)
+                {
+                    Log.Error("CompileActionPatched exception " + __guard_e);
+                    return true;  // fall back to vanilla behavior
+                }
         }
         
         private static void RecalculateOwnersInternalPatched(Object __instance)
         {
+        try
+        {
             MyCubeGrid cubeGrid =
                 (MyCubeGrid) ReflectionUtils.GetInstanceField(__instance.GetType(), __instance, "m_grid");
             needUpdateGridBlocksOwnership[cubeGrid.EntityId] = 0;
+        
+
+
+            }
+                catch (Exception __guard_e)
+                {
+                    Log.Error("RecalculateOwnersInternalPatched exception " + __guard_e);
+
+                }
         }
 
         private static bool RunSandboxedProgramActionPatched(MyProgrammableBlock __instance,

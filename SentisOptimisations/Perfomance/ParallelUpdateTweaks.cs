@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
 using HarmonyLib;
@@ -124,13 +124,35 @@ namespace FixTurrets.Perfomance
         
         private static bool Disabled()
         {
+        try
+        {
             return false;
+        
+
+
+            }
+                catch (Exception __guard_e)
+                {
+                    Log.Error("Disabled exception " + __guard_e);
+                    return true;  // fall back to vanilla behavior
+                }
         }
         
         private static bool RewritePatched(SyntaxTree syntaxTree, ref SyntaxTree __result)
         {
+        try
+        {
             __result = syntaxTree;
             return false;
+        
+
+
+            }
+                catch (Exception __guard_e)
+                {
+                    Log.Error("RewritePatched exception " + __guard_e);
+                    return true;  // fall back to vanilla behavior
+                }
         }
     }
 }

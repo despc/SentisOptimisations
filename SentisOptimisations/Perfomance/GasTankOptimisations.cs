@@ -1,3 +1,4 @@
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -37,6 +38,8 @@ namespace SentisOptimisationsPlugin
 
         private static bool MethodExecuteGasTransferPatched(MyGasTank __instance, ref double totalTransfer)
         {
+        try
+        {
             if (!SentisOptimisationsPlugin.Config.GasTankOptimisation)
             {
                 return true;
@@ -59,6 +62,15 @@ namespace SentisOptimisationsPlugin
                 accumulatedTransfers.Add(totalTransfer);
                 return false;
             }
+        
+
+
+            }
+                catch (Exception __guard_e)
+                {
+                    global::NLog.LogManager.GetCurrentClassLogger().Error("MethodExecuteGasTransferPatched exception " + __guard_e);
+                    return true;  // fall back to vanilla behavior
+                }
         }
 
         /// <summary>Drop per-entity state when an entity is destroyed (called from EntitiesObserver).</summary>
@@ -76,6 +88,8 @@ namespace SentisOptimisationsPlugin
         }
         
         private static bool MethodExecuteGasTransferPatchedVent(MyAirVent __instance, ref float transferAmount)
+        {
+        try
         {
             if (!SentisOptimisationsPlugin.Config.GasTankOptimisation)
             {
@@ -100,6 +114,15 @@ namespace SentisOptimisationsPlugin
                 accumulatedTransfers.Add(transferAmount);
                 return false;
             }
+        
+
+
+            }
+                catch (Exception __guard_e)
+                {
+                    global::NLog.LogManager.GetCurrentClassLogger().Error("MethodExecuteGasTransferPatchedVent exception " + __guard_e);
+                    return true;  // fall back to vanilla behavior
+                }
         }
     }
 }
