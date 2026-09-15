@@ -38,8 +38,9 @@ namespace SentisGameplayImprovements.AllGridsActions
             if (entity is MyCubeGrid)
             {
                 MyCubeGrids.Remove((MyCubeGrid) entity);
-                FreezeLogic.FrozenGrids.Remove(entity.EntityId);
-                FreezeLogic.FrozenPhysicsGrids.Remove(entity.EntityId);
+                // drops frozen-state + compensation stamps: a stale stamp under a recycled
+                // EntityId would hand the next block that gets this id a bogus delta
+                FreezeLogic.ForgetGrid((MyCubeGrid) entity);
                 return;
             }
 
