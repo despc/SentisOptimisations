@@ -13,6 +13,7 @@ using Sandbox.Game.Entities.Cube;
 using Sandbox.ModAPI;
 using SentisOptimisations;
 using SentisOptimisations.DelayedLogic;
+using SentisOptimisations.Utils;
 using VRage.Game;
 using VRage.Game.Entity;
 using VRage.Game.Entity.EntityComponents.Interfaces;
@@ -25,12 +26,21 @@ namespace SentisOptimisationsPlugin.Freezer;
 public class FreezeLogic
 {
     private static int _wakeupTimeInSec = 10;
-    public static HashSet<long> FrozenGrids = new();
-    public static HashSet<long> FrozenPhysicsGrids = new();
-    public static HashSet<long> InFreezeQueue = new();
-    private Dictionary<long, DateTime> WakeUpDatas = new(); //EntityId:NextWakeUpTime
-    public static ConcurrentDictionary<long, ulong> LastUpdateFrames = new(); //BlockId:LastUpdateFrame
-    public static List<float> CpuLoads = new();
+
+    // Written by the game thread (freeze/unfreeze actions, entity-removal observer) and read/
+    // written by the background FreezerLoop; plain HashSet would race and can throw or tear.
+    public static ConcurrentHashSet<long> FrozenGrids = new();
+    public static ConcurrentHashSet<long> FrozenPhysicsGrids = new();
+    public static ConcurrentHashSet<long> InFreezeQueue = new();
+    private static readonly Dictionary<long, DateTime> WakeUpDatas = new(); //EntityId:NextWakeUpTime
+    private static readonly object _wakeUpLock = new();
+
+    // sanity cap for one compensation: at 60 fps this is ~8 hours of simulation
+    internal const ulong MaxCompensationFrames = 60UL * 60 * 8;
+
+    // Written by the FreezerLoop thread, averaged by the same/other loops - lock it.
+    private static readonly List<float> CpuLoads = new();
+    private static readonly object CpuLoadLock = new();
 
     public void CheckGridGroup(HashSet<MyCubeGrid> grids)
     {
@@ -83,10 +93,7 @@ public class FreezeLogic
     private void UnfreezeGrids(HashSet<MyCubeGrid> grids, bool isWakeUpTime)
     {
         var minEntityId = grids.MinBy(grid => grid.EntityId).EntityId;
-        lock (InFreezeQueue)
-        {
-            InFreezeQueue.Remove(minEntityId);
-        }
+        InFreezeQueue.Remove(minEntityId);
 
         var groupWithFixedGrid = GroupContainsFixedGrid(grids);
 
@@ -109,17 +116,17 @@ public class FreezeLogic
 
             if (!isWakeUpTime)
             {
-                WakeUpDatas.Remove(grid.EntityId);
+                lock (_wakeUpLock)
+                {
+                    WakeUpDatas.Remove(grid.EntityId);
+                }
             }
 
             if (grid.Parent == null)
             {
                 Log("Unfreeze grid " + grid.DisplayName);
                 FrozenGrids.Remove(grid.EntityId);
-                lock (InFreezeQueue)
-                {
-                    InFreezeQueue.Remove(grid.EntityId);
-                }
+                InFreezeQueue.Remove(grid.EntityId);
 
                 CompensateFrozenFrames(grid);
                 
@@ -150,6 +157,7 @@ public class FreezeLogic
 
     private static void CompensateFrozenFrames(MyCubeGrid grid)
     {
+        var frame = MySandboxGame.Static.SimulationFrameCounter;
         foreach (var myCubeBlock in grid.GetFatBlocks())
         {
             if (!(myCubeBlock is MyFunctionalBlock))
@@ -157,6 +165,7 @@ public class FreezeLogic
                 continue;
             }
 
+            var blockId = myCubeBlock.EntityId;
             var needToCompensate = NeedToCompensate((MyFunctionalBlock)myCubeBlock);
             if (needToCompensate)
             {
@@ -164,29 +173,55 @@ public class FreezeLogic
                     (MyTimerComponent)myCubeBlock.easyGetField("m_timer", typeof(MyFunctionalBlock));
                 if (timer != null)
                 {
-                    if (LastUpdateFrames.TryGetValue(myCubeBlock.EntityId, out var lastUpdateFrame))
+                    // Accumulate the frozen period; a previous pending period is NOT overwritten.
+                    if (!CompensationTracker.OnUnfrozen(blockId, frame, MaxCompensationFrames))
+                        continue;
+                    if (!CompensationTracker.TryScheduleApply(blockId))
+                        continue; // an already-scheduled apply will pick everything up
+
+                    // Apply after the unfrozen blocks have run a couple of normal frames. The
+                    // apply takes the ACCUMULATED total atomically; if the block got frozen
+                    // again in the meantime the total survives for the next apply.
+                    MyAPIGateway.Utilities.InvokeOnGameThread(() =>
                     {
-                        var framesAfterFreeze =
-                            (uint)(MySandboxGame.Static.SimulationFrameCounter - lastUpdateFrame);
-                        MyAPIGateway.Utilities.InvokeOnGameThread(() =>
+                        try
                         {
-                            try
+                            if (CompensationTracker.IsFrozen(blockId))
                             {
-                                timer.FramesFromLastTrigger = framesAfterFreeze;
+                                CompensationTracker.ReleaseSchedule(blockId);
+                                return;
+                            }
+
+                            if (myCubeBlock.Closed || myCubeBlock.MarkedForClose)
+                            {
+                                CompensationTracker.Forget(blockId);
+                                return;
+                            }
+
+                            if (CompensationTracker.TryTakeCompensation(blockId, out var framesAfterFreeze))
+                            {
+                                // ADD to whatever vanilla accumulated during the apply window
+                                // instead of overwriting: overwriting silently dropped the
+                                // ~2 s of real production of that window.
+                                var vanilla = timer.FramesFromLastTrigger;
+                                timer.FramesFromLastTrigger =
+                                    uint.MaxValue - vanilla < framesAfterFreeze
+                                        ? uint.MaxValue
+                                        : vanilla + framesAfterFreeze;
                                 grid.PlayerPresenceTier = MyUpdateTiersPlayerPresence.Normal;
                             }
-                            catch (Exception ex)
-                            {
-                                SentisOptimisationsPlugin.Log.Error(ex, "Compensate exception");
-                            }
-                        }, StartAt: (int)(MySandboxGame.Static.SimulationFrameCounter + 120));
-                        LastUpdateFrames.Remove(myCubeBlock.EntityId);
-                    }
+                        }
+                        catch (Exception ex)
+                        {
+                            CompensationTracker.ReleaseSchedule(blockId);
+                            SentisOptimisationsPlugin.Log.Error(ex, "Compensate exception");
+                        }
+                    }, StartAt: (int)(frame + 120));
                 }
             }
             else
             {
-                LastUpdateFrames.Remove(myCubeBlock.EntityId);
+                CompensationTracker.Forget(blockId);
             }
         }
     }
@@ -231,38 +266,37 @@ public class FreezeLogic
         var minEntityId = grids.MinBy(grid => grid.EntityId).EntityId;
         if (needToAwake)
         {
-            if (WakeUpDatas.TryGetValue(minEntityId, out var dateTime))
+            lock (_wakeUpLock)
             {
-                if (DateTime.Now.AddSeconds(_wakeupTimeInSec) > dateTime)
+                if (WakeUpDatas.TryGetValue(minEntityId, out var dateTime))
                 {
-                    WakeUpDatas[minEntityId] = DateTime.Now +
-                                               TimeSpan.FromSeconds(
-                                                   SentisOptimisationsPlugin.Config.MinWakeUpIntervalInSec +
-                                                   minEntityId % SentisOptimisationsPlugin.Config
-                                                       .MinWakeUpIntervalInSec);
+                    if (DateTime.Now.AddSeconds(_wakeupTimeInSec) > dateTime)
+                    {
+                        WakeUpDatas[minEntityId] = DateTime.Now +
+                                                   TimeSpan.FromSeconds(
+                                                       SentisOptimisationsPlugin.Config.MinWakeUpIntervalInSec +
+                                                       minEntityId % SentisOptimisationsPlugin.Config
+                                                           .MinWakeUpIntervalInSec);
+                    }
+                    else if (DateTime.Now < dateTime && dateTime < DateTime.Now.AddSeconds(_wakeupTimeInSec))
+                    {
+                        return;
+                    }
                 }
-                else if (DateTime.Now < dateTime && dateTime < DateTime.Now.AddSeconds(_wakeupTimeInSec))
+                else
                 {
-                    return;
+                    WakeUpDatas.Add(minEntityId,
+                        DateTime.Now + TimeSpan.FromSeconds(SentisOptimisationsPlugin.Config.MinWakeUpIntervalInSec +
+                                                            minEntityId % SentisOptimisationsPlugin.Config
+                                                                .MinWakeUpIntervalInSec));
                 }
-            }
-            else
-            {
-                WakeUpDatas.Add(minEntityId,
-                    DateTime.Now + TimeSpan.FromSeconds(SentisOptimisationsPlugin.Config.MinWakeUpIntervalInSec +
-                                                        minEntityId % SentisOptimisationsPlugin.Config
-                                                            .MinWakeUpIntervalInSec));
             }
         }
 
-        lock (InFreezeQueue)
+        // Add returns false when the id is already queued (ConcurrentDictionary.TryAdd)
+        if (!InFreezeQueue.Add(minEntityId))
         {
-            if (InFreezeQueue.Contains(minEntityId))
-            {
-                return;
-            }
-
-            InFreezeQueue.Add(minEntityId);
+            return;
         }
 
         var delayBeforeFreezeSec = SentisOptimisationsPlugin.Config
@@ -272,6 +306,7 @@ public class FreezeLogic
 
         if (needToFreezeGrids.Count == 0)
         {
+            InFreezeQueue.Remove(minEntityId);
             return;
         }
 
@@ -288,11 +323,7 @@ public class FreezeLogic
                         return false;
                     }
 
-                    var isInQueue = false;
-                    lock (InFreezeQueue)
-                    {
-                        isInQueue = InFreezeQueue.Contains(minEntityId);
-                    }
+                    var isInQueue = InFreezeQueue.Contains(minEntityId);
 
                     return grid.Parent == null && isInQueue;
                 }).ToList();
@@ -322,26 +353,20 @@ public class FreezeLogic
 
                         FrozenGrids.Add(grid.EntityId);
                         UnregisterRecursive(grid);
+
+                        // Stamp the compensation clock on the game thread, at the exact frame the
+                        // grid stops updating. Blocks that leave the world must drop their stamp
+                        // (see ForgetBlocks below + EntitiesObserver): EntityIds are reused.
+                        var frame = MySandboxGame.Static.SimulationFrameCounter;
+                        foreach (var myCubeBlock in grid.GetFatBlocks())
+                        {
+                            if (myCubeBlock is MyFunctionalBlock functional && NeedToCompensate(functional))
+                            {
+                                CompensationTracker.OnFrozen(myCubeBlock.EntityId, frame);
+                            }
+                        }
                     }
                 });
-
-                foreach (var grid in realyNeedToFreezeGrids)
-                {
-                    if (grid == null || grid.Closed || grid.MarkedForClose || grid.IsPreview) continue;
-                    foreach (var myCubeBlock in grid.GetFatBlocks())
-                    {
-                        if (!(myCubeBlock is MyFunctionalBlock))
-                        {
-                            continue;
-                        }
-
-                        var needToCompensate = NeedToCompensate((MyFunctionalBlock)myCubeBlock);
-                        if (needToCompensate)
-                        {
-                            LastUpdateFrames[myCubeBlock.EntityId] = MySandboxGame.Static.SimulationFrameCounter;
-                        }
-                    }
-                }
             }
             catch (Exception e)
             {
@@ -349,11 +374,33 @@ public class FreezeLogic
             }
 
 
-            lock (InFreezeQueue)
-            {
-                InFreezeQueue.Remove(minEntityId);
-            }
+            InFreezeQueue.Remove(minEntityId);
         });
+    }
+
+    /// <summary>
+    /// Drop every trace of grids that left the world. A stale freeze stamp under a recycled
+    /// EntityId would hand the next holder of that id an absurd compensation delta.
+    /// </summary>
+    public static void ForgetGrid(MyCubeGrid grid)
+    {
+        FrozenGrids.Remove(grid.EntityId);
+        FrozenPhysicsGrids.Remove(grid.EntityId);
+        InFreezeQueue.Remove(grid.EntityId);
+        lock (_wakeUpLock)
+        {
+            WakeUpDatas.Remove(grid.EntityId);
+        }
+
+        try
+        {
+            foreach (var block in grid.GetFatBlocks())
+                CompensationTracker.Forget(block.EntityId);
+        }
+        catch (Exception e)
+        {
+            // grid already torn down; stamps for its blocks are dropped below on sweep
+        }
     }
 
     private static bool GroupContainsFixedGrid(HashSet<MyCubeGrid> grids)
@@ -475,12 +522,15 @@ public class FreezeLogic
 
     public void UpdateCpuLoad(float cpuLoad)
     {
-        while (CpuLoads.Count > 30)
+        lock (CpuLoadLock)
         {
-            CpuLoads.RemoveAt(0);
-        }
+            while (CpuLoads.Count > 30)
+            {
+                CpuLoads.RemoveAt(0);
+            }
 
-        CpuLoads.Add(cpuLoad);
+            CpuLoads.Add(cpuLoad);
+        }
     }
 
     public static void UpdateFreezePhysics(bool freezePhysicsEnabled)
@@ -551,11 +601,16 @@ public class FreezeLogic
     public static float GetAvgCpuLoad()
     {
         float sum = 0;
-        var cpuLoads = CpuLoads;
-        for (var i = 0; i < cpuLoads.Count; i++)
+        int count;
+        lock (CpuLoadLock)
         {
-            sum += cpuLoads[i];
+            count = CpuLoads.Count;
+            for (var i = 0; i < count; i++)
+            {
+                sum += CpuLoads[i];
+            }
         }
-        return (float)Math.Round((decimal)(cpuLoads.Count > 0 ? sum / cpuLoads.Count : 0.0), 1);
+
+        return (float)Math.Round((decimal)(count > 0 ? sum / count : 0.0), 1);
     }
 }

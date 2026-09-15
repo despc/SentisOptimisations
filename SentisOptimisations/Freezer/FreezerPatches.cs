@@ -44,10 +44,10 @@ public static class FreezerPatches
     private static PropertyInfo CurrentStateProp =
         typeof(MyAssembler).GetProperty("CurrentState",
             BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
-    
+
     private static MethodInfo _OutputInventory_ContentsChanged = typeof(MyAssembler).GetMethod("OutputInventory_ContentsChanged",
         BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
-    
+
 
     public static void Patch(PatchContext ctx) => global::SentisOptimisations.PatchGuard.Run("FreezerPatches", ctx, PatchImpl);
 
@@ -95,7 +95,7 @@ public static class FreezerPatches
         ctx.GetPattern(MethodGetComponentsFromConveyor).Prefixes.Add(
             typeof(FreezerPatches).GetMethod(nameof(GetComponentsFromConveyorPatch),
                 BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-        
+
     }
 
     private static bool FinishDisassembling(MyBlueprintDefinitionBase blueprint, int count, MyAssembler __instance)
@@ -104,7 +104,7 @@ public static class FreezerPatches
         {
             _OutputInventory_ContentsChanged.Invoke(__instance, new object[]{ @base});
         };
-        
+
         if (__instance.RepeatEnabled)
         {
             __instance.OutputInventory.ContentsChanged -= new Action<MyInventoryBase>(action);
@@ -117,16 +117,16 @@ public static class FreezerPatches
             if (queueItem.Blueprint == blueprint)
             {
                 __instance.RemoveQueueItemRequest(m_queue.IndexOf(queueItem), count);
-                __instance.easySetField("m_currentQueueItem", new MyProductionBlock.QueueItem?()); 
+                __instance.easySetField("m_currentQueueItem", new MyProductionBlock.QueueItem?());
                 break;
             }
         }
         foreach (MyBlueprintDefinitionBase.Item result in blueprint.Results)
             __instance.OutputInventory.RemoveItemsOfType(result.Amount * count, result.Id, MyItemFlags.None, false);
-        
+
         if (__instance.RepeatEnabled)
             __instance.OutputInventory.ContentsChanged += new Action<MyInventoryBase>(action);
-        
+
         MyFixedPoint myFixedPoint = (MyFixedPoint) (1f / __instance.GetEfficiencyMultiplierForBlueprint(blueprint));
         for (int index = 0; index < blueprint.Prerequisites.Length; ++index)
         {
@@ -136,7 +136,7 @@ public static class FreezerPatches
         }
         return false;
     }
-    
+
     private static bool GetComponentsFromConveyorPatch(MyAssembler __instance)
     {
         if (__instance.InputInventory.VolumeFillFactor >= 0.99)
@@ -144,23 +144,36 @@ public static class FreezerPatches
         MyTimerComponent timer =
             (MyTimerComponent)__instance.easyGetField("m_timer", typeof(MyFunctionalBlock));
         var timerFramesFromLastTrigger = timer.FramesFromLastTrigger;
-        DelayedProcessor.Instance.AddDelayedAction(DateTime.Now, () =>
+        // The whole pull (queue read + PullItem) must run on the game thread: inventories and
+        // the conveyor are not thread-safe. Vanilla did this on the game thread as well.
+        try
         {
-            try
+            MyAPIGateway.Utilities.InvokeOnGameThread(() =>
             {
-                AsyncCollectAssemblerRequiredItems(__instance, timerFramesFromLastTrigger);
-            }
-            catch (Exception e)
-            {
-                //
-            }
-        });
+                try
+                {
+                    AsyncCollectAssemblerRequiredItems(__instance, timerFramesFromLastTrigger);
+                }
+                catch (Exception e)
+                {
+                    SentisOptimisationsPlugin.Log.Error(e, "Assembler collect items exception");
+                }
+            });
+        }
+        catch (Exception e)
+        {
+            SentisOptimisationsPlugin.Log.Error(e, "Assembler collect scheduling exception");
+            return true; // fall back to vanilla component pull
+        }
 
         return false;
     }
 
     private static void AsyncCollectAssemblerRequiredItems(MyAssembler __instance, uint timerFramesFromLastTrigger)
     {
+        // frames -> seconds at the simulation rate; integer division used to truncate any
+        // window shorter than a second to zero (no pull at all during normal operation)
+        var elapsedSeconds = timerFramesFromLastTrigger / 60f;
         float num1 = 0.0f;
         List<MyProductionBlock.QueueItem> m_queue =
             (List<MyProductionBlock.QueueItem>)__instance.easyGetField("m_queue");
@@ -211,27 +224,25 @@ public static class FreezerPatches
             foreach (MyTuple<MyFixedPoint, MyBlueprintDefinitionBase.Item> requiredComponent in
                      m_requiredComponents)
             {
-                MyAPIGateway.Utilities.InvokeOnGameThread(() =>
+                // already running on the game thread (see GetComponentsFromConveyorPatch)
+                try
                 {
-                    try
-                    {
-                        MyBlueprintDefinitionBase.Item obj = requiredComponent.Item2;
-                        MyFixedPoint itemAmount =
-                            __instance.InputInventory.GetItemAmount(obj.Id, MyItemFlags.None, false);
+                    MyBlueprintDefinitionBase.Item obj = requiredComponent.Item2;
+                    MyFixedPoint itemAmount =
+                        __instance.InputInventory.GetItemAmount(obj.Id, MyItemFlags.None, false);
 
-                        MyFixedPoint myFixedPoint = (obj.Amount * (timerFramesFromLastTrigger / 60)) - itemAmount;
-                        if (!(myFixedPoint <= 0))
-                        {
-                            var fixedPoint = __instance.CubeGrid.GridSystems.ConveyorSystem.PullItem(obj.Id,
-                                new MyFixedPoint?(myFixedPoint),
-                                __instance, __instance.InputInventory, false, false);
-                        }
-                    }
-                    catch (Exception e)
+                    MyFixedPoint myFixedPoint = (obj.Amount * elapsedSeconds) - itemAmount;
+                    if (!(myFixedPoint <= 0))
                     {
-                        SentisOptimisationsPlugin.Log.Error(e, "Assembler collect items exception");
+                        var fixedPoint = __instance.CubeGrid.GridSystems.ConveyorSystem.PullItem(obj.Id,
+                            new MyFixedPoint?(myFixedPoint),
+                            __instance, __instance.InputInventory, false, false);
                     }
-                });
+                }
+                catch (Exception e)
+                {
+                    SentisOptimisationsPlugin.Log.Error(e, "Assembler collect items exception");
+                }
             }
         }
 
@@ -246,6 +257,9 @@ public static class FreezerPatches
 
     private static bool UpdateProductionRefinery(MyRefinery __instance, uint framesFromLastTrigger)
     {
+        if (CompensationTracker.IsFrozen(__instance.EntityId))
+            return false; // frozen: skip, never run production for a frozen block
+
         if (framesFromLastTrigger < 3601)
         {
             return true;
@@ -287,7 +301,7 @@ public static class FreezerPatches
             // __instance.IsProducing = flag;
             if (!__instance.IsProducing)
                 return false;
-            ProcessQueueItems(__instance, timeDelta);
+            CompensationTracker.RunCompensationPass(() => ProcessQueueItems(__instance, timeDelta));
         }
         catch (Exception e)
         {
@@ -422,6 +436,9 @@ public static class FreezerPatches
     private static bool UpdateProductionAssembler(MyAssembler __instance, uint framesFromLastTrigger,
         bool forceUpdate = false)
     {
+        if (CompensationTracker.IsFrozen(__instance.EntityId))
+            return false; // frozen: skip, never run production for a frozen block
+
         if (__instance is MySurvivalKit)
         {
             return true;
@@ -433,16 +450,20 @@ public static class FreezerPatches
         }
         try
         {
-
-            DelayedProcessor.Instance.AddDelayedAction(DateTime.Now, () =>
+            // The whole compensation - state, queue, inventories, conveyor reads and item moves -
+            // must run in one game-thread pass. Deciding on a background snapshot and mutating on
+            // the game thread later (the old behavior) duplicated items when the conveyor moved
+            // stock between the snapshot and the execution.
+            MyAPIGateway.Utilities.InvokeOnGameThread(() =>
             {
                 try
                 {
-                    AsyncUpdateAssemblerProduction(__instance, framesFromLastTrigger, forceUpdate);
+                    CompensationTracker.RunCompensationPass(framesFromLastTrigger,
+                        () => AsyncUpdateAssemblerProduction(__instance, framesFromLastTrigger, forceUpdate));
                 }
                 catch (Exception e)
                 {
-                    //
+                    SentisOptimisationsPlugin.Log.Error(e, "Assembler compensation exception");
                 }
             });
         }
@@ -455,6 +476,11 @@ public static class FreezerPatches
         return false;
     }
 
+    /// <summary>
+    /// Fast-forward assembler production after an unfreeze. Runs on the GAME THREAD; the large
+    /// framesFromLastTrigger is consumed here, so vanilla production for this tick is skipped
+    /// (prefix returns false).
+    /// </summary>
     private static void AsyncUpdateAssemblerProduction(MyAssembler __instance, uint framesFromLastTrigger,
         bool forceUpdate)
     {
@@ -554,27 +580,23 @@ public static class FreezerPatches
             var count = assemblingEntry.Value;
             if (__instance.DisassembleEnabled)
             {
-                MyAPIGateway.Utilities.InvokeOnGameThread(() =>
+                try
                 {
-                    try
-                    {
-                        // FreezeLogic.CompensationLogs($"Disassembling Assembler, build {count} items of {bp.DisplayNameText} {__instance.CustomName} Grid - {__instance.CubeGrid.DisplayName} ");
-                        FinishDisassembling(bp, count, __instance);
-                    }
-                    catch (Exception e)
-                    {
-                        SentisOptimisationsPlugin.Log.Error(e, "Assembler disasembling exception");
-                    }
-                });
+                    // on the game thread already - mutate inline, atomically with the decision above
+                    FinishDisassembling(bp, count, __instance);
+                }
+                catch (Exception e)
+                {
+                    SentisOptimisationsPlugin.Log.Error(e, "Assembler disasembling exception");
+                }
             }
             else
             {
                 FinishAssembling(bp, count, __instance);
             }
-            
+
         }
 
-        Thread.Sleep(32);
         if (__instance.CurrentState != MyAssembler.StateEnum.Ok || __instance.CurrentItemIndexServer != -1)
             m_currentItemIndex.Value = __instance.CurrentItemIndexServer;
         IsProducingPropAss.GetSetMethod(true).Invoke(__instance,
@@ -585,7 +607,7 @@ public static class FreezerPatches
             });
     }
 
-    
+
     private static void FinishAssembling(MyBlueprintDefinitionBase blueprint, int count, MyAssembler assembler)
     {
         MyFixedPoint myFixedPoint = (MyFixedPoint)(1f / assembler.GetEfficiencyMultiplierForBlueprint(blueprint));
@@ -597,20 +619,20 @@ public static class FreezerPatches
         {
             MyBlueprintDefinitionBase.Item prerequisite = blueprint.Prerequisites[index];
             var itemAmount = assembler.InputInventory.GetItemAmount(prerequisite.Id);
-            
+
             int inBlocksResourcesFoundForCount = (int)((float)itemAmount / (float)(prerequisite.Amount * myFixedPoint));
             if (inBlocksResourcesFoundForCount < count)
             {
                 var countInAnother = GetItemsCountInOtherBlocks(assembler, prerequisite, myFixedPoint, count - inBlocksResourcesFoundForCount);
                 inBlocksResourcesFoundForCount = inBlocksResourcesFoundForCount + countInAnother;
             }
-            
+
             if (inBlocksResourcesFoundForCount < countWithReqs)
             {
                 countWithReqs = inBlocksResourcesFoundForCount;
             }
         }
-        
+
         for (int index = 0; index < blueprint.Prerequisites.Length; ++index)
         {
             MyBlueprintDefinitionBase.Item prerequisite = blueprint.Prerequisites[index];
@@ -630,7 +652,7 @@ public static class FreezerPatches
                 }
                 else
                 {
-                    inventoriesToRemove[assembler.InputInventory] = new List<KeyValuePair<MyFixedPoint?, MyDefinitionId>>(){itemToRemove};  
+                    inventoriesToRemove[assembler.InputInventory] = new List<KeyValuePair<MyFixedPoint?, MyDefinitionId>>(){itemToRemove};
                 }
                 if (inAssemblerResourcesFoundForCount == countWithReqs)
                 {
@@ -660,42 +682,43 @@ public static class FreezerPatches
             if (queueItem.Blueprint == blueprint)
             {
                 assembler.RemoveQueueItemRequest(m_queue.IndexOf(queueItem), countWithReqs);
-                assembler.easySetField("m_currentQueueItem", new MyProductionBlock.QueueItem?()); 
+                assembler.easySetField("m_currentQueueItem", new MyProductionBlock.QueueItem?());
                 break;
             }
         }
-        
-        
-        MyAPIGateway.Utilities.InvokeOnGameThread(() =>
-        {
-            try
-            {
-                foreach (var i2r in inventoriesToRemove)
-                {
-                    foreach (var item in i2r.Value)
-                    {
-                        i2r.Key.RemoveItemsOfType((MyFixedPoint)item.Key, item.Value);   
-                    }
-                }
 
-                foreach (MyBlueprintDefinitionBase.Item result in blueprint.Results)
+
+        // On the game thread already: take inventory and add results in the SAME pass as the
+        // resource decision above. A deferred execution (old behavior) raced with the conveyor:
+        // removal silently took less than the snapshot promised while the full output was added,
+        // duplicating items.
+        try
+        {
+            foreach (var i2r in inventoriesToRemove)
+            {
+                foreach (var item in i2r.Value)
                 {
-                    
-                    MyObjectBuilder_PhysicalObject newObject =
-                        (MyObjectBuilder_PhysicalObject)MyObjectBuilderSerializerKeen.CreateNewObject(result.Id.TypeId,
-                            result.Id.SubtypeName);
-                    assembler.OutputInventory.AddItems(result.Amount * countWithReqs, newObject);
-                    if (MyVisualScriptLogicProvider.NewItemBuilt != null)
-                        MyVisualScriptLogicProvider.NewItemBuilt(assembler.EntityId, assembler.CubeGrid.EntityId,
-                            assembler.Name, assembler.CubeGrid.Name, newObject.TypeId.ToString(), newObject.SubtypeName,
-                            result.Amount.ToIntSafe() * countWithReqs);
+                    i2r.Key.RemoveItemsOfType((MyFixedPoint)item.Key, item.Value);
                 }
             }
-            catch (Exception e)
+
+            foreach (MyBlueprintDefinitionBase.Item result in blueprint.Results)
             {
-                SentisOptimisationsPlugin.Log.Error(e, "Compensate assembler exception");
+
+                MyObjectBuilder_PhysicalObject newObject =
+                    (MyObjectBuilder_PhysicalObject)MyObjectBuilderSerializerKeen.CreateNewObject(result.Id.TypeId,
+                        result.Id.SubtypeName);
+                assembler.OutputInventory.AddItems(result.Amount * countWithReqs, newObject);
+                if (MyVisualScriptLogicProvider.NewItemBuilt != null)
+                    MyVisualScriptLogicProvider.NewItemBuilt(assembler.EntityId, assembler.CubeGrid.EntityId,
+                        assembler.Name, assembler.CubeGrid.Name, newObject.TypeId.ToString(), newObject.SubtypeName,
+                        result.Amount.ToIntSafe() * countWithReqs);
             }
-        });
+        }
+        catch (Exception e)
+        {
+            SentisOptimisationsPlugin.Log.Error(e, "Compensate assembler exception");
+        }
     }
 
     private static int GetItemsCountInOtherBlocks(MyAssembler assembler, MyBlueprintDefinitionBase.Item prerequisite,
@@ -703,7 +726,7 @@ public static class FreezerPatches
     {
         var prerequisiteAmount = prerequisite.Amount * myFixedPoint * count;
         MyFixedPoint inOtherAmount = 0;
-        
+
         foreach (var myCubeBlock in assembler.CubeGrid.GetFatBlocks())
         {
             if (myCubeBlock.HasInventory)
@@ -742,7 +765,7 @@ public static class FreezerPatches
         }
         return (int)((float)inOtherAmount / (float)(prerequisite.Amount * myFixedPoint));
     }
-    
+
     private static bool HasItemsInOtherBlocks(MyAssembler assembler, MyBlueprintDefinitionBase.Item prerequisite,
         MyFixedPoint myFixedPoint,
         Dictionary<MyInventory, List<KeyValuePair<MyFixedPoint?, MyDefinitionId>>> inventoriesToRemove, int count)
@@ -777,7 +800,7 @@ public static class FreezerPatches
                         }
                         else
                         {
-                            inventoriesToRemove[myInventory] = new List<KeyValuePair<MyFixedPoint?, MyDefinitionId>>(){itemToRemove};  
+                            inventoriesToRemove[myInventory] = new List<KeyValuePair<MyFixedPoint?, MyDefinitionId>>(){itemToRemove};
                         }
 
                         if (prerequisiteAmount <= 0)
@@ -810,7 +833,7 @@ public static class FreezerPatches
         }
 
         return true;
-    
+
 
 
         }
@@ -832,14 +855,14 @@ public static class FreezerPatches
 
         IMyEntity entity = __instance.Entity;
         if (entity == null)
-            return false;
+            return true; // tearing down: must NOT skip vanilla OnMotionDynamic
         if (FreezeLogic.FrozenGrids.Contains(entity.EntityId))
         {
             return false;
         }
 
         return true;
-    
+
 
 
         }
@@ -859,6 +882,14 @@ public static class FreezerPatches
         IMyEntity entity = __instance.Entity;
 
         if (!(entity is MyProductionBlock))
+        {
+            return true;
+        }
+
+        // This overflow dance exists only to absorb a compensation burst. Applying it to
+        // everyday vanilla item flow silently destroyed overflow whenever no container had
+        // room, and logged errors for normal conveyor traffic.
+        if (!CompensationTracker.InCompensation(entity.EntityId))
         {
             return true;
         }
@@ -915,7 +946,7 @@ public static class FreezerPatches
         }
 
         return true;
-    
+
 
 
         }
