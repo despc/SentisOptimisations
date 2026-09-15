@@ -44,6 +44,11 @@ namespace SentisGameplayImprovements.AllGridsActions
                 return;
             }
 
+            if (entity is Sandbox.Game.Entities.MyCubeBlock cubeBlock)
+            {
+                CompensationTracker.Forget(cubeBlock.EntityId);
+            }
+
             GasTankOptimisations.CleanupEntity(entity);
             PBFix.CleanupEntity(entity);
 
@@ -144,6 +149,7 @@ namespace SentisGameplayImprovements.AllGridsActions
             MyCubeGrids.Clear();
             VoxelMaps.Clear();
             Planets.Clear();
+            CompensationTracker.ClearAll();
         }
     }
 }

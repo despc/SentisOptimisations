@@ -221,7 +221,7 @@ public class FreezeLogic
             }
             else
             {
-                CompensationTracker.Forget(blockId);
+                CompensationTracker.CancelPending(blockId);
             }
         }
     }
