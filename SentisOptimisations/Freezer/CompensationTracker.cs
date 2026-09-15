@@ -28,6 +28,15 @@ public static class CompensationTracker
     // blockId -> a deferred apply is already scheduled and will take the accumulated total
     static readonly ConcurrentDictionary<long, byte> ApplyScheduled = new();
 
+    // blockId -> cumulative frames atomically taken from pending and successfully applied. These
+    // diagnostics/test ledgers do not drive production. Equality after a run proves each dispatched
+    // compensation batch completed exactly once (no loss and no duplicate pass).
+    static readonly ConcurrentDictionary<long, ulong> TakenFrames = new();
+    // Frozen frames already injected into the block timer but not yet observed completing a
+    // production pass. Vanilla frames added during the wake-up window are deliberately excluded.
+    static readonly ConcurrentDictionary<long, ulong> AwaitingApplyFrames = new();
+    static readonly ConcurrentDictionary<long, ulong> AppliedFrames = new();
+
     // Set only while a compensation fast-forward pass runs on the game thread. The AddItems
     // overflow handling must not touch ordinary item flow - only the burst produced here.
     [ThreadStatic] private static bool _inCompensation;
@@ -54,6 +63,33 @@ public static class CompensationTracker
             _inCompensation = false;
         }
     }
+
+    /// <summary>
+    /// Runs a compensation pass and records it only after the complete body returned successfully.
+    /// Tests use this counter to distinguish "pending was removed" from "catch-up actually ran".
+    /// </summary>
+    public static void RunTrackedCompensationPass(long blockId, uint framesFromLastTrigger, Action pass)
+    {
+        RunCompensationPass(framesFromLastTrigger, pass);
+        CompleteProductionPass(blockId, framesFromLastTrigger);
+    }
+
+    /// <summary>Marks the exact injected frozen-frame batch after either a custom or vanilla
+    /// production pass returned successfully. The full timer delta may also contain normal frames.</summary>
+    public static void CompleteProductionPass(long blockId, uint framesFromLastTrigger)
+    {
+        // Presence in AwaitingApplyFrames, not the total timer delta, identifies a real injected
+        // frozen period. Even a short valid period must leave the ledger balanced.
+        if (AwaitingApplyFrames.TryRemove(blockId, out var frozenFrames))
+            AppliedFrames.AddOrUpdate(blockId, frozenFrames,
+                (_, total) => total + frozenFrames);
+    }
+
+    public static ulong? PeekTakenFrames(long blockId) =>
+        TakenFrames.TryGetValue(blockId, out var frames) ? frames : (ulong?)null;
+
+    public static ulong? PeekAppliedFrames(long blockId) =>
+        AppliedFrames.TryGetValue(blockId, out var frames) ? frames : (ulong?)null;
 
     /// <summary>Called on the game thread at the moment the grid is frozen.</summary>
     public static void OnFrozen(long blockId, ulong frame)
@@ -118,12 +154,26 @@ public static class CompensationTracker
     {
         ApplyScheduled.TryRemove(blockId, out _);
         frames = 0;
-        return PendingFrames.TryRemove(blockId, out frames) && frames > 0;
+        if (!PendingFrames.TryRemove(blockId, out frames) || frames == 0)
+            return false;
+        var taken = frames;
+        TakenFrames.AddOrUpdate(blockId, taken, (_, total) => total + taken);
+        AwaitingApplyFrames.AddOrUpdate(blockId, taken, (_, total) => total + taken);
+        return true;
     }
 
     /// <summary>Current uncompensated total (diagnostics/tests).</summary>
     public static uint? PeekPending(long blockId) =>
         PendingFrames.TryGetValue(blockId, out var v) ? v : (uint?)null;
+
+    /// <summary>Clears only live compensation state when a block no longer needs catch-up.
+    /// Historical taken/applied ledgers survive so diagnostics can prove exactly-once completion.</summary>
+    public static void CancelPending(long blockId)
+    {
+        FrozenSince.TryRemove(blockId, out _);
+        PendingFrames.TryRemove(blockId, out _);
+        ApplyScheduled.TryRemove(blockId, out _);
+    }
 
     /// <summary>
     /// Drops all compensation state for a block. MUST be called when the block leaves the world:
@@ -135,6 +185,20 @@ public static class CompensationTracker
         FrozenSince.TryRemove(blockId, out _);
         PendingFrames.TryRemove(blockId, out _);
         ApplyScheduled.TryRemove(blockId, out _);
+        TakenFrames.TryRemove(blockId, out _);
+        AwaitingApplyFrames.TryRemove(blockId, out _);
+        AppliedFrames.TryRemove(blockId, out _);
+    }
+
+    public static void ClearAll()
+    {
+        FrozenSince.Clear();
+        PendingFrames.Clear();
+        ApplyScheduled.Clear();
+        TakenFrames.Clear();
+        AwaitingApplyFrames.Clear();
+        AppliedFrames.Clear();
+        _inCompensation = false;
     }
 
     public static void ForgetBlocks(System.Collections.Generic.IEnumerable<long> blockIds)

@@ -83,11 +83,17 @@ public static class FreezerPatches
         ctx.GetPattern(MethodUpdateProductionAssembler).Prefixes.Add(
             typeof(FreezerPatches).GetMethod(nameof(UpdateProductionAssembler),
                 BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+        ctx.GetPattern(MethodUpdateProductionAssembler).Suffixes.Add(
+            typeof(FreezerPatches).GetMethod(nameof(AfterUpdateProductionAssembler),
+                BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
 
         var MethodUpdateProductionRefinery = typeof(MyRefinery).GetMethod
             ("UpdateProduction", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
         ctx.GetPattern(MethodUpdateProductionRefinery).Prefixes.Add(
             typeof(FreezerPatches).GetMethod(nameof(UpdateProductionRefinery),
+                BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+        ctx.GetPattern(MethodUpdateProductionRefinery).Suffixes.Add(
+            typeof(FreezerPatches).GetMethod(nameof(AfterUpdateProductionRefinery),
                 BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
 
         var MethodGetComponentsFromConveyor = typeof(MyAssembler).GetMethod
@@ -98,7 +104,23 @@ public static class FreezerPatches
 
     }
 
-    private static bool FinishDisassembling(MyBlueprintDefinitionBase blueprint, int count, MyAssembler __instance)
+    [ThreadStatic] private static HashSet<long> _vanillaProductionPasses;
+
+    private static void BeginProductionPrefix(long blockId)
+    {
+        _vanillaProductionPasses?.Remove(blockId);
+    }
+
+    private static void SelectVanillaProduction(long blockId)
+    {
+        (_vanillaProductionPasses ??= new HashSet<long>()).Add(blockId);
+    }
+
+    private static bool ConsumeVanillaProduction(long blockId) =>
+        _vanillaProductionPasses != null && _vanillaProductionPasses.Remove(blockId);
+
+    private static bool FinishDisassembling(MyBlueprintDefinitionBase blueprint, int count,
+        MyAssembler __instance)
     {
         var action = delegate(MyInventoryBase @base)
         {
@@ -257,11 +279,13 @@ public static class FreezerPatches
 
     private static bool UpdateProductionRefinery(MyRefinery __instance, uint framesFromLastTrigger)
     {
+        BeginProductionPrefix(__instance.EntityId);
         if (CompensationTracker.IsFrozen(__instance.EntityId))
             return false; // frozen: skip, never run production for a frozen block
 
         if (framesFromLastTrigger < 3601)
         {
+            SelectVanillaProduction(__instance.EntityId);
             return true;
         }
 
@@ -271,6 +295,7 @@ public static class FreezerPatches
         {
             if (subtypeName.Contains("Crusher"))
             {
+                SelectVanillaProduction(__instance.EntityId);
                 return true;
             }
         }
@@ -301,15 +326,27 @@ public static class FreezerPatches
             // __instance.IsProducing = flag;
             if (!__instance.IsProducing)
                 return false;
-            CompensationTracker.RunCompensationPass(() => ProcessQueueItems(__instance, timeDelta));
+            CompensationTracker.RunTrackedCompensationPass(__instance.EntityId, framesFromLastTrigger,
+                () => ProcessQueueItems(__instance, timeDelta));
         }
         catch (Exception e)
         {
             SentisOptimisationsPlugin.Log.Error(e, "UpdateProduction compensation exception");
-            return true;
+            return CustomRefineryPassFailureFallback();
         }
 
         return false;
+    }
+
+    private static bool CustomRefineryPassFailureFallback() => false;
+
+    // For deltas below the custom-refinery threshold vanilla UpdateProduction handles the timer.
+    // Record the exact injected frozen-frame batch only after that original method returned.
+    private static void AfterUpdateProductionRefinery(MyRefinery __instance, uint framesFromLastTrigger)
+    {
+        if (ConsumeVanillaProduction(__instance.EntityId) &&
+            !CompensationTracker.IsFrozen(__instance.EntityId))
+            CompensationTracker.CompleteProductionPass(__instance.EntityId, framesFromLastTrigger);
     }
 
 
@@ -436,44 +473,49 @@ public static class FreezerPatches
     private static bool UpdateProductionAssembler(MyAssembler __instance, uint framesFromLastTrigger,
         bool forceUpdate = false)
     {
+        BeginProductionPrefix(__instance.EntityId);
         if (CompensationTracker.IsFrozen(__instance.EntityId))
             return false; // frozen: skip, never run production for a frozen block
 
         if (__instance is MySurvivalKit)
         {
+            SelectVanillaProduction(__instance.EntityId);
             return true;
         }
 
         if (__instance.BlockDefinition.Id.SubtypeName.Contains("Basic"))
         {
+            SelectVanillaProduction(__instance.EntityId);
             return true;
         }
         try
         {
-            // The whole compensation - state, queue, inventories, conveyor reads and item moves -
-            // must run in one game-thread pass. Deciding on a background snapshot and mutating on
-            // the game thread later (the old behavior) duplicated items when the conveyor moved
-            // stock between the snapshot and the execution.
-            MyAPIGateway.Utilities.InvokeOnGameThread(() =>
-            {
-                try
-                {
-                    CompensationTracker.RunCompensationPass(framesFromLastTrigger,
-                        () => AsyncUpdateAssemblerProduction(__instance, framesFromLastTrigger, forceUpdate));
-                }
-                catch (Exception e)
-                {
-                    SentisOptimisationsPlugin.Log.Error(e, "Assembler compensation exception");
-                }
-            });
+            // UpdateProduction is already invoked on the game thread. Run the complete decision
+            // and mutation pass inline; re-posting it leaves queued work that can execute after
+            // FreezeLogic has marked and unregistered the block.
+            CompensationTracker.RunTrackedCompensationPass(__instance.EntityId, framesFromLastTrigger,
+                () => AsyncUpdateAssemblerProduction(__instance, framesFromLastTrigger, forceUpdate));
         }
         catch (Exception e)
         {
-            SentisOptimisationsPlugin.Log.Error(e, "UpdateProduction compensation exception");
-            return true;
+            SentisOptimisationsPlugin.Log.Error(e, "Assembler production/compensation exception");
+            return CustomAssemblerPassFailureFallback();
         }
 
         return false;
+    }
+
+    // Once the custom pass starts it may already have changed progress, queue and inventories.
+    // Falling through to vanilla after an exception would process the partially-mutated state twice.
+    private static bool CustomAssemblerPassFailureFallback() => false;
+
+    // Survival Kits and Basic assemblers use vanilla production. Credit the injected batch only
+    // when that original path was selected and returned successfully.
+    private static void AfterUpdateProductionAssembler(MyAssembler __instance, uint framesFromLastTrigger)
+    {
+        if (ConsumeVanillaProduction(__instance.EntityId) &&
+            !CompensationTracker.IsFrozen(__instance.EntityId))
+            CompensationTracker.CompleteProductionPass(__instance.EntityId, framesFromLastTrigger);
     }
 
     /// <summary>
@@ -580,15 +622,9 @@ public static class FreezerPatches
             var count = assemblingEntry.Value;
             if (__instance.DisassembleEnabled)
             {
-                try
-                {
-                    // on the game thread already - mutate inline, atomically with the decision above
-                    FinishDisassembling(bp, count, __instance);
-                }
-                catch (Exception e)
-                {
-                    SentisOptimisationsPlugin.Log.Error(e, "Assembler disasembling exception");
-                }
+                // Propagate failures to the outer fail-closed prefix. Swallowing here would mark a
+                // partially-mutated compensation batch as successfully applied.
+                FinishDisassembling(bp, count, __instance);
             }
             else
             {
@@ -692,32 +728,24 @@ public static class FreezerPatches
         // resource decision above. A deferred execution (old behavior) raced with the conveyor:
         // removal silently took less than the snapshot promised while the full output was added,
         // duplicating items.
-        try
+        foreach (var i2r in inventoriesToRemove)
         {
-            foreach (var i2r in inventoriesToRemove)
+            foreach (var item in i2r.Value)
             {
-                foreach (var item in i2r.Value)
-                {
-                    i2r.Key.RemoveItemsOfType((MyFixedPoint)item.Key, item.Value);
-                }
-            }
-
-            foreach (MyBlueprintDefinitionBase.Item result in blueprint.Results)
-            {
-
-                MyObjectBuilder_PhysicalObject newObject =
-                    (MyObjectBuilder_PhysicalObject)MyObjectBuilderSerializerKeen.CreateNewObject(result.Id.TypeId,
-                        result.Id.SubtypeName);
-                assembler.OutputInventory.AddItems(result.Amount * countWithReqs, newObject);
-                if (MyVisualScriptLogicProvider.NewItemBuilt != null)
-                    MyVisualScriptLogicProvider.NewItemBuilt(assembler.EntityId, assembler.CubeGrid.EntityId,
-                        assembler.Name, assembler.CubeGrid.Name, newObject.TypeId.ToString(), newObject.SubtypeName,
-                        result.Amount.ToIntSafe() * countWithReqs);
+                i2r.Key.RemoveItemsOfType((MyFixedPoint)item.Key, item.Value);
             }
         }
-        catch (Exception e)
+
+        foreach (MyBlueprintDefinitionBase.Item result in blueprint.Results)
         {
-            SentisOptimisationsPlugin.Log.Error(e, "Compensate assembler exception");
+            MyObjectBuilder_PhysicalObject newObject =
+                (MyObjectBuilder_PhysicalObject)MyObjectBuilderSerializerKeen.CreateNewObject(result.Id.TypeId,
+                    result.Id.SubtypeName);
+            assembler.OutputInventory.AddItems(result.Amount * countWithReqs, newObject);
+            if (MyVisualScriptLogicProvider.NewItemBuilt != null)
+                MyVisualScriptLogicProvider.NewItemBuilt(assembler.EntityId, assembler.CubeGrid.EntityId,
+                    assembler.Name, assembler.CubeGrid.Name, newObject.TypeId.ToString(), newObject.SubtypeName,
+                    result.Amount.ToIntSafe() * countWithReqs);
         }
     }
 

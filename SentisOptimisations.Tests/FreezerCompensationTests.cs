@@ -140,6 +140,21 @@ namespace SentisOptimisations.Tests
             }
         }
 
+        [Fact]
+        public void ClearAll_removes_every_tracker_dictionary_across_world_reload()
+        {
+            const long id = 782;
+            CompensationTracker.OnFrozen(id, 100);
+            CompensationTracker.OnUnfrozen(id, 200, 28800);
+            CompensationTracker.TryTakeCompensation(id, out var frames);
+            CompensationTracker.RunTrackedCompensationPass(id, frames, () => { });
+            CompensationTracker.ClearAll();
+            Assert.False(CompensationTracker.IsFrozen(id));
+            Assert.Null(CompensationTracker.PeekPending(id));
+            Assert.Null(CompensationTracker.PeekTakenFrames(id));
+            Assert.Null(CompensationTracker.PeekAppliedFrames(id));
+        }
+
         // ------------------------------------------------------------- compensation-pass gate
 
         [Fact]
@@ -211,19 +226,137 @@ namespace SentisOptimisations.Tests
         }
 
         [Fact]
-        public void Assembler_and_refinery_compensation_run_on_the_game_thread()
+        public void Failed_custom_assembler_pass_never_falls_through_to_vanilla()
         {
-            // The prefixes must schedule the fast-forward via InvokeOnGameThread (game thread),
-            // not via DelayedProcessor (background thread).
-            foreach (var name in new[] { "UpdateProductionAssembler", "GetComponentsFromConveyorPatch" })
-            {
-                var m = PatchMethod(name);
-                Assert.NotNull(m);
-                Assert.True(Calls(m, "InvokeOnGameThread"),
-                    $"{name} does not dispatch to the game thread");
-                Assert.False(Calls(m, "AddDelayedAction"),
-                    $"{name} still runs production logic on the delayed/background thread");
-            }
+            var fallback = PatchMethod("CustomAssemblerPassFailureFallback");
+            Assert.NotNull(fallback);
+            Assert.False((bool)fallback.Invoke(null, null),
+                "vanilla must not run after a possibly partial custom mutation");
+        }
+
+        [Fact]
+        public void Failed_custom_refinery_pass_never_falls_through_to_vanilla()
+        {
+            var fallback = PatchMethod("CustomRefineryPassFailureFallback");
+            Assert.NotNull(fallback);
+            Assert.False((bool)fallback.Invoke(null, null),
+                "vanilla must not run after a possibly partial refinery mutation");
+        }
+
+        [Fact]
+        public void Successful_compensation_pass_is_recorded_but_failed_pass_is_not()
+        {
+            const long block = 12001;
+            CompensationTracker.Forget(block);
+            CompensationTracker.OnFrozen(block, 100);
+            Assert.True(CompensationTracker.OnUnfrozen(block, 700, 28800));
+            Assert.True(CompensationTracker.TryTakeCompensation(block, out var frames));
+            Assert.Throws<InvalidOperationException>(() =>
+                CompensationTracker.RunTrackedCompensationPass(block, frames,
+                    () => throw new InvalidOperationException("expected")));
+            Assert.Null(CompensationTracker.PeekAppliedFrames(block));
+
+            CompensationTracker.RunTrackedCompensationPass(block, frames, () => { });
+            Assert.Equal(600UL, CompensationTracker.PeekAppliedFrames(block));
+            CompensationTracker.Forget(block);
+            Assert.Null(CompensationTracker.PeekAppliedFrames(block));
+        }
+
+        [Fact]
+        public void Taken_and_applied_ledgers_match_after_exactly_once_pass()
+        {
+            const long id = 778;
+            CompensationTracker.Forget(id);
+            CompensationTracker.OnFrozen(id, 100);
+            Assert.True(CompensationTracker.OnUnfrozen(id, 5100, 28800));
+            Assert.True(CompensationTracker.TryTakeCompensation(id, out var frames));
+            CompensationTracker.RunTrackedCompensationPass(id, frames, () => { });
+
+            Assert.Equal((ulong?)5000, CompensationTracker.PeekTakenFrames(id));
+            Assert.Equal(CompensationTracker.PeekTakenFrames(id),
+                CompensationTracker.PeekAppliedFrames(id));
+            CompensationTracker.Forget(id);
+        }
+
+        [Fact]
+        public void Applied_ledger_records_only_injected_frozen_frames_not_vanilla_timer_frames()
+        {
+            const long id = 780;
+            CompensationTracker.Forget(id);
+            CompensationTracker.OnFrozen(id, 100);
+            Assert.True(CompensationTracker.OnUnfrozen(id, 5100, 28800));
+            Assert.True(CompensationTracker.TryTakeCompensation(id, out var frozenFrames));
+
+            CompensationTracker.RunTrackedCompensationPass(id, frozenFrames + 120, () => { });
+
+            Assert.Equal((ulong?)5000, CompensationTracker.PeekTakenFrames(id));
+            Assert.Equal(CompensationTracker.PeekTakenFrames(id),
+                CompensationTracker.PeekAppliedFrames(id));
+            CompensationTracker.Forget(id);
+        }
+
+        [Fact]
+        public void Short_valid_compensation_is_recorded_after_successful_pass()
+        {
+            const long id = 781;
+            CompensationTracker.Forget(id);
+            CompensationTracker.OnFrozen(id, 100);
+            Assert.True(CompensationTracker.OnUnfrozen(id, 130, 28800));
+            Assert.True(CompensationTracker.TryTakeCompensation(id, out var frames));
+            CompensationTracker.CompleteProductionPass(id, frames);
+            Assert.Equal((ulong?)30, CompensationTracker.PeekTakenFrames(id));
+            Assert.Equal(CompensationTracker.PeekTakenFrames(id),
+                CompensationTracker.PeekAppliedFrames(id));
+            CompensationTracker.Forget(id);
+        }
+
+        [Fact]
+        public void Cancelling_inactive_compensation_preserves_history_until_entity_removal()
+        {
+            const long id = 779;
+            CompensationTracker.Forget(id);
+            CompensationTracker.OnFrozen(id, 100);
+            Assert.True(CompensationTracker.OnUnfrozen(id, 4100, 28800));
+            Assert.True(CompensationTracker.TryTakeCompensation(id, out var frames));
+            CompensationTracker.RunTrackedCompensationPass(id, frames, () => { });
+
+            CompensationTracker.CancelPending(id);
+            Assert.Equal((ulong?)4000, CompensationTracker.PeekTakenFrames(id));
+            Assert.Equal((ulong?)4000, CompensationTracker.PeekAppliedFrames(id));
+            CompensationTracker.Forget(id);
+            Assert.Null(CompensationTracker.PeekTakenFrames(id));
+            Assert.Null(CompensationTracker.PeekAppliedFrames(id));
+        }
+
+        [Fact]
+        public void Assembler_update_does_not_queue_work_past_a_freeze_boundary()
+        {
+            // UpdateProduction is already a game-thread callback. Re-posting its work allows an
+            // update observed before freeze to mutate inventories after the block is frozen.
+            var assembler = PatchMethod("UpdateProductionAssembler");
+            Assert.NotNull(assembler);
+            Assert.False(Calls(assembler, "InvokeOnGameThread"),
+                "assembler update defers work that can execute after the grid freezes");
+            Assert.False(Calls(assembler, "AddDelayedAction"));
+            Assert.True(Calls(assembler, "RunTrackedCompensationPass", typeof(CompensationTracker).FullName),
+                "assembler update no longer executes/records the compensation pass inline");
+
+            // GetComponentsFromConveyor can be entered by conveyor scheduling and keeps its
+            // explicit game-thread hop; its inner mutation is still a single inline pass.
+            var conveyor = PatchMethod("GetComponentsFromConveyorPatch");
+            Assert.NotNull(conveyor);
+            Assert.True(Calls(conveyor, "InvokeOnGameThread"));
+            Assert.False(Calls(conveyor, "AddDelayedAction"));
+        }
+
+        [Theory]
+        [InlineData("AfterUpdateProductionRefinery")]
+        [InlineData("AfterUpdateProductionAssembler")]
+        public void Vanilla_production_postfix_completes_the_exact_injected_batch(string methodName)
+        {
+            var postfix = PatchMethod(methodName);
+            Assert.NotNull(postfix);
+            Assert.True(Calls(postfix, "CompleteProductionPass", typeof(CompensationTracker).FullName));
         }
 
         [Theory]
@@ -248,6 +381,28 @@ namespace SentisOptimisations.Tests
                 "AddItemsPatched still rewrites every vanilla production-inventory AddItems call");
         }
 
+        [Theory]
+        [InlineData("AsyncUpdateAssemblerProduction")]
+        [InlineData("FinishAssembling")]
+        public void Assembler_mutation_helpers_do_not_swallow_partial_failures(string methodName)
+        {
+            var method = PatchMethod(methodName);
+            Assert.NotNull(method);
+            Assert.DoesNotContain(method.GetMethodBody().ExceptionHandlingClauses, c =>
+                c.Flags == ExceptionHandlingClauseOptions.Clause ||
+                c.Flags == ExceptionHandlingClauseOptions.Filter);
+        }
+
+        [Fact]
+        public void Inactive_existing_block_cancels_pending_without_erasing_history()
+        {
+            var compensate = typeof(FreezeLogic).GetMethod("CompensateFrozenFrames",
+                BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.NotNull(compensate);
+            Assert.True(Calls(compensate, "CancelPending", typeof(CompensationTracker).FullName),
+                "inactive live blocks must preserve taken/applied history");
+        }
+
         [Fact]
         public void Entity_removal_drops_frozen_and_compensation_state()
         {
@@ -258,6 +413,13 @@ namespace SentisOptimisations.Tests
             Assert.NotNull(m);
             Assert.True(Calls(m, "ForgetGrid", typeof(FreezeLogic).FullName),
                 "grid removal must clear frozen sets, wake-up schedule AND compensation stamps");
+            Assert.True(Calls(m, "Forget", typeof(CompensationTracker).FullName),
+                "individual production-block removal must clear its compensation state");
+
+            var clear = observer.GetMethod("ClearAll", BindingFlags.Static | BindingFlags.Public);
+            Assert.NotNull(clear);
+            Assert.True(Calls(clear, "ClearAll", typeof(CompensationTracker).FullName),
+                "world unload must clear every compensation dictionary");
         }
 
         [Theory]
