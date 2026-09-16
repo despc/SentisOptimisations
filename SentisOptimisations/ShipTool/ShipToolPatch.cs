@@ -447,6 +447,12 @@ namespace SentisOptimisationsPlugin.ShipTool
 
         public static float GetWelderRadius(MyShipWelder welder)
         {
+            // Respect the live work-radius multiplier: read the current detector sphere radius
+            // (kept in sync by ShipToolRadiusPatch / the runtime Ship tools settings) instead of
+            // the raw definition, which would ignore the multiplier on the projection-weld path.
+            var sphere = _detectorSphere != null ? _detectorSphere.Invoke(welder) : default;
+            if (sphere.Radius > 0f)
+                return sphere.Radius;
             return ((MyShipWelderDefinition)(welder.BlockDefinition)).SensorRadius;
         }
 

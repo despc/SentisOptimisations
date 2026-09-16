@@ -324,6 +324,11 @@ namespace SentisOptimisationsPlugin
             _config = Persistent<MainConfig>.Load(Path.Combine(StoragePath, "SentisOptimisations.cfg"));
         }
 
+        public static void SaveConfig()
+        {
+            _config?.Save();
+        }
+
         public override void Dispose()
         {
             _config.Save(Path.Combine(StoragePath, "SentisOptimisations.cfg"));
