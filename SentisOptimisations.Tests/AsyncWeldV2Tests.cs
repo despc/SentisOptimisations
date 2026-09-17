@@ -136,14 +136,13 @@ public class AsyncWeldV2Tests
     }
 
     [Fact]
-    public void AsyncWeld_setting_stays_loadable_but_inert()
+    public void AsyncWeld_setting_is_removed()
     {
         var cfg = PluginHarness.Config; // real MainConfig instance
         Assert.NotNull(cfg);
-        var prop = cfg.GetType().GetProperty("AsyncWeld");
-        Assert.NotNull(prop); // old .cfg files must keep deserializing
-        Assert.NotNull(prop.GetCustomAttribute<ObsoleteAttribute>()); // and is documented inert
-        Assert.False((bool)prop.GetValue(cfg)); // default off
+        // The inert compatibility flag is gone; welding is always game-thread (AsyncWeld v2).
+        // Old .cfg files may still contain <AsyncWeld>; deserialization ignores unknown members.
+        Assert.Null(cfg.GetType().GetProperty("AsyncWeld"));
     }
 
     [Fact]

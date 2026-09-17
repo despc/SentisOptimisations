@@ -19,12 +19,7 @@ namespace SentisOptimisationsPlugin
         private bool _welderSelfWelding = true;
         private int _projectionBuildsPerFrame = 1;
         private int _projectionChecksPerActivation = 24;
-        // AsyncWeld v2: the old threaded weld pipeline was removed (it raced with the game
-        // thread: Havok broadphase, conveyor, grid mutation). Welding now runs fully on the game
-        // thread with the safe optimizations (observer-based discovery, fast block scan, per-tick
-        // caps). The setting is kept only so existing .cfg files still deserialize; it is inert.
-        private bool _asyncWeld = false;
-        
+
         //physics profile антипалочная защита
         private bool _enablePhysicsGuard = false;
         private float _physicsMsToAlert = 1.5f;
@@ -169,9 +164,6 @@ namespace SentisOptimisationsPlugin
             set => SetValue(ref _projectionChecksPerActivation, value < 1 ? 1 : value);
         }
         
-        [DisplayTab(Name = "Async weld", GroupName = "Welder Tweaks", Tab = "Welder Optimizations", Order = 8, Description = "Async weld")]
-        [System.Obsolete("Inert since AsyncWeld v2: welding is always game-thread now. Kept for cfg compatibility.")]
-        public bool AsyncWeld { get => _asyncWeld; set => SetValue(ref _asyncWeld, value); }
         ///Freezer
         [DisplayTab(Name = "Enable Freezer", GroupName = "Freezer", Tab = "Freezer", Order = 0, Description = "Enable Freezer")]
         public bool FreezerEnabled { get => _freezerEnabled; set => SetValue(ref _freezerEnabled, value); }
