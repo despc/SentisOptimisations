@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Threading.Tasks;
 using Sandbox.Game.Entities;
+using SentisOptimisationsPlugin.Freezer;
 using Torch.Managers.PatchManager;
 using VRage.Collections;
 using VRage.Game.Entity;
@@ -68,10 +69,22 @@ namespace Optimizer.Optimizations
 
             var builders = new MyObjectBuilder_EntityBase[entities.Count];
             var grids = new List<int>();
+            FrozenGridSaveCache.BeginSnapshot();
             for (var i = 0; i < entities.Count; i++)
             {
+                var grid = entities[i] as MyCubeGrid;
+                // Frozen grids may already have been built over the previous frames (see FrozenGridSaveCache).
+                if (grid != null && FrozenGridSaveCache.TryTake(grid, out var prepared))
+                {
+                    builders[i] = prepared;
+                    continue;
+                }
                 entities[i].BeforeSave();
-                if (entities[i] is MyCubeGrid) grids.Add(i);
+                if (grid != null)
+                {
+                    grids.Add(i);
+                    FrozenGridSaveCache.RecordBuiltInSnapshot(grid);
+                }
                 else builders[i] = entities[i].GetObjectBuilder();
             }
 
@@ -86,6 +99,7 @@ namespace Optimizer.Optimizations
                     builders[index] = entities[index].GetObjectBuilder();
             }
 
+            FrozenGridSaveCache.EndSnapshot();
             __result = new List<MyObjectBuilder_EntityBase>(builders);
             return false;
         }

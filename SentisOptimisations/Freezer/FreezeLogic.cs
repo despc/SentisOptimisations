@@ -32,6 +32,8 @@ public class FreezeLogic
     public static ConcurrentHashSet<long> FrozenGrids = new();
     public static ConcurrentHashSet<long> FrozenPhysicsGrids = new();
     public static ConcurrentHashSet<long> InFreezeQueue = new();
+    // Simulation frame at which each grid was frozen (written on the game thread at freeze time).
+    public static readonly ConcurrentDictionary<long, ulong> FrozenAtFrame = new();
     private static readonly Dictionary<long, DateTime> WakeUpDatas = new(); //EntityId:NextWakeUpTime
     private static readonly object _wakeUpLock = new();
 
@@ -125,7 +127,9 @@ public class FreezeLogic
             if (grid.Parent == null)
             {
                 Log("Unfreeze grid " + grid.DisplayName);
+                FrozenGridSaveCache.Invalidate(grid.EntityId);
                 FrozenGrids.Remove(grid.EntityId);
+                FrozenAtFrame.TryRemove(grid.EntityId, out _);
                 InFreezeQueue.Remove(grid.EntityId);
 
                 CompensateFrozenFrames(grid);
@@ -352,6 +356,7 @@ public class FreezeLogic
                         }
 
                         FrozenGrids.Add(grid.EntityId);
+                        FrozenAtFrame[grid.EntityId] = MySandboxGame.Static.SimulationFrameCounter;
                         UnregisterRecursive(grid);
 
                         // Stamp the compensation clock on the game thread, at the exact frame the
@@ -384,7 +389,9 @@ public class FreezeLogic
     /// </summary>
     public static void ForgetGrid(MyCubeGrid grid)
     {
+        FrozenGridSaveCache.Invalidate(grid.EntityId);
         FrozenGrids.Remove(grid.EntityId);
+        FrozenAtFrame.TryRemove(grid.EntityId, out _);
         FrozenPhysicsGrids.Remove(grid.EntityId);
         InFreezeQueue.Remove(grid.EntityId);
         lock (_wakeUpLock)
