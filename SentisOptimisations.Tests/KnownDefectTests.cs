@@ -17,16 +17,9 @@ namespace SentisOptimisations.Tests
     /// </summary>
     public class KnownDefectTests
     {
-        // ------------------------------------------------------------------ finding: AsyncWeld default
-        [Fact]
-        public void AsyncWeld_must_default_to_off_until_weld_is_game_thread_safe()
-        {
-            // Weld() is invoked from a thread-pool thread when AsyncWeld=true; Space Engineers
-            // entity APIs are not thread-safe. Default must be false.
-            var cfg = PluginHarness.Config;
-            var asyncWeld = cfg.GetType().GetProperty("AsyncWeld").GetValue(cfg);
-            Assert.False((bool)asyncWeld, "AsyncWeld defaults to true: welds run off the game thread");
-        }
+        // The AsyncWeld finding was fixed by deleting the flag entirely (weld is always
+        // game-thread since AsyncWeld v2); the defect test retired with it. See
+        // AsyncWeldV2Tests.AsyncWeld_setting_is_removed.
 
         // ----------------------------------------------------- finding: searchlight prefix misbinding
         [Fact]
