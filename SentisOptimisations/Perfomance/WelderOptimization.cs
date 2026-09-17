@@ -1,11 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using NAPI;
 using Sandbox;
 using Sandbox.Definitions;
 using Sandbox.Game;
 using Sandbox.Game.Entities;
+using Sandbox.Game.Entities.Blocks;
 using Sandbox.Game.Entities.Cube;
 using Sandbox.Game.Weapons;
 using Sandbox.Game.World;
@@ -23,6 +25,40 @@ namespace Optimizer.Optimizations
     [PatchShim]
     public static class WelderOptimization
     {
+        private static readonly ProjectionBuildBudget ProjectionBudget = new ProjectionBuildBudget();
+        private static readonly Dictionary<long, ProjectionFrontierState> ProjectionFrontiers =
+            new Dictionary<long, ProjectionFrontierState>();
+        private static readonly Vector3I[] NeighborDirections =
+        {
+            Vector3I.Left, Vector3I.Right, Vector3I.Up, Vector3I.Down,
+            Vector3I.Forward, Vector3I.Backward,
+        };
+
+        private sealed class ProjectionFrontierState
+        {
+            public MyCubeGrid Preview;
+            public readonly List<Vector3I> Positions = new List<Vector3I>();
+            public readonly ProjectionFrontierCursor Cursor = new ProjectionFrontierCursor();
+            public readonly Queue<Vector3I> Ready = new Queue<Vector3I>();
+            public readonly HashSet<Vector3I> Queued = new HashSet<Vector3I>();
+            public long LastSeenFrame;
+
+            public void Reset(MyCubeGrid preview)
+            {
+                Preview = preview;
+                Positions.Clear();
+                if (preview != null)
+                    foreach (var block in preview.CubeBlocks) Positions.Add(block.Position);
+                Cursor.Reset();
+                Ready.Clear();
+                Queued.Clear();
+            }
+
+            public void Enqueue(Vector3I position)
+            {
+                if (Queued.Add(position)) Ready.Enqueue(position);
+            }
+        }
 
         public static void Patch(PatchContext ctx) => global::SentisOptimisations.PatchGuard.Run("WelderOptimization", ctx, PatchImpl);
 
@@ -198,7 +234,12 @@ namespace Optimizer.Optimizations
                 return;
             }
 
-
+            // Do not run the expensive projector/CanBuild scan when another welder has already
+            // spent the global materialization budget for this simulation frame.
+            if (!ProjectionBudget.CanConsume(MySession.Static.GameplayFrameCounter,
+                    SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.ProjectionBuildsPerFrame,
+                    welder.EntityId))
+                return;
 
             var array = FindProjectedBlocks(welder);
             DoWeldProjections(welder, array);
@@ -206,64 +247,106 @@ namespace Optimizer.Optimizations
 
         private static void DoWeldProjections(MyShipWelder welder, List<MyWelder.ProjectionRaycastData> array)
         {
+            if (array == null || array.Count == 0) return;
             MyInventory inventory = welder.GetInventory(0);
-            if (welder.UseConveyorSystem)
+            if (welder.UseConveyorSystem && !MySession.Static.CreativeMode)
             {
-                Dictionary<MyDefinitionId, int> componentsToPull = new Dictionary<MyDefinitionId, int>();
-                for (int i = 0; i < array.Count; i++)
+                // Conveyor PullItem is a bulk staging operation; pulling one item immediately
+                // before ContainItems does not reliably make a new component type available.
+                // Aggregate only the current buildable frontier. The expensive grid mutation is
+                // still governed independently by the global per-frame Build budget below.
+                var componentsToPull = new Dictionary<MyDefinitionId, int>();
+                foreach (var candidate in array)
                 {
-                    MyCubeBlockDefinition.Component[] components = array[i].hitCube.BlockDefinition.Components;
-                    if (components != null && components.Length != 0)
-                    {
-                        MyDefinitionId id = components[0].Definition.Id;
-                        componentsToPull.Sum(id, 1);
-                    }
+                    var candidateComponents = candidate.hitCube.BlockDefinition.Components;
+                    if (candidateComponents == null || candidateComponents.Length == 0) continue;
+                    componentsToPull.Sum(candidateComponents[0].Definition.Id, 1);
                 }
-
-                foreach (var x in componentsToPull)
-                {
-                    welder.CubeGrid.GridSystems.ConveyorSystem.PullItem(x.Key, new MyFixedPoint?(x.Value), welder,
-                        inventory,
-                        false, false);
-                }
+                foreach (var component in componentsToPull)
+                    welder.CubeGrid.GridSystems.ConveyorSystem.PullItem(component.Key,
+                        new MyFixedPoint?(Math.Min(component.Value, 8)), welder, inventory, false, false);
             }
-
-            bool flag3 = false;
 
             foreach (MyWelder.ProjectionRaycastData projectionRaycastData in array)
             {
-                if (welder.IsWithinWorldLimits(projectionRaycastData.cubeProjector,
+                var components = projectionRaycastData.hitCube.BlockDefinition.Components;
+                if (components == null || components.Length == 0)
+                    continue;
+
+                var componentId = components[0].Definition.Id;
+                if (!welder.IsWithinWorldLimits(projectionRaycastData.cubeProjector,
                         projectionRaycastData.hitCube.BlockDefinition.BlockPairName,
-                        projectionRaycastData.hitCube.BlockDefinition.PCU)
-                    && (MySession.Static.CreativeMode ||
-                        inventory.ContainItems(new MyFixedPoint?(1),
-                            projectionRaycastData.hitCube
-                                .BlockDefinition.Components[0]
-                                .Definition.Id, MyItemFlags.None)))
+                        projectionRaycastData.hitCube.BlockDefinition.PCU))
+                    continue;
+                if (!MySession.Static.CreativeMode &&
+                    !inventory.ContainItems(new MyFixedPoint?(1), componentId, MyItemFlags.None))
+                    continue;
+
+                // This is deliberately global, not per welder: multiple tools are updated in
+                // one simulation frame and their synchronous Build costs otherwise stack.
+                if (!ProjectionBudget.TryConsume(MySession.Static.GameplayFrameCounter,
+                        SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.ProjectionBuildsPerFrame,
+                        welder.EntityId))
+                    break;
+
+                // game thread already: build the projection inline
+                MyWelder.ProjectionRaycastData invokedBlock = projectionRaycastData;
+                try
                 {
-                    // game thread already: build the projection inline
-                    MyWelder.ProjectionRaycastData invokedBlock = projectionRaycastData;
-                    try
-                    {
                     if (invokedBlock.cubeProjector.Closed ||
                         invokedBlock.cubeProjector.CubeGrid.Closed ||
                         invokedBlock.hitCube.FatBlock != null && invokedBlock.hitCube.FatBlock.Closed)
-                        return;
+                        continue;
                     invokedBlock.cubeProjector.Build(invokedBlock.hitCube, welder.OwnerId,
                         welder.EntityId,
                         builtBy: welder.BuiltBy);
-                    }
-                    catch (Exception e)
-                    {
-                        SentisOptimisationsPlugin.SentisOptimisationsPlugin.Log.Error(e);
-                    }
+                    QueueProjectedNeighbors(invokedBlock.cubeProjector, invokedBlock.hitCube.Position);
+                }
+                catch (Exception e)
+                {
+                    SentisOptimisationsPlugin.SentisOptimisationsPlugin.Log.Error(e);
                 }
             }
         }
 
+        private static void QueueProjectedNeighbors(MyProjectorBase projector, Vector3I builtPosition)
+        {
+            if (projector == null || projector.ProjectedGrid == null) return;
+            ProjectionFrontierState state;
+            if (!ProjectionFrontiers.TryGetValue(projector.EntityId, out state)) return;
+            foreach (var direction in NeighborDirections)
+            {
+                var position = builtPosition + direction;
+                if (projector.ProjectedGrid.GetCubeBlock(position) != null) state.Enqueue(position);
+            }
+        }
+
+        private static ProjectionFrontierState FrontierState(MyProjectorBase projector, MyCubeGrid preview,
+            long frame)
+        {
+            ProjectionFrontierState state;
+            if (!ProjectionFrontiers.TryGetValue(projector.EntityId, out state))
+            {
+                state = new ProjectionFrontierState();
+                ProjectionFrontiers[projector.EntityId] = state;
+            }
+            if (state.Preview != preview || state.Positions.Count != preview.BlocksCount)
+                state.Reset(preview);
+            state.LastSeenFrame = frame;
+
+            if (ProjectionFrontiers.Count > 32)
+            {
+                var stale = ProjectionFrontiers
+                    .Where(pair => frame - pair.Value.LastSeenFrame > 600 || pair.Value.Preview == null ||
+                                   pair.Value.Preview.Closed)
+                    .Select(pair => pair.Key).ToList();
+                foreach (var key in stale) ProjectionFrontiers.Remove(key);
+            }
+            return state;
+        }
+
         private static List<MyWelder.ProjectionRaycastData> FindProjectedBlocks(MyShipWelder welder)
         {
-            HashSet<MySlimBlock> m_projectedBlock = new HashSet<MySlimBlock>();
             var w = welder.WorldMatrix;
             var d = (MyShipWelderDefinition) (welder.BlockDefinition);
             BoundingSphereD boundingSphereD = new BoundingSphereD(
@@ -271,31 +354,51 @@ namespace Optimizer.Optimizations
                 ShipToolPatch.GetWelderRadius(welder));
             List<MyWelder.ProjectionRaycastData> list = new List<MyWelder.ProjectionRaycastData>();
             List<MyEntity> entitiesInSphere = MyEntities.GetEntitiesInSphere(ref boundingSphereD);
+            var frame = MySession.Static.GameplayFrameCounter;
+            var checks = Math.Max(1, SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config
+                .ProjectionChecksPerActivation);
 
             foreach (MyEntity myEntity in entitiesInSphere)
             {
                 MyCubeGrid myCubeGrid = myEntity as MyCubeGrid;
                 if (myCubeGrid != null && myCubeGrid.Projector != null)
                 {
-                    myCubeGrid.GetBlocksInsideSphere(ref boundingSphereD, m_projectedBlock, false);
-                    foreach (MySlimBlock mySlimBlock in m_projectedBlock)
+                    var projector = myCubeGrid.Projector;
+                    var state = FrontierState(projector, myCubeGrid, frame);
+
+                    // Validate a few high-value frontier cells first. Stale entries are cheap and
+                    // bounded; successful builds enqueue only their six grid neighbours.
+                    var readyChecks = Math.Min(4, state.Ready.Count);
+                    while (readyChecks-- > 0 && list.Count == 0)
                     {
-                        if (myCubeGrid.Projector.CanBuild(mySlimBlock, true) == BuildCheckResult.OK)
+                        var position = state.Ready.Dequeue();
+                        state.Queued.Remove(position);
+                        var block = myCubeGrid.GetCubeBlock(position);
+                        if (block != null &&
+                            Vector3D.DistanceSquared(myCubeGrid.GridIntegerToWorld(position), boundingSphereD.Center) <=
+                            boundingSphereD.Radius * boundingSphereD.Radius &&
+                            projector.CanBuild(block, true) == BuildCheckResult.OK)
                         {
-                            MySlimBlock cubeBlock = myCubeGrid.GetCubeBlock(mySlimBlock.Position);
-                            if (cubeBlock != null)
-                            {
-                                list.Add(new MyWelder.ProjectionRaycastData(BuildCheckResult.OK, cubeBlock,
-                                    myCubeGrid.Projector));
-                            }
+                            list.Add(new MyWelder.ProjectionRaycastData(BuildCheckResult.OK, block, projector));
                         }
                     }
 
-                    m_projectedBlock.Clear();
+                    if (list.Count == 0)
+                    foreach (var index in state.Cursor.Take(state.Positions.Count, checks))
+                    {
+                        var position = state.Positions[index];
+                        if (Vector3D.DistanceSquared(myCubeGrid.GridIntegerToWorld(position), boundingSphereD.Center) >
+                            boundingSphereD.Radius * boundingSphereD.Radius) continue;
+                        var block = myCubeGrid.GetCubeBlock(position);
+                        if (block != null && projector.CanBuild(block, true) == BuildCheckResult.OK)
+                        {
+                            list.Add(new MyWelder.ProjectionRaycastData(BuildCheckResult.OK, block, projector));
+                            break;
+                        }
+                    }
                 }
             }
 
-            m_projectedBlock.Clear();
             entitiesInSphere.Clear();
 
             return list;
