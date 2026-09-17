@@ -17,6 +17,8 @@ namespace SentisOptimisationsPlugin
         private bool _welderTweaksEnabled = true;
         private bool _welderCanWeldProjectionsIfWeldedOtherBlocks = false;
         private bool _welderSelfWelding = true;
+        private int _projectionBuildsPerFrame = 1;
+        private int _projectionChecksPerActivation = 24;
         // AsyncWeld v2: the old threaded weld pipeline was removed (it raced with the game
         // thread: Havok broadphase, conveyor, grid mutation). Welding now runs fully on the game
         // thread with the safe optimizations (observer-based discovery, fast block scan, per-tick
@@ -152,6 +154,20 @@ namespace SentisOptimisationsPlugin
 
         [DisplayTab(Name = "Self Welding", GroupName = "Welder Tweaks", Tab = "Welder Optimizations", Order = 5, Description = "Welder can weld it self")]
         public bool WelderTweaksSelfWelding { get => _welderSelfWelding; set => SetValue(ref _welderSelfWelding, value); }
+
+        [DisplayTab(Name = "Projection builds per frame", GroupName = "Welder Tweaks", Tab = "Welder Optimizations", Order = 6, Description = "Global server-wide limit for projection block materialization per simulation frame. Minimum 1; runtime adjustable.")]
+        public int ProjectionBuildsPerFrame
+        {
+            get => _projectionBuildsPerFrame;
+            set => SetValue(ref _projectionBuildsPerFrame, value < 1 ? 1 : value);
+        }
+
+        [DisplayTab(Name = "Projection checks per activation", GroupName = "Welder Tweaks", Tab = "Welder Optimizations", Order = 7, Description = "Maximum new projector CanBuild checks performed by one welder activation. Minimum 1; runtime adjustable.")]
+        public int ProjectionChecksPerActivation
+        {
+            get => _projectionChecksPerActivation;
+            set => SetValue(ref _projectionChecksPerActivation, value < 1 ? 1 : value);
+        }
         
         [DisplayTab(Name = "Async weld", GroupName = "Welder Tweaks", Tab = "Welder Optimizations", Order = 8, Description = "Async weld")]
         [System.Obsolete("Inert since AsyncWeld v2: welding is always game-thread now. Kept for cfg compatibility.")]
