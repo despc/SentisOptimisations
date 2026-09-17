@@ -9,16 +9,19 @@ using VRage.Game.ObjectBuilders.ComponentSystem;
 namespace Optimizer.Optimizations
 {
     /// <summary>
-    /// Allocation-free equivalent of MyComponentContainer.Serialize for blocks without serialized
-    /// components.
+    /// Leaner MyComponentContainer.Serialize.
     ///
     /// Vanilla builds a temporary List for every component type of every block before it knows
-    /// whether any component is serialized, then throws the lists away. It runs for every block of
-    /// every grid on each world save (and on blueprint copies, grid replication...): measured 336
-    /// bytes per conveyor block that ends up with no component container at all. The replacement
-    /// first checks whether anything is serialized without allocating, then serializes the same
-    /// components in the same order into the same container, returning null exactly when vanilla
-    /// does. On any exception the vanilla method runs instead.
+    /// whether any component is serialized, and creates a component container even when every
+    /// serialized component returns no builder - e.g. conveyors, whose only "serialized" component is
+    /// a hierarchy component without children. That empty container is dropped when the save is
+    /// written. It runs for every block of every grid on each world save (and on blueprint copies,
+    /// grid replication...): 336 bytes per conveyor block in vanilla, 0 here.
+    ///
+    /// The replacement serializes the same components in the same order and creates the container
+    /// only for the first builder; with no builders it returns null, as vanilla does for blocks
+    /// without serialized components (all consumers already handle a null container). On any
+    /// exception the vanilla method runs instead.
     /// </summary>
     [PatchShim]
     public static class ComponentContainerSerialize
@@ -64,32 +67,20 @@ namespace Optimizer.Optimizations
 
         public static MyObjectBuilder_ComponentContainer Serialize(Dictionary<Type, List<MyComponentBase>> components, bool copy)
         {
-            var anySerialized = false;
-            foreach (var entry in components)
-            {
-                foreach (var component in entry.Value)
-                {
-                    if (!component.IsSerialized()) continue;
-                    anySerialized = true;
-                    break;
-                }
-                if (anySerialized) break;
-            }
-            if (!anySerialized) return null;
-
-            var result = new MyObjectBuilder_ComponentContainer();
+            MyObjectBuilder_ComponentContainer result = null;
             foreach (var entry in components)
             {
                 foreach (var component in entry.Value)
                 {
                     if (!component.IsSerialized()) continue;
                     var builder = component.Serialize(copy);
-                    if (builder != null)
-                        result.Components.Add(new MyObjectBuilder_ComponentContainer.ComponentData
-                        {
-                            TypeId = entry.Key.Name,
-                            Component = builder,
-                        });
+                    if (builder == null) continue;
+                    if (result == null) result = new MyObjectBuilder_ComponentContainer();
+                    result.Components.Add(new MyObjectBuilder_ComponentContainer.ComponentData
+                    {
+                        TypeId = entry.Key.Name,
+                        Component = builder,
+                    });
                 }
             }
             return result;
