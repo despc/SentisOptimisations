@@ -133,6 +133,18 @@ namespace Optimizer.Optimizations
             }
         }
 
+        /// <summary>
+        /// Reads and resets the wake counter so a test can watch a single open: the counter is the
+        /// race-free proof that opening pulled the queue forward, unlike a queue snapshot a fast
+        /// server may already have sent through.
+        /// </summary>
+        public static long TakeWokenUp()
+        {
+            var value = WokenUp;
+            WokenUp = 0;
+            return value;
+        }
+
         /// <summary>How many inventories of this client are queued, and how many are due within so many frames.</summary>
         public static long[] InventoryQueueState(MyClientStateBase state, long withinFrames)
         {
