@@ -61,35 +61,26 @@ namespace SentisOptimisationsPlugin
             MySession.Static.Players.TryGetPlayerBySteamId(forClient.Id.Value, out player);
             if (player == null || player.Identity == null)
             {
-                Log.Error("cant replicate - player null");
-                return false;
-            }
-
-            var requestFromIdentity = player.Identity.IdentityId;
-
-            if (PlayerUtils.IsAdmin(requestFromIdentity))
-            {
+                // No player yet (or an identity-less client): vanilla would send the grid, so the
+                // stream must not be dropped - it would never finish for that client.
+                Log.Warn("replicating grid " + Grid.EntityId + " to a client without a player");
                 return true;
             }
 
-            var owner = PlayerUtils.GetOwner(Grid);
-            if (owner == 0)
+            var access = AccessFor(Grid, player.Identity.IdentityId);
+            MyObjectBuilder_EntityBase builder;
+            try
             {
+                builder = GridStreamBuilders.Get(Grid, (IMyReplicable)__instance, forClient, access,
+                    MySession.Static.GameplayFrameCounter);
+            }
+            catch (Exception e)
+            {
+                Log.Error(e, "grid builder for streaming failed, using vanilla");
                 return true;
             }
-            if (owner == requestFromIdentity)
-            {
-                return true;
-            }
-            
-            IMyFaction ownerFaction = FactionUtils.GetFactionOfPlayer(owner);
-            IMyFaction requestFromFaction = FactionUtils.GetFactionOfPlayer(requestFromIdentity);
-            bool requestFromFactionMember = ownerFaction != null && ownerFaction == requestFromFaction;
 
             stream.WriteBool(false);
-            MyObjectBuilder_EntityBase builder;
-            using (MyReplicationLayer.StartSerializingReplicable((IMyReplicable) __instance, forClient))
-                builder = Grid.GetObjectBuilder(false);
             MyReplicationServer replicationServer =
                 (MyReplicationServer) ReflectionUtils.InvokeStaticMethod(typeof(MyMultiplayer), "GetReplicationServer",
                     new object[] { });
@@ -98,25 +89,6 @@ namespace SentisOptimisationsPlugin
             {
                 try
                 {
-                    foreach (var myObjectBuilderCubeBlock in ((MyObjectBuilder_CubeGrid) builder).CubeBlocks)
-                    {
-                        if (myObjectBuilderCubeBlock is MyObjectBuilder_MyProgrammableBlock)
-                        {
-                            var shareMode = myObjectBuilderCubeBlock.ShareMode;
-                            if (shareMode == MyOwnershipShareModeEnum.All)
-                            {
-                                continue;
-                            }
-
-                            if (requestFromFactionMember && shareMode == MyOwnershipShareModeEnum.Faction)
-                            {
-                                continue;
-                            }
-                            ((MyObjectBuilder_MyProgrammableBlock) myObjectBuilderCubeBlock).Program =
-                                "You don't need to see this";
-                        }
-                    }
-
                     MySerializer.Write<MyObjectBuilder_EntityBase>(stream, ref builder,
                         MyObjectBuilderSerializerKeen.Dynamic);
                 }
@@ -142,6 +114,19 @@ namespace SentisOptimisationsPlugin
             }));
 
             return false;
+        }
+
+        /// <summary>How much of the grid's scripts this player may see.</summary>
+        private static GridStreamBuilders.Access AccessFor(MyCubeGrid grid, long requestFromIdentity)
+        {
+            if (PlayerUtils.IsAdmin(requestFromIdentity)) return GridStreamBuilders.Access.Full;
+            var owner = PlayerUtils.GetOwner(grid);
+            if (owner == 0 || owner == requestFromIdentity) return GridStreamBuilders.Access.Full;
+            IMyFaction ownerFaction = FactionUtils.GetFactionOfPlayer(owner);
+            IMyFaction requestFromFaction = FactionUtils.GetFactionOfPlayer(requestFromIdentity);
+            return ownerFaction != null && ownerFaction == requestFromFaction
+                ? GridStreamBuilders.Access.Faction
+                : GridStreamBuilders.Access.None;
         }
     }
 }
