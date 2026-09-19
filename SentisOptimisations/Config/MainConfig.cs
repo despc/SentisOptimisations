@@ -49,6 +49,7 @@ namespace SentisOptimisationsPlugin
         //Other
         private bool _enableMainDebugLogs = false;
         private int _charSyncDist = 10000;
+        private int _physicsThreads = Optimizer.Optimizations.HavokThreadPool.DefaultThreads;
         
         //Scripts
         private bool _punishHeavyScripts = false;
@@ -209,6 +210,10 @@ namespace SentisOptimisationsPlugin
         }
         
         
+        [DisplayTab(Name = "Physics threads", GroupName = "Other", Tab = "Other", Order = 3,
+            Description = "Havok worker threads for the physics step. Vanilla lets Havok pick (7 on a 16-thread CPU); default is 80% of the logical processors. Takes effect after a restart")]
+        public int PhysicsThreads { get => _physicsThreads; set => SetValue(ref _physicsThreads, value); }
+
         [DisplayTab(Name = "Enable debug logs", GroupName = "Other", Tab = "Other", Order = 9, Description = "Enable debug logs")]
         public bool EnableMainDebugLogs { get => _enableMainDebugLogs; set => SetValue(ref _enableMainDebugLogs, value); }
         
