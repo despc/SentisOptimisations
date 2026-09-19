@@ -53,10 +53,6 @@ namespace SentisOptimisationsPlugin.ShipTool
                 typeof(ShipToolPatch).GetMethod(nameof(ActivateCommonPatch),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
 
-            ctx.GetPattern(typeof(MyCubeGrid).GetMethod(nameof(MyCubeGrid.GetBlocksInsideSpheres)))
-                .Prefixes.Add(typeof(ShipToolPatch).GetMethod(nameof(GetBlocksInsideSpheresPatch),
-                    BindingFlags.Static | BindingFlags.NonPublic));
-            
             var DrillEnvironmentSector = typeof(MyDrillBase).GetMethod(
                 "DrillEnvironmentSector", BindingFlags.Instance | BindingFlags.NonPublic);
 
@@ -110,340 +106,59 @@ namespace SentisOptimisationsPlugin.ShipTool
             return false;
         }
 
-        private static void GetBlocksInsideSpheresPatch(MyCubeGrid __instance, ref BoundingSphereD sphere1,
-            ref BoundingSphereD sphere2,
-            ref BoundingSphereD sphere3,
-            HashSet<MySlimBlock> blocks1,
-            HashSet<MySlimBlock> blocks2,
-            HashSet<MySlimBlock> blocks3,
-            bool respectDeformationRatio,
-            float detectionBlockHalfSize,
-            ref MatrixD invWorldGrid)
-        {
-            try
-            {
-                blocks1.Clear();
-                blocks2.Clear();
-                blocks3.Clear();
-                HashSet<MyCubeBlock> m_processedBlocks = new HashSet<MyCubeBlock>();
-                Vector3D result;
-                Vector3D.Transform(ref sphere3.Center, ref invWorldGrid, out result);
-                Vector3I vector3I1 = Vector3I.Round((result - sphere3.Radius) * (double)__instance.GridSizeR);
-                Vector3I vector3I2 = Vector3I.Round((result + sphere3.Radius) * (double)__instance.GridSizeR);
-                Vector3 vector3 = new Vector3(detectionBlockHalfSize);
-                BoundingSphereD boundingSphereD1 = new BoundingSphereD(result, sphere1.Radius);
-                BoundingSphereD boundingSphereD2 = new BoundingSphereD(result, sphere2.Radius);
-                BoundingSphereD boundingSphereD3 = new BoundingSphereD(result, sphere3.Radius);
-                ConcurrentDictionary<Vector3I, MyCube> instanceMCubes =
-                    (ConcurrentDictionary<Vector3I, MyCube>)__instance.easyGetField("m_cubes");
-                if ((vector3I2.X - vector3I1.X) * (vector3I2.Y - vector3I1.Y) * (vector3I2.Z - vector3I1.Z) <
-                    instanceMCubes.Count)
-                {
-                    Vector3I key = new Vector3I();
-                    for (key.X = vector3I1.X; key.X <= vector3I2.X; ++key.X)
-                    {
-                        for (key.Y = vector3I1.Y; key.Y <= vector3I2.Y; ++key.Y)
-                        {
-                            for (key.Z = vector3I1.Z; key.Z <= vector3I2.Z; ++key.Z)
-                            {
-                                MyCube myCube;
-                                if (instanceMCubes.TryGetValue(key, out myCube))
-                                {
-                                    MySlimBlock cubeBlock = myCube.CubeBlock;
-                                    if (cubeBlock.FatBlock == null ||
-                                        !m_processedBlocks.Contains(cubeBlock.FatBlock))
-                                    {
-                                        m_processedBlocks.Add(cubeBlock.FatBlock);
-                                        if (respectDeformationRatio)
-                                        {
-                                            boundingSphereD1.Radius =
-                                                sphere1.Radius * (double)cubeBlock.DeformationRatio;
-                                            boundingSphereD2.Radius =
-                                                sphere2.Radius * (double)cubeBlock.DeformationRatio;
-                                            boundingSphereD3.Radius =
-                                                sphere3.Radius * (double)cubeBlock.DeformationRatio;
-                                        }
-
-                                        BoundingBox boundingBox = cubeBlock.FatBlock == null
-                                            ? new BoundingBox(cubeBlock.Position * __instance.GridSize - vector3,
-                                                cubeBlock.Position * __instance.GridSize + vector3)
-                                            : new BoundingBox(
-                                                cubeBlock.Min * __instance.GridSize - __instance.GridSizeHalf,
-                                                cubeBlock.Max * __instance.GridSize + __instance.GridSizeHalf);
-                                        if (boundingBox.Intersects((BoundingSphere)boundingSphereD3))
-                                        {
-                                            if (boundingBox.Intersects((BoundingSphere)boundingSphereD2))
-                                            {
-                                                if (boundingBox.Intersects((BoundingSphere)boundingSphereD1))
-                                                    blocks1.Add(cubeBlock);
-                                                else
-                                                    blocks2.Add(cubeBlock);
-                                            }
-                                            else
-                                                blocks3.Add(cubeBlock);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                else
-                {
-                    foreach (MyCube myCube in (IEnumerable<MyCube>)instanceMCubes.Values)
-                    {
-                        MySlimBlock cubeBlock = myCube.CubeBlock;
-                        if (cubeBlock.FatBlock == null || !m_processedBlocks.Contains(cubeBlock.FatBlock))
-                        {
-                            m_processedBlocks.Add(cubeBlock.FatBlock);
-                            if (respectDeformationRatio)
-                            {
-                                boundingSphereD1.Radius = sphere1.Radius * (double)cubeBlock.DeformationRatio;
-                                boundingSphereD2.Radius = sphere2.Radius * (double)cubeBlock.DeformationRatio;
-                                boundingSphereD3.Radius = sphere3.Radius * (double)cubeBlock.DeformationRatio;
-                            }
-
-                            BoundingBox boundingBox = cubeBlock.FatBlock == null
-                                ? new BoundingBox(cubeBlock.Position * __instance.GridSize - vector3,
-                                    cubeBlock.Position * __instance.GridSize + vector3)
-                                : new BoundingBox(cubeBlock.Min * __instance.GridSize - __instance.GridSizeHalf,
-                                    cubeBlock.Max * __instance.GridSize + __instance.GridSizeHalf);
-                            if (boundingBox.Intersects((BoundingSphere)boundingSphereD3))
-                            {
-                                if (boundingBox.Intersects((BoundingSphere)boundingSphereD2))
-                                {
-                                    if (boundingBox.Intersects((BoundingSphere)boundingSphereD1))
-                                        blocks1.Add(cubeBlock);
-                                    else
-                                        blocks2.Add(cubeBlock);
-                                }
-                                else
-                                    blocks3.Add(cubeBlock);
-                            }
-                        }
-                    }
-                }
-            }
-            catch (Exception e)
-            {
-                Log.Error("Exception during GetBlocksInsideSpheresPatch", e);
-            }
-        }
-
+        /// <summary>
+        /// Throttles tool activations on grids no player is near; an activation that is not skipped
+        /// is the game's own ActivateCommon.
+        ///
+        /// This used to replace ActivateCommon with a copy from the time the scan ran on worker
+        /// threads. On the game thread the copy only lost to the original: it found entities by
+        /// enumerating the entity observer's cache, whose enumerator copied every grid, character and voxel
+        /// map of the world through ConcurrentDictionary.Keys on each call, allocated new collections
+        /// for every activation, reached the tool's fields and methods through reflection with boxing,
+        /// and dropped the game's cache of the tool's own grid blocks. With 220 idle welders that was
+        /// 401 MB of garbage a minute, 45% of everything the game thread allocated. The game's version
+        /// queries MyGamePruningStructure into a shared list and allocates next to nothing.
+        /// </summary>
         private static bool ActivateCommonPatch(MyShipToolBase __instance)
         {
             try
             {
+                if (!SentisOptimisationsPlugin.Config.SlowdownEnabled ||
+                    MySandboxGame.Static.SimulationFrameCounter <= 6000)
+                    return true;
+
                 var blockId = __instance.EntityId;
-
-                if (SentisOptimisationsPlugin.Config.SlowdownEnabled &&
-                    MySandboxGame.Static.SimulationFrameCounter > 6000)
+                var myUpdateTiersPlayerPresence = __instance.CubeGrid.PlayerPresenceTier;
+                if (myUpdateTiersPlayerPresence == MyUpdateTiersPlayerPresence.Tier1)
+                    return !NeedSkip(blockId, 30);
+                if (myUpdateTiersPlayerPresence == MyUpdateTiersPlayerPresence.Tier2)
                 {
-                    var myUpdateTiersPlayerPresence = __instance.CubeGrid.PlayerPresenceTier;
-                    if (myUpdateTiersPlayerPresence == MyUpdateTiersPlayerPresence.Tier1)
+                    int nobodyToOffCount = 0;
+                    if (NobodyToOff.TryGetValue(blockId, out nobodyToOffCount))
                     {
-                        if (NeedSkip(blockId, 30)) return false;
-                    }
-                    else if (myUpdateTiersPlayerPresence == MyUpdateTiersPlayerPresence.Tier2)
-                    {
-                        int nobodyToOffCount = 0;
-                        if (NobodyToOff.TryGetValue(blockId, out nobodyToOffCount))
+                        NobodyToOff[blockId] = nobodyToOffCount++;
+                        if (nobodyToOffCount > 5000)
                         {
-                            NobodyToOff[blockId] = nobodyToOffCount++;
-                            if (nobodyToOffCount > 5000)
-                            {
-                                __instance.Enabled = false;
-                                NobodyToOff.Remove(blockId);
-                                return false;
-                            }
+                            __instance.Enabled = false;
+                            NobodyToOff.Remove(blockId);
+                            return false;
                         }
-                        else
-                        {
-                            NobodyToOff[blockId] = 0;
-                        }
-
-                        if (NeedSkip(blockId, 300)) return false;
                     }
-                }
-
-                DoActivateCommon(__instance);
-            }
-            catch (Exception e)
-            {
-                Log.Error("DoActivateCommon exception ", e);
-            }
-
-            return false;
-        }
-
-        // AsyncWeld v2: everything that touches game state runs inline on the game thread.
-        // The speed used to come from running the scan on worker threads, but those scans read
-        // Havok broadphase / conveyor / grid state while the game mutated it (crashes and stale
-        // weld/grind results). The safe and *faster* equivalent used here:
-        //  * entity discovery via the EntitiesObserver AABB cache instead of a physics sphere query
-        //    (falls back to the vanilla query when the cache is not populated);
-        //  * the O(min(volume, cubes)) GetBlocksInsideSpheres replacement patch (already game-thread);
-        //  * the per-block caps in WelderOptimization / ActivateCommon throttling.
-        // No queueing, no InvokeOnGameThread, no 10-60 tick StartAt latency.
-        private static void DoActivateCommon(MyShipToolBase __instance)
-        {
-            BoundingSphere m_detectorSphere = _detectorSphere.Invoke(__instance);
-            BoundingSphereD boundingSphereD = new BoundingSphereD(
-                Vector3D.Transform(m_detectorSphere.Center, __instance.CubeGrid.WorldMatrix),
-                (double)m_detectorSphere.Radius);
-            BoundingSphereD sphere = new BoundingSphereD(boundingSphereD.Center,
-                (double)m_detectorSphere.Radius * 0.5);
-
-            __instance.easySetField("m_isActivatedOnSomething", false, typeof(MyShipToolBase));
-            bool flag = false;
-
-            var topEntities = GetTopMostEntitiesInSphereFast(ref boundingSphereD);
-            var entitiesInContactSync = GetEntitiesInContact(__instance, topEntities, ref flag);
-            ProcessEntitiesInContact(__instance, boundingSphereD, flag, entitiesInContactSync, sphere);
-            topEntities.Clear();
-        }
-
-        /// <summary>
-        /// Game-thread entity discovery: cheap AABB filter over the observed-entity cache, which
-        /// avoids a Havok broadphase query for every active welder/grinder tick.
-        /// </summary>
-        public static List<MyEntity> GetTopMostEntitiesInSphereFast(ref BoundingSphereD sphere)
-        {
-            var observed = EntitiesObserver.EntitiesToShipTools;
-            if (observed.Count == 0)
-                return MyEntities.GetTopMostEntitiesInSphere(ref sphere);
-
-            var result = new List<MyEntity>();
-            foreach (var entity in observed)
-            {
-                if (entity == null || entity.MarkedForClose)
-                    continue;
-                if (entity.PositionComp.WorldAABB.Intersects(sphere))
-                    result.Add(entity);
-            }
-            return result;
-        }
-
-        private static void ProcessEntitiesInContact(MyShipToolBase __instance,
-            BoundingSphereD boundingSphereD, bool flag, HashSet<MyEntity> entitiesInContact, BoundingSphereD sphere)
-        {
-            
-            CheckEnvironment(__instance, boundingSphereD, flag);
-
-            HashSet<MySlimBlock> blocksToActivateOnSync = new HashSet<MySlimBlock>();
-            foreach (MyEntity myEntity in entitiesInContact)
-            {
-                MyCharacter myCharacter = myEntity as MyCharacter;
-                MyCubeGrid myCubeGrid = myEntity as MyCubeGrid;
-
-                if (myCubeGrid != null)
-                {
-                    HashSet<MySlimBlock> mTempBlocksBuffer = new HashSet<MySlimBlock>();
-                    myCubeGrid.GetBlocksInsideSphere(ref boundingSphereD, mTempBlocksBuffer);
-                    blocksToActivateOnSync.UnionWith(mTempBlocksBuffer);
-                }
-
-                if (myCharacter != null && Sync.IsServer)
-                {
-                    MyStringHash damageType = MyDamageType.Drill;
-                    switch (__instance)
+                    else
                     {
-                        case IMyShipGrinder _:
-                            damageType = MyDamageType.Grind;
-                            break;
-                        case IMyShipWelder _:
-                            damageType = MyDamageType.Weld;
-                            break;
+                        NobodyToOff[blockId] = 0;
                     }
 
-                    if (new MyOrientedBoundingBoxD((BoundingBoxD)myCharacter.PositionComp.LocalAABB,
-                            myCharacter.PositionComp.WorldMatrixRef).Intersects(ref sphere))
-                        myCharacter.DoDamage(20f, damageType, true, __instance.EntityId);
-                }
-            }
-
-            CallActivate(__instance, blocksToActivateOnSync);
-        }
-
-        private static HashSet<MyEntity> GetEntitiesInContact(MyShipToolBase __instance, List<MyEntity> topEntities, ref bool flag)
-        {
-            HashSet<MyEntity> entitiesInContact = new HashSet<MyEntity>();
-            try
-            {
-                foreach (MyEntity myEntity in topEntities)
-                {
-                    if (myEntity is MyEnvironmentSector)
-                        flag = true;
-                    MyEntity topMostParent = myEntity.GetTopMostParent((Type)null);
-                    if ((bool)__instance.easyCallMethod("CanInteractWith", new object[] { topMostParent }, true,
-                            typeof(MyShipToolBase)))
-                        entitiesInContact.Add(topMostParent);
+                    return !NeedSkip(blockId, 300);
                 }
             }
             catch (Exception e)
             {
-                Log.Error("Async exception " + e);
+                Log.Error(e, "ship tool throttling failed");
             }
-            return entitiesInContact;
+
+            return true;
         }
-
-
-
-        private static void CheckEnvironment(MyShipToolBase __instance, BoundingSphereD boundingSphereD, bool flag)
-        {
-            var mCheckEnvironmentSector =
-                (bool)__instance.easyGetField("m_checkEnvironmentSector", typeof(MyShipToolBase));
-            
-            if (!(mCheckEnvironmentSector & flag)) return;
-            
-            MyPhysics.HitInfo? nullable = MyPhysics.CastRay(boundingSphereD.Center,
-                boundingSphereD.Center + boundingSphereD.Radius * __instance.WorldMatrix.Forward, 24);
-            if (nullable.HasValue && nullable.HasValue)
-            {
-                IMyEntity hitEntity = nullable.Value.HkHitInfo.GetHitEntity();
-                if (hitEntity is MyEnvironmentSector)
-                {
-                    MyEnvironmentSector environmentSector = hitEntity as MyEnvironmentSector;
-                    uint shapeKey = nullable.Value.HkHitInfo.GetShapeKey(0);
-                    int itemFromShapeKey = environmentSector.GetItemFromShapeKey(shapeKey);
-                    if (environmentSector.DataView.Items[itemFromShapeKey].ModelIndex >= (short)0)
-                    {
-                        MyBreakableEnvironmentProxy module =
-                            environmentSector.GetModule<MyBreakableEnvironmentProxy>();
-                        Vector3D vector3D = __instance.CubeGrid.WorldMatrix.Right +
-                                            __instance.CubeGrid.WorldMatrix.Forward;
-                        vector3D.Normalize();
-                        // double num1 = 10.0;
-                        // float num2 = (float)(num1 * num1) * __instance.CubeGrid.Physics.Mass;
-                        int itemId = itemFromShapeKey;
-                        Vector3D position = (Vector3D)nullable.Value.HkHitInfo.Position;
-                        Vector3D hitnormal = vector3D;
-                        // double impactEnergy = (double)num2;
-                        module.BreakAt(itemId, position, hitnormal);
-                    }
-                }
-            }
-        }
-
-        private static void CallActivate(MyShipToolBase __instance, HashSet<MySlimBlock> m_blocksToActivateOn)
-        {
-            bool m_isActivatedOnSomething =
-                (bool)__instance.easyGetField("m_isActivatedOnSomething", typeof(MyShipToolBase));
-
-            var instanceMIsActivatedOnSomething = m_isActivatedOnSomething |
-                                                  (bool)__instance.easyCallMethod("Activate",
-                                                      new object[] { m_blocksToActivateOn });
-            __instance.easySetField("m_isActivatedOnSomething", instanceMIsActivatedOnSomething,
-                typeof(MyShipToolBase));
-
-            int m_activateCounter = (int)__instance.easyGetField("m_activateCounter", typeof(MyShipToolBase));
-            ReflectionUtils.SetInstanceField(typeof(MyShipToolBase), __instance, "m_activateCounter",
-                m_activateCounter + 1);
-            ReflectionUtils.SetInstanceField(typeof(MyShipToolBase), __instance, "m_lastTimeActivate",
-                MySandboxGame.TotalGamePlayTimeInMilliseconds);
-            ((HashSet<MySlimBlock>)__instance.easyGetField("m_blocksToActivateOn", typeof(MyShipToolBase))).Clear();
-        }
-
 
         public static float GetWelderRadius(MyShipWelder welder)
         {
@@ -456,15 +171,6 @@ namespace SentisOptimisationsPlugin.ShipTool
             return ((MyShipWelderDefinition)(welder.BlockDefinition)).SensorRadius;
         }
 
-        private static void SetRadius(MyShipToolBase __instance, float radius)
-        {
-            BoundingSphere m_detectorSphere =
-                (BoundingSphere)ReflectionUtils.GetInstanceField(typeof(MyShipToolBase), __instance,
-                    "m_detectorSphere");
-            BoundingSphere bs = new BoundingSphere(m_detectorSphere.Center, radius);
-            ReflectionUtils.SetInstanceField(typeof(MyShipToolBase), __instance, "m_detectorSphere", bs);
-        }
-        
         private static bool NeedSkip(long blockId, int cd)
         {
             int cooldown;
