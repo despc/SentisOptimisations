@@ -16,6 +16,17 @@ namespace SentisOptimisations.Tests
     /// </summary>
     public class FreezerCompensationTests
     {
+        // ---------------------------------------------------------------- physics freeze
+
+        [Fact]
+        public void Frozen_bodies_can_leave_the_active_set()
+        {
+            // Without it every physics-frozen grid is walked by UpdateActiveRigidBodies each frame.
+            var field = typeof(FreezeLogic).GetField("RigidBodyDeactivated", BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.NotNull(field);
+            Assert.NotNull(field.GetValue(null));
+        }
+
         // ---------------------------------------------------------------- tracker behavior
 
         [Fact]
