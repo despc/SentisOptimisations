@@ -107,17 +107,38 @@ namespace Optimizer.Optimizations
         }
 
 
+        // Welders activate on the game thread only, one at a time, so the scratch collections of an
+        // activation are shared instead of allocated for each of them: an idle welder activates
+        // every quarter second whether or not it finds anything to weld.
+        private static readonly Dictionary<string, int> MissingComponents = new Dictionary<string, int>();
+        private static readonly HashSet<MySlimBlock> TargetsToWeld = new HashSet<MySlimBlock>();
+        private static readonly List<MyWelder.ProjectionRaycastData> ProjectedBlocks = new List<MyWelder.ProjectionRaycastData>();
+        private static readonly Dictionary<MyDefinitionId, int> ComponentsToPull = new Dictionary<MyDefinitionId, int>();
+
         public static void ActivateInternal(MyShipWelder welder, HashSet<MySlimBlock> targets)
         {
-            Dictionary<string, int> m_missingComponents = new Dictionary<string, int>();
             if (welder.MarkedForClose || welder.Closed)
             {
                 return;
             }
 
+            try
+            {
+                ActivateInternal(welder, targets, MissingComponents, TargetsToWeld);
+            }
+            finally
+            {
+                MissingComponents.Clear();
+                TargetsToWeld.Clear();
+            }
+        }
+
+        private static void ActivateInternal(MyShipWelder welder, HashSet<MySlimBlock> targets,
+            Dictionary<string, int> m_missingComponents, HashSet<MySlimBlock> targetsToWeld)
+        {
             int num = targets.Count;
             m_missingComponents.Clear();
-            HashSet<MySlimBlock> targetsToWeld = new HashSet<MySlimBlock>();
+            targetsToWeld.Clear();
             int i = 0;
             foreach (MySlimBlock mySlimBlock in targets)
             {
@@ -241,8 +262,16 @@ namespace Optimizer.Optimizations
                     welder.EntityId))
                 return;
 
-            var array = FindProjectedBlocks(welder);
-            DoWeldProjections(welder, array);
+            try
+            {
+                var array = FindProjectedBlocks(welder);
+                DoWeldProjections(welder, array);
+            }
+            finally
+            {
+                ProjectedBlocks.Clear();
+                ComponentsToPull.Clear();
+            }
         }
 
         private static void DoWeldProjections(MyShipWelder welder, List<MyWelder.ProjectionRaycastData> array)
@@ -255,7 +284,8 @@ namespace Optimizer.Optimizations
                 // before ContainItems does not reliably make a new component type available.
                 // Aggregate only the current buildable frontier. The expensive grid mutation is
                 // still governed independently by the global per-frame Build budget below.
-                var componentsToPull = new Dictionary<MyDefinitionId, int>();
+                var componentsToPull = ComponentsToPull;
+                componentsToPull.Clear();
                 foreach (var candidate in array)
                 {
                     var candidateComponents = candidate.hitCube.BlockDefinition.Components;
@@ -352,7 +382,8 @@ namespace Optimizer.Optimizations
             BoundingSphereD boundingSphereD = new BoundingSphereD(
                 w.Translation + w.Forward * (welder.CubeGrid.GridSize * 1.5f + d.SensorOffset),
                 ShipToolPatch.GetWelderRadius(welder));
-            List<MyWelder.ProjectionRaycastData> list = new List<MyWelder.ProjectionRaycastData>();
+            var list = ProjectedBlocks;
+            list.Clear();
             List<MyEntity> entitiesInSphere = MyEntities.GetEntitiesInSphere(ref boundingSphereD);
             var frame = MySession.Static.GameplayFrameCounter;
             var checks = Math.Max(1, SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config

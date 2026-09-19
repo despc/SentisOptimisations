@@ -146,14 +146,19 @@ public class AsyncWeldV2Tests
     }
 
     [Fact]
-    public void Fast_discovery_helper_exists_on_game_thread_path()
+    public void Activation_is_the_games_own_after_the_throttle()
     {
+        // The copy of ActivateCommon enumerated every grid of the world through
+        // ConcurrentDictionary.Keys and allocated per activation; the prefix of
+        // GetBlocksInsideSpheres copied the vanilla algorithm and let vanilla run after it anyway.
         var shipToolPatch = PluginType("SentisOptimisationsPlugin.ShipTool.ShipToolPatch");
-        var fast = shipToolPatch?.GetMethod("GetTopMostEntitiesInSphereFast",
-            BindingFlags.Static | BindingFlags.Public);
-        Assert.NotNull(fast);
-        var ps = fast.GetParameters();
-        Assert.Equal(new[] { "sphere" }, ps.Select(p => p.Name));
-        Assert.True(ps[0].ParameterType.IsByRef, "sphere must be passed by ref like the vanilla query");
+        Assert.NotNull(shipToolPatch);
+        foreach (var name in new[]
+                 {
+                     "DoActivateCommon", "GetTopMostEntitiesInSphereFast", "GetEntitiesInContact",
+                     "ProcessEntitiesInContact", "CallActivate", "GetBlocksInsideSpheresPatch",
+                 })
+            Assert.Null(shipToolPatch.GetMethod(name,
+                BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public));
     }
 }

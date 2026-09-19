@@ -18,7 +18,6 @@ namespace SentisGameplayImprovements.AllGridsActions
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
-        public static ConcurrentHashSet<MyEntity> EntitiesToShipTools = new ConcurrentHashSet<MyEntity>();
         public static ConcurrentHashSet<MySafeZone> Safezones = new ConcurrentHashSet<MySafeZone>();
         public static ConcurrentHashSet<MyCubeGrid> MyCubeGrids = new ConcurrentHashSet<MyCubeGrid>();
         public static ConcurrentHashSet<IMyVoxelMap> VoxelMaps = new ConcurrentHashSet<IMyVoxelMap>();
@@ -26,15 +25,6 @@ namespace SentisGameplayImprovements.AllGridsActions
 
         public static void MyEntitiesOnOnEntityRemove(MyEntity entity)
         {
-            if (entity is MyEnvironmentSector
-                || entity is MyCubeGrid
-                || entity is MyPlanet
-                || entity is IMyVoxelMap
-                || entity is MyCharacter)
-            {
-                EntitiesToShipTools.Remove(entity);
-            }
-
             if (entity is MyCubeGrid)
             {
                 MyCubeGrids.Remove((MyCubeGrid) entity);
@@ -72,15 +62,6 @@ namespace SentisGameplayImprovements.AllGridsActions
 
         public static void MyEntitiesOnOnEntityAdd(MyEntity entity)
         {
-            if (entity is MyEnvironmentSector
-                || entity is MyCubeGrid
-                || entity is MyPlanet
-                || entity is IMyVoxelMap
-                || entity is MyCharacter)
-            {
-                EntitiesToShipTools.Add(entity);
-            }
-
             if (entity is MySafeZone)
             {
                 Safezones.Add((MySafeZone) entity);
@@ -144,7 +125,6 @@ namespace SentisGameplayImprovements.AllGridsActions
 
         public static void ClearAll()
         {
-            EntitiesToShipTools.Clear();
             Safezones.Clear();
             MyCubeGrids.Clear();
             VoxelMaps.Clear();
