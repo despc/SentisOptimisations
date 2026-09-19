@@ -186,11 +186,22 @@ namespace SentisOptimisationsPlugin.CrashFix
             return null;
         }
 
+        // A cleanup this slow (one frame) is worth a line in the log.
+        private const long SlowRemoveClientMs = 16;
+
+        /// <summary>
+        /// Vanilla RemoveClient loops "while (client.Replicables.Count > 0) RemoveForClient(first)", and
+        /// RemoveClientReplicable leaves a replicable that is no longer in m_replicableGroups in the
+        /// client's list: the loop never ends and the server hangs on a logout. Here every replicable
+        /// is removed once from a snapshot, each in its own try, and the client is dropped whatever
+        /// happens - OnClientLeft repeats RemoveClient while the client is still listed.
+        /// </summary>
         private static bool RemoveClientPatch(MyReplicationServer __instance, Endpoint endpoint)
         {
+            IDictionary clientDataDict = null;
             try
             {
-                var clientDataDict = _clientStates.Invoke(__instance);
+                clientDataDict = _clientStates.Invoke(__instance);
                 if (!clientDataDict.Contains(endpoint))
                 {
                     return false;
@@ -198,16 +209,13 @@ namespace SentisOptimisationsPlugin.CrashFix
 
                 Object clientData = clientDataDict[endpoint];
                 var clientReplicables = _replicables.Invoke(clientData);
-                Stopwatch sw = new Stopwatch();
-                sw.Start();
-                SentisOptimisationsPlugin.Log.Info(
-                    $"Client Replicables before cleanup after logout {clientReplicables.Count}");
-                var clentReplicables = new List<IMyReplicable>(clientReplicables.Keys);
-                foreach (var clentReplicable in clentReplicables)
+                var sw = Stopwatch.StartNew();
+                var before = clientReplicables.Count;
+                foreach (var replicable in new List<IMyReplicable>(clientReplicables.Keys))
                 {
                     try
                     {
-                        _removeForClient.Invoke(__instance, clentReplicable, clientData, false);
+                        _removeForClient.Invoke(__instance, replicable, clientData, false);
                     }
                     catch (Exception e)
                     {
@@ -215,17 +223,30 @@ namespace SentisOptimisationsPlugin.CrashFix
                     }
                 }
 
-                SentisOptimisationsPlugin.Log.Info(
-                    $"Client Replicables after cleanup after logout {_replicables.Invoke(clientData).Count} time - {sw.ElapsedMilliseconds}");
-                clientDataDict.Remove(endpoint);
-                var recentClientsStates = _recentClientsStates.Invoke(__instance);
-                var replicationServerCallback = _callback.Invoke(__instance);
-                recentClientsStates[endpoint] =
-                    replicationServerCallback.GetUpdateTime() + MyTimeSpan.FromSeconds(60.0);
+                var left = clientReplicables.Count;
+                if (left > 0 || sw.ElapsedMilliseconds >= SlowRemoveClientMs)
+                    SentisOptimisationsPlugin.Log.Warn(
+                        $"Client logout cleanup: {before} replicables, {left} left behind, {sw.ElapsedMilliseconds} ms");
             }
             catch (Exception e)
             {
                 SentisOptimisationsPlugin.Log.Error(e, "RemoveClientPatch exception ");
+            }
+            finally
+            {
+                try
+                {
+                    if (clientDataDict != null && clientDataDict.Contains(endpoint))
+                    {
+                        clientDataDict.Remove(endpoint);
+                        _recentClientsStates.Invoke(__instance)[endpoint] =
+                            _callback.Invoke(__instance).GetUpdateTime() + MyTimeSpan.FromSeconds(60.0);
+                    }
+                }
+                catch (Exception e)
+                {
+                    SentisOptimisationsPlugin.Log.Error(e, "RemoveClientPatch exception ");
+                }
             }
 
             return false;
