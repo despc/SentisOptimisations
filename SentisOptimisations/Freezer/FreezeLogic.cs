@@ -7,9 +7,11 @@ using Havok;
 using NAPI;
 using Sandbox;
 using Sandbox.Engine.Voxels;
+using Sandbox.Engine.Physics;
 using Sandbox.Game.Components;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Cube;
+using Sandbox.Game.World;
 using Sandbox.ModAPI;
 using SentisOptimisations;
 using SentisOptimisations.DelayedLogic;
@@ -56,19 +58,93 @@ public class FreezeLogic
             var freezeDistance = isAnyGridStatic
                 ? SentisOptimisationsPlugin.Config.FreezeDistanceStatic
                 : SentisOptimisationsPlugin.Config.FreezeDistanceDynamic;
-            if (!freezerEnabled || PlayerUtils.IsAnyPlayersInRadius(gridsPosition, freezeDistance)
+            var stepped = IsPhysicsStepped(grids);
+            if (!freezerEnabled || stepped && PlayerUtils.IsAnyPlayersInRadius(gridsPosition, freezeDistance)
                 || isWakeUpTime)
             {
                 UnfreezeGrids(grids, isWakeUpTime);
                 return;
             }
 
-            FreezeGrids(grids);
+            FreezeGrids(grids, now: !stepped);
         }
         catch (InvalidOperationException e)
         {
             // ignore "Collection was modified"
         }
+    }
+
+    // With EnableSelectivePhysicsUpdates, MyPhysics steps only the Havok worlds (clusters) that hold a
+    // character or something replicated to a client. A group awake in logic in a world that is not
+    // stepped runs its pistons, rotors and thrusters against physics that stands still, and the
+    // constraints snap when the world is stepped again: a kick of several m/s, 15 m in freezer_physics
+    // (the world stops the moment the player leaves, the freeze came 5 s later; on the way back the
+    // thaw came before the grids were streamed to the player). So a group thaws only while its world is
+    // stepped and freezes at once when it is not. The set is taken on the game thread once per freezer
+    // pass (RefreshSteppedWorlds); null means every world is stepped (the setting is off).
+    private static volatile HashSet<HkWorld> _steppedWorlds;
+    // Every world the snapshot saw. Havok worlds are made anew when clusters are rebuilt; a world the
+    // snapshot has not seen yet is taken as stepped, or a group next to a player froze on the spot.
+    private static volatile HashSet<HkWorld> _knownWorlds;
+    private static readonly System.Reflection.FieldInfo WorldObserverField =
+        typeof(MyPhysics).GetField("m_worldObserver", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+    private static readonly System.Reflection.MethodInfo IsClusterActiveMethod =
+        typeof(MyPhysics).GetMethod("IsClusterActive", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
+            null, new[] { typeof(int), typeof(int) }, null);
+    private static MyPhysics _boundPhysics;
+    private static Func<int, int, bool> _isClusterActive;
+
+    /// <summary>Takes the set of Havok worlds MyPhysics steps. Game thread.</summary>
+    public static void RefreshSteppedWorlds()
+    {
+        try
+        {
+            var physics = MySession.Static?.GetComponent<MyPhysics>();
+            if (physics == null || WorldObserverField == null || IsClusterActiveMethod == null || MyPhysics.Clusters == null ||
+                WorldObserverField.GetValue(physics) == null)
+            {
+                _steppedWorlds = null;
+                _knownWorlds = null;
+                return;
+            }
+
+            if (_boundPhysics != physics)
+            {
+                _isClusterActive = (Func<int, int, bool>)Delegate.CreateDelegate(typeof(Func<int, int, bool>), physics, IsClusterActiveMethod);
+                _boundPhysics = physics;
+            }
+
+            var stepped = new HashSet<HkWorld>();
+            var known = new HashSet<HkWorld>();
+            foreach (var cluster in MyPhysics.Clusters.GetClusters())
+            {
+                if (!(cluster.UserData is HkWorld world)) continue;
+                known.Add(world);
+                if (_isClusterActive(cluster.ClusterId, world.CharacterRigidBodies.Count)) stepped.Add(world);
+            }
+            _knownWorlds = known;
+            _steppedWorlds = stepped;
+        }
+        catch (Exception e)
+        {
+            _steppedWorlds = null;
+            _knownWorlds = null;
+            SentisOptimisationsPlugin.Log.Error(e, "Stepped Havok worlds");
+        }
+    }
+
+    private static bool IsPhysicsStepped(HashSet<MyCubeGrid> grids)
+    {
+        var stepped = _steppedWorlds;
+        var known = _knownWorlds;
+        if (stepped == null || known == null) return true;
+        foreach (var grid in grids)
+        {
+            var world = grid.Physics?.HavokWorld;
+            if (world == null || stepped.Contains(world) || !known.Contains(world)) return true;
+        }
+
+        return false;
     }
 
     private bool IsWakeUpTime(HashSet<MyCubeGrid> grids)
@@ -96,56 +172,39 @@ public class FreezeLogic
     {
         var minEntityId = grids.MinBy(grid => grid.EntityId).EntityId;
         InFreezeQueue.Remove(minEntityId);
+        if (!grids.Any(grid => FrozenGrids.Contains(grid.EntityId))) return;
 
-        var realyNeedToUnFreezeGrids = grids.Where(grid =>
+        // Which grids to thaw is decided on the game thread, like the freeze: read from here, a freeze
+        // being applied grid by grid on the game thread showed only part of the group as frozen, only that
+        // part got its bodies back to dynamic, and the rest stayed fixed with constraints to moving grids
+        // (a top torn off in freezer_stress).
+        MyAPIGateway.Utilities.InvokeOnGameThread(() =>
         {
-            if (!FrozenGrids.Contains(grid.EntityId))
+            foreach (var grid in grids)
             {
-                return false;
-            }
-
-            if (grid.IsPreview)
-            {
-                return false;
-            }
-
-            return true;
-        }).ToList();
-        foreach (var grid in realyNeedToUnFreezeGrids)
-        {
-
-            if (!isWakeUpTime)
-            {
-                lock (_wakeUpLock)
+                if (grid.Closed || grid.MarkedForClose || grid.IsPreview || grid.Parent != null) continue;
+                if (!FrozenGrids.Contains(grid.EntityId)) continue;
+                if (!isWakeUpTime)
                 {
-                    WakeUpDatas.Remove(grid.EntityId);
+                    lock (_wakeUpLock)
+                    {
+                        WakeUpDatas.Remove(grid.EntityId);
+                    }
                 }
-            }
 
-            if (grid.Parent == null)
-            {
                 Log("Unfreeze grid " + grid.DisplayName);
                 FrozenGridSaveCache.Invalidate(grid.EntityId);
                 FrozenGrids.Remove(grid.EntityId);
                 FrozenAtFrame.TryRemove(grid.EntityId, out _);
                 InFreezeQueue.Remove(grid.EntityId);
-
                 CompensateFrozenFrames(grid);
-                
-            }
-            
-        }
-        MyAPIGateway.Utilities.InvokeOnGameThread(() =>
-        {
-            foreach (var grid in realyNeedToUnFreezeGrids)
-            {
-                if (grid.Closed || grid.MarkedForClose) continue;
+
                 // Whatever the config or the group is now: a body the freezer made fixed goes back to
                 // dynamic. Gating this on FreezePhysics or on "the group has a fixed grid" left bodies
                 // fixed for good on a non-static grid once either changed while it was frozen.
                 DoUnfreezePhysics(grid);
                 RegisterRecursive(grid);
-                grid.PlayerPresenceTier = MyUpdateTiersPlayerPresence.Normal;  
+                grid.PlayerPresenceTier = MyUpdateTiersPlayerPresence.Normal;
             }
         });
     }
@@ -221,7 +280,8 @@ public class FreezeLogic
         }
     }
 
-    private void FreezeGrids(HashSet<MyCubeGrid> grids)
+    /// <param name="now">Without the DelayBeforeFreezeSec wait: the group's Havok world is not stepped.</param>
+    private void FreezeGrids(HashSet<MyCubeGrid> grids, bool now = false)
     {
         var configAntifreezeBlocksSubtypes = SentisOptimisationsPlugin.Config.AntifreezeBlocksSubtypes;
         var antifreezeBlocksSubtypes = configAntifreezeBlocksSubtypes.Split(':');
@@ -294,7 +354,7 @@ public class FreezeLogic
             return;
         }
 
-        var delayBeforeFreezeSec = SentisOptimisationsPlugin.Config
+        var delayBeforeFreezeSec = now ? 0 : SentisOptimisationsPlugin.Config
             .DelayBeforeFreezeSec;
         var needToFreezeGrids = grids.Where(grid => !FrozenGrids.Contains(grid.EntityId)).ToList();
 
@@ -445,6 +505,20 @@ public class FreezeLogic
         }
     }
 
+    // MyGridPhysics.ConvertToStatic puts the now fixed body into the world's set of active bodies
+    // (HkWorld.RigidBodyActivated), and Havok never deactivates a fixed body: every physics-frozen
+    // grid stayed in that set for as long as it was frozen, and MyPhysics.UpdateActiveRigidBodies
+    // walked all of them every frame (~5 ms a frame with 1250 frozen grids). The private
+    // HkWorld.RigidBodyDeactivated takes the body out the way a deactivation does (nothing else
+    // listens to it); ConvertToDynamic puts it back on thaw.
+    // Null if a game update renames it: frozen bodies then just stay in the set, as before.
+    internal static readonly Action<HkWorld, HkEntity> RigidBodyDeactivated =
+        typeof(HkWorld).GetMethod("RigidBodyDeactivated",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
+                null, new[] { typeof(HkEntity) }, null) is { } method
+            ? (Action<HkWorld, HkEntity>)Delegate.CreateDelegate(typeof(Action<HkWorld, HkEntity>), method, false)
+            : null;
+
     private static void DoFreezePhysics(MyCubeGrid grid)
     {
         try
@@ -452,6 +526,9 @@ public class FreezeLogic
             var gridPhysics = grid.Physics;
             gridPhysics.ConvertToStatic();
             FrozenPhysicsGrids.Add(grid.EntityId);
+            var body = gridPhysics.RigidBody;
+            if (RigidBodyDeactivated != null && body != null && body.IsFixed && body.InWorld && gridPhysics.HavokWorld != null)
+                RigidBodyDeactivated(gridPhysics.HavokWorld, body);
         }
         catch (Exception e)
         {

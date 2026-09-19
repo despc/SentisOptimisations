@@ -80,6 +80,8 @@ namespace SentisOptimisationsPlugin.AllGridsActions
                     try
                     {
                         await Task.Delay(500);
+                        // For the next pass: which Havok worlds are stepped (selective physics updates).
+                        MyAPIGateway.Utilities.InvokeOnGameThread(FreezeLogic.RefreshSteppedWorlds);
                         var cpuLoad = MySandboxGame.Static.CPULoad;
                         _freezeLogic.UpdateCpuLoad(cpuLoad);
                         var gridsList = new HashSet<IMyCubeGrid>(EntitiesObserver.MyCubeGrids);
