@@ -23,8 +23,9 @@ namespace Optimizer.Optimizations
     /// never opened a terminal still made half a million inventory serializations a minute, and the
     /// frames where many of them line up are the worst frames of the run: 73 ms of a 96 ms frame.
     ///
-    /// A client with nothing open in front of it (no context entity) gets those inventories every
-    /// <see cref="IdleSendIntervalFrames"/> frames instead of every few. Nothing is dropped: the delta
+    /// A client with nothing open in front of it (no context entity) gets the inventories of grids
+    /// farther than <see cref="NearDistance"/> every <see cref="IdleSendIntervalFrames"/> frames
+    /// instead of every few. Nothing is dropped: the delta
     /// is computed against what that client last received, so the next update carries everything that
     /// changed meanwhile. The moment the client opens something, all of its inventories are pulled to
     /// the front of its queue and it is served at the normal rate again, so opening a terminal shows
@@ -34,10 +35,22 @@ namespace Optimizer.Optimizations
     [PatchShim]
     public static class IdleInventorySync
     {
-        /// <summary>How rarely, on average, an inventory goes to a client that has nothing open, in frames.</summary>
-        public const long IdleSendIntervalFrames = 600;
+        /// <summary>
+        /// How rarely, on average, an inventory goes to a client that has nothing open, in frames
+        /// (ten minutes). Only a safety net for whatever shows inventories without a context entity:
+        /// opening something is served at once, and whatever is near the client is not held back.
+        /// Every inventory that changes goes to every client once per interval, so the interval is
+        /// what the traffic is: a base of busy refineries seen by 64 clients is ~640 thousand
+        /// inventory/client pairs, and at one minute that was still ~560 thousand writes and 210 MB of
+        /// garbage a minute.
+        /// </summary>
+        public const long IdleSendIntervalFrames = 36000;
+
+        /// <summary>Inventories of grids closer than this to the client, in metres, are sent at the normal rate.</summary>
+        public const double NearDistance = 100;
 
         public static long Delayed;
+        public static long Kept;
         public static long Normal;
         public static long WokenUp;
 
@@ -59,9 +72,9 @@ namespace Optimizer.Optimizations
         /// <summary>The server seen by the last frame, so a test can ask about the queues.</summary>
         private static MyReplicationServer _server;
 
-        /// <summary>Whether a client had something open when it was last looked at; drops with the client.</summary>
-        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<object, Flag> Looking =
-            new System.Runtime.CompilerServices.ConditionalWeakTable<object, Flag>();
+        /// <summary>What this frame knows about each client; drops with the client.</summary>
+        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<object, ClientView> Views =
+            new System.Runtime.CompilerServices.ConditionalWeakTable<object, ClientView>();
         [ThreadStatic] private static bool _rescheduling;
 
         public static void Patch(PatchContext ctx) =>
@@ -85,6 +98,16 @@ namespace Optimizer.Optimizations
             {
                 Normal++;
                 return true;
+            }
+            // Already waiting for its turn: leave it there. The game moves a queued entry to whichever
+            // time is sooner, and every change of a busy inventory schedules it again, so with a new
+            // random delay each time the soonest of dozens of draws won and the idle interval was
+            // never reached (measured: 768 thousand inventory writes a minute at 1800 frames, the
+            // same as at 600).
+            if (DirtyQueue(client).Contains(groupEntry))
+            {
+                Kept++;
+                return false;
             }
             // The game's own scheduling, only from a later frame, so the layer's interval, its random
             // spread and the removal of replicables that left the layer all still apply.
@@ -114,10 +137,17 @@ namespace Optimizer.Optimizations
             var frame = SyncFrame(__instance);
             foreach (var client in clients.Values)
             {
-                var looking = IsLooking(client);
-                var flag = Looking.GetOrCreateValue(client);
-                if (looking && !flag.Looking) WakeInventories(client, frame);
-                flag.Looking = looking;
+                var view = Views.GetOrCreateValue(client);
+                var state = ClientState(client) as MyClientState;
+                var looking = state?.ContextEntity != null;
+                if (looking && !view.Looking) WakeInventories(client, frame);
+                view.Looking = looking;
+                // Each of these looks the player up, and the replicable after it, in dictionaries; they
+                // are read here once a frame instead of on every inventory scheduled for the client.
+                view.Controlled = state?.ControlledReplicable;
+                view.Character = state?.CharacterReplicable;
+                view.Position = state?.Position;
+                view.Known = state != null;
             }
         }
 
@@ -168,21 +198,25 @@ namespace Optimizer.Optimizations
             return new long[2];
         }
 
-        private static bool IsLooking(object client) =>
-            ClientState(client) is MyClientState state && state.ContextEntity != null;
-
         private static bool ShouldDelay(object client, MyStateDataEntry groupEntry)
         {
             if (groupEntry?.Group == null || groupEntry.Group.GetType() != InventoryGroupType) return false;
+            // A client not seen by this frame's update yet is served the normal way.
+            if (!Views.TryGetValue(client, out var view) || !view.Known) return false;
             if (!(ClientState(client) is MyClientState state)) return false;
             // Something is open in front of the client: it may well be this inventory.
             if (state.ContextEntity != null) return false;
             var owner = groupEntry.Owner;
             if (owner == null) return false;
             // The client's own character and whatever it is sitting in are never held back.
-            if (owner == state.ControlledReplicable || owner == state.CharacterReplicable) return false;
+            if (owner == view.Controlled || owner == view.Character) return false;
             var parent = owner.GetParent();
-            if (parent != null && (parent == state.ControlledReplicable || parent == state.CharacterReplicable)) return false;
+            if (parent != null && (parent == view.Controlled || parent == view.Character)) return false;
+            // Neither is whatever is right around the client - the subgrids of its own ship, what it is
+            // docked to, the base it stands in - which its HUD may show without anything being open.
+            var position = view.Position;
+            if (position.HasValue && (parent ?? owner).GetAABB().DistanceSquared(position.Value) <= NearDistance * NearDistance)
+                return false;
             // Only when the layer is already known, so no decision about removing the replicable is skipped.
             return ((System.Collections.IDictionary)ReplicableToLayer(client)).Contains(parent ?? owner);
         }
@@ -222,9 +256,13 @@ namespace Optimizer.Optimizations
             return Expression.Lambda<Func<MyReplicationServer, long>>(Expression.Field(server, field), server).Compile();
         }
 
-        private sealed class Flag
+        private sealed class ClientView
         {
+            public bool Known;
             public bool Looking;
+            public IMyReplicable Controlled;
+            public IMyReplicable Character;
+            public VRageMath.Vector3D? Position;
         }
     }
 }
