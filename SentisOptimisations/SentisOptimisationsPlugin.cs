@@ -118,6 +118,15 @@ namespace SentisOptimisationsPlugin
             {
                 if (newState != TorchSessionState.Loaded)
                     return;
+                // Every plugin has patched by now; see ReemitLeaveFix.
+                try
+                {
+                    CrashFix.ReemitLeaveFix.Apply(Torch.Managers.GetManager<Torch.Managers.PatchManager.PatchManager>());
+                }
+                catch (Exception e)
+                {
+                    Log.Error(e, "Torch re-emit leave fix failed");
+                }
                 AllGridsProcessor.OnLoaded();
                 _replicablesAsync.OnLoaded();
                 DelayedProcessor.OnLoaded();
