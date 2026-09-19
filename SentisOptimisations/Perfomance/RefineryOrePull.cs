@@ -135,7 +135,7 @@ namespace Optimizer.Optimizations
                 if (!FrameBudget.TryAcquire(frame, MaxPullsPerFrame, starving, fill)) return false;
 
                 var pulled = system.PullItems(constraint, (MyFixedPoint)allowed, refinery, input);
-                var networkHasItems = pulled > 0 || NetworkHasAcceptedItems(system, constraint, refinery, input);
+                var networkHasItems = pulled > 0 || NetworkHasAcceptedItems(system, constraint, refinery, input, frame, generation);
                 state.OnResult(frame, networkHasItems, PullPeriodFrames, MaxBackoffFrames, generation,
                     Jitter(refinery.EntityId));
                 return false;
@@ -269,6 +269,42 @@ namespace Optimizer.Optimizations
             if (_pullElementsField == null)
                 _pullElementsField = mapping.GetType().GetField("pullElements", BindingFlags.Instance | BindingFlags.Public);
             return _pullElementsField?.GetValue(mapping) as List<IMyConveyorEndpointBlock>;
+        }
+
+        private sealed class AcceptedItemsScan
+        {
+            public long Generation = -1;
+            public long Frame = -1;
+            public bool HasItems;
+        }
+
+        // Last scan result per logical grid group and constraint (one per refinery type).
+        private static readonly ConditionalWeakTable<object, Dictionary<MyInventoryConstraint, AcceptedItemsScan>> Scans =
+            new ConditionalWeakTable<object, Dictionary<MyInventoryConstraint, AcceptedItemsScan>>();
+
+        /// <summary>
+        /// Whether the network still holds ore for this refinery after a pull that got nothing,
+        /// remembered per network. The answer is asked after every empty pull, and on a base whose ore
+        /// has run out that is every refinery every few seconds, each walking every block, inventory and
+        /// item of the network to find the same nothing (measured: 1.3 s of every 55, plus the inventory
+        /// lookups under it). "Nothing" stays true until the network's generation changes, which
+        /// already happens on any ore stored into a sending inventory and on a rebuilt conveyor graph -
+        /// the same signal that wakes refineries from their backoff. "Something" is only reused within
+        /// the frame, because pulls take it away.
+        /// </summary>
+        private static bool NetworkHasAcceptedItems(MyGridConveyorSystem system, MyInventoryConstraint constraint,
+            MyRefinery start, MyInventory destination, long frame, long generation)
+        {
+            var key = NetworkKey(start.CubeGrid);
+            if (key == null) return NetworkHasAcceptedItems(system, constraint, start, destination);
+            var byConstraint = Scans.GetValue(key, _ => new Dictionary<MyInventoryConstraint, AcceptedItemsScan>());
+            if (!byConstraint.TryGetValue(constraint, out var scan))
+                byConstraint[constraint] = scan = new AcceptedItemsScan();
+            if (scan.Generation == generation && (!scan.HasItems || scan.Frame == frame)) return scan.HasItems;
+            scan.HasItems = NetworkHasAcceptedItems(system, constraint, start, destination);
+            scan.Generation = generation;
+            scan.Frame = frame;
+            return scan.HasItems;
         }
 
         /// <summary>
