@@ -31,6 +31,25 @@ namespace SentisOptimisationsPlugin
             return (Func<TOwner, TField>)method.CreateDelegate(typeof(Func<TOwner, TField>));
         }
 
+        /// <summary>
+        /// Reads an instance field of a type that cannot be named at compile time - an internal
+        /// class of the game, say. The instance is passed as an object and cast inside.
+        /// </summary>
+        public static Func<object, TField> FieldOn<TField>(Type owner, string name)
+        {
+            var field = owner.GetField(name, Any);
+            if (field == null) throw new MissingFieldException(owner.FullName, name);
+            var method = new DynamicMethod("Get_" + owner.Name + "_" + name, typeof(TField),
+                new[] { typeof(object) }, owner, true);
+            var il = method.GetILGenerator();
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Castclass, owner);
+            il.Emit(OpCodes.Ldfld, field);
+            if (typeof(TField) == typeof(object) && field.FieldType.IsValueType) il.Emit(OpCodes.Box, field.FieldType);
+            il.Emit(OpCodes.Ret);
+            return (Func<object, TField>)method.CreateDelegate(typeof(Func<object, TField>));
+        }
+
         /// <summary>Writes an instance field, by name.</summary>
         public static Action<TOwner, TField> SetField<TOwner, TField>(string name)
         {
