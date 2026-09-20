@@ -159,7 +159,7 @@ namespace SentisOptimisations.Tests
         {
             ((System.Collections.IDictionary)PbFixType.GetField("Cooldowns",
                 BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public).GetValue(null)).Clear();
-            var rField = PbFixType.GetField("r", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+            var rField = PbFixType.GetField("Random", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
             rField.SetValue(null, seeded); // static readonly is writable via reflection on .NET Framework
         }
 

@@ -189,7 +189,17 @@ namespace SentisOptimisationsPlugin
                     {
                        //do nothing
                     }
-                    
+
+                    try
+                    {
+                        gui.ScriptsExpander.Header =
+                            $"Scripts: {PbLoad.Running()} running, {PbLoad.TotalMsPerFrame():F2} ms/frame in total";
+                        gui.ScriptsStatistic.Text = PbLoad.Report(20);
+                    }
+                    catch (Exception e)
+                    {
+                        //do nothing
+                    }
                 });
             }
             catch (Exception e)
