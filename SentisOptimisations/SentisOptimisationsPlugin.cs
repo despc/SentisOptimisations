@@ -114,6 +114,7 @@ namespace SentisOptimisationsPlugin
                 SerializerWarmup.Reset();
                 ReplicablesPatch.ClearAll();
                 Freezer.WakeRequests.ClearAll();
+                Freezer.FrozenProduction.ClearAll();
                 DelayedProcessor.OnUnloading();
                 MyEntities.OnEntityAdd -= EntitiesObserver.MyEntitiesOnOnEntityAdd;
                 MyEntities.OnEntityRemove -= EntitiesObserver.MyEntitiesOnOnEntityRemove;
@@ -188,7 +189,8 @@ namespace SentisOptimisationsPlugin
                         gui.FreezerStatistic.Text =
                             $"Avg CPU Load: {FreezeLogic.GetAvgCpuLoad()}% " +
                             $"Physics: {Optimizer.Optimizations.PhysicsLoadMonitor.AverageMs:F2} ms/frame (last {Optimizer.Optimizations.PhysicsLoadMonitor.LastMs:F2}) " +
-                            $"Total grids: {EntitiesObserver.MyCubeGrids.Count}, Frozen: {FreezeLogic.FrozenGrids.Count}, Frozen physics: {FreezeLogic.FrozenPhysicsGrids.Count}";
+                            $"Total grids: {EntitiesObserver.MyCubeGrids.Count}, Frozen: {FreezeLogic.FrozenGrids.Count}, Frozen physics: {FreezeLogic.FrozenPhysicsGrids.Count} " +
+                            Freezer.FrozenProduction.Summary();
                     }
                     catch (Exception e)
                     {
@@ -241,6 +243,7 @@ namespace SentisOptimisationsPlugin
         public override void Update()
         {
             Optimizer.Optimizations.GrinderPatches.Flush();
+            Freezer.FrozenProduction.Tick();
             if (MySandboxGame.Static.SimulationFrameCounter % 600 == 0)
             {
                 DelayedProcessor.Instance.AddDelayedAction(DateTime.Now, DetectSZDDos);

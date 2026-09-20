@@ -216,6 +216,7 @@ public class FreezeLogic
     private static void CompensateFrozenFrames(MyCubeGrid grid)
     {
         var frame = MySandboxGame.Static.SimulationFrameCounter;
+        FrozenProduction.OnThawed(grid, frame);
         foreach (var myCubeBlock in grid.GetFatBlocks())
         {
             if (!(myCubeBlock is MyFunctionalBlock))
@@ -405,6 +406,10 @@ public class FreezeLogic
                         FrozenAtFrame[grid.EntityId] = frame;
                         UnregisterRecursive(grid);
 
+                        // Gas generators, oxygen farms and farm plots are not production blocks:
+                        // their catch-up is its own thing (FrozenProduction).
+                        FrozenProduction.OnFrozen(grid, frame);
+
                         // Stamp the compensation clock at the exact frame the grid stops updating.
                         // Blocks that leave the world must drop their stamp (see ForgetGrid +
                         // EntitiesObserver): EntityIds are reused.
@@ -447,7 +452,10 @@ public class FreezeLogic
         try
         {
             foreach (var block in grid.GetFatBlocks())
+            {
                 CompensationTracker.Forget(block.EntityId);
+                FrozenProduction.Forget(block.EntityId);
+            }
         }
         catch (Exception e)
         {
