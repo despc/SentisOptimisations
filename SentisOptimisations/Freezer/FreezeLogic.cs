@@ -59,7 +59,11 @@ public class FreezeLogic
                 ? SentisOptimisationsPlugin.Config.FreezeDistanceStatic
                 : SentisOptimisationsPlugin.Config.FreezeDistanceDynamic;
             var stepped = IsPhysicsStepped(grids);
-            if (!freezerEnabled || stepped && PlayerUtils.IsAnyPlayersInRadius(gridsPosition, freezeDistance)
+            // A player is present both where their character is and where whatever they control is:
+            // somebody flying a ship from a remote control block keeps two places alive, and their
+            // own surroundings used to stay frozen because a player's position is the ship's.
+            if (!freezerEnabled || stepped && PlayerAnchors.AnyInRadius(gridsPosition, freezeDistance)
+                || WakeRequests.IsAwake(grids)
                 || isWakeUpTime)
             {
                 UnfreezeGrids(grids, isWakeUpTime);

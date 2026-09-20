@@ -112,6 +112,8 @@ namespace SentisOptimisationsPlugin
                 GasTankOptimisations.ClearAll();
                 _voxelStreamCache.OnUnloading();
                 SerializerWarmup.Reset();
+                ReplicablesPatch.ClearAll();
+                Freezer.WakeRequests.ClearAll();
                 DelayedProcessor.OnUnloading();
                 MyEntities.OnEntityAdd -= EntitiesObserver.MyEntitiesOnOnEntityAdd;
                 MyEntities.OnEntityRemove -= EntitiesObserver.MyEntitiesOnOnEntityRemove;
