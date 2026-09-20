@@ -1,403 +1,207 @@
-﻿using System;
+using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Reflection;
 using Havok;
 using NLog;
-using Sandbox;
 using Sandbox.Common.ObjectBuilders;
-using Sandbox.Engine.Physics;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Character;
 using Sandbox.Game.Weapons;
 using Sandbox.Game.World;
-using SentisOptimisations;
 using Torch.Managers.PatchManager;
 using VRage.Game.Components;
 using VRage.Game.Entity;
-using VRage.Game.ModAPI;
 using VRage.Game.ObjectBuilders.Components;
 using VRage.Groups;
+using VRage.Game.ModAPI;
 using VRage.ModAPI;
-using VRageMath;
+using Sandbox.Engine.Physics;
 
 namespace SentisOptimisationsPlugin
 {
+    /// <summary>
+    /// Safe zones: a grid is safe when any grid mechanically attached to it is, the zones of grids
+    /// nobody is near update rarely, and the cost of leaving a zone is charged to the grid that
+    /// causes it.
+    ///
+    /// <b>Subgrids.</b> Vanilla decides for the entity alone, so a rotor head or a piston top outside
+    /// the zone is unprotected while the ship it belongs to is inside. <c>IsSafe</c> is replaced with
+    /// a version that asks the game's own <c>IsSubGridSafe</c> for every grid of the mechanical group.
+    /// It runs on every shot and every bit of damage, so the game's method is bound once into a
+    /// delegate and its private result enum is mapped once - it used to be reflected, boxed and
+    /// mapped through <c>ToString</c> on every call.
+    ///
+    /// <b>Leaving a zone.</b> <c>phantom_Leave</c> is timed, and a grid whose removal takes longer
+    /// than <c>SafeZonePhysicsThreshold</c> is recorded, which is what the DDoS detector reports on.
+    ///
+    /// <b>Zone updates.</b> With <c>SlowdownEnabled</c>, a zone on a grid nobody is near updates once
+    /// in ten or in a hundred frames, zones spread over those frames by a random start.
+    /// </summary>
     [PatchShim]
     public static class SafezonePatch
     {
-        public static Dictionary<long, GridInSzInfo> EntitiesInSZ = new Dictionary<long, GridInSzInfo>();
-        public static Dictionary<long, int> Cooldowns = new Dictionary<long, int>();
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
-        public static readonly Random r = new Random();
+
+        /// <summary>Grids that made leaving a safe zone expensive, and how much time they cost.</summary>
+        public static readonly ConcurrentDictionary<long, GridInSzInfo> EntitiesInSZ =
+            new ConcurrentDictionary<long, GridInSzInfo>();
+
+        private static readonly ConcurrentDictionary<long, int> Cooldowns = new ConcurrentDictionary<long, int>();
+        private static readonly Random Random = new Random();
+
+        private const BindingFlags Instance = BindingFlags.Instance | BindingFlags.NonPublic;
+
+        private static readonly Action<MySafeZone, HkRigidBody, IMyEntity> RemoveEntityPhantom =
+            Accessors.Method<MySafeZone, Action<MySafeZone, HkRigidBody, IMyEntity>>("RemoveEntityPhantom");
+        private static readonly MethodInfo IsSubGridSafeMethod = typeof(MySafeZone).GetMethod("IsSubGridSafe", Instance);
+
+        /// <summary>The private result of IsSubGridSafe, by its underlying value.</summary>
+        private static readonly Dictionary<int, SubgridCheckResult> ResultByValue = new Dictionary<int, SubgridCheckResult>();
+
         public static void Patch(PatchContext ctx) => global::SentisOptimisations.PatchGuard.Run("SafezonePatch", ctx, PatchImpl);
 
         internal static void PatchImpl(PatchContext ctx)
         {
-            var MethodPhantom_Leave = typeof(MySafeZone).GetMethod
-                ("phantom_Leave", BindingFlags.Instance | BindingFlags.NonPublic);
-            
-            ctx.GetPattern(MethodPhantom_Leave).Prefixes.Add(
-                typeof(SafezonePatch).GetMethod(nameof(MethodPhantom_LeavePatched),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            if (RemoveEntityPhantom == null) throw new MissingMethodException("MySafeZone.RemoveEntityPhantom");
+            if (IsSubGridSafeMethod == null) throw new MissingMethodException("MySafeZone.IsSubGridSafe");
+            MapSubgridResults();
 
-            
-            var MySafeZoneIsSafe = typeof(MySafeZone).GetMethod
-                ("IsSafe", BindingFlags.Instance | BindingFlags.NonPublic);
-            
-            ctx.GetPattern(MySafeZoneIsSafe).Prefixes.Add(
-                typeof(SafezonePatch).GetMethod(nameof(MySafeZoneIsSafePatched),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+            const BindingFlags statics = BindingFlags.Static | BindingFlags.NonPublic;
+            var self = typeof(SafezonePatch);
 
-            var MySafeZoneUpdateBeforeSimulation = typeof(MySafeZone).GetMethod
-                (nameof(MySafeZone.UpdateBeforeSimulation), BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
-            
-            ctx.GetPattern(MySafeZoneUpdateBeforeSimulation).Prefixes.Add(
-                typeof(SafezonePatch).GetMethod(nameof(UpdateBeforeSimulationPatched),
-                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-            
-            // var MyRemoveEntityPhantom = typeof(MySafeZone).GetMethod
-            //     ("RemoveEntityPhantom", BindingFlags.Instance | BindingFlags.NonPublic);
-            //
-            // ctx.GetPattern(MyRemoveEntityPhantom).Prefixes.Add(
-            //     typeof(SafezonePatch).GetMethod(nameof(MyRemoveEntityPhantomPatched),
-            //         BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-
-
-            enumStringMapping["NotSafe"] = SubgridCheckResult.NOT_SAFE;
-            enumStringMapping["NeedExtraCheck"] = SubgridCheckResult.NEED_EXTRA_CHECK;
-            enumStringMapping["Safe"] = SubgridCheckResult.SAFE;
-            enumStringMapping["Admin"] = SubgridCheckResult.ADMIN;
+            ctx.GetPattern(typeof(MySafeZone).GetMethod("phantom_Leave", Instance))
+                .Prefixes.Add(self.GetMethod(nameof(PhantomLeavePatched), statics));
+            ctx.GetPattern(typeof(MySafeZone).GetMethod("IsSafe", Instance))
+                .Prefixes.Add(self.GetMethod(nameof(IsSafePatched), statics));
+            ctx.GetPattern(typeof(MySafeZone).GetMethod(nameof(MySafeZone.UpdateBeforeSimulation),
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly))
+                .Prefixes.Add(self.GetMethod(nameof(UpdateBeforeSimulationPatched), statics));
         }
 
+        /// <summary>
+        /// The names of the game's enum are matched to ours once, so the result of every check is a
+        /// dictionary lookup by value instead of a string comparison.
+        /// </summary>
+        private static void MapSubgridResults()
+        {
+            var type = IsSubGridSafeMethod.ReturnType;
+            if (!type.IsEnum) throw new InvalidOperationException("MySafeZone.IsSubGridSafe no longer returns an enum");
+            foreach (var value in Enum.GetValues(type))
+            {
+                var name = Enum.GetName(type, value)?.Replace("_", "").ToUpperInvariant();
+                SubgridCheckResult mapped;
+                switch (name)
+                {
+                    case "NOTSAFE": mapped = SubgridCheckResult.NotSafe; break;
+                    case "NEEDEXTRACHECK": mapped = SubgridCheckResult.NeedExtraCheck; break;
+                    case "SAFE": mapped = SubgridCheckResult.Safe; break;
+                    case "ADMIN": mapped = SubgridCheckResult.Admin; break;
+                    default: continue;
+                }
 
-        private static bool MethodPhantom_LeavePatched(MySafeZone __instance, HkPhantomCallbackShape sender,
-            HkRigidBody body)
+                ResultByValue[(int)value] = mapped;
+            }
+
+            if (ResultByValue.Count == 0)
+                throw new InvalidOperationException("MySafeZone.IsSubGridSafe returns an enum nothing maps to");
+        }
+
+        /// <summary>
+        /// Removes the body from the zone and charges the time it took to the grid, so a grid built
+        /// to make leaving a zone expensive can be found.
+        /// </summary>
+        private static bool PhantomLeavePatched(MySafeZone __instance, HkPhantomCallbackShape sender, HkRigidBody body)
         {
             try
             {
-                IMyEntity entity = body.GetEntity(0U);
-                if (entity == null)
-                    return false;
-                var stopwatch = Stopwatch.StartNew();
-                ReflectionUtils.InvokeInstanceMethod(__instance.GetType(), __instance, "RemoveEntityPhantom",
-                    new object[] {body, entity});
-                stopwatch.Stop();
-                if (entity is not MyCubeGrid)
-                {
-                    return false;
-                }
-                var stopwatchElapsedMilliseconds = stopwatch.ElapsedMilliseconds;
-                if (stopwatchElapsedMilliseconds < SentisOptimisationsPlugin.Config.SafeZonePhysicsThreshold)
-                {
-                    return false;
-                }
+                var entity = body.GetEntity(0U);
+                if (entity == null) return false;
 
-                if (EntitiesInSZ.ContainsKey(entity.EntityId))
+                var startedAt = Stopwatch.GetTimestamp();
+                RemoveEntityPhantom(__instance, body, entity);
+                if (!(entity is MyCubeGrid grid)) return false;
+
+                var ms = (long)((Stopwatch.GetTimestamp() - startedAt) * 1000.0 / Stopwatch.Frequency);
+                if (ms < SentisOptimisationsPlugin.Config.SafeZonePhysicsThreshold) return false;
+
+                EntitiesInSZ.AddOrUpdate(entity.EntityId, _ => new GridInSzInfo(grid, ms), (_, known) =>
                 {
-                    EntitiesInSZ[entity.EntityId].DDosTimeMs += stopwatchElapsedMilliseconds;
-                }
-                else
-                {
-                    EntitiesInSZ[entity.EntityId] = new GridInSzInfo((MyCubeGrid) entity, stopwatchElapsedMilliseconds);
-                }
+                    known.DDosTimeMs += ms;
+                    return known;
+                });
             }
             catch (Exception e)
             {
-                SentisOptimisationsPlugin.Log.Warn("MethodPhantom_LeavePatched Exception ", e);
+                Log.Warn(e, "phantom_Leave patch failed");
             }
 
             return false;
         }
 
-        private static bool MyRemoveEntityPhantomPatched(MySafeZone __instance, HkRigidBody body, IMyEntity entity)
-        {
-            if (MySandboxGame.Static.SimulationFrameCounter < 1000)
-            {
-                return true;
-            }
-
-            try
-            {
-                MyEntity topEntity = entity.GetTopMostParent() as MyEntity;
-                if (topEntity.Physics == null || topEntity.Physics.ShapeChangeInProgress || topEntity != entity)
-                    return false;
-                bool addedOrRemoved =
-                    MySessionComponentSafeZones.IsRecentlyAddedOrRemoved(topEntity) || !entity.InScene;
-                Tuple<HkRigidBody, IMyEntity> p = new Tuple<HkRigidBody, IMyEntity>(body, entity);
-                HashSet<Tuple<HkRigidBody, IMyEntity>> m_RemoveEntityPhantomTaskList = new HashSet<Tuple<HkRigidBody, IMyEntity>>();
-                if (m_RemoveEntityPhantomTaskList.Contains(p))
-                    return false;
-                m_RemoveEntityPhantomTaskList.Add(p);
-                Vector3D position1 = entity.Physics.ClusterToWorld(body.Position);
-                Quaternion rotation1 = Quaternion.CreateFromRotationMatrix(body.GetRigidBodyMatrix());
-                MySandboxGame.Static.Invoke((Action) (() =>
-                {
-                    try
-                    {
-                        m_RemoveEntityPhantomTaskList.Remove(p);
-                        if (__instance.Physics == null)
-                            return;
-                        if (entity.MarkedForClose)
-                        {
-                            bool RemoveEntityInternalResult = (bool) ReflectionUtils.InvokeInstanceMethod(
-                                typeof(MySafeZone), __instance, "RemoveEntityInternal",
-                                new object[] {topEntity, addedOrRemoved});
-                            if (!RemoveEntityInternalResult)
-                                return;
-                            ReflectionUtils.InvokeInstanceMethod(typeof(MySafeZone), __instance, "SendRemovedEntity",
-                                new object[] {topEntity.EntityId, addedOrRemoved});
-                        }
-                        else
-                        {
-                            bool flag = (entity is MyCharacter myCharacter ? (myCharacter.IsDead ? 1 : 0) : 0) != 0 ||
-                                        body.IsDisposed || !entity.Physics.IsInWorld;
-                            if (entity.Physics != null && !flag)
-                            {
-                                position1 = entity.Physics.ClusterToWorld(body.Position);
-                                rotation1 = Quaternion.CreateFromRotationMatrix(body.GetRigidBodyMatrix());
-                            }
-
-                            Vector3D position = __instance.PositionComp.GetPosition();
-                            MatrixD matrix = __instance.PositionComp.GetOrientation();
-                            Quaternion fromRotationMatrix = Quaternion.CreateFromRotationMatrix(in matrix);
-                            HkShape shape1 = HkShape.Empty;
-                            if (entity.Physics != null)
-                            {
-                                if ((HkReferenceObject) entity.Physics.RigidBody != (HkReferenceObject) null)
-                                    shape1 = entity.Physics.RigidBody.GetShape();
-                                else if (entity.Physics is MyPhysicsBody physics && (entity as MyCharacter != null) &&
-                                         physics.CharacterProxy != null)
-                                    shape1 = physics.CharacterProxy.GetHitRigidBody().GetShape();
-                            }
-
-                            bool isPenetratingShapeShape;
-
-                                isPenetratingShapeShape = MyPhysics.IsPenetratingShapeShape(shape1, ref position1, ref rotation1,
-                                    __instance.Physics.RigidBody.GetShape(), ref position, ref fromRotationMatrix);
-                            
-                            if ((flag ? 1 : (shape1.IsValid ? (!isPenetratingShapeShape ? 1 : 0) : 1)) == 0)
-                                return;
-                            bool RemoveEntityInternalResult = (bool) ReflectionUtils.InvokeInstanceMethod(
-                                typeof(MySafeZone), __instance, "RemoveEntityInternal",
-                                new object[] {topEntity, addedOrRemoved});
-                            if (RemoveEntityInternalResult)
-                            {
-                                ReflectionUtils.InvokeInstanceMethod(typeof(MySafeZone), __instance,
-                                    "SendRemovedEntity",
-                                    new object[] {topEntity.EntityId, addedOrRemoved});
-                                if (topEntity is MyCubeGrid myCubeGrid)
-                                {
-                                    foreach (MyShipController fatBlock in myCubeGrid.GetFatBlocks<MyShipController>())
-                                    {
-                                        if (!(fatBlock is MyRemoteControl) && fatBlock.Pilot != null &&
-                                            (fatBlock.Pilot != topEntity &&
-                                             (bool) ReflectionUtils.InvokeInstanceMethod(typeof(MySafeZone), __instance,
-                                                 "RemoveEntityInternal",
-                                                 new object[] {(MyEntity) fatBlock.Pilot, addedOrRemoved})))
-                                        {
-                                            ReflectionUtils.InvokeInstanceMethod(typeof(MySafeZone), __instance,
-                                                "SendRemovedEntity",
-                                                new object[] {fatBlock.Pilot.EntityId, addedOrRemoved});
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    catch (Exception e)
-                    {
-                        Log.Error("Phantom leave exception " + e);
-                    }
-                }), "Phantom leave");
-            }
-            catch (Exception e)
-            {
-                Log.Error("MyRemoveEntityPhantomPatched error " + e);
-            }
-            return false;
-        }
-        
-        private static bool NeedSkip(long blockId, int cd)
-        {
-            int cooldown;
-            if (Cooldowns.TryGetValue(blockId, out cooldown))
-            {
-                if (cooldown > cd)
-                {
-                    Cooldowns[blockId] = 0;
-                    return false;
-                }
-                Cooldowns[blockId] = cooldown + 1;
-                return true;
-            }
-
-            Cooldowns[blockId] = r.Next(0, cd);
-            return true;
-        }
-
+        /// <summary>A zone on a grid nobody is near does not need to update every frame.</summary>
         private static bool UpdateBeforeSimulationPatched(MySafeZone __instance)
         {
-        try
-        {
-            if (!SentisOptimisationsPlugin.Config.SlowdownEnabled)
-            {
-                return true;
-            }
-
-            var safeZoneBlockId = __instance.SafeZoneBlockId;
-            if (safeZoneBlockId == 0)
-            {
-                return true;
-            }
-
-            MyCubeBlock entity;
-            if (!MyEntities.TryGetEntityById<MyCubeBlock>(safeZoneBlockId, out entity))
-            {
-                return true;
-            }
-
-            var entityCubeGrid = entity.CubeGrid;
-
-            var myUpdateTiersPlayerPresence = entityCubeGrid.PlayerPresenceTier;
-            if (myUpdateTiersPlayerPresence == MyUpdateTiersPlayerPresence.Tier1)
-            {
-                if (NeedSkip(entityCubeGrid.EntityId, 10)) return false;
-            }
-            else if (myUpdateTiersPlayerPresence == MyUpdateTiersPlayerPresence.Tier2)
-            {
-                if (NeedSkip(entityCubeGrid.EntityId, 100)) return false;
-            }
-
-            return true;
-        
-
-
-            }
-                catch (Exception __guard_e)
-                {
-                    Log.Error("UpdateBeforeSimulationPatched exception " + __guard_e);
-                    return true;  // fall back to vanilla behavior
-                }
-        }
-
-        private static bool MySafeZoneIsSafePatched(MySafeZone __instance, MyEntity entity, ref bool __result)
-        {
-
-            if (!SentisOptimisationsPlugin.Config.SafeZoneSubGridOptimisation)
-            {
-                return true;
-            }
-         
-            
             try
             {
-                MyFloatingObject myFloatingObject = entity as MyFloatingObject;
-                MyInventoryBagEntity inventoryBagEntity = entity as MyInventoryBagEntity;
-                if (myFloatingObject != null || inventoryBagEntity != null)
+                if (!SentisOptimisationsPlugin.Config.SlowdownEnabled) return true;
+
+                var blockId = __instance.SafeZoneBlockId;
+                if (blockId == 0) return true;
+                if (!MyEntities.TryGetEntityById<MyCubeBlock>(blockId, out var block)) return true;
+
+                var grid = block.CubeGrid;
+                switch (grid.PlayerPresenceTier)
+                {
+                    case MyUpdateTiersPlayerPresence.Tier1: return !NeedSkip(grid.EntityId, 10);
+                    case MyUpdateTiersPlayerPresence.Tier2: return !NeedSkip(grid.EntityId, 100);
+                    default: return true;
+                }
+            }
+            catch (Exception e)
+            {
+                Log.Error(e, "Safe zone update patch failed");
+                return true;
+            }
+        }
+
+        /// <summary>
+        /// Whether the zone protects the entity. Same answers as vanilla, except that a grid is safe
+        /// when any grid of its mechanical group is.
+        /// </summary>
+        private static bool IsSafePatched(MySafeZone __instance, MyEntity entity, ref bool __result)
+        {
+            if (!SentisOptimisationsPlugin.Config.SafeZoneSubGridOptimisation) return true;
+
+            try
+            {
+                if (entity is MyFloatingObject || entity is MyInventoryBagEntity)
                 {
                     __result = __instance.Entities.Contains(entity.EntityId)
                         ? __instance.AccessTypeFloatingObjects == MySafeZoneAccess.Whitelist
-                        : (uint) __instance.AccessTypeFloatingObjects > 0U;
+                        : (uint)__instance.AccessTypeFloatingObjects > 0U;
                     return false;
                 }
 
-                MyEntity topMostParent = entity.GetTopMostParent((Type) null);
-                MyIDModule component;
-                if (topMostParent is IMyComponentOwner<MyIDModule> myComponentOwner &&
-                    myComponentOwner.GetComponent(out component))
+                var topMostParent = entity.GetTopMostParent(null);
+                if (topMostParent is IMyComponentOwner<MyIDModule> owner && owner.GetComponent(out MyIDModule id))
                 {
-                    ulong steamId = MySession.Static.Players.TryGetSteamId(component.Owner);
-                    if (steamId != 0UL && MySafeZone.CheckAdminIgnoreSafezones(steamId))
-                    {
-                        __result = true;
-                        return false;  
-                    }
-                        
-                    if (__instance.AccessTypePlayers == MySafeZoneAccess.Whitelist)
-                    {
-                        if (__instance.Players.Contains(component.Owner))
-                        {
-                            __result = true;
-                            return false;  
-                        }
-                            
-                    }
-                    else if (__instance.Players.Contains(component.Owner))
-                    {
-                        __result = false;
-                        return false; 
-                    }
-                        
-
-                    if (MySession.Static.Factions.TryGetPlayerFaction(component.Owner) is MyFaction playerFaction)
-                    {
-                        if (__instance.AccessTypeFactions == MySafeZoneAccess.Whitelist)
-                        {
-                            if (__instance.Factions.Contains(playerFaction))
-                            {
-                                __result = true;
-                                return false; 
-                            }
-
-                        }
-                        else if (__instance.Factions.Contains(playerFaction))
-                        {
-                            __result = false;
-                            return false; 
-                        }
-                    }
-
-                    __result = __instance.AccessTypePlayers == MySafeZoneAccess.Blacklist;
+                    __result = IsOwnerSafe(__instance, id);
                     return false;
                 }
 
-                if (topMostParent is MyCubeGrid nodeInGroup)
+                if (topMostParent is MyCubeGrid grid)
                 {
-                    MyGroupsBase<MyCubeGrid> groups = MyCubeGridGroups.Static.GetGroups(GridLinkTypeEnum.Mechanical);
-                    SubgridCheckResult subgridCheckResult1 = SubgridCheckResult.NOT_SAFE;
+                    __result = IsGroupSafe(__instance, grid);
+                    return false;
+                }
 
-                    var myCubeGrids = groups.GetGroupNodes(nodeInGroup);
-                    foreach (MyCubeGrid groupNode in myCubeGrids)
-                    {
-                        object result = ReflectionUtils.InvokeInstanceMethod(typeof(MySafeZone), __instance, "IsSubGridSafe", new []{groupNode});
-                        SubgridCheckResult subgridCheckResult2 = MapToResult(result);
-                        //MySafeZone.SubgridCheckResult subgridCheckResult2 = __instance.IsSubGridSafe(groupNode);
-                        switch (subgridCheckResult2)
-                        {
-                            case SubgridCheckResult.NOT_SAFE:
-                                subgridCheckResult1 = SubgridCheckResult.NOT_SAFE;
-                                continue;
-                            case SubgridCheckResult.NEED_EXTRA_CHECK:
-                                if (subgridCheckResult2 > subgridCheckResult1)
-                                {
-                                    subgridCheckResult1 = subgridCheckResult2;
-                                }
-                                continue;
-                            case SubgridCheckResult.SAFE:
-                            case SubgridCheckResult.ADMIN:
-                                __result = true;
-                                return false;
-                            default:
-                                continue;
-                        }
-                    }
-
+                if ((entity is MyAmmoBase || entity is MyMeteor) &&
+                    (__instance.AllowedActions & MySafeZoneAction.Shooting) == 0)
+                {
                     __result = false;
                     return false;
-                }
-
-                switch (entity)
-                {
-                    case MyAmmoBase _:
-                    case MyMeteor _:
-                        if ((__instance.AllowedActions & MySafeZoneAction.Shooting) == (MySafeZoneAction) 0)
-                        {
-                            __result = false;
-                            return false;
-                        }
-                            
-                        break;
                 }
 
                 __result = true;
@@ -405,36 +209,89 @@ namespace SentisOptimisationsPlugin
             }
             catch (Exception e)
             {
-                SentisOptimisationsPlugin.Log.Warn("MySafeZoneIsSafePatched Exception ", e);
+                Log.Warn(e, "IsSafe patch failed; falling back to vanilla");
+                return true;
             }
+        }
+
+        private static bool IsOwnerSafe(MySafeZone zone, MyIDModule id)
+        {
+            var steamId = MySession.Static.Players.TryGetSteamId(id.Owner);
+            if (steamId != 0UL && MySafeZone.CheckAdminIgnoreSafezones(steamId)) return true;
+
+            if (zone.Players.Contains(id.Owner)) return zone.AccessTypePlayers == MySafeZoneAccess.Whitelist;
+
+            if (MySession.Static.Factions.TryGetPlayerFaction(id.Owner) is MyFaction faction &&
+                zone.Factions.Contains(faction))
+            {
+                return zone.AccessTypeFactions == MySafeZoneAccess.Whitelist;
+            }
+
+            return zone.AccessTypePlayers == MySafeZoneAccess.Blacklist;
+        }
+
+        /// <summary>
+        /// Safe as soon as one grid of the mechanical group is. NEED_EXTRA_CHECK counts as not safe,
+        /// which is what the previous version did too - it gathered that case into a variable and then
+        /// never looked at it.
+        /// </summary>
+        private static bool IsGroupSafe(MySafeZone zone, MyCubeGrid grid)
+        {
+            var nodes = MyCubeGridGroups.Static.GetGroups(GridLinkTypeEnum.Mechanical).GetGroupNodes(grid);
+            if (nodes == null || nodes.Count == 0) return IsSubGridSafe(zone, grid) >= SubgridCheckResult.Safe;
+
+            foreach (var node in nodes)
+                if (IsSubGridSafe(zone, node) >= SubgridCheckResult.Safe)
+                    return true;
 
             return false;
         }
 
-        private static SubgridCheckResult MapToResult(object result)
+        private static SubgridCheckResult IsSubGridSafe(MySafeZone zone, MyCubeGrid grid)
         {
-            SubgridCheckResult response;
-            if (enumMapping.TryGetValue(result, out response))
+            var result = IsSubGridSafeMethod.Invoke(zone, new object[] { grid });
+            return ResultByValue.TryGetValue((int)result, out var mapped) ? mapped : SubgridCheckResult.NotSafe;
+        }
+
+        /// <summary>
+        /// True while the zone is inside its cooldown. The first cooldown starts at a random point, so
+        /// the zones of a world do not all update on the same frame.
+        /// </summary>
+        private static bool NeedSkip(long id, int period)
+        {
+            if (!Cooldowns.TryGetValue(id, out var cooldown))
             {
-                return response;
+                Cooldowns[id] = Random.Next(0, period);
+                return true;
             }
 
-            response = enumStringMapping[result.ToString()];
-            enumMapping[result] = response;
-            return response;
+            if (cooldown > period)
+            {
+                Cooldowns[id] = 0;
+                return false;
+            }
+
+            Cooldowns[id] = cooldown + 1;
+            return true;
+        }
+
+        /// <summary>Forgets what is remembered about an entity that is gone.</summary>
+        public static void CleanupEntity(MyEntity entity)
+        {
+            if (entity == null) return;
+            EntitiesInSZ.TryRemove(entity.EntityId, out _);
+            Cooldowns.TryRemove(entity.EntityId, out _);
         }
 
         private enum SubgridCheckResult
         {
-            NOT_SAFE,
-            NEED_EXTRA_CHECK,
-            SAFE,
-            ADMIN
+            NotSafe,
+            NeedExtraCheck,
+            Safe,
+            Admin
         }
-        private  static Dictionary<string, SubgridCheckResult> enumStringMapping = new Dictionary<string, SubgridCheckResult>();
-        private  static Dictionary<object, SubgridCheckResult> enumMapping = new Dictionary<object, SubgridCheckResult>();
     }
-    
+
     public class GridInSzInfo
     {
         public MyCubeGrid MyCubeGrid;
@@ -443,7 +300,7 @@ namespace SentisOptimisationsPlugin
         public GridInSzInfo(MyCubeGrid myCubeGrid, long dDosTimeMs)
         {
             MyCubeGrid = myCubeGrid;
-            this.DDosTimeMs = dDosTimeMs;
+            DDosTimeMs = dDosTimeMs;
         }
     }
 }

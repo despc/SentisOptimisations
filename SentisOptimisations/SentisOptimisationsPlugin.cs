@@ -49,7 +49,7 @@ namespace SentisOptimisationsPlugin
         public static SentisOptimisationsPlugin Instance { get; private set; }
 
         public AllGridsProcessor AllGridsProcessor = new AllGridsProcessor();
-        private SendReplicablesAsync _replicablesAsync = new SendReplicablesAsync();
+        private readonly VoxelStreamCache _voxelStreamCache = new VoxelStreamCache();
         // AsyncWeld v2: the weld/grind pipeline no longer uses worker-thread queues;
         // all game-state work runs on the game thread (see ShipToolPatch / WelderOptimization).
         public DelayedProcessor DelayedProcessor = new DelayedProcessor();
@@ -109,7 +109,9 @@ namespace SentisOptimisationsPlugin
             {
                 AllGridsProcessor.OnUnloading();
                 Optimizer.Optimizations.GrinderPatches.ClearAll();
-                _replicablesAsync.OnUnloading();
+                GasTankOptimisations.ClearAll();
+                _voxelStreamCache.OnUnloading();
+                SerializerWarmup.Reset();
                 DelayedProcessor.OnUnloading();
                 MyEntities.OnEntityAdd -= EntitiesObserver.MyEntitiesOnOnEntityAdd;
                 MyEntities.OnEntityRemove -= EntitiesObserver.MyEntitiesOnOnEntityRemove;
@@ -129,8 +131,9 @@ namespace SentisOptimisationsPlugin
                     Log.Error(e, "Torch re-emit leave fix failed");
                 }
                 Optimizer.Optimizations.PhysicsLoadMonitor.Reset();
+                SerializerWarmup.Run();
                 AllGridsProcessor.OnLoaded();
-                _replicablesAsync.OnLoaded();
+                _voxelStreamCache.OnLoaded();
                 DelayedProcessor.OnLoaded();
                 // re-subscribe (idempotent) for worlds loaded after Init, then seed the cache
                 MyEntities.OnEntityAdd -= EntitiesObserver.MyEntitiesOnOnEntityAdd;
@@ -355,7 +358,6 @@ namespace SentisOptimisationsPlugin
         public override void Dispose()
         {
             _config.Save(Path.Combine(StoragePath, "SentisOptimisations.cfg"));
-            _replicablesAsync.CancellationTokenSource.Cancel();
             base.Dispose();
         }
     }

@@ -133,45 +133,6 @@ namespace SentisOptimisations.Tests
         }
     }
 
-    public class SendReplicablesAsyncTests
-    {
-        sealed class Wrapper : AsyncSync.ISendToClientWrapper
-        {
-            readonly Action _a;
-            public Wrapper(Action a) { _a = a; }
-            public void DoSendToClient() => _a();
-        }
-
-        static void ClearQueue()
-        {
-            lock (SendReplicablesAsync._queue) SendReplicablesAsync._queue.Clear();
-        }
-
-        [Fact]
-        public void Sends_in_order_and_survives_exceptions()
-        {
-            ClearQueue();
-            var s = new SendReplicablesAsync();
-            s.OnLoaded();
-            try
-            {
-                var order = new List<int>();
-                for (int i = 0; i < 10; i++)
-                {
-                    int c = i;
-                    SendReplicablesAsync._queue.Enqueue(new Wrapper(() => { lock (order) order.Add(c); }));
-                }
-                SendReplicablesAsync._queue.Enqueue(new Wrapper(() => throw new Exception("network boom")));
-                int after = 0;
-                SendReplicablesAsync._queue.Enqueue(new Wrapper(() => Interlocked.Increment(ref after)));
-
-                Assert.True(TestSync.WaitUntil(() => Volatile.Read(ref after) == 1, 8000), "loop died on throwing wrapper");
-                lock (order) Assert.Equal(Enumerable.Range(0, 10), order);
-            }
-            finally { s.OnUnloading(); ClearQueue(); }
-        }
-    }
-
     static class TestSync
     {
         public static bool WaitUntil(Func<bool> cond, int ms)

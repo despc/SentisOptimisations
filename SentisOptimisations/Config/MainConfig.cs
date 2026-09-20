@@ -30,7 +30,6 @@ namespace SentisOptimisationsPlugin
 
         //Slowdown
         private bool _slowdownEnabled = true;
-        private bool _fixVoxelFreeze = false;
         
         //Freezer
         private bool _freezerEnabled = true;
@@ -50,6 +49,7 @@ namespace SentisOptimisationsPlugin
         private bool _enableMainDebugLogs = false;
         private int _charSyncDist = 10000;
         private int _physicsThreads = Optimizer.Optimizations.HavokThreadPool.DefaultThreads;
+        private float _replicableAddMsPerFrame = 4f;
         
         //Scripts
         private bool _punishHeavyScripts = false;
@@ -63,13 +63,6 @@ namespace SentisOptimisationsPlugin
         {
             get => _slowdownEnabled;
             set => SetValue(ref _slowdownEnabled, value);
-        }
-        
-        [DisplayTab(Name = "Fix Voxel Freeze Enabled", GroupName = "Slowdown", Tab = "Slowdown", Order = 1, Description = "Fix Voxel Freeze Enabled")]
-        public bool FixVoxelFreeze
-        {
-            get => _fixVoxelFreeze;
-            set => SetValue(ref _fixVoxelFreeze, value);
         }
         
         [DisplayTab(Name = "Safe zone subgrid optimisation", GroupName = "Safe zone", Tab = "Safe zone", Order = 0, Description = "Safe zone subgrid optimisation")]
@@ -127,6 +120,14 @@ namespace SentisOptimisationsPlugin
             set => SetValue(ref _enablePhysicsGuard, value);
         }
         
+        [DisplayTab(Name = "Replicable add ms per frame", GroupName = "Performance", Tab = "Performance", Order = 0,
+            Description = "How long one frame may spend handing entities to joining clients. The rest waits for the next frame, so a join spreads over a few frames instead of stopping the server. 0 turns the budget off")]
+        public float ReplicableAddMsPerFrame
+        {
+            get => _replicableAddMsPerFrame;
+            set => SetValue(ref _replicableAddMsPerFrame, value);
+        }
+
         [DisplayTab(Name = "Gas Tank Optimisation", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Gas Tank Optimisation")]
         public bool GasTankOptimisation
         {

@@ -92,48 +92,21 @@ namespace SentisOptimisations.Tests
             finally { p.OnUnloading(); }
         }
 
-        // -------------------------------------- finding: SendReplicablesAsync swallows all errors
-        [Fact]
-        public void SendReplicables_errors_must_be_logged()
-        {
-            lock (SendReplicablesAsync._queue) SendReplicablesAsync._queue.Clear();
-            // reset the throttle so a previous test's logged error doesn't suppress this one
-            typeof(SendReplicablesAsync)
-                .GetField("_lastErrorLogged", BindingFlags.Static | BindingFlags.NonPublic)
-                ?.SetValue(null, DateTime.MinValue);
-            var s = new SendReplicablesAsync();
-            s.OnLoaded();
-            using var capture = new NLogCapture();
-            try
-            {
-                SendReplicablesAsync._queue.Enqueue(new ExplodingWrapper());
-                Thread.Sleep(1500);
-                Assert.True(capture.Errors.Any(),
-                    "DoSendToClient failures are silently swallowed — a broken replication wrapper is invisible");
-            }
-            finally { s.OnUnloading(); lock (SendReplicablesAsync._queue) SendReplicablesAsync._queue.Clear(); }
-        }
-
-        sealed class ExplodingWrapper : AsyncSync.ISendToClientWrapper
-        {
-            public void DoSendToClient() => throw new Exception("simulated network failure");
-        }
-
         // --------------------------------- finding: entity-keyed batch state is never cleaned up
         [Fact]
         public void GasTank_batch_state_must_shrink_with_the_world()
         {
-            var dictField = typeof(GasTankOptimisations)
-                .GetField("_accumulatedTransfer", BindingFlags.Static | BindingFlags.NonPublic);
-            var state = dictField.GetValue(null);
-            var countProp = state.GetType().GetProperty("Count");
-            // structural requirement: some cleanup hook must exist that empties per-entity state
-            var cleanup = typeof(GasTankOptimisations).GetMethods(
-                    BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
-                .Any(m => m.Name.IndexOf("Cleanup", StringComparison.OrdinalIgnoreCase) >= 0
-                       || m.Name.IndexOf("OnEntityRemove", StringComparison.OrdinalIgnoreCase) >= 0);
-            Assert.True(cleanup,
+            var batches = typeof(GasTankOptimisations)
+                .GetField("Batches", BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.True(batches != null, "GasTankOptimisations no longer keeps its per-block batches where the test looks");
+
+            // A cleanup hook must exist that empties per-entity state, and it must flush, not drop.
+            var cleanup = typeof(GasTankOptimisations).GetMethod("CleanupEntity",
+                BindingFlags.Static | BindingFlags.Public);
+            Assert.True(cleanup != null,
                 "GasTankOptimisations keeps per-tank state forever; needs an entity-removal cleanup hook");
+            Assert.True(typeof(GasTankOptimisations).GetMethod("Flush", BindingFlags.Static | BindingFlags.Public) != null,
+                "what a block still owes must be flushed, not thrown away with its state");
         }
 
         // ------------------------------- finding: EntitiesObserver exposes plain collections to loops
@@ -163,24 +136,25 @@ namespace SentisOptimisations.Tests
         public void GasTank_flush_must_not_lose_the_current_transfer()
         {
             PluginHarness.SetConfig("GasTankOptimisation", true);
-            var m = typeof(GasTankOptimisations).GetMethod("MethodExecuteGasTransferPatched",
+            var prefix = typeof(GasTankOptimisations).GetMethod("TankTransferPrefix",
                 BindingFlags.Static | BindingFlags.NonPublic);
             var tank = System.Runtime.Serialization.FormatterServices
                 .GetUninitializedObject(typeof(Sandbox.Game.Entities.Blocks.MyGasTank));
+            typeof(GasTankOptimisations).GetMethod("Flush", BindingFlags.Static | BindingFlags.Public)
+                .Invoke(null, new object[] { tank }); // start from an empty batch
 
-            // accumulate 30 calls of 1.0 (ref args come back in the object[] on reflection calls)
-            for (int i = 0; i < 30; i++)
+            var perFlush = GasTankOptimisations.TransfersPerFlush;
+            for (int i = 1; i < perFlush; i++)
             {
-                object[] a = { tank, 1.0 };
-                var skip = (bool)m.Invoke(null, a);
-                Assert.False(skip);
+                object[] gathering = { tank, 1.0 };
+                Assert.False((bool)prefix.Invoke(null, gathering), "handed over after " + i + " transfers");
             }
-            // 31st call: original transfer (1.0) plus the 30 accumulated must be flushed
+
+            // The transfer that fills the batch carries everything gathered, its own unit included.
             object[] flush = { tank, 1.0 };
-            var run = (bool)m.Invoke(null, flush);
-            Assert.True(run);
-            // current behavior assigns the sum of the 30 (30.0) and DROPS the 31st unit (1.0)
-            Assert.True(Math.Abs((double)flush[1] - 31.0) < 1e-6, "flush loses the current call's gas transfer");
+            Assert.True((bool)prefix.Invoke(null, flush), "the batch was never handed over");
+            Assert.True(Math.Abs((double)flush[1] - perFlush) < 1e-6,
+                "flush loses gas: handed over " + flush[1] + " of " + perFlush);
         }
     }
 }
