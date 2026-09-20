@@ -128,6 +128,7 @@ namespace SentisOptimisationsPlugin
                 {
                     Log.Error(e, "Torch re-emit leave fix failed");
                 }
+                Optimizer.Optimizations.PhysicsLoadMonitor.Reset();
                 AllGridsProcessor.OnLoaded();
                 _replicablesAsync.OnLoaded();
                 DelayedProcessor.OnLoaded();
@@ -181,6 +182,7 @@ namespace SentisOptimisationsPlugin
                     {
                         gui.FreezerStatistic.Text =
                             $"Avg CPU Load: {FreezeLogic.GetAvgCpuLoad()}% " +
+                            $"Physics: {Optimizer.Optimizations.PhysicsLoadMonitor.AverageMs:F2} ms/frame (last {Optimizer.Optimizations.PhysicsLoadMonitor.LastMs:F2}) " +
                             $"Total grids: {EntitiesObserver.MyCubeGrids.Count}, Frozen: {FreezeLogic.FrozenGrids.Count}, Frozen physics: {FreezeLogic.FrozenPhysicsGrids.Count}";
                     }
                     catch (Exception e)
