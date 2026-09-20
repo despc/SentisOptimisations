@@ -21,6 +21,9 @@ namespace SentisOptimisationsPlugin.AllGridsActions
         public CancellationTokenSource CancellationTokenSource { get; set; }
         private FreezeLogic _freezeLogic = new FreezeLogic();
 
+        /// <summary>How often the physics load is looked at.</summary>
+        private const int PhysicsCheckMs = 2000;
+
         public void OnLoaded()
         {
             CancellationTokenSource = new CancellationTokenSource();
@@ -33,6 +36,12 @@ namespace SentisOptimisationsPlugin.AllGridsActions
             CancellationTokenSource.Cancel();
         }
 
+        /// <summary>
+        /// Watches the physics load. The check costs one number while the server is healthy, so it
+        /// runs every <see cref="PhysicsCheckMs"/>: a grid that drags the simulation down for ten
+        /// seconds - a long structure toppling over on a planet, say - was missed entirely by the
+        /// half-minute pass this loop used to make.
+        /// </summary>
         public async void CheckLoop()
         {
             try
@@ -42,8 +51,8 @@ namespace SentisOptimisationsPlugin.AllGridsActions
                 {
                     try
                     {
-                        await Task.Delay(30000);
-                        await PhysicsProfilerMonitor.__instance.Profile();
+                        await Task.Delay(PhysicsCheckMs);
+                        PhysicsGuard.Check();
                     }
                     catch (Exception e)
                     {

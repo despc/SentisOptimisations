@@ -21,7 +21,7 @@ namespace SentisOptimisationsPlugin
         private int _projectionChecksPerActivation = 24;
 
         //physics profile антипалочная защита
-        private bool _enablePhysicsGuard = false;
+        private bool _enablePhysicsGuard = true;
         private float _physicsMsToAlert = 1.5f;
         private float _physicsMsToPunish = 2f;
         private float _physicsMsToPunishImmediately = 5f;
