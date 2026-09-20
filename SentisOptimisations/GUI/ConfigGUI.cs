@@ -9,6 +9,8 @@ namespace SOPlugin.GUI
         // Previously generated from ConfigGUI.xaml; now built in managed code.
         internal TextBlock ClustersStatistic;
         internal TextBlock FreezerStatistic;
+        internal TextBlock ScriptsStatistic;
+        internal Expander ScriptsExpander;
         internal FilteredGrid MainFilteredGrid;
 
         public ConfigGUI()
@@ -52,6 +54,29 @@ namespace SOPlugin.GUI
             };
             freezerRow.Children.Add(FreezerStatistic);
             root.Children.Add(freezerRow);
+
+            // One line while it is closed, a line per script when it is opened.
+            ScriptsStatistic = new TextBlock
+            {
+                Margin = new Thickness(3, 3, 3, 3),
+                Width = double.NaN,
+                FontFamily = new FontFamily("Consolas"),
+                Text = "Script statistic will be here"
+            };
+            ScriptsExpander = new Expander
+            {
+                Margin = new Thickness(3, 3, 3, 20),
+                Header = "Scripts:",
+                IsExpanded = false,
+                Content = new ScrollViewer
+                {
+                    MaxHeight = 220,
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    Content = ScriptsStatistic
+                }
+            };
+            root.Children.Add(ScriptsExpander);
 
             MainFilteredGrid = new FilteredGrid();
             root.Children.Add(MainFilteredGrid);

@@ -54,6 +54,7 @@ namespace SentisOptimisationsPlugin
         //Scripts
         private bool _punishHeavyScripts = false;
         private float _scriptMaxTime = 2;
+        private float _scriptsMaxMsPerFrame = 0.5f;
         private int _scriptOvertimeExecTimesBeforePunish = 3;
         
        
@@ -228,7 +229,15 @@ namespace SentisOptimisationsPlugin
             set => SetValue(ref _scriptMaxTime, value);
         }
         
-        [DisplayTab(Name = "Scripts overtime exec times before punish", GroupName = "Scripts", Tab = "Scripts", Order = 2, Description = "Scripts overtime exec times before punish")]
+        [DisplayTab(Name = "Scripts max ms per frame", GroupName = "Scripts", Tab = "Scripts", Order = 2,
+            Description = "How much of every frame one script may own on average: a script on Update1 costs its run time every single frame, which no per-run limit can see. 0 turns the limit off")]
+        public float ScriptsMaxMsPerFrame
+        {
+            get => _scriptsMaxMsPerFrame;
+            set => SetValue(ref _scriptsMaxMsPerFrame, value);
+        }
+
+        [DisplayTab(Name = "Scripts overtime exec times before punish", GroupName = "Scripts", Tab = "Scripts", Order = 3, Description = "Scripts overtime exec times before punish")]
         public int ScriptOvertimeExecTimesBeforePunish
         {
             get => _scriptOvertimeExecTimesBeforePunish;
