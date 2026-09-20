@@ -1,181 +1,154 @@
 using System;
 using System.Collections.Concurrent;
-using System.Diagnostics;
 using System.Reflection;
-using NAPI;
+using Sandbox;
 using Sandbox.Engine.Physics;
 using Sandbox.Game.Entities;
 using Sandbox.Game.GameSystems;
 using Sandbox.ModAPI;
 using SentisOptimisations.DelayedLogic;
 using Torch.Managers.PatchManager;
+using VRage.Game.ModAPI;
 using VRage.Groups;
 
 namespace SentisOptimisationsPlugin;
 
+/// <summary>
+/// Grid systems that rebuild themselves on every change rebuild once the changes stop.
+///
+/// Building a conveyor network or a gas system walks every block of the grid, and the game asks for
+/// it on every block placed, removed or reconnected - welding a ship rebuilds it hundreds of times.
+/// Each request is held for <see cref="DebounceSeconds"/> instead, and the rebuild happens when
+/// nothing has asked for it during that time.
+///
+/// The grid keeps working in the meantime: only the rebuild is postponed, and a request that arrives
+/// while one is pending simply pushes it further out.
+/// </summary>
 [PatchShim]
 public static class GridSystemUpdatePatch
 {
-    
-    private static PropertyInfo gridPropertyInfo =
+    /// <summary>How long the last request is waited out before the rebuild runs.</summary>
+    private const double DebounceSeconds = 5;
+
+    private static readonly PropertyInfo GridProperty =
         typeof(MyUpdateableGridSystem).GetProperty("Grid", BindingFlags.Instance | BindingFlags.NonPublic);
-    
-    private static ConcurrentDictionary<long, DateTime> GasUpdateTimes = new ConcurrentDictionary<long, DateTime>();
-    private static ConcurrentDictionary<long, DateTime> ConveyorUpdateTimes = new ConcurrentDictionary<long, DateTime>();
-    private static ConcurrentDictionary<long, DateTime> FlagForRecomputationPatchedTimes = new ConcurrentDictionary<long, DateTime>();
+
+    private static readonly Action<MyGridGasSystem> ScheduleGas =
+        Accessors.Method<MyGridGasSystem, Action<MyGridGasSystem>>("Schedule");
+    private static readonly Action<MyGridConveyorSystem> ScheduleConveyor =
+        Accessors.Method<MyGridConveyorSystem, Action<MyGridConveyorSystem>>("Schedule");
+    private static readonly Action<MyGridConveyorSystem, bool> SetNeedsRecomputation =
+        Accessors.SetField<MyGridConveyorSystem, bool>("m_needsRecomputation");
+
+    private static readonly ConcurrentDictionary<long, long> GasRequests = new ConcurrentDictionary<long, long>();
+    private static readonly ConcurrentDictionary<long, long> ConveyorRequests = new ConcurrentDictionary<long, long>();
+    private static readonly ConcurrentDictionary<long, long> RecomputeRequests = new ConcurrentDictionary<long, long>();
+
+    private static long _sequence;
 
     public static void Patch(PatchContext ctx) => global::SentisOptimisations.PatchGuard.Run("GridSystemUpdatePatch", ctx, PatchImpl);
 
-        internal static void PatchImpl(PatchContext ctx)
+    internal static void PatchImpl(PatchContext ctx)
     {
-        var MethodScheduleUpdateGas = typeof(MyGridGasSystem).GetMethod
-            ("ScheduleUpdate", BindingFlags.Instance | BindingFlags.NonPublic);
+        if (GridProperty == null) throw new MissingMemberException("MyUpdateableGridSystem.Grid");
+        if (ScheduleGas == null || ScheduleConveyor == null || SetNeedsRecomputation == null)
+            throw new InvalidOperationException("GridSystemUpdatePatch: a grid system member could not be bound");
 
+        const BindingFlags instance = BindingFlags.Instance | BindingFlags.NonPublic;
+        const BindingFlags publicInstance = BindingFlags.Instance | BindingFlags.Public;
+        const BindingFlags statics = BindingFlags.Static | BindingFlags.NonPublic;
+        var self = typeof(GridSystemUpdatePatch);
 
-        ctx.GetPattern(MethodScheduleUpdateGas).Prefixes.Add(
-            typeof(GridSystemUpdatePatch).GetMethod(nameof(ScheduleUpdateGasPatched),
-                BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-
-        var MethodUpdateLines = typeof(MyGridConveyorSystem).GetMethod
-            (nameof(MyGridConveyorSystem.UpdateLines), BindingFlags.Instance | BindingFlags.Public);
-
-
-        ctx.GetPattern(MethodUpdateLines).Prefixes.Add(
-            typeof(GridSystemUpdatePatch).GetMethod(nameof(MethodUpdateLinesPatched),
-                BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-        
-        var MethodFlagForRecomputation = typeof(MyGridConveyorSystem).GetMethod
-            (nameof(MyGridConveyorSystem.FlagForRecomputation), BindingFlags.Instance | BindingFlags.Public);
-
-
-        ctx.GetPattern(MethodFlagForRecomputation).Prefixes.Add(
-            typeof(GridSystemUpdatePatch).GetMethod(nameof(FlagForRecomputationPatched),
-                BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+        ctx.GetPattern(typeof(MyGridGasSystem).GetMethod("ScheduleUpdate", instance))
+            .Prefixes.Add(self.GetMethod(nameof(ScheduleUpdateGasPatched), statics));
+        ctx.GetPattern(typeof(MyGridConveyorSystem).GetMethod(nameof(MyGridConveyorSystem.UpdateLines), publicInstance))
+            .Prefixes.Add(self.GetMethod(nameof(UpdateLinesPatched), statics));
+        ctx.GetPattern(typeof(MyGridConveyorSystem).GetMethod(nameof(MyGridConveyorSystem.FlagForRecomputation), publicInstance))
+            .Prefixes.Add(self.GetMethod(nameof(FlagForRecomputationPatched), statics));
     }
 
-
-    private static bool ScheduleUpdateGasPatched(MyGridGasSystem __instance)
+    /// <summary>Forgets what a grid asked for; it is gone.</summary>
+    public static void CleanupEntity(VRage.Game.Entity.MyEntity entity)
     {
-        if (!SentisOptimisationsPlugin.Config.GridSystemOptimisations)
-        {
-            return true;
-        }
-
-        MyCubeGrid grid = (MyCubeGrid)gridPropertyInfo.GetValue(__instance);
-
-        var callScheduleTime = DateTime.Now;
-        GasUpdateTimes[grid.EntityId] = callScheduleTime;
-        DelayedProcessor.Instance.AddDelayedAction(DateTime.Now.AddSeconds(5), () =>
-        {
-            if (GasUpdateTimes.TryGetValue(grid.EntityId, out var lastGasUpdateTime))
-            {
-                if (lastGasUpdateTime > callScheduleTime)
-                {
-                    return;
-                }
-
-                MyAPIGateway.Utilities.InvokeOnGameThread(() =>
-                {
-                    try
-                    {
-                        __instance.easyCallMethod("Schedule", new object[] { });
-                    }
-                    catch
-                    {
-                    }
-                });
-            }
-        });
-        return false;
+        if (!(entity is MyCubeGrid grid)) return;
+        GasRequests.TryRemove(grid.EntityId, out _);
+        ConveyorRequests.TryRemove(grid.EntityId, out _);
+        RecomputeRequests.TryRemove(grid.EntityId, out _);
     }
 
-    private static bool MethodUpdateLinesPatched(MyGridConveyorSystem __instance)
-    {
-        if (!SentisOptimisationsPlugin.Config.GridSystemOptimisations)
-        {
-            return true;
-        }
+    private static bool ScheduleUpdateGasPatched(MyGridGasSystem __instance) =>
+        !Debounce(GasRequests, __instance, grid => ScheduleGas(__instance));
 
-        MyCubeGrid grid = (MyCubeGrid)gridPropertyInfo.GetValue(__instance);
-
-        var callScheduleTime = DateTime.Now;
-        ConveyorUpdateTimes[grid.EntityId] = callScheduleTime;
-        DelayedProcessor.Instance.AddDelayedAction(DateTime.Now.AddSeconds(5), () =>
+    private static bool UpdateLinesPatched(MyGridConveyorSystem __instance) =>
+        !Debounce(ConveyorRequests, __instance, grid =>
         {
-            if (ConveyorUpdateTimes.TryGetValue(grid.EntityId, out var lastLinesUpdateTime))
+            ScheduleConveyor(__instance);
+            __instance.NeedsUpdateLines = true;
+        });
+
+    private static bool FlagForRecomputationPatched(MyGridConveyorSystem __instance) =>
+        !Debounce(RecomputeRequests, __instance, grid =>
+        {
+            // The whole physical group shares a conveyor network, so all of it is flagged at once.
+            var group = MyGridPhysicalHierarchy.Static?.GetGroup(grid);
+            if (group == null)
             {
-                if (lastLinesUpdateTime > callScheduleTime)
-                {
-                    return;
-                }
+                SetNeedsRecomputation(__instance, true);
+                return;
+            }
 
-                MyAPIGateway.Utilities.InvokeOnGameThread(() =>
-                {
-                    try
-                    {
-                        __instance.easyCallMethod("Schedule", new object[] { });
-                        __instance.NeedsUpdateLines = true;
-                    }
-                    catch
-                    {
-                    }
-                });
+            foreach (MyGroups<MyCubeGrid, MyGridPhysicalHierarchyData>.Node node in group.Nodes)
+            {
+                var conveyors = node.NodeData?.GridSystems?.ConveyorSystem;
+                if (conveyors != null) SetNeedsRecomputation(conveyors, true);
             }
         });
-        return false;
-    }
-    
-    private static bool FlagForRecomputationPatched(MyGridConveyorSystem __instance)
+
+    /// <summary>
+    /// Holds the request for <see cref="DebounceSeconds"/> and runs <paramref name="rebuild"/> on the
+    /// game thread if nothing asked again in the meantime. True when the request was taken over,
+    /// false when the caller should do it itself (the feature is off, or the grid is unknown).
+    /// </summary>
+    private static bool Debounce(ConcurrentDictionary<long, long> requests, MyUpdateableGridSystem system, Action<MyCubeGrid> rebuild)
     {
-        if (!SentisOptimisationsPlugin.Config.GridSystemOptimisations)
-        {
-            return true;
-        }
-        StackTrace stackTrace = new StackTrace();
-        var stackFrames = stackTrace.GetFrames();
-        if (stackFrames == null)
-        {
-            return true;
-        }
-        foreach (var stackFrame in stackFrames)
-        {
-            if (stackFrame.GetMethod().GetType() == typeof(MyShipController))
-            {
-                return true;
-            }
-        }
-        
-        MyCubeGrid grid = (MyCubeGrid)gridPropertyInfo.GetValue(__instance);
+        if (!SentisOptimisationsPlugin.Config.GridSystemOptimisations) return false;
 
-        var callScheduleTime = DateTime.Now;
-        FlagForRecomputationPatchedTimes[grid.EntityId] = callScheduleTime;
-        DelayedProcessor.Instance.AddDelayedAction(DateTime.Now.AddSeconds(5), () =>
+        MyCubeGrid grid;
+        try
         {
-            if (FlagForRecomputationPatchedTimes.TryGetValue(grid.EntityId, out var lastLinesUpdateTime))
+            grid = (MyCubeGrid)GridProperty.GetValue(system);
+        }
+        catch (Exception e)
+        {
+            SentisOptimisationsPlugin.Log.Error(e, "Grid system debounce could not read its grid");
+            return false;
+        }
+
+        if (grid == null || grid.MarkedForClose) return false;
+
+        // A counter, not a clock: two requests inside the same tick of DateTime.Now compared equal,
+        // and the second one then cancelled the first.
+        var ticket = System.Threading.Interlocked.Increment(ref _sequence);
+        var gridId = grid.EntityId;
+        requests[gridId] = ticket;
+
+        DelayedProcessor.Instance.AddDelayedAction(DateTime.Now.AddSeconds(DebounceSeconds), () =>
+        {
+            if (!requests.TryGetValue(gridId, out var latest) || latest != ticket) return;
+            MyAPIGateway.Utilities.InvokeOnGameThread(() =>
             {
-                if (lastLinesUpdateTime > callScheduleTime)
+                try
                 {
-                    return;
+                    if (!requests.TryRemove(gridId, out var current) || current != ticket) return;
+                    if (grid.MarkedForClose || grid.Closed) return;
+                    rebuild(grid);
                 }
-
-                MyAPIGateway.Utilities.InvokeOnGameThread(() =>
+                catch (Exception e)
                 {
-                    try
-                    {
-                        MyGroups<MyCubeGrid, MyGridPhysicalHierarchyData>.Group group =
-                            MyGridPhysicalHierarchy.Static.GetGroup(grid);
-                        if (group == null)
-                            return;
-                        foreach (MyGroups<MyCubeGrid, MyGridPhysicalHierarchyData>.Node node in group.Nodes)
-                            node.NodeData.GridSystems.ConveyorSystem.easySetField("m_needsRecomputation", true);
-                    }
-                    catch
-                    {
-                    }
-                }); 
-            }
-            
+                    SentisOptimisationsPlugin.Log.Error(e, "Delayed grid system rebuild failed");
+                }
+            });
         });
-        return false;
+        return true;
     }
 }

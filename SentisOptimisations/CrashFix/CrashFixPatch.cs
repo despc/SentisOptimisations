@@ -159,6 +159,16 @@ namespace SentisOptimisationsPlugin.CrashFix
             harmony.Patch(MethodCheckIdentitiesTrash, finalizer: new HarmonyMethod(finalizerDispatch));
             harmony.Patch(MethodWolfTargetAttack, finalizer: new HarmonyMethod(finalizerDispatch));
             
+            // A client that leaves in the middle of an update makes these throw, and the server
+            // must not go down with it. They came here when the async streaming send was removed.
+            foreach (var name in new[] { "FilterStateSync", "RefreshReplicable", "RemoveClientReplicable", "AddClientReplicable" })
+            {
+                var method = typeof(MyReplicationServer).GetMethod(name,
+                    BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+                if (method == null) throw new MissingMethodException("MyReplicationServer." + name);
+                harmony.Patch(method, finalizer: new HarmonyMethod(finalizer));
+            }
+
             var MethodRemoveClient = typeof(MyReplicationServer).GetMethod
                 ("RemoveClient", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
             ctx.GetPattern(MethodRemoveClient).Prefixes.Add(
