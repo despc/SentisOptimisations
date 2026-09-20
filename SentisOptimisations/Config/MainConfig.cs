@@ -86,12 +86,6 @@ namespace SentisOptimisationsPlugin
             set => SetValue(ref _physicsMsToAlert, value);
         }
         
-        [DisplayTab(Name = "Check Inside Voxel percent", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Check Inside Voxel percent")]
-        public float CheckInsideVoxel
-        {
-            get => _checkInsideVoxel;
-            set => SetValue(ref _checkInsideVoxel, value);
-        }
 
         [DisplayTab(Name = "Physics ms to punish", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Physics ms to punish")]
         public float PhysicsMsToPunish

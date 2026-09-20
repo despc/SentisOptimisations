@@ -117,3 +117,46 @@ public class ReplicableAddTests
         }
     }
 }
+
+/// <summary>The two calls the character update-10 patch rewrites.</summary>
+public class CharacterUpdate10Tests
+{
+    [Fact]
+    public void The_update_and_both_calls_it_rewrites_exist()
+    {
+        var update10 = typeof(Sandbox.Game.Entities.Character.MyCharacter).GetMethod(
+            nameof(Sandbox.Game.Entities.Character.MyCharacter.UpdateBeforeSimulation10),
+            BindingFlags.Instance | BindingFlags.Public, null, Type.EmptyTypes, null);
+        Assert.NotNull(update10);
+
+        var distributor = typeof(Sandbox.Game.EntityComponents.MyResourceDistributorComponent).GetMethod(
+            "UpdateBeforeSimulation", BindingFlags.Instance | BindingFlags.Public, null, Type.EmptyTypes, null);
+        var broadcasters = typeof(Sandbox.Game.Entities.Cube.MyRadioReceiver).GetMethod(
+            "UpdateBroadcastersInRange", BindingFlags.Instance | BindingFlags.Public, null, Type.EmptyTypes, null);
+        Assert.NotNull(distributor);
+        Assert.NotNull(broadcasters);
+
+        // Both have to be in the body, or the transpiler refuses to patch.
+        var il = update10.GetMethodBody().GetILAsByteArray();
+        var module = update10.Module;
+        var called = new List<MethodBase>();
+        for (var i = 0; i < il.Length - 4; i++)
+        {
+            if (il[i] != 0x28 && il[i] != 0x6F) continue;
+            try { called.Add(module.ResolveMethod(BitConverter.ToInt32(il, i + 1))); }
+            catch (Exception) { }
+        }
+
+        // The radio call is emitted against the base declaration, which is why the transpiler
+        // compares GetBaseDefinition() and not the override.
+        Assert.Contains(called.OfType<MethodInfo>(), m => m.Name == distributor.Name && m.GetParameters().Length == 0);
+        Assert.Contains(called.OfType<MethodInfo>(), m => m.Name == broadcasters.Name && m.GetParameters().Length == 0);
+    }
+
+    [Fact]
+    public void The_period_leaves_the_delay_under_a_second()
+    {
+        // Vanilla does this every 10 frames; the patch does it every Period * 10.
+        Assert.InRange(Optimizer.Optimizations.CharacterUpdate10.Period, 2, 6);
+    }
+}
