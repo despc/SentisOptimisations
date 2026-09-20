@@ -108,6 +108,7 @@ namespace SentisOptimisationsPlugin
             if (newState == TorchSessionState.Unloading)
             {
                 AllGridsProcessor.OnUnloading();
+                Optimizer.Optimizations.GrinderPatches.ClearAll();
                 _replicablesAsync.OnUnloading();
                 DelayedProcessor.OnUnloading();
                 MyEntities.OnEntityAdd -= EntitiesObserver.MyEntitiesOnOnEntityAdd;
@@ -222,6 +223,7 @@ namespace SentisOptimisationsPlugin
 
         public override void Update()
         {
+            Optimizer.Optimizations.GrinderPatches.Flush();
             if (MySandboxGame.Static.SimulationFrameCounter % 600 == 0)
             {
                 DelayedProcessor.Instance.AddDelayedAction(DateTime.Now, DetectSZDDos);
