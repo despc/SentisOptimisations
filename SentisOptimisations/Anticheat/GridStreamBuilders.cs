@@ -86,6 +86,8 @@ namespace SentisOptimisationsPlugin
         public static long BlockRebuilds;
         public static long StructureRebuilds;
         public static long IndexMismatches;
+        /// <summary>Block groups that had no name and were given one so the grid could be sent.</summary>
+        public static long NamedEmptyGroups;
         public static long StaleByEvent;
         public static long StaleByDirtyBlocks;
         public static long BuildTicks;
@@ -182,10 +184,50 @@ namespace SentisOptimisationsPlugin
             entry.None = null;
             entry.StructureStale = false;
             entry.DirtyBlocks.Clear();
+            NameEmptyGroups(entry.Full);
             IndexBlocks(entry);
             IndexTimers(entry);
             IndexVolatileBlocks(entry);
         }
+
+        /// <summary>
+        /// A block group without a name cannot be sent to anybody.
+        ///
+        /// The network serializer refuses a null name outright, and the failure lands on a worker
+        /// thread in the middle of a stream: the client is told the grid is coming, the data never
+        /// arrives, and the grid sits there half-replicated for as long as the player looks at it.
+        /// A blueprint saved with such a group - and they exist, one came out of the operator's own
+        /// projector - therefore makes the whole grid carrying it invisible to everyone.
+        ///
+        /// Saving and loading tolerate the missing name, so nothing else ever complains. Giving the
+        /// group a name for the copy that goes over the wire costs nothing and keeps the grid
+        /// reachable; groups inside a projector's blueprint are walked too, which is where the one
+        /// in the bench lives.
+        /// </summary>
+        private static void NameEmptyGroups(MyObjectBuilder_CubeGrid builder)
+        {
+            if (builder == null) return;
+            if (builder.BlockGroups != null)
+                foreach (var group in builder.BlockGroups)
+                    if (group != null && string.IsNullOrEmpty(group.Name))
+                    {
+                        group.Name = UnnamedGroup;
+                        NamedEmptyGroups++;
+                    }
+
+            if (builder.CubeBlocks == null) return;
+            foreach (var block in builder.CubeBlocks) NameEmptyGroups(block);
+        }
+
+        /// <summary>The same for the blueprints a projector carries inside its own builder.</summary>
+        private static void NameEmptyGroups(MyObjectBuilder_CubeBlock block)
+        {
+            var projector = block as MyObjectBuilder_ProjectorBase;
+            if (projector?.ProjectedGrids == null) return;
+            foreach (var projected in projector.ProjectedGrids) NameEmptyGroups(projected);
+        }
+
+        public const string UnnamedGroup = "Group";
 
         /// <summary>Pairs every block timer with its place in the builder.</summary>
         private static void IndexTimers(Entry entry)
@@ -321,6 +363,7 @@ namespace SentisOptimisationsPlugin
             if (!entry.BlockIndex.TryGetValue(block, out var index)) { entry.StructureStale = true; return false; }
             var blockBuilder = block.GetObjectBuilder();
             if (blockBuilder == null) { entry.StructureStale = true; return false; }
+            NameEmptyGroups(blockBuilder);
             entry.Full.CubeBlocks[index] = blockBuilder;
             BlockRebuilds++;
             return true;
