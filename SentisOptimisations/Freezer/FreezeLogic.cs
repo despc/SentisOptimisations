@@ -464,12 +464,31 @@ public class FreezeLogic
     }
 
     /// <summary>
-    /// The physics of a group is frozen only as a whole and only if nothing holds it in place: no
-    /// static grid and no landing gear locked to voxels (those stay dynamic, logic frozen). The
-    /// group is read now, on the game thread: a grid that joined it during the freeze delay would
-    /// otherwise stay dynamic, held by constraints to fixed bodies, and so would a group where
-    /// some grids are already frozen without their physics (unless the whole group is being
-    /// switched over at once, <paramref name="wholeGroup"/>, as when FreezePhysics is turned on).
+    /// The physics of a group is frozen only as a whole. The group is read now, on the game
+    /// thread: a grid that joined it during the freeze delay would otherwise stay dynamic, held by
+    /// constraints to fixed bodies, and so would a group where some grids are already frozen
+    /// without their physics (unless the whole group is being switched over at once,
+    /// <paramref name="wholeGroup"/>, as when FreezePhysics is turned on).
+    ///
+    /// A group held in place by a static grid is frozen too. It used to be left with only its logic
+    /// frozen, on the idea that the game keeps such bodies fixed anyway; it keeps the static grid
+    /// fixed, and nothing else: every subgrid on a piston, rotor or hinge of a base stays a dynamic
+    /// body, simulated whenever it moves. A stack of pistons frozen while it swayed swung on for a
+    /// minute with nobody there, its logic - and with it the sway damping - switched off. The
+    /// static grid itself is left alone; only the bodies that are really dynamic become fixed, and
+    /// only those come back dynamic on thaw.
+    ///
+    /// A group in which the game holds a grid fixed although it is not static - a chassis on a
+    /// landing gear locked to a static grid or to voxels - stays logic-only, as before: frozen and
+    /// thawed around such a chassis on a planet, its wheels and tops came back with a kick of a
+    /// hundred metres a second (freezer_physics, "planet, gear on static").
+    ///
+    /// So does a group held by a static grid while any of its joints moves - a piston on its way,
+    /// a rotor or hinge turning. The world stops being stepped the moment the last player leaves,
+    /// and until the freezer's next pass the pistons' logic carries on without the bodies; frozen
+    /// fixed like that, a stack of pistons came back with its constraints pulling at twenty
+    /// million, far past what a piston will move against, and never moved again (piston_stack).
+    /// Frozen in logic only it catches up by itself on the thaw, as it always did.
     /// </summary>
     private static bool CanFreezePhysics(HashSet<MyCubeGrid> grids, bool wholeGroup = false)
     {
@@ -479,43 +498,41 @@ public class FreezeLogic
         MyAPIGateway.GridGroups.GetGroup(any, GridLinkTypeEnum.Physical, current);
         var group = current.Cast<MyCubeGrid>().ToHashSet();
         if (group.Any(grid => !grids.Contains(grid) ||
-                              !wholeGroup && FrozenGrids.Contains(grid.EntityId) && !FrozenPhysicsGrids.Contains(grid.EntityId)))
+                              !wholeGroup && FrozenGrids.Contains(grid.EntityId) && !FrozenPhysicsGrids.Contains(grid.EntityId) &&
+                              !KeptFixed(grid)))
             return false;
-        return !GroupContainsFixedGrid(group);
+        if (group.Any(HeldByGear)) return false;
+        return !group.Any(grid => grid.IsStatic) || !group.Any(HasMovingJoint);
     }
 
-    private static bool GroupContainsFixedGrid(HashSet<MyCubeGrid> grids)
+    /// <summary>A piston that is not resting against a limit or at zero, or a rotor or hinge told to turn.</summary>
+    private static bool HasMovingJoint(MyCubeGrid grid)
     {
-        try
+        foreach (var block in grid.GetFatBlocks())
         {
-            return grids.Any(grid =>
+            if (block is Sandbox.ModAPI.IMyPistonBase piston && piston.IsWorking)
             {
-                if (grid.IsStatic)
-                {
+                var velocity = piston.Velocity;
+                if (velocity != 0f &&
+                    !(velocity < 0f ? piston.CurrentPosition <= piston.MinLimit : piston.CurrentPosition >= piston.MaxLimit))
                     return true;
-                }
-
-                if (grid.Physics == null)
-                {
-                    return false;
-                }
-
-                return new HashSet<HkConstraint>(grid.Physics.Constraints).Any(constraint =>
-                {
-                    if (constraint.RigidBodyB == null)
-                    {
-                        return false;
-                    }
-
-                    return constraint.RigidBodyB.UserObject is MyVoxelPhysicsBody;
-                });
-            });
+            }
+            else if (block is Sandbox.ModAPI.IMyMotorStator stator && stator.IsWorking && stator.TargetVelocityRad != 0f)
+            {
+                return true;
+            }
         }
-        catch (Exception e)
-        {
-            return true;
-        }
+        return false;
     }
+
+    /// <summary>A grid whose body the game itself keeps fixed: static, or held by a landing gear.</summary>
+    private static bool KeptFixed(MyCubeGrid grid) =>
+        grid.IsStatic || grid.Physics?.RigidBody == null || grid.Physics.RigidBody.IsFixed && !FrozenPhysicsGrids.Contains(grid.EntityId);
+
+    /// <summary>Not static, but fixed by the game - not by the freezer: a landing gear holds it.</summary>
+    private static bool HeldByGear(MyCubeGrid grid) =>
+        !grid.IsStatic && grid.Physics?.RigidBody != null && grid.Physics.RigidBody.IsFixed &&
+        !FrozenPhysicsGrids.Contains(grid.EntityId);
 
     // MyGridPhysics.ConvertToStatic puts the now fixed body into the world's set of active bodies
     // (HkWorld.RigidBodyActivated), and Havok never deactivates a fixed body: every physics-frozen
@@ -536,6 +553,10 @@ public class FreezeLogic
         try
         {
             var gridPhysics = grid.Physics;
+            // A body the game already keeps fixed - a grid a landing gear holds to a static grid or
+            // to voxels - is not the freezer's to take: noted as frozen, the thaw handed it back as
+            // a dynamic body, and the chassis the gear held dropped off its lock with a kick.
+            if (KeptFixed(grid)) return;
             gridPhysics.ConvertToStatic();
             FrozenPhysicsGrids.Add(grid.EntityId);
             var body = gridPhysics.RigidBody;
