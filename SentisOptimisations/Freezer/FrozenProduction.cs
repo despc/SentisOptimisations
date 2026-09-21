@@ -100,7 +100,7 @@ public static class FrozenProduction
     private static long _plotTicks;
     private static double _fuelBurned;
 
-    /// <summary>For the freezer's statistics line.</summary>
+    /// <summary>For the compensation log (see EnableCompensationLogs).</summary>
     public static string Summary() =>
         $"Compensated: {_gasCompensated / 1000} k gas, {_fuelBurned:F0} fuel burned, {_plotTicks} plant ticks" +
         (PlotQueue.IsEmpty ? "" : $" ({PlotQueue.Count} plants catching up)");

@@ -161,6 +161,28 @@ namespace SentisOptimisationsPlugin
             }
         }
 
+        private static string _lastCompensationSummary;
+
+        /// <summary>
+        /// What the freezer has handed back to thawed grids, for the compensation log - not the
+        /// panel. Written only when it changed, so an idle server does not repeat it.
+        /// </summary>
+        private static void LogCompensationSummary()
+        {
+            try
+            {
+                if (!Config.EnableCompensationLogs) return;
+                var summary = Freezer.FrozenProduction.Summary();
+                if (summary == _lastCompensationSummary) return;
+                _lastCompensationSummary = summary;
+                FreezeLogic.CompensationLogs("Freezer " + summary);
+            }
+            catch (Exception e)
+            {
+                Log.Error(e, "compensation summary failed");
+            }
+        }
+
         public void UpdateGui()
         {
             try
@@ -178,6 +200,7 @@ namespace SentisOptimisationsPlugin
                 }
 
                 var clustersCount = clusters.Count;
+                LogCompensationSummary();
 
                 Instance.UpdateUI(x =>
                 {
@@ -187,10 +210,9 @@ namespace SentisOptimisationsPlugin
                     try
                     {
                         gui.FreezerStatistic.Text =
-                            $"Avg CPU Load: {FreezeLogic.GetAvgCpuLoad()}% " +
+                            $"Avg CPU Load: {FreezeLogic.GetAvgCpuLoad()}%, Peak {Freezer.CpuLoadPeak.Seconds}s: {Freezer.CpuLoadPeak.Peak()}%, " +
                             $"Physics: {Optimizer.Optimizations.PhysicsLoadMonitor.AverageMs:F2} ms/frame (last {Optimizer.Optimizations.PhysicsLoadMonitor.LastMs:F2}) " +
-                            $"Total grids: {EntitiesObserver.MyCubeGrids.Count}, Frozen: {FreezeLogic.FrozenGrids.Count}, Frozen physics: {FreezeLogic.FrozenPhysicsGrids.Count} " +
-                            Freezer.FrozenProduction.Summary();
+                            $"Total grids: {EntitiesObserver.MyCubeGrids.Count}, Frozen: {FreezeLogic.FrozenGrids.Count}, Frozen physics: {FreezeLogic.FrozenPhysicsGrids.Count}";
                     }
                     catch (Exception e)
                     {
@@ -243,6 +265,7 @@ namespace SentisOptimisationsPlugin
         public override void Update()
         {
             Optimizer.Optimizations.GrinderPatches.Flush();
+            Freezer.CpuLoadPeak.Sample(MySandboxGame.Static.CPULoad);
             Optimizer.Optimizations.WelderOptimization.RunDeferred();
             Freezer.FrozenProduction.Tick();
             if (MySandboxGame.Static.SimulationFrameCounter % 600 == 0)
