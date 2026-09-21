@@ -93,6 +93,7 @@ namespace Optimizer.Optimizations
                 targets.Remove(__instance.SlimBlock);
             }
 
+            WelderDiagnostics.Count(ref WelderDiagnostics.Activations);
             ActivateInternal(__instance, targets);
             return false;
         
@@ -114,6 +115,41 @@ namespace Optimizer.Optimizations
         private static readonly HashSet<MySlimBlock> TargetsToWeld = new HashSet<MySlimBlock>();
         private static readonly List<MyWelder.ProjectionRaycastData> ProjectedBlocks = new List<MyWelder.ProjectionRaycastData>();
         private static readonly Dictionary<MyDefinitionId, int> ComponentsToPull = new Dictionary<MyDefinitionId, int>();
+        /// <summary>
+        /// The cells of a projection one welder can reach, and where it stopped testing them.
+        ///
+        /// Which cells are in reach only changes when the ship moves or the blueprint does, and
+        /// working it out means walking every cell of the projection: on a large blueprint, with a
+        /// wall of welders asking four times a second each, that is hundreds of thousands of
+        /// distance checks a second for an answer that did not change. So it is kept until the tool
+        /// has moved <see cref="ReachMovedM"/>, the projection has gained or lost a block, or
+        /// <see cref="ReachFrames"/> have passed.
+        /// </summary>
+        private sealed class Reach
+        {
+            public readonly List<Vector3I> Cells = new List<Vector3I>();
+            public readonly ProjectionFrontierCursor Cursor = new ProjectionFrontierCursor();
+            public Vector3D Center;
+            public double Radius;
+            public int PreviewBlocks;
+            public long Frame = long.MinValue;
+            public long Projector;
+        }
+
+        private const double ReachMovedM = 0.5;
+        private const long ReachFrames = 60;
+
+        private static readonly Dictionary<long, Reach> Reaches = new Dictionary<long, Reach>();
+
+        private static Reach ReachOf(long welderId)
+        {
+            Reach reach;
+            if (Reaches.TryGetValue(welderId, out reach)) return reach;
+            if (Reaches.Count > 512) Reaches.Clear();   // tools come and go; this is only a cache
+            reach = new Reach();
+            Reaches[welderId] = reach;
+            return reach;
+        }
 
         public static void ActivateInternal(MyShipWelder welder, HashSet<MySlimBlock> targets)
         {
@@ -161,14 +197,17 @@ namespace Optimizer.Optimizations
             foreach (KeyValuePair<string, int> keyValuePair in m_missingComponents)
             {
                 MyDefinitionId myDefinitionId = new MyDefinitionId(typeof(MyObjectBuilder_Component), keyValuePair.Key);
-                if (Math.Max(
-                        keyValuePair.Value - (int) inventory.GetItemAmount(myDefinitionId, MyItemFlags.None, false),
-                        0) !=
-                    0 && welder.UseConveyorSystem)
-                {
-                    welder.CubeGrid.GridSystems.ConveyorSystem.PullItem(myDefinitionId,
-                        new MyFixedPoint?(keyValuePair.Value), welder, inventory, false, false);
-                }
+                var held = (int) inventory.GetItemAmount(myDefinitionId, MyItemFlags.None, false);
+                if (Math.Max(keyValuePair.Value - held, 0) == 0 || !welder.UseConveyorSystem) continue;
+
+                // Queued pulls are worked off by the conveyor system later, which is fine while the
+                // tool still holds some of the component - it welds from what it has and the top-up
+                // catches up. Holding none of it is different: the tool welds nothing, so nothing
+                // on the ship moves, and a queue that never gets worked off leaves it starved with
+                // a full container behind it. That one is fetched now.
+                var immediately = held == 0;
+                welder.CubeGrid.GridSystems.ConveyorSystem.PullItem(myDefinitionId,
+                    new MyFixedPoint?(keyValuePair.Value), welder, inventory, false, immediately);
             }
 
             m_missingComponents.Clear();
@@ -177,6 +216,7 @@ namespace Optimizer.Optimizations
             // must run on the game thread; it already does here. Queuing it on a worker only
             // created data races, so the inline path is the only path.
             var welded = Weld(welder, targets, inventory, num);
+            if (welded) WelderDiagnostics.Count(ref WelderDiagnostics.Welded);
 
             WeldProjectionsWithWelding(welder, welded);
         }
@@ -260,8 +300,12 @@ namespace Optimizer.Optimizations
             if (!ProjectionBudget.CanConsume(MySession.Static.GameplayFrameCounter,
                     SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.ProjectionBuildsPerFrame,
                     welder.EntityId))
+            {
+                WelderDiagnostics.Count(ref WelderDiagnostics.NoPermit);
                 return;
+            }
 
+            WelderDiagnostics.Count(ref WelderDiagnostics.Scans);
             try
             {
                 var array = FindProjectedBlocks(welder);
@@ -280,10 +324,16 @@ namespace Optimizer.Optimizations
             MyInventory inventory = welder.GetInventory(0);
             if (welder.UseConveyorSystem && !MySession.Static.CreativeMode)
             {
-                // Conveyor PullItem is a bulk staging operation; pulling one item immediately
-                // before ContainItems does not reliably make a new component type available.
-                // Aggregate only the current buildable frontier. The expensive grid mutation is
-                // still governed independently by the global per-frame Build budget below.
+                // A projector materializes a block out of the first component in its list, and the
+                // welder has to be holding one. The queued form of PullItem - the one vanilla uses
+                // here - is a request the conveyor system works off later, and on a tool that holds
+                // none of that component there is no later: nothing is built, so nothing else ever
+                // moves, and the ship sits over the block with a full container behind it. Measured
+                // on the mixed slab: a queued pull delivered 0, an immediate one delivered at once.
+                //
+                // So the cheap queued pull tops the tool up as before, and a component the tool does
+                // not have at all is fetched immediately. That path costs a synchronous conveyor
+                // lookup, and it only runs for a component the welder is completely out of.
                 var componentsToPull = ComponentsToPull;
                 componentsToPull.Clear();
                 foreach (var candidate in array)
@@ -293,8 +343,14 @@ namespace Optimizer.Optimizations
                     componentsToPull.Sum(candidateComponents[0].Definition.Id, 1);
                 }
                 foreach (var component in componentsToPull)
+                {
+                    var immediately = !inventory.ContainItems(new MyFixedPoint?(1), component.Key, MyItemFlags.None);
+                    WelderDiagnostics.Count(ref (immediately
+                        ? ref WelderDiagnostics.PullsImmediate
+                        : ref WelderDiagnostics.PullsQueued));
                     welder.CubeGrid.GridSystems.ConveyorSystem.PullItem(component.Key,
-                        new MyFixedPoint?(Math.Min(component.Value, 8)), welder, inventory, false, false);
+                        new MyFixedPoint?(Math.Min(component.Value, 8)), welder, inventory, false, immediately);
+                }
             }
 
             foreach (MyWelder.ProjectionRaycastData projectionRaycastData in array)
@@ -304,20 +360,31 @@ namespace Optimizer.Optimizations
                     continue;
 
                 var componentId = components[0].Definition.Id;
+                WelderDiagnostics.Count(ref WelderDiagnostics.Candidates);
                 if (!welder.IsWithinWorldLimits(projectionRaycastData.cubeProjector,
                         projectionRaycastData.hitCube.BlockDefinition.BlockPairName,
                         projectionRaycastData.hitCube.BlockDefinition.PCU))
+                {
+                    WelderDiagnostics.Count(ref WelderDiagnostics.OverLimits);
                     continue;
+                }
+
                 if (!MySession.Static.CreativeMode &&
                     !inventory.ContainItems(new MyFixedPoint?(1), componentId, MyItemFlags.None))
+                {
+                    WelderDiagnostics.Count(ref WelderDiagnostics.NoComponents);
                     continue;
+                }
 
                 // This is deliberately global, not per welder: multiple tools are updated in
                 // one simulation frame and their synchronous Build costs otherwise stack.
                 if (!ProjectionBudget.TryConsume(MySession.Static.GameplayFrameCounter,
                         SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.ProjectionBuildsPerFrame,
                         welder.EntityId))
+                {
+                    WelderDiagnostics.Count(ref WelderDiagnostics.BudgetSpent);
                     break;
+                }
 
                 // game thread already: build the projection inline
                 MyWelder.ProjectionRaycastData invokedBlock = projectionRaycastData;
@@ -330,6 +397,7 @@ namespace Optimizer.Optimizations
                     invokedBlock.cubeProjector.Build(invokedBlock.hitCube, welder.OwnerId,
                         welder.EntityId,
                         builtBy: welder.BuiltBy);
+                    WelderDiagnostics.Count(ref WelderDiagnostics.Builds);
                     QueueProjectedNeighbors(invokedBlock.cubeProjector, invokedBlock.hitCube.Position);
                 }
                 catch (Exception e)
@@ -414,13 +482,46 @@ namespace Optimizer.Optimizations
                         }
                     }
 
-                    if (list.Count == 0)
-                    foreach (var index in state.Cursor.Take(state.Positions.Count, checks))
+                    if (list.Count != 0) continue;
+
+                    // Only the cells this welder could actually build are worth a CanBuild call -
+                    // the expensive part - and the cursor has to walk those, not the whole
+                    // projection. Sharing one cursor over every cell of the blueprint left a welder
+                    // spending its whole allowance on cells metres outside its own sensor: on the
+                    // mixed slab the tools saw two candidates between twenty-two of them where
+                    // vanilla saw fifty-four, and the ship sat over buildable blocks doing nothing.
+                    var reach = ReachOf(welder.EntityId);
+                    if (reach.Projector != projector.EntityId ||
+                        reach.PreviewBlocks != state.Positions.Count ||
+                        reach.Radius != boundingSphereD.Radius ||
+                        frame - reach.Frame > ReachFrames ||
+                        Vector3D.DistanceSquared(reach.Center, boundingSphereD.Center) > ReachMovedM * ReachMovedM)
                     {
-                        var position = state.Positions[index];
-                        if (Vector3D.DistanceSquared(myCubeGrid.GridIntegerToWorld(position), boundingSphereD.Center) >
-                            boundingSphereD.Radius * boundingSphereD.Radius) continue;
-                        var block = myCubeGrid.GetCubeBlock(position);
+                        reach.Cells.Clear();
+                        for (var i = 0; i < state.Positions.Count; i++)
+                        {
+                            var position = state.Positions[i];
+                            if (Vector3D.DistanceSquared(myCubeGrid.GridIntegerToWorld(position),
+                                    boundingSphereD.Center) >
+                                boundingSphereD.Radius * boundingSphereD.Radius) continue;
+                            reach.Cells.Add(position);
+                        }
+
+                        reach.Center = boundingSphereD.Center;
+                        reach.Radius = boundingSphereD.Radius;
+                        reach.PreviewBlocks = state.Positions.Count;
+                        reach.Projector = projector.EntityId;
+                        reach.Frame = frame;
+                    }
+
+                    if (reach.Cells.Count == 0) continue;
+
+                    // Each welder keeps its own place in that list, so tools sitting side by side
+                    // do not all test the same few cells.
+                    var start = reach.Cursor.Take(reach.Cells.Count, Math.Min(checks, reach.Cells.Count));
+                    foreach (var index in start)
+                    {
+                        var block = myCubeGrid.GetCubeBlock(reach.Cells[index]);
                         if (block != null && projector.CanBuild(block, true) == BuildCheckResult.OK)
                         {
                             list.Add(new MyWelder.ProjectionRaycastData(BuildCheckResult.OK, block, projector));
