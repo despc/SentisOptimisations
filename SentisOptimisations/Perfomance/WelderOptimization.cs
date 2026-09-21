@@ -9,6 +9,7 @@ using Sandbox.Game;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Blocks;
 using Sandbox.Game.Entities.Cube;
+using Sandbox.Game.SessionComponents;
 using Sandbox.Game.Weapons;
 using Sandbox.Game.World;
 using Sandbox.ModAPI;
@@ -55,18 +56,24 @@ namespace Optimizer.Optimizations
             public void Reset(MyCubeGrid preview)
             {
                 Preview = preview;
+                Ready.Clear();
+                Queued.Clear();
+                Compact();
+            }
+
+            /// <summary>The cells still to build, without the ones built since; the queue stays.</summary>
+            public void Compact()
+            {
                 Positions.Clear();
                 Extents.Clear();
-                if (preview != null)
-                    foreach (var block in preview.CubeBlocks)
+                if (Preview != null)
+                    foreach (var block in Preview.CubeBlocks)
                     {
                         Positions.Add(block.Position);
-                        Extents.Add(HalfDiagonal(block, preview.GridSize));
+                        Extents.Add(HalfDiagonal(block, Preview.GridSize));
                     }
 
                 Cursor.Reset();
-                Ready.Clear();
-                Queued.Clear();
             }
 
             private static float HalfDiagonal(MySlimBlock block, float gridSize)
@@ -135,6 +142,7 @@ namespace Optimizer.Optimizations
         private static readonly Dictionary<string, int> MissingComponents = new Dictionary<string, int>();
         private static readonly HashSet<MySlimBlock> TargetsToWeld = new HashSet<MySlimBlock>();
         private static readonly List<MyWelder.ProjectionRaycastData> ProjectedBlocks = new List<MyWelder.ProjectionRaycastData>();
+        private static readonly List<MyEntity> GridsInSphere = new List<MyEntity>();
         private static readonly Dictionary<MyDefinitionId, int> ComponentsToPull = new Dictionary<MyDefinitionId, int>();
         /// <summary>
         /// The cells of a projection one welder can reach, and where it stopped testing them.
@@ -317,15 +325,64 @@ namespace Optimizer.Optimizations
             }
 
             // Do not run the expensive projector/CanBuild scan when another welder has already
-            // spent the global materialization budget for this simulation frame.
+            // spent the global materialization budget for this simulation frame - but do not drop
+            // the turn either. Welders of one ship activate in the same frame, a quarter of a
+            // second apart, so with one build a frame the second and the third tool of a ship lost
+            // every turn they had: three welders built as fast as one. They wait for the next
+            // frame with room instead (see RunDeferred), which keeps the frame's cost where the
+            // cap puts it and the ship's speed where its welders put it.
             if (!ProjectionBudget.CanConsume(MySession.Static.GameplayFrameCounter,
                     SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.ProjectionBuildsPerFrame,
                     welder.EntityId))
             {
                 WelderDiagnostics.Count(ref WelderDiagnostics.NoPermit);
+                if (DeferredIds.Add(welder.EntityId)) Deferred.Enqueue(welder);
                 return;
             }
 
+            ScanAndBuild(welder);
+        }
+
+        private static readonly Queue<MyShipWelder> Deferred = new Queue<MyShipWelder>();
+        private static readonly HashSet<long> DeferredIds = new HashSet<long>();
+
+        /// <summary>
+        /// Once a frame, from the plugin's update: the welders that were turned away by the frame
+        /// budget get their scan now, while this frame still has room. No more scans than the
+        /// budget has builds, so a queue of tools that find nothing cannot turn into a long frame.
+        /// </summary>
+        public static void RunDeferred()
+        {
+            if (Deferred.Count == 0) return;
+            try
+            {
+                var config = SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config;
+                var frame = MySession.Static.GameplayFrameCounter;
+                var limit = Math.Max(1, config.ProjectionBuildsPerFrame);
+                var scans = 0;
+                while (Deferred.Count > 0 && scans < limit)
+                {
+                    var welder = Deferred.Peek();
+                    if (!ProjectionBudget.CanConsume(frame, limit, welder.EntityId)) break;
+                    Deferred.Dequeue();
+                    DeferredIds.Remove(welder.EntityId);
+                    if (!config.WelderTweaksEnabled || welder.MarkedForClose || welder.Closed || !welder.IsWorking)
+                        continue;
+                    scans++;
+                    WelderDiagnostics.Count(ref WelderDiagnostics.DeferredScans);
+                    ScanAndBuild(welder);
+                }
+            }
+            catch (Exception e)
+            {
+                Deferred.Clear();
+                DeferredIds.Clear();
+                SentisOptimisationsPlugin.SentisOptimisationsPlugin.Log.Error(e);
+            }
+        }
+
+        private static void ScanAndBuild(MyShipWelder welder)
+        {
             WelderDiagnostics.Count(ref WelderDiagnostics.Scans);
             try
             {
@@ -419,7 +476,7 @@ namespace Optimizer.Optimizations
                         welder.EntityId,
                         builtBy: welder.BuiltBy);
                     WelderDiagnostics.Count(ref WelderDiagnostics.Builds);
-                    QueueProjectedNeighbors(invokedBlock.cubeProjector, invokedBlock.hitCube.Position);
+                    QueueProjectedNeighbors(invokedBlock.cubeProjector, invokedBlock.hitCube);
                 }
                 catch (Exception e)
                 {
@@ -428,16 +485,54 @@ namespace Optimizer.Optimizations
             }
         }
 
-        private static void QueueProjectedNeighbors(MyProjectorBase projector, Vector3I builtPosition)
+        /// <summary>
+        /// A block that was just built is what the blocks against it can now be built from, so
+        /// they go to the front of the search. That means every block touching any of its faces,
+        /// not only the six cells around its centre: a thruster or a turret is several cells
+        /// across, and on a real ship most of what grows out of it touches it somewhere else.
+        /// </summary>
+        private static void QueueProjectedNeighbors(MyProjectorBase projector, MySlimBlock built)
         {
-            if (projector == null || projector.ProjectedGrid == null) return;
+            var preview = projector?.ProjectedGrid;
+            if (preview == null || built == null) return;
             ProjectionFrontierState state;
             if (!ProjectionFrontiers.TryGetValue(projector.EntityId, out state)) return;
+            var min = built.Min;
+            var max = built.Max;
             foreach (var direction in NeighborDirections)
             {
-                var position = builtPosition + direction;
-                if (projector.ProjectedGrid.GetCubeBlock(position) != null) state.Enqueue(position);
+                // the layer of cells just outside this face
+                var from = min;
+                var to = max;
+                if (direction.X > 0) from.X = to.X = max.X + 1;
+                else if (direction.X < 0) from.X = to.X = min.X - 1;
+                else if (direction.Y > 0) from.Y = to.Y = max.Y + 1;
+                else if (direction.Y < 0) from.Y = to.Y = min.Y - 1;
+                else if (direction.Z > 0) from.Z = to.Z = max.Z + 1;
+                else from.Z = to.Z = min.Z - 1;
+                for (var x = from.X; x <= to.X; x++)
+                for (var y = from.Y; y <= to.Y; y++)
+                for (var z = from.Z; z <= to.Z; z++)
+                {
+                    var neighbour = preview.GetCubeBlock(new Vector3I(x, y, z));
+                    if (neighbour != null) state.Enqueue(neighbour.Position);
+                }
             }
+        }
+
+        /// <summary>
+        /// Whether the projector will really build this block for this welder. A block from a DLC
+        /// the welder's owner does not have passes CanBuild, and the projector then quietly builds
+        /// nothing - and tells whoever flies the ship about the missing DLC, every time. A welder
+        /// handed one of those spent its turn and the frame's build on it for ever: on a real ship
+        /// with a few DLC lights and panels the last blocks never came, and nothing else did either.
+        /// </summary>
+        private static bool OwnerHasDlc(MySlimBlock block, ulong ownerSteamId)
+        {
+            var dlc = MySession.Static.GetComponent<MySessionComponentDLC>();
+            if (dlc == null || dlc.GetFirstMissingDefinitionDLC(block.BlockDefinition, ownerSteamId) == null) return true;
+            WelderDiagnostics.Count(ref WelderDiagnostics.NoDlc);
+            return false;
         }
 
         private static ProjectionFrontierState FrontierState(MyProjectorBase projector, MyCubeGrid preview,
@@ -449,8 +544,16 @@ namespace Optimizer.Optimizations
                 state = new ProjectionFrontierState();
                 ProjectionFrontiers[projector.EntityId] = state;
             }
-            if (state.Preview != preview || state.Positions.Count != preview.BlocksCount)
+            // A build takes one block out of the preview, and that must not throw away what the
+            // search has learnt: it used to, on every build, and the queue of blocks next to fresh
+            // ones was emptied before anyone got to it - on a real ship the welders were left
+            // sweeping the whole blueprint blind. Built cells just drop out as they are met; the
+            // lists are only compacted once a good share of them is gone. A preview that grew is a
+            // different blueprint, and starts over.
+            if (state.Preview != preview || preview.BlocksCount > state.Positions.Count)
                 state.Reset(preview);
+            else if (preview.BlocksCount < state.Positions.Count * 9 / 10)
+                state.Compact();
             state.LastSeenFrame = frame;
 
             if (ProjectionFrontiers.Count > 32)
@@ -473,10 +576,20 @@ namespace Optimizer.Optimizations
                 ShipToolPatch.GetWelderRadius(welder));
             var list = ProjectedBlocks;
             list.Clear();
-            List<MyEntity> entitiesInSphere = MyEntities.GetEntitiesInSphere(ref boundingSphereD);
+            // Only grids can carry a projection, and top-level ones at that: the full query also
+            // collected every functional block of every grid in the sphere, which for a big radius
+            // over a big ship was thousands of entities for nothing. The game's list is shared, so
+            // it is copied out before anything else can run a query into it.
+            var found = MyEntities.GetTopMostEntitiesInSphere(ref boundingSphereD);
+            var entitiesInSphere = GridsInSphere;
+            entitiesInSphere.Clear();
+            foreach (var entity in found)
+                if (entity is MyCubeGrid) entitiesInSphere.Add(entity);
+            found.Clear();
             var frame = MySession.Static.GameplayFrameCounter;
             var checks = Math.Max(1, SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config
                 .ProjectionChecksPerActivation);
+            var ownerSteamId = MySession.Static.Players.TryGetSteamId(welder.OwnerId);
 
             foreach (MyEntity myEntity in entitiesInSphere)
             {
@@ -488,17 +601,31 @@ namespace Optimizer.Optimizations
 
                     // Validate a few high-value frontier cells first. Stale entries are cheap and
                     // bounded; successful builds enqueue only their six grid neighbours.
-                    var readyChecks = Math.Min(4, state.Ready.Count);
-                    while (readyChecks-- > 0 && list.Count == 0)
+                    // Only CanBuild calls count against the allowance: an entry whose block has been
+                    // built since costs one lookup and is simply dropped. A block out of this tool's
+                    // reach goes back for the others, and a block that passes stays queued until it
+                    // is really built - this frame's build may go to another tool, or the component
+                    // may still be on its way, and a candidate lost from the queue is left to the
+                    // blind sweep below, which on a big blueprint takes a long time to come back.
+                    var readyChecks = 4;
+                    var readyLeft = state.Ready.Count;
+                    while (readyChecks > 0 && readyLeft-- > 0 && list.Count == 0)
                     {
                         var position = state.Ready.Dequeue();
                         state.Queued.Remove(position);
                         var block = myCubeGrid.GetCubeBlock(position);
-                        if (block != null &&
-                            block.WorldAABB.Intersects(boundingSphereD) &&
-                            projector.CanBuild(block, true) == BuildCheckResult.OK)
+                        if (block == null) continue;
+                        if (!block.WorldAABB.Intersects(boundingSphereD))
+                        {
+                            state.Enqueue(position);
+                            continue;
+                        }
+
+                        readyChecks--;
+                        if (projector.CanBuild(block, true) == BuildCheckResult.OK && OwnerHasDlc(block, ownerSteamId))
                         {
                             list.Add(new MyWelder.ProjectionRaycastData(BuildCheckResult.OK, block, projector));
+                            state.Enqueue(position);
                         }
                     }
 
@@ -545,7 +672,8 @@ namespace Optimizer.Optimizations
                     foreach (var index in start)
                     {
                         var block = myCubeGrid.GetCubeBlock(reach.Cells[index]);
-                        if (block != null && projector.CanBuild(block, true) == BuildCheckResult.OK)
+                        if (block != null && projector.CanBuild(block, true) == BuildCheckResult.OK &&
+                            OwnerHasDlc(block, ownerSteamId))
                         {
                             list.Add(new MyWelder.ProjectionRaycastData(BuildCheckResult.OK, block, projector));
                             break;
