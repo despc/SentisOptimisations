@@ -243,6 +243,7 @@ namespace SentisOptimisationsPlugin
         public override void Update()
         {
             Optimizer.Optimizations.GrinderPatches.Flush();
+            Optimizer.Optimizations.WelderOptimization.RunDeferred();
             Freezer.FrozenProduction.Tick();
             if (MySandboxGame.Static.SimulationFrameCounter % 600 == 0)
             {
