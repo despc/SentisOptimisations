@@ -9,7 +9,6 @@ namespace SentisOptimisationsPlugin
 
         //optimisations
         private bool _gasTankOptimisation = true;
-        private bool _gridSystemOptimisations = true;
         private bool _safeZoneSubGridOptimisation = true;
         private int _safeZonePhysicsThreshold = 10; // детект сварки динамики в сз, автоперевод в статику если грид обрабатывается больше N мс
         
@@ -127,13 +126,6 @@ namespace SentisOptimisationsPlugin
             get => _gasTankOptimisation;
             set => SetValue(ref _gasTankOptimisation, value);
         }
-        
-        [DisplayTab(Name = "Grid System Optimisations", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Grid System Optimisations")]
-        public bool GridSystemOptimisations
-        {
-            get => _gridSystemOptimisations;
-            set => SetValue(ref _gridSystemOptimisations, value);
-        } 
         
          //=================================================================================================
 

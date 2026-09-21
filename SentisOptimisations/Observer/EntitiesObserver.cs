@@ -41,7 +41,6 @@ namespace SentisGameplayImprovements.AllGridsActions
 
             GasTankOptimisations.CleanupEntity(entity);
             PBFix.CleanupEntity(entity);
-            GridSystemUpdatePatch.CleanupEntity(entity);
             SafezonePatch.CleanupEntity(entity);
 
             if (entity is MyPlanet)
