@@ -38,6 +38,15 @@ namespace Optimizer.Optimizations
         {
             public MyCubeGrid Preview;
             public readonly List<Vector3I> Positions = new List<Vector3I>();
+
+            /// <summary>
+            /// Half the diagonal of each block, in metres. A welder reaches a block when its sensor
+            /// touches the block, not when it touches the block's centre: a jump drive or a safe
+            /// zone is three cells across, and measuring to the middle puts it out of reach while
+            /// the tool is sitting right against its face.
+            /// </summary>
+            public readonly List<float> Extents = new List<float>();
+
             public readonly ProjectionFrontierCursor Cursor = new ProjectionFrontierCursor();
             public readonly Queue<Vector3I> Ready = new Queue<Vector3I>();
             public readonly HashSet<Vector3I> Queued = new HashSet<Vector3I>();
@@ -47,11 +56,23 @@ namespace Optimizer.Optimizations
             {
                 Preview = preview;
                 Positions.Clear();
+                Extents.Clear();
                 if (preview != null)
-                    foreach (var block in preview.CubeBlocks) Positions.Add(block.Position);
+                    foreach (var block in preview.CubeBlocks)
+                    {
+                        Positions.Add(block.Position);
+                        Extents.Add(HalfDiagonal(block, preview.GridSize));
+                    }
+
                 Cursor.Reset();
                 Ready.Clear();
                 Queued.Clear();
+            }
+
+            private static float HalfDiagonal(MySlimBlock block, float gridSize)
+            {
+                var cells = block.Max - block.Min + Vector3I.One;
+                return 0.5f * gridSize * new Vector3(cells.X, cells.Y, cells.Z).Length();
             }
 
             public void Enqueue(Vector3I position)
@@ -474,8 +495,7 @@ namespace Optimizer.Optimizations
                         state.Queued.Remove(position);
                         var block = myCubeGrid.GetCubeBlock(position);
                         if (block != null &&
-                            Vector3D.DistanceSquared(myCubeGrid.GridIntegerToWorld(position), boundingSphereD.Center) <=
-                            boundingSphereD.Radius * boundingSphereD.Radius &&
+                            block.WorldAABB.Intersects(boundingSphereD) &&
                             projector.CanBuild(block, true) == BuildCheckResult.OK)
                         {
                             list.Add(new MyWelder.ProjectionRaycastData(BuildCheckResult.OK, block, projector));
@@ -501,9 +521,12 @@ namespace Optimizer.Optimizations
                         for (var i = 0; i < state.Positions.Count; i++)
                         {
                             var position = state.Positions[i];
+                            // The sensor has to touch the block, not its centre: a three-cell block
+                            // whose face is right against the tool would otherwise never be found.
+                            var extent = i < state.Extents.Count ? state.Extents[i] : 0f;
+                            var reachable = boundingSphereD.Radius + extent;
                             if (Vector3D.DistanceSquared(myCubeGrid.GridIntegerToWorld(position),
-                                    boundingSphereD.Center) >
-                                boundingSphereD.Radius * boundingSphereD.Radius) continue;
+                                    boundingSphereD.Center) > reachable * reachable) continue;
                             reach.Cells.Add(position);
                         }
 
