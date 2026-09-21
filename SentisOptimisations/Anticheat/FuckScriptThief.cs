@@ -94,18 +94,13 @@ namespace SentisOptimisationsPlugin
                 }
                 catch (Exception ex)
                 {
-                    XmlSerializer serializer = MyXmlSerializerManager.GetSerializer(builder.GetType());
-                    MyLog.Default.WriteLine("Grid data - START");
-                    try
-                    {
-                        serializer.Serialize(MyLog.Default.GetTextWriter(), (object) builder);
-                    }
-                    catch (Exception e)
-                    {
-                        Log.Error(e, "Serrialize grid failed");
-                    }
-
-                    MyLog.Default.WriteLine("Grid data - END");
+                    // The failure that matters is this one. It used to be hidden: the handler wrote
+                    // the builder to the game log as XML through a writer that is not made for two
+                    // threads, that write threw as well, and only the second exception was logged -
+                    // while the first was rethrown into a worker and lost. The stream then never
+                    // completed, and the grid sat "pending" on the client for ever.
+                    Log.Error(ex, "Streaming grid " + Grid.EntityId + " (" + Grid.DisplayName + ", " +
+                                  Grid.BlocksCount + " blocks) to " + forClient.Id.Value + " failed");
                     throw;
                 }
 
