@@ -112,14 +112,14 @@ namespace SentisOptimisations.Tests
         [Fact]
         public void Contract_hauling_reward_target_is_static_with_exact_param_names()
         {
-            // was: instance patch on a STATIC method + 'baseRew' vs 'baseReward' → KeyNotFound
+            // was: instance patch on a STATIC method + 'baseRew' vs 'baseReward' → KeyNotFound. The suffix now
+            // scales only the result, so it names no parameter of the target at all.
             var rows = RowsFor("GetHaulingMoneyReward").ToList();
             Assert.NotEmpty(rows);
             foreach (var r in rows)
             {
                 Assert.True(r.Original.IsStatic, "GetHaulingMoneyReward must be patched as static");
-                Assert.Contains("baseReward", r.Patch.GetParameters().Select(p => p.Name));
-                Assert.Contains("distance", r.Patch.GetParameters().Select(p => p.Name));
+                Assert.Equal(new[] { "__result" }, r.Patch.GetParameters().Select(p => p.Name));
             }
         }
 
