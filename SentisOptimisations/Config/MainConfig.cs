@@ -1,4 +1,4 @@
-﻿using SentisOptimisationsPlugin.Freezer;
+using SentisOptimisationsPlugin.Freezer;
 using SOPlugin.GUI;
 using Torch;
 
@@ -9,15 +9,13 @@ namespace SentisOptimisationsPlugin
 
         //optimisations
         private bool _gasTankOptimisation = true;
-        private bool _safeZoneSubGridOptimisation = true;
-        private int _safeZonePhysicsThreshold = 10; // детект сварки динамики в сз, автоперевод в статику если грид обрабатывается больше N мс
+        private bool _safeZoneGridTracking = true;
         
         //welders
         private bool _welderTweaksEnabled = true;
         private bool _welderCanWeldProjectionsIfWeldedOtherBlocks = false;
         private bool _welderSelfWelding = true;
         private int _projectionBuildsPerFrame = 1;
-        private int _projectionChecksPerActivation = 24;
 
         //physics profile антипалочная защита
         private bool _enablePhysicsGuard = true;
@@ -27,8 +25,6 @@ namespace SentisOptimisationsPlugin
         private int _physicsChecksBeforePunish = 5;
         private float _checkInsideVoxel = 0.2f;
 
-        //Slowdown
-        private bool _slowdownEnabled = true;
         
         //Freezer
         private bool _freezerEnabled = true;
@@ -47,7 +43,6 @@ namespace SentisOptimisationsPlugin
         //Other
         private bool _enableMainDebugLogs = false;
         private int _physicsThreads = Optimizer.Optimizations.HavokThreadPool.DefaultThreads;
-        private float _replicableAddMsPerFrame = 4f;
         
         //Scripts
         private bool _punishHeavyScripts = false;
@@ -56,26 +51,8 @@ namespace SentisOptimisationsPlugin
         private int _scriptOvertimeExecTimesBeforePunish = 3;
         
        
-        [DisplayTab(Name = "Slowdown Enabled", GroupName = "Slowdown", Tab = "Slowdown", Order = 0, Description = "Slowdown Enabled")]
-        public bool SlowdownEnabled
-        {
-            get => _slowdownEnabled;
-            set => SetValue(ref _slowdownEnabled, value);
-        }
         
-        [DisplayTab(Name = "Safe zone subgrid optimisation", GroupName = "Safe zone", Tab = "Safe zone", Order = 0, Description = "Safe zone subgrid optimisation")]
-        public bool SafeZoneSubGridOptimisation
-        {
-            get => _safeZoneSubGridOptimisation;
-            set => SetValue(ref _safeZoneSubGridOptimisation, value);
-        }
         
-        [DisplayTab(Name = "Safe zone Physics Threshold", GroupName = "Safe zone", Tab = "Safe zone", Order = 0, Description = "Safe zone Physics Threshold")]
-        public int SafeZonePhysicsThreshold
-        {
-            get => _safeZonePhysicsThreshold;
-            set => SetValue(ref _safeZonePhysicsThreshold, value);
-        }
         
         [DisplayTab(Name = "Physics ms to alert", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Physics ms to alert")]
         public float PhysicsMsToAlert
@@ -112,19 +89,18 @@ namespace SentisOptimisationsPlugin
             set => SetValue(ref _enablePhysicsGuard, value);
         }
         
-        [DisplayTab(Name = "Replicable add ms per frame", GroupName = "Performance", Tab = "Performance", Order = 0,
-            Description = "How long one frame may spend handing entities to joining clients. The rest waits for the next frame, so a join spreads over a few frames instead of stopping the server. 0 turns the budget off")]
-        public float ReplicableAddMsPerFrame
-        {
-            get => _replicableAddMsPerFrame;
-            set => SetValue(ref _replicableAddMsPerFrame, value);
-        }
-
         [DisplayTab(Name = "Gas Tank Optimisation", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Gas Tank Optimisation")]
         public bool GasTankOptimisation
         {
             get => _gasTankOptimisation;
             set => SetValue(ref _gasTankOptimisation, value);
+        }
+
+        [DisplayTab(Name = "Safe zone grid tracking", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Safe zones find dynamic grids by geometry instead of their physics phantom (welding inside a zone stops costing physics time). Applies to zones created or rebuilt after the change, all zones after a restart")]
+        public bool SafeZoneGridTracking
+        {
+            get => _safeZoneGridTracking;
+            set => SetValue(ref _safeZoneGridTracking, value);
         }
         
          //=================================================================================================
@@ -145,12 +121,6 @@ namespace SentisOptimisationsPlugin
             set => SetValue(ref _projectionBuildsPerFrame, value < 1 ? 1 : value);
         }
 
-        [DisplayTab(Name = "Projection checks per activation", GroupName = "Welder Tweaks", Tab = "Welder Optimizations", Order = 7, Description = "Maximum new projector CanBuild checks performed by one welder activation. Minimum 1; runtime adjustable.")]
-        public int ProjectionChecksPerActivation
-        {
-            get => _projectionChecksPerActivation;
-            set => SetValue(ref _projectionChecksPerActivation, value < 1 ? 1 : value);
-        }
         
         ///Freezer
         [DisplayTab(Name = "Enable Freezer", GroupName = "Freezer", Tab = "Freezer", Order = 0, Description = "Enable Freezer")]

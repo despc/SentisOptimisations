@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using NLog;
 using Sandbox.Game.Entities;
@@ -31,6 +31,7 @@ namespace SentisGameplayImprovements.AllGridsActions
                 // drops frozen-state + compensation stamps: a stale stamp under a recycled
                 // EntityId would hand the next block that gets this id a bogus delta
                 FreezeLogic.ForgetGrid((MyCubeGrid) entity);
+                Optimizer.Optimizations.SafeZoneGridTracking.OnGridRemoved((MyCubeGrid) entity);
                 return;
             }
 
@@ -41,7 +42,6 @@ namespace SentisGameplayImprovements.AllGridsActions
 
             GasTankOptimisations.CleanupEntity(entity);
             PBFix.CleanupEntity(entity);
-            SafezonePatch.CleanupEntity(entity);
 
             if (entity is MyPlanet)
             {

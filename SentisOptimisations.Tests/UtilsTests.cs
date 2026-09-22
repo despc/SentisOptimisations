@@ -149,60 +149,6 @@ namespace SentisOptimisations.Tests
         }
     }
 
-    public class PBFixNeedSkipTests
-    {
-        static readonly Type PbFixType = TestPaths.PluginAssembly.GetType("SentisOptimisationsPlugin.PBFix");
-        static readonly MethodInfo NeedSkip = PbFixType.GetMethod("NeedSkip",
-            BindingFlags.Static | BindingFlags.NonPublic);
-
-        static void ClearState(Random seeded)
-        {
-            ((System.Collections.IDictionary)PbFixType.GetField("Cooldowns",
-                BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public).GetValue(null)).Clear();
-            var rField = PbFixType.GetField("Random", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
-            rField.SetValue(null, seeded); // static readonly is writable via reflection on .NET Framework
-        }
-
-        static bool Call(long id, int cd) => (bool)NeedSkip.Invoke(null, new object[] { id, cd });
-
-        [Fact]
-        public void First_call_skips_and_seeds_a_value_within_cooldown()
-        {
-            ClearState(new Random(1234));
-            Assert.True(Call(1, 10));
-            var dict = (System.Collections.IDictionary)PbFixType.GetField("Cooldowns",
-                BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public).GetValue(null);
-            var seeded = (int)dict[1L];
-            Assert.InRange(seeded, 0, 9);
-        }
-
-        [Fact]
-        public void Skips_until_cooldown_exceeded_then_passes_and_resets()
-        {
-            ClearState(new Random(1));
-            const long id = 77;
-            const int cd = 5;
-            Assert.True(Call(id, cd));        // seeds, returns true
-            int through = 0, skipped = 0;
-            for (int i = 0; i < 20; i++)
-            {
-                if (Call(id, cd)) skipped++; else through++;
-            }
-            Assert.True(through >= 1, "must eventually let something through");
-            Assert.True(skipped > through, "must skip the majority of calls");
-        }
-
-        [Fact]
-        public void Different_blocks_have_independent_cooldowns()
-        {
-            ClearState(new Random(7));
-            Assert.True(Call(1, 3));
-            Assert.True(Call(2, 3));
-            var dict = (System.Collections.IDictionary)PbFixType.GetField("Cooldowns",
-                BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public).GetValue(null);
-            Assert.True(dict.Contains(1L) && dict.Contains(2L));
-        }
-    }
 }
 
 namespace SentisOptimisations.Tests

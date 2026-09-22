@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -41,7 +41,6 @@ namespace SentisOptimisationsPlugin
     public class SentisOptimisationsPlugin : TorchPluginBase, IWpfPlugin
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
-        public static Dictionary<long, long> gridsInSZ = new Dictionary<long, long>();
         private static TorchSessionManager SessionManager;
         private static Persistent<MainConfig> _config;
         public static MainConfig Config => _config.Data;
@@ -268,100 +267,7 @@ namespace SentisOptimisationsPlugin
             Freezer.CpuLoadPeak.Sample(MySandboxGame.Static.CPULoad);
             Optimizer.Optimizations.WelderOptimization.RunDeferred();
             Freezer.FrozenProduction.Tick();
-            if (MySandboxGame.Static.SimulationFrameCounter % 600 == 0)
-            {
-                DelayedProcessor.Instance.AddDelayedAction(DateTime.Now, DetectSZDDos);
-            }
-        }
-
-        private static void DetectSZDDos()
-        {
-            foreach (var keyValuePair in new Dictionary<long, GridInSzInfo>(SafezonePatch.EntitiesInSZ))
-            {
-                var entityId = keyValuePair.Key;
-                var cubeGrid = keyValuePair.Value.MyCubeGrid;
-                var displayName = "";
-                if (cubeGrid != null)
-                {
-                    displayName = cubeGrid.DisplayName;
-                }
-
-                var time = keyValuePair.Value.DDosTimeMs;
-                if (time > 5)
-                {
-                    Log.Error("Entity in sz " + entityId + "   " + displayName + " time - " + time);
-                    if (gridsInSZ.ContainsKey(entityId))
-                    {
-                        if (gridsInSZ[entityId] > 1)
-                        {
-                            try
-                            {
-                                if (!cubeGrid.IsStatic)
-                                {
-                                    MyAPIGateway.Utilities.InvokeOnGameThread(() =>
-                                    {
-                                        cubeGrid.Physics?.SetSpeeds(Vector3.Zero, Vector3.Zero);
-                                        cubeGrid.ConvertToStatic();
-                                        try
-                                        {
-                                            MyMultiplayer.RaiseEvent(cubeGrid,
-                                                x => x.ConvertToStatic, default);
-                                            DelayedProcessor.Instance.AddDelayedAction(
-                                                DateTime.Now.AddMilliseconds(MyRandom.Instance.Next(300, 2000)), () =>
-                                                {
-                                                    MyAPIGateway.Utilities.InvokeOnGameThread(() =>
-                                                    {
-                                                        try
-                                                        {
-                                                            FixShipLogic.FixGroupByGrid(cubeGrid);
-                                                        }
-                                                        catch
-                                                        {
-                                                        }
-                                                    });
-                                                });
-                                        }
-                                        catch (Exception ex)
-                                        {
-                                            Log.Error(ex, "()Exception in RaiseEvent.");
-                                        }
-                                    });
-
-                                    if (cubeGrid.BigOwners.Count > 0)
-                                    {
-                                        ChatUtils.SendTo(cubeGrid.BigOwners[0],
-                                            "Структура " + displayName + " конвертирована в статику в связи с дудосом");
-                                        MyVisualScriptLogicProvider.ShowNotification(
-                                            "Структура " + displayName + " конвертирована в статику в связи с дудосом",
-                                            10000,
-                                            "Red",
-                                            cubeGrid.BigOwners[0]);
-                                    }
-
-                                    Log.Error("Grid " + displayName + " Converted To Static");
-                                    gridsInSZ[entityId] = 0;
-                                    continue;
-                                }
-                            }
-                            catch (Exception e)
-                            {
-                                Log.Error(e);
-                            }
-
-                            gridsInSZ[entityId] = 0;
-                            continue;
-                        }
-
-                        gridsInSZ[entityId] += 1;
-                    }
-                    else
-                    {
-                        gridsInSZ[entityId] = 1;
-                    }
-                }
-            }
-
-            SafezonePatch.EntitiesInSZ.Clear();
+            Optimizer.Optimizations.SafeZoneGridTracking.Tick();
         }
 
         public UserControl GetControl()

@@ -33,10 +33,6 @@ namespace SentisOptimisationsPlugin
     /// which walks the blocks of the whole logical group. The ownership recalculation of a grid is
     /// patched to mark that grid instead, and the refresh runs on the next script run of a marked grid.
     ///
-    /// <b>Scripts of grids nobody is near run rarely.</b> With <c>SlowdownEnabled</c>, a block on a
-    /// grid in the second player-presence tier runs once in <see cref="Tier2Period"/> invocations,
-    /// blocks spread over those invocations by a random start.
-    ///
     /// <b>The load of each block is measured</b> - see <see cref="PbLoad"/> for what is measured and
     /// why - and a block that is over its budget in most of its recent runs is switched off and
     /// damaged below its critical integrity, as before.
@@ -50,13 +46,7 @@ namespace SentisOptimisationsPlugin
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
-        /// <summary>One run in this many is let through for a grid of the second presence tier.</summary>
-        private const int Tier2Period = 300;
-
-        /// <summary>Scripts are left alone until the world has settled after load.</summary>
-        private const ulong FramesBeforeSlowdown = 6000;
-
-        /// <summary>And punished only well after that, so a loading world cannot condemn a script.</summary>
+        /// <summary>Scripts are punished only well after the world loaded, so a loading world cannot condemn a script.</summary>
         private const ulong FramesBeforePunish = 10800;
 
         /// <summary>How often the owner of a script over its budget is told about it.</summary>
@@ -66,8 +56,6 @@ namespace SentisOptimisationsPlugin
         public static ConcurrentDictionary<long, byte> needUpdateGridBlocksOwnership =
             new ConcurrentDictionary<long, byte>();
 
-        private static readonly ConcurrentDictionary<long, int> Cooldowns = new ConcurrentDictionary<long, int>();
-        private static readonly Random Random = new Random();
 
         // ------------------------------------------------------------------ vanilla bindings
 
@@ -138,7 +126,6 @@ namespace SentisOptimisationsPlugin
         {
             if (!(entity is MyProgrammableBlock pb)) return;
             PbLoad.Forget(pb);
-            Cooldowns.TryRemove(pb.EntityId, out _);
         }
 
         /// <summary>
@@ -178,8 +165,7 @@ namespace SentisOptimisationsPlugin
 
         /// <summary>
         /// Replaces <c>MyProgrammableBlock.RunSandboxedProgramAction</c>: the same sequence as vanilla,
-        /// with the ownership refresh made conditional, the run skipped for a sleeping grid and the
-        /// time of the run measured.
+        /// with the ownership refresh made conditional and the time of the run measured.
         /// </summary>
         private static bool RunSandboxedProgramActionPatched(MyProgrammableBlock __instance,
             ref MyProgrammableBlock.ScriptTerminationReason __result, Action<IMyGridProgram> action,
@@ -187,14 +173,6 @@ namespace SentisOptimisationsPlugin
         {
             try
             {
-                if (SentisOptimisationsPlugin.Config.SlowdownEnabled &&
-                    MySandboxGame.Static.SimulationFrameCounter > FramesBeforeSlowdown &&
-                    __instance.CubeGrid.PlayerPresenceTier == MyUpdateTiersPlayerPresence.Tier2 &&
-                    NeedSkip(__instance.EntityId, Tier2Period))
-                {
-                    return false;
-                }
-
                 if (MySandboxGame.Static.UpdateThread != Thread.CurrentThread &&
                     MyVRage.Platform.Scripting.ReportIncorrectBehaviour(MyCommonTexts.ModRuleViolation_PBParallelInvocation))
                 {
@@ -371,28 +349,6 @@ namespace SentisOptimisationsPlugin
             var message = $"Script execution time exceeded PB - ({pb.CustomName}) on - ({pb.CubeGrid.DisplayName}) block disabled";
             ChatUtils.SendTo(ownerId, message);
             MyVisualScriptLogicProvider.ShowNotification(message, 5000, "Red", ownerId);
-        }
-
-        /// <summary>
-        /// True while the block is inside its cooldown. The first cooldown of a block starts at a
-        /// random point, so the blocks of a world do not all run on the same invocation.
-        /// </summary>
-        private static bool NeedSkip(long blockId, int period)
-        {
-            if (!Cooldowns.TryGetValue(blockId, out var cooldown))
-            {
-                Cooldowns[blockId] = Random.Next(0, period);
-                return true;
-            }
-
-            if (cooldown > period)
-            {
-                Cooldowns[blockId] = 0;
-                return false;
-            }
-
-            Cooldowns[blockId] = cooldown + 1;
-            return true;
         }
 
         // ------------------------------------------------------------------ binding helpers
