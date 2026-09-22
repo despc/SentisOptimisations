@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -26,6 +26,12 @@ namespace Optimizer.Optimizations
     [PatchShim]
     public static class WelderOptimization
     {
+        /// <summary>
+        /// How many new projector CanBuild checks one welder activation makes; the next activation
+        /// goes on where this one stopped, and the neighbours of a block just built come first.
+        /// </summary>
+        private const int ProjectionChecksPerActivation = 24;
+
         private static readonly ProjectionBuildBudget ProjectionBudget = new ProjectionBuildBudget();
         private static readonly Dictionary<long, ProjectionFrontierState> ProjectionFrontiers =
             new Dictionary<long, ProjectionFrontierState>();
@@ -587,8 +593,7 @@ namespace Optimizer.Optimizations
                 if (entity is MyCubeGrid) entitiesInSphere.Add(entity);
             found.Clear();
             var frame = MySession.Static.GameplayFrameCounter;
-            var checks = Math.Max(1, SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config
-                .ProjectionChecksPerActivation);
+            var checks = ProjectionChecksPerActivation;
             var ownerSteamId = MySession.Static.Players.TryGetSteamId(welder.OwnerId);
 
             foreach (MyEntity myEntity in entitiesInSphere)

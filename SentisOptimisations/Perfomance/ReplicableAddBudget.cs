@@ -34,7 +34,7 @@ namespace SentisOptimisationsPlugin
         private static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
         /// <summary>How long one frame may spend giving replicables to clients.</summary>
-        private static float MsPerFrame => SentisOptimisationsPlugin.Config.ReplicableAddMsPerFrame;
+        private const float MsPerFrame = 4f;
 
         /// <summary>Adds put off to a later frame since the world was loaded.</summary>
         public static long Delayed;
@@ -79,7 +79,7 @@ namespace SentisOptimisationsPlugin
                 return true;
             }
 
-            if (MsPerFrame <= 0 || MySandboxGame.Static == null)
+            if (MySandboxGame.Static == null)
             {
                 _depth++;
                 return true;

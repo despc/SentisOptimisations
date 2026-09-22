@@ -54,34 +54,6 @@ public class PatchTargetTests
     }
 
     [Fact]
-    public void Safe_zone_targets_exist()
-    {
-        Assert.NotNull(typeof(MySafeZone).GetMethod("phantom_Leave", Instance));
-        Assert.NotNull(typeof(MySafeZone).GetMethod("IsSafe", Instance));
-        Assert.NotNull(typeof(MySafeZone).GetMethod(nameof(MySafeZone.UpdateBeforeSimulation),
-            BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly));
-
-        var remove = typeof(MySafeZone).GetMethod("RemoveEntityPhantom", Instance);
-        Assert.NotNull(remove);
-        Assert.Equal(typeof(HkRigidBody), remove.GetParameters()[0].ParameterType);
-
-        var isSubGridSafe = typeof(MySafeZone).GetMethod("IsSubGridSafe", Instance);
-        Assert.NotNull(isSubGridSafe);
-        Assert.True(isSubGridSafe.ReturnType.IsEnum, "IsSubGridSafe no longer returns an enum the patch can map");
-        Assert.Equal(typeof(MyCubeGrid), isSubGridSafe.GetParameters().Single().ParameterType);
-    }
-
-    [Fact]
-    public void The_subgrid_result_names_are_the_ones_the_patch_maps()
-    {
-        var names = Enum.GetNames(typeof(MySafeZone).GetMethod("IsSubGridSafe", Instance).ReturnType)
-            .Select(n => n.Replace("_", "").ToUpperInvariant())
-            .ToList();
-        Assert.Contains("NOTSAFE", names);
-        Assert.Contains("SAFE", names);
-    }
-
-    [Fact]
     public void Skipped_render_side_methods_exist()
     {
         Assert.NotNull(typeof(MyEntity3DSoundEmitter).GetMethod(
@@ -89,6 +61,28 @@ public class PatchTargetTests
         Assert.NotNull(typeof(MyThrust).GetMethod("RenderUpdate",
             BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly));
         Assert.NotNull(typeof(Sandbox.Game.Entities.Character.MyCharacter).GetMethod("UpdateHeadAndWeapon", Instance));
+    }
+
+    [Fact]
+    public void Safe_zone_grid_tracking_targets_exist()
+    {
+        // the zone's own insert and remove, bound as delegates
+        Assert.NotNull(Accessors.Field<MySafeZone, VRage.Collections.MyConcurrentHashSet<VRage.Game.ModAPI.IMyCubeGrid>>("m_grids"));
+        Assert.NotNull(Accessors.Field<MySafeZone, VRage.Collections.MyConcurrentHashSet<long>>("m_containedEntities"));
+        Assert.NotNull(Accessors.Method<MySafeZone, Func<MySafeZone, VRage.Game.Entity.MyEntity, bool>>("InsertEntityInternal"));
+        Assert.NotNull(Accessors.Method<MySafeZone, Action<MySafeZone, long>>("SendInsertedEntity"));
+        Assert.NotNull(Accessors.Method<MySafeZone, Action<MySafeZone, VRage.Game.Entity.MyEntity>>("RemovedByPhysics"));
+
+        var filters = typeof(Sandbox.Engine.Physics.MyPhysics).GetMethod("InitCollisionFilters", BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(filters);
+        Assert.Equal(typeof(HkWorld), filters.GetParameters().Single().ParameterType);
+
+        var create = typeof(Sandbox.Engine.Physics.MyPhysicsBody).GetMethod(nameof(Sandbox.Engine.Physics.MyPhysicsBody.CreateFromCollisionObject),
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
+        Assert.NotNull(create);
+        var filter = create.GetParameters().Single(p => p.Name == "collisionFilter");
+        Assert.Equal(typeof(int), filter.ParameterType);
+        Assert.Equal(15, filter.DefaultValue);
     }
 }
 
