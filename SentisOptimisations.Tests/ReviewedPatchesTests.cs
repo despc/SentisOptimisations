@@ -64,6 +64,23 @@ public class PatchTargetTests
     }
 
     [Fact]
+    public void Idle_thrust_damage_targets_exist()
+    {
+        var damage = typeof(MyThrust).GetMethod("ThrustDamageAsync", Instance);
+        Assert.NotNull(damage);
+        Assert.Equal(typeof(uint), damage.GetParameters().Single().ParameterType);
+        var strength = typeof(MyThrust).GetProperty(nameof(MyThrust.CurrentStrength));
+        Assert.NotNull(strength);
+        Assert.Equal(typeof(float), strength.PropertyType);
+        // The flame length is rolled before the cast, the way the thruster's own update rolls it.
+        Assert.Equal(typeof(float), typeof(MyThrust).GetField(nameof(MyThrust.ThrustLengthRand))?.FieldType);
+        Assert.NotNull(typeof(Sandbox.Definitions.MyThrustDefinition).GetField("FlameLengthScale"));
+        // RenderUpdate is skipped, but the flag it would clear still is, or the ten-frame update never turns off.
+        Assert.Equal(typeof(bool), typeof(MyThrust).GetField("m_renderNeedsUpdate", Instance)?.FieldType);
+        Assert.NotNull(typeof(MyThrust).GetMethod("RenderUpdate", Instance | BindingFlags.DeclaredOnly));
+    }
+
+    [Fact]
     public void Safe_zone_grid_tracking_targets_exist()
     {
         // the zone's own insert and remove, bound as delegates

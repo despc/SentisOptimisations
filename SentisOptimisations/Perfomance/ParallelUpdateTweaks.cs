@@ -21,7 +21,8 @@ namespace SentisOptimisationsPlugin
     /// Skipped outright:
     /// <list type="bullet">
     /// <item><c>MyEntity3DSoundEmitter.Update</c> - positional audio, updated per emitter per frame;</item>
-    /// <item><c>MyThrust.RenderUpdate</c> - the thruster flame, its colour and its light;</item>
+    /// <item><c>MyThrust.RenderUpdate</c> - the thruster flame, its colour and its light (the flag that
+    /// asks for it is still cleared, so the thruster's ten-frame update turns off as in vanilla);</item>
     /// <item><c>MyCharacter.UpdateHeadAndWeapon</c> - the animation of the head and of the held tool,
     /// which the server does not draw.</item>
     /// </list>
@@ -48,14 +49,18 @@ namespace SentisOptimisationsPlugin
                      {
                          typeof(MyEntity3DSoundEmitter).GetMethod(nameof(MyEntity3DSoundEmitter.Update),
                              BindingFlags.Instance | BindingFlags.Public),
-                         typeof(MyThrust).GetMethod("RenderUpdate",
-                             BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly),
                          typeof(MyCharacter).GetMethod("UpdateHeadAndWeapon", BindingFlags.Instance | BindingFlags.NonPublic),
                      })
             {
                 if (target == null) throw new InvalidOperationException("ParallelUpdateTweaks: a skipped method is gone");
                 ctx.GetPattern(target).Prefixes.Add(skip);
             }
+
+            var thrustRender = typeof(MyThrust).GetMethod("RenderUpdate",
+                BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+            if (thrustRender == null) throw new InvalidOperationException("ParallelUpdateTweaks: MyThrust.RenderUpdate is gone");
+            ctx.GetPattern(thrustRender).Prefixes.Add(
+                typeof(ParallelUpdateTweaks).GetMethod(nameof(SkipThrustRender), BindingFlags.Static | BindingFlags.NonPublic));
 
             var rewriter = typeof(ModPerfCounter).Assembly.GetType("VRage.Scripting.Rewriters.PerfCountingRewriter");
             var rewrite = rewriter?.GetMethod("Rewrite", BindingFlags.Static | BindingFlags.Public);
@@ -75,6 +80,20 @@ namespace SentisOptimisationsPlugin
 
         /// <summary>Skips the patched method.</summary>
         private static bool Skip() => false;
+
+        private static readonly Action<MyThrust, bool> SetRenderNeedsUpdate =
+            Accessors.SetField<MyThrust, bool>("m_renderNeedsUpdate");
+
+        /// <summary>
+        /// Skips the flame but still marks it done, as the end of the method would. The thruster keeps its
+        /// ten-frame update only while that mark is set; left set, every thruster in the world ran it forever -
+        /// 2469 calls a frame, 0.68 ms, for 128 Spitfires on the stand.
+        /// </summary>
+        private static bool SkipThrustRender(MyThrust __instance)
+        {
+            SetRenderNeedsUpdate(__instance, false);
+            return false;
+        }
 
         /// <summary>Hands the script back as it is, without the profiler's counters.</summary>
         private static bool RewritePatched(SyntaxTree syntaxTree, ref SyntaxTree __result)

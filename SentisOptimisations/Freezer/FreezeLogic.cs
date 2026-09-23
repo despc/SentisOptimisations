@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -286,14 +286,48 @@ public class FreezeLogic
     }
 
     /// <param name="now">Without the DelayBeforeFreezeSec wait: the group's Havok world is not stepped.</param>
+    /// <summary>What the freezer wants to know of a grid's blocks, and when it last looked.</summary>
+    private sealed class GridScan
+    {
+        public int Blocks;
+        public DateTime At;
+        public string Antifreeze;
+        public bool HasAntifreeze;
+        public bool Compensable;
+    }
+
+    // Every group away from the players comes here twice a second, frozen ones included; looking at all
+    // their blocks each time kept a pool thread busy with the whole world. A grid is looked at again when
+    // its block count or the antifreeze setting changes, or after ScanSeconds.
+    private static readonly ConcurrentDictionary<long, GridScan> Scans = new();
+    private const double ScanSeconds = 30;
+
+    private static GridScan Scan(MyCubeGrid grid, string antifreezeSetting, string[] antifreezeSubtypes)
+    {
+        var now = DateTime.UtcNow;
+        if (Scans.TryGetValue(grid.EntityId, out var scan) && scan.Blocks == grid.BlocksCount &&
+            scan.Antifreeze == antifreezeSetting && (now - scan.At).TotalSeconds < ScanSeconds)
+            return scan;
+        scan = new GridScan
+        {
+            Blocks = grid.BlocksCount,
+            At = now,
+            Antifreeze = antifreezeSetting,
+            HasAntifreeze = !string.IsNullOrEmpty(antifreezeSetting) && grid.GetBlocks().Any(block =>
+                Enumerable.Contains(antifreezeSubtypes, block.BlockDefinition.Id.SubtypeName)),
+            Compensable = grid.GetFatBlocks().Any(block => block is MyFunctionalBlock functional && NeedToCompensate(functional)),
+        };
+        Scans[grid.EntityId] = scan;
+        return scan;
+    }
+
     private void FreezeGrids(HashSet<MyCubeGrid> grids, bool now = false)
     {
         var configAntifreezeBlocksSubtypes = SentisOptimisationsPlugin.Config.AntifreezeBlocksSubtypes;
         var antifreezeBlocksSubtypes = configAntifreezeBlocksSubtypes.Split(':');
         foreach (var grid in grids)
         {
-            if (!string.IsNullOrEmpty(configAntifreezeBlocksSubtypes) && grid.GetBlocks().Any(block =>
-                    Enumerable.Contains(antifreezeBlocksSubtypes, block.BlockDefinition.Id.SubtypeName)))
+            if (Scan(grid, configAntifreezeBlocksSubtypes, antifreezeBlocksSubtypes).HasAntifreeze)
             {
                 // Log("Found antifreeze block, skip grid " + grid.DisplayName);
                 return;
@@ -315,8 +349,7 @@ public class FreezeLogic
         bool needToAwake = false;
         foreach (var myCubeGrid in grids)
         {
-            if (myCubeGrid.GetFatBlocks()
-                .Any(block => block is MyFunctionalBlock && NeedToCompensate((MyFunctionalBlock)block)))
+            if (Scan(myCubeGrid, configAntifreezeBlocksSubtypes, antifreezeBlocksSubtypes).Compensable)
             {
                 needToAwake = true;
                 break;
@@ -439,6 +472,7 @@ public class FreezeLogic
     /// </summary>
     public static void ForgetGrid(MyCubeGrid grid)
     {
+        Scans.TryRemove(grid.EntityId, out _);
         FrozenGridSaveCache.Invalidate(grid.EntityId);
         FrozenGrids.Remove(grid.EntityId);
         FrozenAtFrame.TryRemove(grid.EntityId, out _);

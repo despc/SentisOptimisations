@@ -160,3 +160,73 @@ public class CharacterUpdate10Tests
         Assert.InRange(Optimizer.Optimizations.CharacterUpdate10.Period, 2, 6);
     }
 }
+
+/// <summary>The call the antenna update-10 patch rewrites, and what it reads to decide.</summary>
+public class AntennaUpdate10Tests
+{
+    [Fact]
+    public void The_antenna_update_holds_exactly_one_radio_call()
+    {
+        var update10 = typeof(Sandbox.Game.Entities.Cube.MyRadioAntenna).GetMethod(
+            nameof(Sandbox.Game.Entities.Cube.MyRadioAntenna.UpdateAfterSimulation10),
+            BindingFlags.Instance | BindingFlags.Public, null, Type.EmptyTypes, null);
+        Assert.NotNull(update10);
+        Assert.Equal(typeof(Sandbox.Game.Entities.Cube.MyRadioAntenna), update10.DeclaringType);
+
+        var il = update10.GetMethodBody().GetILAsByteArray();
+        var module = update10.Module;
+        var called = new List<MethodBase>();
+        for (var i = 0; i < il.Length - 4; i++)
+        {
+            if (il[i] != 0x28 && il[i] != 0x6F) continue;
+            try { called.Add(module.ResolveMethod(BitConverter.ToInt32(il, i + 1))); }
+            catch (Exception) { }
+        }
+
+        // The transpiler refuses to patch unless it finds exactly one.
+        Assert.Single(called.OfType<MethodInfo>(), m => m.Name == "UpdateBroadcastersInRange" && m.GetParameters().Length == 0);
+    }
+
+    [Fact]
+    public void The_grid_tells_whether_a_player_sees_it()
+    {
+        var tier = typeof(Sandbox.Game.Entities.MyCubeGrid).GetProperty("PlayerPresenceTier");
+        Assert.NotNull(tier);
+        Assert.Equal(typeof(VRage.Game.ModAPI.MyUpdateTiersPlayerPresence), tier.PropertyType);
+        // Once in 100 frames at most: the relay notices a new antenna under two seconds later.
+        Assert.InRange(Optimizer.Optimizations.AntennaUpdate10.IdlePeriod, 2, 10);
+        // Half a second at most where a player can see it.
+        Assert.InRange(Optimizer.Optimizations.AntennaUpdate10.SeenPeriod, 2, 3);
+    }
+}
+
+/// <summary>What the idle turret search skip reads from the game.</summary>
+public class TurretIdleSearchTests
+{
+    private const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;
+
+    [Fact]
+    public void The_turret_search_and_what_it_looks_at_exist()
+    {
+        var system = typeof(Sandbox.Game.Weapons.MyLargeTurretTargetingSystem);
+        Assert.NotNull(system.GetMethod("CheckAndSelectNearTargetsParallel", BindingFlags.Instance | BindingFlags.Public, null, Type.EmptyTypes, null));
+        Assert.Equal(typeof(Sandbox.Game.Entities.Interfaces.IMyTargetingReceiver), system.GetField("m_targetReceiver", Private)?.FieldType);
+        Assert.Equal(typeof(Sandbox.Game.Entities.MyCubeGrid), system.GetField("m_focusedTarget", Private)?.FieldType);
+
+        var grid = typeof(Sandbox.Game.EntityComponents.MyGridTargeting);
+        Assert.Equal(typeof(int), grid.GetField("m_lastScan", Private)?.FieldType);
+        Assert.Equal(typeof(List<VRage.Game.Entity.MyEntity>), grid.GetField("m_targetRoots", Private)?.FieldType);
+        Assert.Equal(typeof(Dictionary<Sandbox.Game.Entities.MyCubeGrid, VRage.Game.ModAPI.Ingame.MyGridTargetingRelationFiltering>),
+            grid.GetField("m_gridToRelation", Private)?.FieldType);
+        Assert.NotNull(grid.GetProperty("ScanLock"));
+    }
+
+    [Fact]
+    public void The_skip_trusts_a_scan_only_as_long_as_the_game_does()
+    {
+        // MyGridTargeting.RescanIfNeeded rescans after 100 frames; the skip must not trust it longer.
+        var frames = (int)typeof(Optimizer.Optimizations.TurretIdleSearch)
+            .GetField("ScanFrames", BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue();
+        Assert.Equal(100, frames);
+    }
+}

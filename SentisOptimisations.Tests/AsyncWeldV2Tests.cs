@@ -13,8 +13,12 @@ namespace SentisOptimisations.Tests;
 /// </summary>
 public class AsyncWeldV2Tests
 {
+    // The plugin's assembly is loaded here, not left to whichever test touched it first: run alone,
+    // these tests found no type in the assemblies loaded so far.
+    private static readonly Assembly Plugin = typeof(SentisOptimisationsPlugin.SentisOptimisationsPlugin).Assembly;
+
     private static Type PluginType(string fullName) =>
-        AppDomain.CurrentDomain.GetAssemblies()
+        Plugin.GetType(fullName) ?? AppDomain.CurrentDomain.GetAssemblies()
             .Select(a => a.GetType(fullName))
             .FirstOrDefault(t => t != null);
 
