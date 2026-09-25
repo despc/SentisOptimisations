@@ -42,8 +42,8 @@ namespace SentisOptimisationsPlugin.Freezer;
 /// </summary>
 public static class FrozenProduction
 {
-    /// <summary>Sanity cap for one catch-up: at 60 fps this is ~8 hours of simulation.</summary>
-    private const ulong MaxCatchUpFrames = 60UL * 60 * 8;
+    /// <summary>Sanity cap for one catch-up: the timer compensation's.</summary>
+    private const ulong MaxCatchUpFrames = FreezeLogic.MaxCompensationFrames;
 
     /// <summary>Below this the sun is averaged over the freeze itself; above it, over a whole day.</summary>
     private const double ShortFreezeSeconds = 600;
