@@ -91,6 +91,21 @@ public static class CompensationTracker
     public static ulong? PeekAppliedFrames(long blockId) =>
         AppliedFrames.TryGetValue(blockId, out var frames) ? frames : (ulong?)null;
 
+    /// <summary>A block for the log: its name and its grid's (looked up only when something is logged).</summary>
+    static string Describe(long blockId)
+    {
+        try
+        {
+            if (Sandbox.Game.Entities.MyEntities.GetEntityById(blockId) is Sandbox.Game.Entities.MyCubeBlock block)
+                return $"block '{block.DisplayNameText}' on grid '{block.CubeGrid?.DisplayName}' ({blockId})";
+        }
+        catch
+        {
+            // (no game around it: the tests)
+        }
+        return $"block {blockId}";
+    }
+
     /// <summary>Called on the game thread at the moment the grid is frozen.</summary>
     public static void OnFrozen(long blockId, ulong frame)
     {
@@ -113,7 +128,7 @@ public static class CompensationTracker
             if (since > frame)
             {
                 SentisOptimisationsPlugin.Log.Warn(
-                    $"Compensation: stale future stamp for block {blockId} (stamped {since}, now {frame}) - skipped");
+                    $"Compensation: stale future stamp for {Describe(blockId)} (stamped {since}, now {frame}) - skipped");
                 PendingFrames.TryRemove(blockId, out _);
                 return false;
             }
@@ -122,7 +137,7 @@ public static class CompensationTracker
             if (delta > maxFrames)
             {
                 SentisOptimisationsPlugin.Log.Warn(
-                    $"Compensation: delta {delta} frames for block {blockId} exceeds sanity cap {maxFrames} - clamped");
+                    $"Compensation: delta {delta} frames for {Describe(blockId)} exceeds sanity cap {maxFrames} - clamped");
                 delta = maxFrames;
             }
 
@@ -160,6 +175,40 @@ public static class CompensationTracker
         TakenFrames.AddOrUpdate(blockId, taken, (_, total) => total + taken);
         AwaitingApplyFrames.AddOrUpdate(blockId, taken, (_, total) => total + taken);
         return true;
+    }
+
+    /// <summary>
+    /// Takes at most <paramref name="maxFrames"/> of the accumulated compensation; the rest stays pending
+    /// for the next apply. A second caller never gets the same frames.
+    /// </summary>
+    public static bool TryTakeCompensation(long blockId, uint maxFrames, out uint frames)
+    {
+        ApplyScheduled.TryRemove(blockId, out _);
+        while (true)
+        {
+            frames = 0;
+            if (!PendingFrames.TryGetValue(blockId, out var pending) || pending == 0)
+            {
+                PendingFrames.TryRemove(blockId, out _);
+                return false;
+            }
+            if (pending <= maxFrames)
+            {
+                if (!((System.Collections.Generic.ICollection<System.Collections.Generic.KeyValuePair<long, uint>>)PendingFrames)
+                        .Remove(new System.Collections.Generic.KeyValuePair<long, uint>(blockId, pending)))
+                    continue;                                      // changed meanwhile: look again
+                frames = pending;
+            }
+            else
+            {
+                if (!PendingFrames.TryUpdate(blockId, pending - maxFrames, pending)) continue;
+                frames = maxFrames;
+            }
+            var taken = frames;
+            TakenFrames.AddOrUpdate(blockId, taken, (_, total) => total + taken);
+            AwaitingApplyFrames.AddOrUpdate(blockId, taken, (_, total) => total + taken);
+            return true;
+        }
     }
 
     /// <summary>Current uncompensated total (diagnostics/tests).</summary>

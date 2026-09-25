@@ -115,6 +115,25 @@ namespace SentisOptimisations.Tests
         }
 
         [Fact]
+        public void A_long_freeze_is_handed_out_in_portions()
+        {
+            const long block = 1011;
+            CompensationTracker.OnFrozen(block, 0);
+            CompensationTracker.OnUnfrozen(block, 2500, 100_000);
+
+            Assert.True(CompensationTracker.TryTakeCompensation(block, 1000, out var first));
+            Assert.Equal(1000u, first);
+            Assert.Equal(1500u, CompensationTracker.PeekPending(block));
+            Assert.True(CompensationTracker.TryTakeCompensation(block, 1000, out var second));
+            Assert.True(CompensationTracker.TryTakeCompensation(block, 1000, out var last));
+            Assert.Equal(500u, last);
+            Assert.Null(CompensationTracker.PeekPending(block));
+            Assert.False(CompensationTracker.TryTakeCompensation(block, 1000, out _));
+            Assert.Equal(2500UL, CompensationTracker.PeekTakenFrames(block));
+            CompensationTracker.Forget(block);
+        }
+
+        [Fact]
         public void Forget_drops_all_state_for_a_block()
         {
             const long block = 1007;

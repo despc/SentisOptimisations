@@ -131,6 +131,7 @@ namespace SentisGameplayImprovements.AllGridsActions
             VoxelMaps.Clear();
             Planets.Clear();
             CompensationTracker.ClearAll();
+            CompensationCatchUp.Clear();
         }
     }
 }

@@ -39,8 +39,8 @@ public class FreezeLogic
     private static readonly Dictionary<long, DateTime> WakeUpDatas = new(); //EntityId:NextWakeUpTime
     private static readonly object _wakeUpLock = new();
 
-    // sanity cap for one compensation: at 60 fps this is ~8 hours of simulation
-    internal const ulong MaxCompensationFrames = 60UL * 60 * 8;
+    // sanity cap for one compensation: 8 hours of simulation at 60 frames a second
+    internal const ulong MaxCompensationFrames = 60UL * 60 * 60 * 8;
 
     // Written by the FreezerLoop thread, averaged by the same/other loops - lock it.
     private static readonly List<float> CpuLoads = new();
@@ -70,6 +70,8 @@ public class FreezeLogic
                 return;
             }
 
+            // frames still being worked off after a thaw: the group stays awake until they are
+            if (CompensationCatchUp.IsBusy(grids)) return;
             FreezeGrids(grids, now: !stepped);
         }
         catch (InvalidOperationException e)
@@ -235,47 +237,9 @@ public class FreezeLogic
                     // Accumulate the frozen period; a previous pending period is NOT overwritten.
                     if (!CompensationTracker.OnUnfrozen(blockId, frame, MaxCompensationFrames))
                         continue;
-                    if (!CompensationTracker.TryScheduleApply(blockId))
-                        continue; // an already-scheduled apply will pick everything up
-
-                    // Apply after the unfrozen blocks have run a couple of normal frames. The
-                    // apply takes the ACCUMULATED total atomically; if the block got frozen
-                    // again in the meantime the total survives for the next apply.
-                    MyAPIGateway.Utilities.InvokeOnGameThread(() =>
-                    {
-                        try
-                        {
-                            if (CompensationTracker.IsFrozen(blockId))
-                            {
-                                CompensationTracker.ReleaseSchedule(blockId);
-                                return;
-                            }
-
-                            if (myCubeBlock.Closed || myCubeBlock.MarkedForClose)
-                            {
-                                CompensationTracker.Forget(blockId);
-                                return;
-                            }
-
-                            if (CompensationTracker.TryTakeCompensation(blockId, out var framesAfterFreeze))
-                            {
-                                // ADD to whatever vanilla accumulated during the apply window
-                                // instead of overwriting: overwriting silently dropped the
-                                // ~2 s of real production of that window.
-                                var vanilla = timer.FramesFromLastTrigger;
-                                timer.FramesFromLastTrigger =
-                                    uint.MaxValue - vanilla < framesAfterFreeze
-                                        ? uint.MaxValue
-                                        : vanilla + framesAfterFreeze;
-                                grid.PlayerPresenceTier = MyUpdateTiersPlayerPresence.Normal;
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            CompensationTracker.ReleaseSchedule(blockId);
-                            SentisOptimisationsPlugin.Log.Error(ex, "Compensate exception");
-                        }
-                    }, StartAt: (int)(frame + 120));
+                    // Worked off in steps once the unfrozen blocks have run a couple of normal
+                    // frames (CompensationCatchUp); the grid stays awake until it is done.
+                    CompensationCatchUp.Add(grid, myCubeBlock, (int)(frame + 120));
                 }
             }
             else
