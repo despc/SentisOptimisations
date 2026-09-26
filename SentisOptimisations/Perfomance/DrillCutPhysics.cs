@@ -37,8 +37,10 @@ namespace Optimizer.Optimizations
     /// (the drill broke into solid rock under it) is dropped and built as before, because an empty
     /// stale cell would let the ship fall through that rock.
     ///
-    /// Everything else that changes voxels - explosions, voxel hands, filling, the admin tools -
-    /// is untouched.
+    /// The hand drill's cut-outs (and explosions', the same cut-out) are handled the same way: a
+    /// bot digging with the hand drill cut once a second and got a 7-12 ms physics step each time.
+    ///
+    /// Everything else that changes voxels - voxel hands, filling, the admin tools - is untouched.
     /// </summary>
     [PatchShim]
     public static class DrillCutPhysics
@@ -92,6 +94,14 @@ namespace Optimizer.Optimizations
             pattern.Prefixes.Add(typeof(DrillCutPhysics).GetMethod(nameof(FinishPrefix), statics));
             pattern.Suffixes.Add(typeof(DrillCutPhysics).GetMethod(nameof(FinishSuffix), statics));
             ctx.GetPattern(invalidate).Transpilers.Add(typeof(DrillCutPhysics).GetMethod(nameof(InvalidateRangeTranspiler), statics));
+            // the hand drill's cut-outs (and explosions'): the notify the cut-out queues to the game thread
+            var notify = HandCutNotify.Value;
+            if (notify != null)
+            {
+                ctx.GetPattern(notify.Value.Method).Prefixes.Add(typeof(DrillCutPhysics).GetMethod(nameof(HandCutPrefix), statics));
+                ctx.GetPattern(notify.Value.Method).Suffixes.Add(typeof(DrillCutPhysics).GetMethod(nameof(FinishSuffix), statics));
+            }
+            else NLog.LogManager.GetCurrentClassLogger().Warn("DrillCutPhysics: no MyVoxelGenerator.<CutOutShapeWithProperties> notify; the hand drill's cut-outs stay vanilla");
             if (MarkForShapeUpdate == null) return;
             var taskComplete = VoxelPhysicsBodyType.GetMethod("OnTaskComplete", instance);
             var update10 = VoxelPhysicsBodyType.GetMethod("UpdateAfterSimulation10", instance, null, Type.EmptyTypes, null);
@@ -263,6 +273,50 @@ namespace Optimizer.Optimizations
         }
 
         private static void FinishSuffix() => _inCut = false;
+
+        /// <summary>
+        /// The lambda <c>MyVoxelGenerator.CutOutShapeWithProperties</c> queues to the game thread once a cut-out is
+        /// written: <c>voxelMap.Storage.NotifyChanged(minCorner, maxCorner, ...)</c>, the storage range it changed
+        /// kept in its closure. The hand drill cuts once a second through it (and an explosion once): the voxel body
+        /// dropped every cell of the range, and the next physics step built the ones the character stands in (and
+        /// its drill's sensor rays reach) synchronously - 7-12 ms physics steps once a second while a bot digs.
+        /// </summary>
+        private static readonly Lazy<(MethodInfo Method, FieldInfo Outer, FieldInfo Min, FieldInfo Max)?> HandCutNotify =
+            new Lazy<(MethodInfo, FieldInfo, FieldInfo, FieldInfo)?>(() =>
+            {
+                const BindingFlags any = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
+                var generator = typeof(MyShipDrill).Assembly.GetType("Sandbox.Engine.Voxels.MyVoxelGenerator", true);
+                foreach (var closure in generator.GetNestedTypes(BindingFlags.NonPublic))
+                foreach (var method in closure.GetMethods(any))
+                {
+                    if (!method.Name.StartsWith("<CutOutShapeWithProperties>") || method.GetParameters().Length != 0) continue;
+                    // the corners in the lambda's own closure, or in the outer one it holds (CS$<>8__locals1)
+                    foreach (var outer in new FieldInfo[] { null }.Concat(closure.GetFields(any)))
+                    {
+                        var holder = outer == null ? closure : outer.FieldType;
+                        var min = holder.GetField("minCorner", any);
+                        var max = holder.GetField("maxCorner", any);
+                        if (min?.FieldType == typeof(Vector3I) && max?.FieldType == typeof(Vector3I)) return (method, outer, min, max);
+                    }
+                }
+                return null;
+            });
+
+        private static void HandCutPrefix(object __instance)
+        {
+            var notify = HandCutNotify.Value.Value;
+            var holder = notify.Outer == null ? __instance : notify.Outer.GetValue(__instance);
+            if (holder == null) return;
+            _cutFrame = MySandboxGame.Static?.SimulationFrameCounter ?? 0;
+            _inCut = true;
+            CutBoundsBuffer.Clear();
+            CutBoundsBuffer.Add(new BoundingBoxI((Vector3I)notify.Min.GetValue(holder), (Vector3I)notify.Max.GetValue(holder)));
+            _cutBounds = CutBoundsBuffer;
+            if (++HandCuts % 300 == 0)
+                NLog.LogManager.GetCurrentClassLogger().Info($"DrillCutPhysics: {HandCuts} hand cut-outs; cells kept till rebuilt {KeptCells}, dropped the vanilla way {InvalidatedCells}, untouched {UntouchedCells}, shape updates batched {ShapeUpdatesApplied}");
+        }
+
+        public static long HandCuts;
 
         /// <summary>
         /// Replaces <c>gridShape.InvalidateRange(ref min, ref max, buffer)</c> with

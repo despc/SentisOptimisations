@@ -30,6 +30,7 @@ namespace SentisOptimisationsPlugin.AllGridsActions
         public void OnLoaded()
         {
             CancellationTokenSource = new CancellationTokenSource();
+            PhysicsGuard.OnWorldLoaded();
             Task.Run(CheckLoop);
             Task.Run(FreezerLoop);
         }

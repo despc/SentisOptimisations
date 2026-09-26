@@ -46,6 +46,20 @@ namespace SentisOptimisationsPlugin
 
         private static readonly Dictionary<long, DateTime> ActedAt = new Dictionary<long, DateTime>();
 
+        /// <summary>
+        /// Nothing is checked this long after the world is loaded: the first minute's physics is the world settling
+        /// (grids placed, bodies waking, planets streamed in), not a grid of anybody's to blame.
+        /// </summary>
+        public static readonly TimeSpan StartDelay = TimeSpan.FromMinutes(1);
+
+        private static DateTime? _loadedAt;
+
+        /// <summary>The world is loaded: the checks start <see cref="StartDelay"/> from now.</summary>
+        public static void OnWorldLoaded() => _loadedAt = DateTime.UtcNow;
+
+        /// <summary>Whether the checks still wait for the world to settle (no load noted: they do not).</summary>
+        public static bool Waiting(DateTime now, DateTime? loadedAt) => loadedAt.HasValue && now - loadedAt.Value < StartDelay;
+
         private sealed class GroupLoad
         {
             public long Key;
@@ -57,6 +71,7 @@ namespace SentisOptimisationsPlugin
         public static void Check()
         {
             if (!SentisOptimisationsPlugin.Config.EnablePhysicsGuard) return;
+            if (Waiting(DateTime.UtcNow, _loadedAt)) return;
             if (Optimizer.Optimizations.PhysicsLoadMonitor.Frames == 0) return;
 
             var stepMs = Optimizer.Optimizations.PhysicsLoadMonitor.AverageMs;
