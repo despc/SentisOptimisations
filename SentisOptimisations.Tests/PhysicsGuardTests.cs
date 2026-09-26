@@ -12,6 +12,22 @@ namespace SentisOptimisations.Tests;
 
 public class PhysicsGuardTests
 {
+    [Fact]
+    public void Waits_the_first_minute_after_the_world_is_loaded()
+    {
+        var loaded = new DateTime(2026, 9, 26, 12, 0, 0, DateTimeKind.Utc);
+        Assert.True(PhysicsGuard.Waiting(loaded, loaded));
+        Assert.True(PhysicsGuard.Waiting(loaded.AddSeconds(59), loaded));
+        Assert.False(PhysicsGuard.Waiting(loaded.AddSeconds(60), loaded));
+        Assert.False(PhysicsGuard.Waiting(loaded.AddMinutes(30), loaded));
+    }
+
+    [Fact]
+    public void Does_not_wait_when_no_load_was_noted()
+    {
+        Assert.False(PhysicsGuard.Waiting(DateTime.UtcNow, null));
+    }
+
     private const BindingFlags Any = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
 
     [Fact]
