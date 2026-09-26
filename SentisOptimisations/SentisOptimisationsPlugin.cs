@@ -61,7 +61,13 @@ namespace SentisOptimisationsPlugin
             Log.Info("Init SentisOptimisationsPlugin");
             MyFakes.ENABLE_SCRAP = false;
             MySimpleProfiler.ENABLE_SIMPLE_PROFILER = false;
-            
+            // Full collections in the background, not stopping the game thread: with the default mode a blocking
+            // gen2 of a 1-4 GB heap every minute or two was a frame of 100-200 ms (SentisWatcher's perf table). Blocking
+            // ones still happen when memory runs short.
+            var latency = System.Runtime.GCSettings.LatencyMode;
+            System.Runtime.GCSettings.LatencyMode = System.Runtime.GCLatencyMode.SustainedLowLatency;
+            Log.Info($"GC latency mode {latency} -> {System.Runtime.GCSettings.LatencyMode}, server GC {System.Runtime.GCSettings.IsServerGC}");
+
             SetupConfig();
             SessionManager = Torch.Managers.GetManager<TorchSessionManager>();
             if (SessionManager == null)

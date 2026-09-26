@@ -51,10 +51,18 @@ public class FreezeLogic
         try
         {
             var freezerEnabled = SentisOptimisationsPlugin.Config.FreezerEnabled;
-            var anyGrid = grids.FirstElement();
+            // walked with the set's own enumerator: twice a second for every group, LINQ over the set boxed an
+            // enumerator and made a delegate each time (a steady share of the server's garbage)
+            MyCubeGrid anyGrid = null;
+            var isAnyGridStatic = false;
+            foreach (var grid in grids)
+            {
+                anyGrid ??= grid;
+                if (grid.IsStatic) { isAnyGridStatic = true; break; }
+            }
+            if (anyGrid == null) return;
             var gridsPosition = anyGrid.PositionComp.GetPosition();
             var isWakeUpTime = IsWakeUpTime(grids);
-            var isAnyGridStatic = grids.Any(grid => grid.IsStatic);
             var freezeDistance = isAnyGridStatic
                 ? SentisOptimisationsPlugin.Config.FreezeDistanceStatic
                 : SentisOptimisationsPlugin.Config.FreezeDistanceDynamic;
@@ -139,6 +147,30 @@ public class FreezeLogic
         }
     }
 
+    /// <summary>
+    /// The key of a group: its smallest entity id. Compared as longs - the MinBy of VRage takes its key as a float,
+    /// in which neighbouring ids are equal, so which grid won depended on the order the set was walked in - and
+    /// without a boxed enumerator and a delegate per call.
+    /// </summary>
+    private static bool AnyFrozen(HashSet<MyCubeGrid> grids)
+    {
+        foreach (var grid in grids)
+            if (FrozenGrids.Contains(grid.EntityId)) return true;
+        return false;
+    }
+
+    // the antifreeze setting split once per change of it, not for every group twice a second
+    private static string _antifreezeSetting;
+    private static string[] _antifreezeSubtypes = new string[0];
+
+    internal static long MinEntityId(HashSet<MyCubeGrid> grids)
+    {
+        var min = long.MaxValue;
+        foreach (var grid in grids)
+            if (grid.EntityId < min) min = grid.EntityId;
+        return min;
+    }
+
     private static bool IsPhysicsStepped(HashSet<MyCubeGrid> grids)
     {
         var stepped = _steppedWorlds;
@@ -155,7 +187,7 @@ public class FreezeLogic
 
     private bool IsWakeUpTime(HashSet<MyCubeGrid> grids)
     {
-        var minEntityId = grids.MinBy(grid => grid.EntityId).EntityId;
+        var minEntityId = MinEntityId(grids);
         if (WakeUpDatas.TryGetValue(minEntityId, out var data))
         {
             if (DateTime.Now < data && data < DateTime.Now.AddSeconds(_wakeupTimeInSec))
@@ -176,9 +208,11 @@ public class FreezeLogic
 
     private void UnfreezeGrids(HashSet<MyCubeGrid> grids, bool isWakeUpTime)
     {
-        var minEntityId = grids.MinBy(grid => grid.EntityId).EntityId;
+        var minEntityId = MinEntityId(grids);
         InFreezeQueue.Remove(minEntityId);
-        if (!grids.Any(grid => FrozenGrids.Contains(grid.EntityId))) return;
+        if (!AnyFrozen(grids)) return;
+        // the loop's set is reused for the next group: the thaw on the game thread keeps its own
+        grids = new HashSet<MyCubeGrid>(grids);
 
         // Which grids to thaw is decided on the game thread, like the freeze: read from here, a freeze
         // being applied grid by grid on the game thread showed only part of the group as frozen, only that
@@ -288,7 +322,12 @@ public class FreezeLogic
     private void FreezeGrids(HashSet<MyCubeGrid> grids, bool now = false)
     {
         var configAntifreezeBlocksSubtypes = SentisOptimisationsPlugin.Config.AntifreezeBlocksSubtypes;
-        var antifreezeBlocksSubtypes = configAntifreezeBlocksSubtypes.Split(':');
+        if (!ReferenceEquals(configAntifreezeBlocksSubtypes, _antifreezeSetting))
+        {
+            _antifreezeSubtypes = (configAntifreezeBlocksSubtypes ?? "").Split(':');
+            _antifreezeSetting = configAntifreezeBlocksSubtypes;
+        }
+        var antifreezeBlocksSubtypes = _antifreezeSubtypes;
         foreach (var grid in grids)
         {
             if (Scan(grid, configAntifreezeBlocksSubtypes, antifreezeBlocksSubtypes).HasAntifreeze)
@@ -320,7 +359,7 @@ public class FreezeLogic
             }
         }
 
-        var minEntityId = grids.MinBy(grid => grid.EntityId).EntityId;
+        var minEntityId = MinEntityId(grids);
         if (needToAwake)
         {
             lock (_wakeUpLock)
@@ -358,15 +397,20 @@ public class FreezeLogic
 
         var delayBeforeFreezeSec = now ? 0 : SentisOptimisationsPlugin.Config
             .DelayBeforeFreezeSec;
-        var needToFreezeGrids = grids.Where(grid => !FrozenGrids.Contains(grid.EntityId)).ToList();
+        // a group frozen already (most of them, every pass): nothing to list
+        var anyToFreeze = false;
+        foreach (var grid in grids)
+            if (!FrozenGrids.Contains(grid.EntityId)) { anyToFreeze = true; break; }
 
-        if (needToFreezeGrids.Count == 0)
+        if (!anyToFreeze)
         {
             InFreezeQueue.Remove(minEntityId);
             return;
         }
 
         Thread.Sleep(8);
+        // the loop's set is reused for the next group: the delayed freeze keeps its own
+        grids = new HashSet<MyCubeGrid>(grids);
         // Everything is decided on the game thread at the moment of the freeze: during the delay a
         // player may come (the unfreeze drops the queue entry) and the group may change (a gear
         // locks, a grid joins). The queue entry is dropped only there, so the check sees it.

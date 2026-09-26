@@ -163,6 +163,14 @@ namespace Optimizer.Optimizations
 
         internal static void PatchImpl(PatchContext ctx)
         {
+            // Server GC: a young generation of a gigabyte and more, collected rarely and in parallel; a forced gen0
+            // there took a frame of 35 ms (the stand) where the estimate learned for the workstation collector said
+            // it fits. Nothing to schedule - the collector's own timing is left alone.
+            if (System.Runtime.GCSettings.IsServerGC)
+            {
+                SentisOptimisationsPlugin.SentisOptimisationsPlugin.Log.Info("GcScheduler: server GC, no collections scheduled");
+                return;
+            }
             var update = typeof(MySandboxGame).GetMethod("Update",
                 BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public, null, Type.EmptyTypes, null);
             var pattern = ctx.GetPattern(update);

@@ -139,7 +139,8 @@ namespace SentisOptimisationsPlugin
                         var startedAt = Stopwatch.GetTimestamp();
                         var wasCached = storage.AreDataCached;
                         var onGameThread = Sandbox.MySandboxGame.Static?.UpdateThread == Thread.CurrentThread;
-                        storage.Save(out data);
+                        if (storage is Sandbox.Engine.Voxels.MyStorageBase storageBase) data = VoxelBlob.Get(storageBase);     // compressed outside the storage's lock
+                        else storage.Save(out data);
                         if (!wasCached && onGameThread) Interlocked.Increment(ref OnGameThread);
                         if (!wasCached)
                         {

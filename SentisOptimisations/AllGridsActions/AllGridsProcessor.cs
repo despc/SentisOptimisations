@@ -20,6 +20,9 @@ namespace SentisOptimisationsPlugin.AllGridsActions
 
         public CancellationTokenSource CancellationTokenSource { get; set; }
         private FreezeLogic _freezeLogic = new FreezeLogic();
+        private readonly HashSet<IMyCubeGrid> _left = new HashSet<IMyCubeGrid>();
+        private readonly HashSet<IMyCubeGrid> _group = new HashSet<IMyCubeGrid>();
+        private readonly HashSet<MyCubeGrid> _groupGrids = new HashSet<MyCubeGrid>();
 
         /// <summary>How often the physics load is looked at.</summary>
         private const int PhysicsCheckMs = 2000;
@@ -81,14 +84,23 @@ namespace SentisOptimisationsPlugin.AllGridsActions
                         MyAPIGateway.Utilities.InvokeOnGameThread(FreezeLogic.RefreshSteppedWorlds);
                         var cpuLoad = MySandboxGame.Static.CPULoad;
                         _freezeLogic.UpdateCpuLoad(cpuLoad);
-                        var gridsList = new HashSet<IMyCubeGrid>(EntitiesObserver.MyCubeGrids);
-                        while (gridsList.Count > 0)
+                        // the same three sets every pass (the freeze logic copies the one it keeps): new ones per
+                        // group twice a second were a steady share of the server's garbage
+                        _left.Clear();
+                        foreach (var grid in EntitiesObserver.MyCubeGrids) _left.Add(grid);
+                        while (_left.Count > 0)
                         {
-                            var grid = gridsList.FirstElement();
-                            HashSet<IMyCubeGrid> grids = new HashSet<IMyCubeGrid>();
-                            MyAPIGateway.GridGroups.GetGroup(grid, GridLinkTypeEnum.Physical, grids);
-                            grids.ForEach(cubeGrid => gridsList.Remove(cubeGrid));
-                            _freezeLogic.CheckGridGroup(grids.Select(cubeGrid => (MyCubeGrid)cubeGrid).ToHashSet());
+                            var grid = _left.FirstElement();
+                            _group.Clear();
+                            MyAPIGateway.GridGroups.GetGroup(grid, GridLinkTypeEnum.Physical, _group);
+                            _left.Remove(grid);
+                            _groupGrids.Clear();
+                            foreach (var cubeGrid in _group)
+                            {
+                                _left.Remove(cubeGrid);
+                                _groupGrids.Add((MyCubeGrid)cubeGrid);
+                            }
+                            if (_groupGrids.Count > 0) _freezeLogic.CheckGridGroup(_groupGrids);
                         }
                         
                         DelayedProcessor.Instance.AddDelayedAction(DateTime.Now, SentisOptimisationsPlugin.Instance.UpdateGui);

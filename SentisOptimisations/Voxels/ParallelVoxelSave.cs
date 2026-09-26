@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using NLog;
 using Sandbox.Engine.Voxels;
@@ -39,7 +40,16 @@ namespace SentisOptimisationsPlugin
         /// <summary>Leaves per batch.</summary>
         private const int BatchLeaves = 512;
 
-        private static bool _disabled, _verified;
+        private static bool _disabled;
+
+        /// <summary>The first saves of a large storage are also written the vanilla way and compared: the first
+        /// with nothing cached, the next ones with the leaves' bytes taken from the cache.</summary>
+        private const int Verifications = 3;
+        private static int _verified;
+
+        /// <summary>Checked already for this build of the plugin and of the game (<see cref="VerifiedOnce"/>).</summary>
+        private static bool? _checkedBefore;
+        private static bool CheckedBefore() => _checkedBefore ?? (_checkedBefore = VerifiedOnce.Is("ParallelVoxelSave")).Value;
         [ThreadStatic] private static bool _vanilla;
 
         private static MethodInfo _writeStorageAccess, _writeStorageMetaData, _writeMaterialTable, _writeDataProvider, _writeOctreeNodes, _saveAccess;
@@ -47,6 +57,25 @@ namespace SentisOptimisationsPlugin
         private static Type _saveAccessType;
         private static Action<object, Stream> _writeLeaf;
         private static Func<object, int> _chunkType, _chunkSize;
+
+        // what makes a leaf's bytes: its octree's node dictionary (the same instance for good) and that
+        // dictionary's version (bumped by every add, set, remove, clear), its height and its default value
+        private static Func<object, object> _leafOctree, _octreeNodes;
+        private static Func<object, int> _octreeHeight, _octreeDefault, _nodesVersion;
+
+        private sealed class Cached
+        {
+            public ulong Key;
+            public object Nodes;
+            public int Version, Height, Default;
+            public byte[] Bytes;
+        }
+
+        /// <summary>The bytes of every octree leaf as it was last written, kept while the leaf lives.</summary>
+        private static readonly ConditionalWeakTable<object, Cached> Leaves = new ConditionalWeakTable<object, Cached>();
+
+        /// <summary>Leaves taken from the cache and leaves written, since the start (for the log).</summary>
+        public static long LeavesReused, LeavesWritten;
 
         /// <summary>Saves written here, and milliseconds they took (for the log).</summary>
         public static long Written, WrittenMs;
@@ -97,6 +126,30 @@ namespace SentisOptimisationsPlugin
             il.Emit(OpCodes.Ret);
             _writeLeaf = (Action<object, Stream>)method.CreateDelegate(typeof(Action<object, Stream>));
 
+            var octreeField = leafType.GetField("m_octree", any) ?? throw new MissingFieldException("MyMicroOctreeLeaf.m_octree");
+            var octreeType = octreeField.FieldType;
+            var nodesField = octreeType.GetField("m_nodes", any) ?? throw new MissingFieldException("MySparseOctree.m_nodes");
+            var heightField = octreeType.GetField("m_treeHeight", any) ?? throw new MissingFieldException("MySparseOctree.m_treeHeight");
+            var defaultField = octreeType.GetField("m_defaultContent", any) ?? throw new MissingFieldException("MySparseOctree.m_defaultContent");
+            var versionField = nodesField.FieldType.GetField("version", any) ?? throw new MissingFieldException("NativeDictionary.version");
+            if (!nodesField.IsInitOnly) throw new InvalidOperationException("MySparseOctree.m_nodes is not readonly: its instance may change");
+            Func<object, TResult> Read<TResult>(Type owner, FieldInfo field)
+            {
+                var getter = new DynamicMethod("Read" + field.Name, typeof(TResult), new[] { typeof(object) }, storage, true);
+                var g = getter.GetILGenerator();
+                g.Emit(OpCodes.Ldarg_0);
+                g.Emit(OpCodes.Castclass, owner);
+                g.Emit(OpCodes.Ldfld, field);
+                if (field.FieldType == typeof(byte)) g.Emit(OpCodes.Conv_I4);
+                g.Emit(OpCodes.Ret);
+                return (Func<object, TResult>)getter.CreateDelegate(typeof(Func<object, TResult>));
+            }
+            _leafOctree = Read<object>(leafType, octreeField);
+            _octreeNodes = Read<object>(octreeType, nodesField);
+            _octreeHeight = Read<int>(octreeType, heightField);
+            _octreeDefault = Read<int>(octreeType, defaultField);
+            _nodesVersion = Read<int>(nodesField.FieldType, versionField);
+
             ctx.GetPattern(storage.GetMethod("SaveInternal", any, null, new[] { typeof(Stream) }, null) ?? throw new MissingMethodException("MyOctreeStorage.SaveInternal"))
                 .Prefixes.Add(typeof(ParallelVoxelSave).GetMethod(nameof(SaveInternalPrefix), BindingFlags.Static | BindingFlags.NonPublic));
         }
@@ -110,14 +163,37 @@ namespace SentisOptimisationsPlugin
                 var material = (IDictionary)_materialLeaves.GetValue(__instance);
                 if (content.Count + material.Count < MinLeaves) return true;
                 var started = Stopwatch.GetTimestamp();
-                if (!_verified) return Verify(__instance, stream);
-                // into a buffer of its own first: the stream gets the bytes only once they are all there, so a
-                // failure leaves it untouched and the game writes the data itself
-                lock (Whole)
+                if (_verified < Verifications && !CheckedBefore())
                 {
-                    Whole.SetLength(0);
-                    Write(__instance, Whole, content, material);
-                    stream.Write(Whole.GetBuffer(), 0, (int)Whole.Length);
+                    // not checked yet: the game thread (the world save's snapshot) writes the game's way - a check
+                    // there is a frame of both ways; the check is made off it (the blob for the clients, rebuilt in the
+                    // background, see VoxelStreamCache)
+                    if (Sandbox.MySandboxGame.Static?.UpdateThread == System.Threading.Thread.CurrentThread) return true;
+                    return Verify(__instance, stream);
+                }
+                if (stream is MemoryStream memory)
+                {
+                    // a buffer (the pooled one of VoxelBuffers): straight into it, and on a failure cut back to where
+                    // it was, for the game to write the data itself - no copy of the whole storage
+                    var start = memory.Position;
+                    try { Write(__instance, memory, content, material); }
+                    catch
+                    {
+                        memory.SetLength(start);
+                        memory.Position = start;
+                        throw;
+                    }
+                }
+                else
+                {
+                    // into a buffer of its own first: the stream gets the bytes only once they are all there, so a
+                    // failure leaves it untouched and the game writes the data itself
+                    lock (Whole)
+                    {
+                        Whole.SetLength(0);
+                        Write(__instance, Whole, content, material);
+                        stream.Write(Whole.GetBuffer(), 0, (int)Whole.Length);
+                    }
                 }
                 Written++;
                 WrittenMs += (long)((Stopwatch.GetTimestamp() - started) * 1000.0 / Stopwatch.Frequency);
@@ -151,8 +227,12 @@ namespace SentisOptimisationsPlugin
             var b = vanilla.GetBuffer();
             var same = ours.Length == vanilla.Length;
             for (long i = 0; same && i < ours.Length; i++) same = a[i] == b[i];
-            _verified = true;
-            if (same) Log.Info($"Parallel voxel save checked: {vanilla.Length / 1024} KB the same as the game's; {oursMs:0.0} ms against {vanillaMs:0.0} ms");
+            _verified++;
+            if (same)
+            {
+                Log.Info($"Parallel voxel save checked: {vanilla.Length / 1024} KB the same as the game's; {oursMs:0.0} ms against {vanillaMs:0.0} ms");
+                if (_verified >= Verifications) VerifiedOnce.Mark("ParallelVoxelSave");
+            }
             else
             {
                 _disabled = true;
@@ -213,7 +293,40 @@ namespace SentisOptimisationsPlugin
             }
         }
 
-        private static void WriteLeaf(Stream stream, ulong key, object leaf)
+        /// <summary>A leaf: its bytes as last written when nothing of it changed since, else written and kept.</summary>
+        private static void WriteLeaf(MemoryStream stream, ulong key, object leaf)
+        {
+            var type = (MyOctreeStorage.ChunkTypeEnum)_chunkType(leaf);
+            if (type != MyOctreeStorage.ChunkTypeEnum.ContentLeafOctree && type != MyOctreeStorage.ChunkTypeEnum.MaterialLeafOctree)
+            {
+                WriteLeafNow(stream, key, leaf);
+                return;
+            }
+            var octree = _leafOctree(leaf);
+            var nodes = _octreeNodes(octree);
+            var version = _nodesVersion(nodes);
+            var height = _octreeHeight(octree);
+            var defaultContent = _octreeDefault(octree);
+            if (Leaves.TryGetValue(leaf, out var cached) && cached.Key == key && ReferenceEquals(cached.Nodes, nodes) &&
+                cached.Version == version && cached.Height == height && cached.Default == defaultContent)
+            {
+                stream.Write(cached.Bytes, 0, cached.Bytes.Length);
+                System.Threading.Interlocked.Increment(ref LeavesReused);
+                return;
+            }
+            var start = (int)stream.Position;
+            WriteLeafNow(stream, key, leaf);
+            var bytes = new byte[(int)stream.Position - start];
+            Buffer.BlockCopy(stream.GetBuffer(), start, bytes, 0, bytes.Length);
+            lock (Leaves)
+            {
+                Leaves.Remove(leaf);
+                Leaves.Add(leaf, new Cached { Key = key, Nodes = nodes, Version = version, Height = height, Default = defaultContent, Bytes = bytes });
+            }
+            System.Threading.Interlocked.Increment(ref LeavesWritten);
+        }
+
+        private static void WriteLeafNow(Stream stream, ulong key, object leaf)
         {
             var type = (MyOctreeStorage.ChunkTypeEnum)_chunkType(leaf);
             new MyOctreeStorage.ChunkHeader { ChunkType = type, Size = _chunkSize(leaf) + 8, Version = 3 }.WriteTo(stream);

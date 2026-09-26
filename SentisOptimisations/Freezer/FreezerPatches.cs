@@ -728,6 +728,21 @@ public static class FreezerPatches
         // resource decision above. A deferred execution (old behavior) raced with the conveyor:
         // removal silently took less than the snapshot promised while the full output was added,
         // duplicating items.
+        // Every inventory holds all that is to be taken from it, summed per item - or nothing is made in
+        // this pass: a removal that takes less than planned while the whole output is added makes items
+        // out of nothing.
+        foreach (var i2r in inventoriesToRemove)
+        foreach (var byItem in System.Linq.Enumerable.GroupBy(i2r.Value, v => v.Value))
+        {
+            MyFixedPoint planned = 0;
+            foreach (var item in byItem) planned += item.Key ?? 0;
+            if (i2r.Key.GetItemAmount(byItem.Key) < planned)
+            {
+                SentisOptimisationsPlugin.Log.Warn($"Assembler '{assembler.DisplayNameText}' on '{assembler.CubeGrid.DisplayName}': " +
+                                                    $"{byItem.Key.SubtypeName} planned {planned} but only {i2r.Key.GetItemAmount(byItem.Key)} there - nothing made this pass");
+                return;
+            }
+        }
         foreach (var i2r in inventoriesToRemove)
         {
             foreach (var item in i2r.Value)
@@ -757,7 +772,8 @@ public static class FreezerPatches
 
         foreach (var myCubeBlock in assembler.CubeGrid.GetFatBlocks())
         {
-            if (myCubeBlock.HasInventory)
+            // the assembler's own input is counted by the caller already
+            if (myCubeBlock.HasInventory && myCubeBlock != assembler)
             {
                 for (int i = 0; i < myCubeBlock.InventoryCount; i++)
                 {
@@ -801,11 +817,17 @@ public static class FreezerPatches
         var prerequisiteAmount = prerequisite.Amount * myFixedPoint * count;
         foreach (var myCubeBlock in assembler.CubeGrid.GetFatBlocks())
         {
-            if (myCubeBlock.HasInventory)
+            // Not the assembler itself: its input is taken from by the caller already, and counting it
+            // again scheduled a second removal from the same stack - the removal then took only what
+            // was there while the full output was added (items out of nothing).
+            if (myCubeBlock.HasInventory && myCubeBlock != assembler)
             {
                 for (int i = 0; i < myCubeBlock.InventoryCount; i++)
                 {
                     var myInventory = myCubeBlock.GetInventory(i);
+                    // only what the conveyor could bring (the count above asks the same)
+                    if (!((IMyInventory)myInventory).CanTransferItemTo(assembler.InputInventory, prerequisite.Id))
+                        continue;
 
                     var itemAmount = myInventory.GetItemAmount(prerequisite.Id);
                     if (itemAmount > 0)

@@ -202,13 +202,22 @@ namespace SentisOptimisationsPlugin.Freezer
             _collecting = true;
         }
 
+        /// <summary>What a block of a frozen grid costs to build, learned as they are built.</summary>
+        private static double _msPerBlock;
+
         private static void CollectSome()
         {
             var watch = Stopwatch.StartNew();
+            var done = 0;
             while (_collectIndex < _toCollect.Count && watch.Elapsed.TotalMilliseconds < FrameBudgetMs)
             {
-                var grid = _toCollect[_collectIndex++];
+                var grid = _toCollect[_collectIndex];
+                // the next grid only if it should fit in what is left of the budget (at least one a frame): the
+                // last grid of a frame took it to 5-8 ms before every save
+                if (done > 0 && watch.Elapsed.TotalMilliseconds + grid.BlocksCount * _msPerBlock > FrameBudgetMs) break;
+                _collectIndex++;
                 if (grid.MarkedForClose || grid.Closed || !FreezeLogic.FrozenGrids.Contains(grid.EntityId)) continue;
+                var gridStarted = watch.Elapsed.TotalMilliseconds;
                 var entry = new Entry { Grid = grid };
                 entry.BlockChanged = _ => entry.Stale = true;
                 entry.Closing = _ => entry.Stale = true;
@@ -218,6 +227,9 @@ namespace SentisOptimisationsPlugin.Freezer
                 Entries[grid.EntityId] = entry;
                 grid.BeforeSave();
                 entry.Builder = grid.GetObjectBuilder();
+                done++;
+                var perBlock = (watch.Elapsed.TotalMilliseconds - gridStarted) / Math.Max(1, grid.BlocksCount);
+                _msPerBlock = _msPerBlock <= 0 ? perBlock : _msPerBlock * 0.8 + perBlock * 0.2;
             }
             _collectionFrames++;
             _collectionMaxFrameMs = Math.Max(_collectionMaxFrameMs, watch.Elapsed.TotalMilliseconds);
