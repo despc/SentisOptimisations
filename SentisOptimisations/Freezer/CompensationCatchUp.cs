@@ -57,6 +57,13 @@ public static class CompensationCatchUp
         public readonly List<string> Dropped = new List<string>();
         public int Steps, Frames;
         public double Refined, LastPulled;
+        public readonly Dictionary<long, (string Name, int Steps, uint Frames)> Done = new Dictionary<long, (string, int, uint)>();
+
+        public void Count(MyCubeBlock block, uint frames)
+        {
+            Done.TryGetValue(block.EntityId, out var had);
+            Done[block.EntityId] = (block.DisplayNameText, had.Steps + 1, had.Frames + frames);
+        }
         public string Name;
     }
 
@@ -120,8 +127,9 @@ public static class CompensationCatchUp
             }
             if (job.Blocks.Count > 0) continue;
             Jobs.Remove(job.Key);
-            FreezeLogic.CompensationLogs($"Compensation catch-up on {job.Name}: {job.Steps} steps of up to {StepSeconds} s in " +
-                                         $"{frame - job.StartAt} frames, {job.Refined:F0} kg of ore refined" + (job.Dropped.Count > 0 ? "; dropped: " + string.Join(", ", job.Dropped) : ""));
+            FreezeLogic.CompensationLogs($"Compensation catch-up on grid '{job.Name}' in {frame - job.StartAt} frames: " +
+                                         string.Join(", ", job.Done.Values.Select(d => $"'{d.Name}' {d.Frames / 60.0:0} s in {d.Steps} steps")) +
+                                         $"; {job.Refined:F0} kg of ore refined" + (job.Dropped.Count > 0 ? "; dropped: " + string.Join(", ", job.Dropped) : ""));
             foreach (var id in job.Grids)
                 if (!Jobs.Values.Any(j => j.Grids.Contains(id))) Busy.TryRemove(id, out _);
         }
@@ -147,13 +155,13 @@ public static class CompensationCatchUp
         var frame = (int)MySandboxGame.Static.SimulationFrameCounter;
         if (!block.Enabled || !block.IsFunctional)
         {
-            job.Dropped.Add($"{block.DisplayNameText} off");
+            job.Dropped.Add($"'{block.DisplayNameText}' switched off");
             CompensationTracker.CancelPending(block.EntityId);
             return false;
         }
         if (!job.WaitingSince.TryGetValue(block.EntityId, out var since)) job.WaitingSince[block.EntityId] = since = frame;
         if (frame - since < PowerWaitFrames) return false;
-        job.Dropped.Add($"{block.DisplayNameText} without power");
+        job.Dropped.Add($"'{block.DisplayNameText}' without power");
         CompensationTracker.CancelPending(block.EntityId);
         return false;
     }
@@ -189,7 +197,7 @@ public static class CompensationCatchUp
         var frame = (int)MySandboxGame.Static.SimulationFrameCounter;
         if (!job.PowerWaitSince.TryGetValue(block.EntityId, out var since)) job.PowerWaitSince[block.EntityId] = since = frame;
         if (frame - since < PowerWaitFrames) return false;
-        job.Dropped.Add($"{block.DisplayNameText} short of power ({sink.CurrentInputByType(electricity):F3} of {operational:F3} MW)");
+        job.Dropped.Add($"'{block.DisplayNameText}' short of power ({sink.CurrentInputByType(electricity):F3} of {operational:F3} MW)");
         CompensationTracker.CancelPending(block.EntityId);
         return false;
     }
@@ -209,7 +217,11 @@ public static class CompensationCatchUp
             if (Ready(job, block) && AssemblerStep(job, block)) job.Steps++;
         // anything else the freezer compensates: its frames as they are
         foreach (var block in job.Blocks.Where(b => !(b is MyRefinery) && !(b is MyAssembler)).ToList())
-            if (CompensationTracker.TryTakeCompensation(block.EntityId, uint.MaxValue, out var frames)) GiveToTimer(block, frames);
+            if (CompensationTracker.TryTakeCompensation(block.EntityId, uint.MaxValue, out var frames))
+            {
+                GiveToTimer(block, frames);
+                job.Count(block, frames);
+            }
     }
 
     private static double Ore(MyRefinery refinery) =>
@@ -236,6 +248,7 @@ public static class CompensationCatchUp
         }
         if (Ore(refinery) > 0 && !Powered(job, refinery)) return false;
         if (!CompensationTracker.TryTakeCompensation(refinery.EntityId, StepFrames, out var frames)) return false;
+        job.Count(refinery, frames);
         UpdateProduction.Invoke(refinery, new object[] { frames });
         if (refinery.UseConveyorSystem && refinery.OutputInventory.VolumeFillFactor > 0.25f)
             MyGridConveyorSystem.PushAnyRequest(refinery, refinery.OutputInventory);
@@ -248,6 +261,7 @@ public static class CompensationCatchUp
             PullForQueue(assembler, Math.Min(StepFrames, Owed(assembler)) / 60f);
         if (!assembler.IsQueueEmpty && !Powered(job, assembler)) return false;
         if (!CompensationTracker.TryTakeCompensation(assembler.EntityId, StepFrames, out var frames)) return false;
+        job.Count(assembler, frames);
         UpdateProductionAssembler.Invoke(assembler, new object[] { frames, false });
         if (assembler.UseConveyorSystem && assembler.OutputInventory.VolumeFillFactor > 0.25f)
             MyGridConveyorSystem.PushAnyRequest(assembler, assembler.OutputInventory);

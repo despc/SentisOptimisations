@@ -39,7 +39,7 @@ namespace SentisOptimisationsPlugin
 
         public void AlertPlayerGrid(List<IMyCubeGrid> grids)
         {
-            var minEntityId = grids.MinBy(grid => grid.EntityId).EntityId;
+            var minEntityId = grids.Min(grid => grid.EntityId);
             string gridNames = string.Join(", ", grids.Select(grid => grid.DisplayName));
             var ownerId = PlayerUtils.GetOwner(grids);
             var playerIdentity = PlayerUtils.GetPlayerIdentity(ownerId);
@@ -64,7 +64,7 @@ namespace SentisOptimisationsPlugin
 
         public void PunishPlayerGrid(List<IMyCubeGrid> grids)
         {
-            var minEntityId = grids.MinBy(grid => grid.EntityId).EntityId;
+            var minEntityId = grids.Min(grid => grid.EntityId);
             string gridNames = string.Join(", ", grids.Select(grid => grid.DisplayName));
             var ownerId = PlayerUtils.GetOwner(grids);
             var playerIdentity = PlayerUtils.GetPlayerIdentity(ownerId);

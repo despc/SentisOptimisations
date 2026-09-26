@@ -197,7 +197,7 @@ namespace SentisOptimisationsPlugin
             }
 
             var startedAt = Stopwatch.GetTimestamp();
-            storage.Save(out var data);
+            var data = VoxelBlob.Get(storage);     // compressed outside the storage's lock
             var ms = (long)((Stopwatch.GetTimestamp() - startedAt) * 1000.0 / Stopwatch.Frequency);
 
             tracked.LastRebuild = DateTime.UtcNow;

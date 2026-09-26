@@ -240,6 +240,7 @@ public static class FrozenProduction
         {
             if (Stamps.IsEmpty) return;
             Network network = null;
+            List<string> done = null;
 
             foreach (var block in grid.GetFatBlocks())
             {
@@ -251,16 +252,27 @@ public static class FrozenProduction
                 if (plot != null)
                 {
                     QueuePlot(block, plot, (int)(frames / FramesPerPlotTick));
+                    if (frames / FramesPerPlotTick >= 1)
+                        (done ??= new List<string>()).Add($"'{block.DisplayNameText}' {(int)(frames / FramesPerPlotTick)} plant ticks");
                     continue;
                 }
 
                 if (seconds <= 0) continue;
                 network = network ?? Network.For(grid, frame);
+                var gasBefore = _gasCompensated;
+                var fuelBefore = _fuelBurned;
                 if (block is MyGasGenerator generator) CompensateGenerator(generator, seconds, stamp, network);
                 else if (block is MyOxygenFarm farm) CompensateFarm(farm, seconds, stamp, network);
                 else if (block is MyReactor reactor) CompensateReactor(reactor, seconds, stamp, network);
                 else if (block is MyGasFueledPowerProducer engine) CompensateEngine(engine, seconds, stamp, network);
+                if (_gasCompensated != gasBefore || _fuelBurned != fuelBefore)
+                    (done ??= new List<string>()).Add($"'{block.DisplayNameText}' {seconds:0} s: " +
+                        (_gasCompensated != gasBefore ? $"{_gasCompensated - gasBefore} L gas" : "") +
+                        (_gasCompensated != gasBefore && _fuelBurned != fuelBefore ? ", " : "") +
+                        (_fuelBurned != fuelBefore ? $"{_fuelBurned - fuelBefore:F1} fuel burned" : ""));
             }
+            if (done != null)
+                FreezeLogic.CompensationLogs($"Frozen production on grid '{grid.DisplayName}': " + string.Join("; ", done));
         }
         catch (Exception e)
         {

@@ -18,6 +18,10 @@ namespace SentisOptimisationsPlugin
         private static long _checkpoint, _sector, _voxels, _started, _voxelsStart, _partStart;
         private static int _gc0, _gc1, _gc2, _voxelCalls;
 
+        // the voxel storages written out whole in the snapshot (changed since their last save)
+        private static long _dataStart, _dataTicks, _dataBytes;
+        private static int _dataCount;
+
         public static void Patch(PatchContext ctx) => global::SentisOptimisations.PatchGuard.Run("SaveTiming", ctx, c =>
         {
             const BindingFlags any = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
@@ -32,6 +36,7 @@ namespace SentisOptimisationsPlugin
             Around(typeof(MySession).GetMethod("GetSector", any), nameof(PartStart), nameof(SectorEnd));
             Around(typeof(MyVoxelMaps).GetMethod("GetVoxelMapsData", any), nameof(VoxelsStart), nameof(VoxelsEnd));
             Around(typeof(MySession).GetMethod("SaveDataComponents", any, null, Type.EmptyTypes, null), nameof(PartStart), nameof(ComponentsEnd));
+            Around(typeof(Sandbox.Engine.Voxels.MyStorageBase).GetMethod("GetVoxelData", any, null, Type.EmptyTypes, null), nameof(DataStart), nameof(DataEnd));
         });
 
         private static long Now => Stopwatch.GetTimestamp();
@@ -43,6 +48,8 @@ namespace SentisOptimisationsPlugin
             _started = _partStart = Now;
             _sector = _voxels = 0;
             _voxelCalls = 0;
+            _dataTicks = _dataBytes = 0;
+            _dataCount = 0;
             _gc0 = GC.CollectionCount(0); _gc1 = GC.CollectionCount(1); _gc2 = GC.CollectionCount(2);
         }
 
@@ -52,6 +59,15 @@ namespace SentisOptimisationsPlugin
         private static void VoxelsStart() => _voxelsStart = Now;
         private static void VoxelsEnd() { if (_started != 0) { _voxels += Now - _voxelsStart; _voxelCalls++; } }
 
+        private static void DataStart() => _dataStart = Now;
+        private static void DataEnd(byte[] __result)
+        {
+            if (_started == 0) return;
+            _dataTicks += Now - _dataStart;
+            _dataBytes += __result?.Length ?? 0;
+            _dataCount++;
+        }
+
         // saving the data components is the last part
         private static void ComponentsEnd()
         {
@@ -59,7 +75,8 @@ namespace SentisOptimisationsPlugin
             var total = Now - _started;
             _started = 0;
             SentisOptimisationsPlugin.Log.Info(
-                $"Save snapshot: {Ms(total):0.0} ms - checkpoint {Ms(_checkpoint):0.0}, entities {Ms(_sector):0.0}, voxels {Ms(_voxels):0.0} ({_voxelCalls} passes), " +
+                $"Save snapshot: {Ms(total):0.0} ms - checkpoint {Ms(_checkpoint):0.0}, entities {Ms(_sector):0.0}, voxels {Ms(_voxels):0.0} ({_voxelCalls} passes; " +
+                $"{_dataCount} changed storages written, {_dataBytes / 1024} KB in {Ms(_dataTicks):0.0} ms), " +
                 $"rest {Ms(total - _checkpoint - _sector - _voxels):0.0}; collections {GC.CollectionCount(0) - _gc0}/{GC.CollectionCount(1) - _gc1}/{GC.CollectionCount(2) - _gc2}");
         }
     }
