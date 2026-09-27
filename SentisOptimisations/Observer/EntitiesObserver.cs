@@ -70,7 +70,7 @@ namespace SentisGameplayImprovements.AllGridsActions
 
             if (entity is MyPlanet)
             {
-                Log.Warn("Add planet to list " + entity.DisplayName);
+                if (global::SentisOptimisations.DiagLog.On) Log.Warn("Add planet to list " + entity.DisplayName);
                 Planets.Add((MyPlanet) entity);
                 return;
             }
@@ -116,7 +116,7 @@ namespace SentisGameplayImprovements.AllGridsActions
                     }
                 }
 
-                Log.Info($"EntitiesObserver primed from world: {added} entities");
+                if (global::SentisOptimisations.DiagLog.On) Log.Info($"EntitiesObserver primed from world: {added} entities");
             }
             catch (Exception e)
             {

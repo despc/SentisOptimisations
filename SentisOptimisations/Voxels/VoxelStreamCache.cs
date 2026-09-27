@@ -137,7 +137,7 @@ namespace SentisOptimisationsPlugin
             var token = CancellationTokenSource.Token;
             try
             {
-                Log.Info("Voxel stream cache started");
+                if (global::SentisOptimisations.DiagLog.On) Log.Info("Voxel stream cache started");
                 while (!token.IsCancellationRequested)
                 {
                     await Task.Delay(TimeSpan.FromSeconds(LoopSeconds), token);
@@ -208,7 +208,7 @@ namespace SentisOptimisationsPlugin
 
             if (SentisOptimisationsPlugin.Config.EnableMainDebugLogs)
             {
-                Log.Info($"Voxel blob of {voxel.StorageName} rebuilt off the game thread: " +
+                if (global::SentisOptimisations.DiagLog.On) Log.Info($"Voxel blob of {voxel.StorageName} rebuilt off the game thread: " +
                          $"{tracked.LastBlobBytes / 1024 / 1024.0:F1} MB in {ms} ms");
             }
         }

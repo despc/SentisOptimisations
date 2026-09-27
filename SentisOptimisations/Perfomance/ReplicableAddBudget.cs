@@ -123,7 +123,7 @@ namespace SentisOptimisationsPlugin
             _startedAt = 0;
             if (ms > SlowAddMs)
             {
-                Log.Info($"ReplicableAddBudget: one add of {replicable?.GetType().Name} took {ms:F0} ms " +
+                if (global::SentisOptimisations.DiagLog.On) Log.Info($"ReplicableAddBudget: one add of {replicable?.GetType().Name} took {ms:F0} ms " +
                          "with everything it brought in; the budget cannot split it");
             }
         }

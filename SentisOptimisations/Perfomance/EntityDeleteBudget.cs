@@ -87,7 +87,7 @@ namespace SentisOptimisationsPlugin
                 }
                 // what time did not allow: next frame, with the pinned ones
                 if (toDelete.Count > 0)
-                    Log.Info($"EntityDeleteBudget: {deleted} deleted in {(Stopwatch.GetTimestamp() - started) * 1000.0 / Stopwatch.Frequency:0.0} ms, {toDelete.Count} left for the next frame");
+                    if (global::SentisOptimisations.DiagLog.On) Log.Info($"EntityDeleteBudget: {deleted} deleted in {(Stopwatch.GetTimestamp() - started) * 1000.0 / Stopwatch.Frequency:0.0} ms, {toDelete.Count} left for the next frame");
                 foreach (var entity in toDelete) nextFrame.Add(entity);
                 toDelete.Clear();
             }

@@ -129,7 +129,7 @@ namespace SentisOptimisationsPlugin
             work.Frames++;
             Step();
             if (_work == null)
-                Log.Info($"EconomySpread: tick done in {work.Frames} frames, {work.StepsDone} steps; start {work.StartMs:0.0} ms, the longest step {work.MaxStepMs:0.0} ms ({work.MaxStep})");
+                if (global::SentisOptimisations.DiagLog.On) Log.Info($"EconomySpread: tick done in {work.Frames} frames, {work.StepsDone} steps; start {work.StartMs:0.0} ms, the longest step {work.MaxStepMs:0.0} ms ({work.MaxStep})");
         }
 
         /// <summary>One step of the game's loop: the next faction's balance (its stations and stores queued), a station, or a faction's stores.</summary>

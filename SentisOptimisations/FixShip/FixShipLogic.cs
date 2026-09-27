@@ -71,7 +71,7 @@ namespace SentisOptimisations
             foreach (MyCubeGrid myCubeGrid in myCubeGridList)
             {
                 IMyEntity myEntity = (IMyEntity) myCubeGrid;
-                Log.Warn("Auto fixship after convert Grid " +
+                if (global::SentisOptimisations.DiagLog.On) Log.Warn("Auto fixship after convert Grid " +
                          myCubeGrid.DisplayName );
 
                 myEntity.Close();

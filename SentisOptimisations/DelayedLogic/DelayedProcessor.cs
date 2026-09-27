@@ -44,7 +44,7 @@ namespace SentisOptimisations.DelayedLogic
         {
             try
             {
-                Log.Info("DelayedLogic started");
+                if (global::SentisOptimisations.DiagLog.On) Log.Info("DelayedLogic started");
                 while (!CancellationTokenSource.Token.IsCancellationRequested)
                 {
                     Thread.Sleep(500);

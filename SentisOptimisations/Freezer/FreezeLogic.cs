@@ -677,7 +677,7 @@ public class FreezeLogic
     {
         if (SentisOptimisationsPlugin.Config.EnableDebugLogs)
         {
-            SentisOptimisationsPlugin.Log.Warn(message);
+            SentisOptimisationsPlugin.Log.Info(message);
         }
     }
 
@@ -685,7 +685,7 @@ public class FreezeLogic
     {
         if (SentisOptimisationsPlugin.Config.EnableCompensationLogs)
         {
-            SentisOptimisationsPlugin.Log.Warn(message);
+            SentisOptimisationsPlugin.Log.Info(message);
         }
     }
 

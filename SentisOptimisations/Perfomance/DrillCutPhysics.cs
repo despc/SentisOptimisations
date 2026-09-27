@@ -313,7 +313,7 @@ namespace Optimizer.Optimizations
             CutBoundsBuffer.Add(new BoundingBoxI((Vector3I)notify.Min.GetValue(holder), (Vector3I)notify.Max.GetValue(holder)));
             _cutBounds = CutBoundsBuffer;
             if (++HandCuts % 300 == 0)
-                NLog.LogManager.GetCurrentClassLogger().Info($"DrillCutPhysics: {HandCuts} hand cut-outs; cells kept till rebuilt {KeptCells}, dropped the vanilla way {InvalidatedCells}, untouched {UntouchedCells}, shape updates batched {ShapeUpdatesApplied}");
+                if (global::SentisOptimisations.DiagLog.On) NLog.LogManager.GetCurrentClassLogger().Info($"DrillCutPhysics: {HandCuts} hand cut-outs; cells kept till rebuilt {KeptCells}, dropped the vanilla way {InvalidatedCells}, untouched {UntouchedCells}, shape updates batched {ShapeUpdatesApplied}");
         }
 
         public static long HandCuts;

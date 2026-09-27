@@ -738,7 +738,7 @@ public static class FreezerPatches
             foreach (var item in byItem) planned += item.Key ?? 0;
             if (i2r.Key.GetItemAmount(byItem.Key) < planned)
             {
-                SentisOptimisationsPlugin.Log.Warn($"Assembler '{assembler.DisplayNameText}' on '{assembler.CubeGrid.DisplayName}': " +
+                if (global::SentisOptimisations.DiagLog.On) SentisOptimisationsPlugin.Log.Warn($"Assembler '{assembler.DisplayNameText}' on '{assembler.CubeGrid.DisplayName}': " +
                                                     $"{byItem.Key.SubtypeName} planned {planned} but only {i2r.Key.GetItemAmount(byItem.Key)} there - nothing made this pass");
                 return;
             }

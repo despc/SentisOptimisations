@@ -32,8 +32,9 @@ namespace SentisOptimisationsPlugin
         private int _freezeDistanceStatic = 3000;
         private bool _freezeNpc = false;
         private bool _freezeSignals = false;
-        private bool _enableDebugLogs = true;
-        private bool _enableCompensationLogs = true;
+        private bool _enableDebugLogs = false;
+        private bool _enableCompensationLogs = false;
+        private bool _diagnosticLogs = false;
         private bool _freezePhysics = false;
         private string _antifreezeBlockSubtypes = "LargeBlockSmallContainer_admin2:LargeBlockSmallContainer_admin";
         private int _minWakeUpIntervalInSec = 600;
@@ -144,7 +145,7 @@ namespace SentisOptimisationsPlugin
         [DisplayTab(Name = "Min WakeUp Interval In Sec", GroupName = "Freezer", Tab = "Freezer", Order = 5, Description = "Min WakeUp Interval In Sec")]
         public int MinWakeUpIntervalInSec { get => _minWakeUpIntervalInSec; set => SetValue(ref _minWakeUpIntervalInSec, value); }
         
-        [DisplayTab(Name = "Debug logs", GroupName = "Freezer", Tab = "Freezer", Order = 9, Description = "Debug logs")]
+        [DisplayTab(Name = "Freezer logs", GroupName = "Logs", Tab = "Logs", Order = 1, Description = "Every grid frozen and woken up (off by default)")]
         public bool EnableDebugLogs { get => _enableDebugLogs; set => SetValue(ref _enableDebugLogs, value); }
         
         [DisplayTab(Name = "Delay before freeze in sec", GroupName = "Freezer", Tab = "Freezer", Order = 8, Description = "Delay before freeze in sec")]
@@ -153,8 +154,12 @@ namespace SentisOptimisationsPlugin
         [DisplayTab(Name = "Delay before freezer start in sec", GroupName = "Freezer", Tab = "Freezer", Order = 7, Description = "Delay before freezer start in sec")]
         public int DelayBeforeFreezerStartSec { get => _delayBeforeFreezerStartSec; set => SetValue(ref _delayBeforeFreezerStartSec, value); }
 
-        [DisplayTab(Name = "Compensation logs", GroupName = "Freezer", Tab = "Freezer", Order = 10, Description = "Compensation logs")]
+        [DisplayTab(Name = "Compensation logs", GroupName = "Logs", Tab = "Logs", Order = 2, Description = "What frozen blocks are given for the time they were frozen (off by default)")]
         public bool EnableCompensationLogs { get => _enableCompensationLogs; set => SetValue(ref _enableCompensationLogs, value); }
+
+        [DisplayTab(Name = "Diagnostic logs", GroupName = "Logs", Tab = "Logs", Order = 0,
+            Description = "Timings and what the optimisations did (warm-ups, save and voxel timings, deferred deletes, economy steps...). Off by default; errors are logged anyway")]
+        public bool DiagnosticLogs { get => _diagnosticLogs; set => SetValue(ref _diagnosticLogs, value); }
         [DisplayTab(Name = "Freeze Physics", GroupName = "Freezer", Tab = "Freezer", Order = 6, Description = "Freeze Physics")]
         public bool FreezePhysics
         {

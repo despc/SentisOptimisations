@@ -43,7 +43,7 @@ namespace SentisOptimisationsPlugin
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
         private static TorchSessionManager SessionManager;
         private static Persistent<MainConfig> _config;
-        public static MainConfig Config => _config.Data;
+        public static MainConfig Config => _config?.Data;
         public UserControl _control = null;
         public static SentisOptimisationsPlugin Instance { get; private set; }
 
@@ -66,7 +66,7 @@ namespace SentisOptimisationsPlugin
             // ones still happen when memory runs short.
             var latency = System.Runtime.GCSettings.LatencyMode;
             System.Runtime.GCSettings.LatencyMode = System.Runtime.GCLatencyMode.SustainedLowLatency;
-            Log.Info($"GC latency mode {latency} -> {System.Runtime.GCSettings.LatencyMode}, server GC {System.Runtime.GCSettings.IsServerGC}");
+            if (global::SentisOptimisations.DiagLog.On) Log.Info($"GC latency mode {latency} -> {System.Runtime.GCSettings.LatencyMode}, server GC {System.Runtime.GCSettings.IsServerGC}");
 
             SetupConfig();
             SessionManager = Torch.Managers.GetManager<TorchSessionManager>();
@@ -140,6 +140,7 @@ namespace SentisOptimisationsPlugin
                 }
                 Optimizer.Optimizations.PhysicsLoadMonitor.Reset();
                 SerializerWarmup.Run();
+                PluginJitWarmup.Run();
                 AllGridsProcessor.OnLoaded();
                 _voxelStreamCache.OnLoaded();
                 DelayedProcessor.OnLoaded();
@@ -275,6 +276,7 @@ namespace SentisOptimisationsPlugin
             Freezer.FrozenProduction.Tick();
             Optimizer.Optimizations.SafeZoneGridTracking.Tick();
             RespawnPointsCache.Tick();
+            FaunaSpawnPrefetch.Tick();
         }
 
         public UserControl GetControl()

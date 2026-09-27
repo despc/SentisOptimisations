@@ -21,26 +21,26 @@ namespace SentisOptimisationsPlugin
                 SingleOrDefault(assembly => assembly.GetName().Name == "SEDiscordBridge");
             if (assembly == null)
             {
-                Log.Warn("No discord bridge found, skip patch");
+                if (global::SentisOptimisations.DiagLog.On) Log.Warn("No discord bridge found, skip patch");
                 return;
             }
             var type = assembly.GetType("SEDiscordBridge.DiscordBridge");
             if (type == null)
             {
-                Log.Warn("No discord bridge found, skip patch");
+                if (global::SentisOptimisations.DiagLog.On) Log.Warn("No discord bridge found, skip patch");
                 return;
             }
             var SendStatusM = type.GetMethod
                 ("SendStatus", BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
             if (SendStatusM == null)
             {
-                Log.Warn("No discord bridge found, skip patch");
+                if (global::SentisOptimisations.DiagLog.On) Log.Warn("No discord bridge found, skip patch");
                 return;
             }
             ctx.GetPattern(SendStatusM).Prefixes.Add(
                 typeof(DiscordBridgePatch).GetMethod(nameof(SendStatusPatched),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public));
-            Log.Warn("Patch discord bridge success");
+            if (global::SentisOptimisations.DiagLog.On) Log.Warn("Patch discord bridge success");
         }
 
         private static void SendStatusPatched(ref string status)

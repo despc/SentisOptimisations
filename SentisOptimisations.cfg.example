@@ -82,7 +82,7 @@
   <MinWakeUpIntervalInSec>600</MinWakeUpIntervalInSec>
 
   <!-- Подробный лог заморозки и разморозки. -->
-  <EnableDebugLogs>true</EnableDebugLogs>
+  <EnableDebugLogs>false</EnableDebugLogs>
 
   <!-- Сколько секунд ждать после ухода игроков, прежде чем заморозить группу. -->
   <DelayBeforeFreezeSec>5</DelayBeforeFreezeSec>
@@ -91,7 +91,7 @@
   <DelayBeforeFreezerStartSec>5</DelayBeforeFreezerStartSec>
 
   <!-- Писать в лог итоги компенсации производства замороженных гридов. -->
-  <EnableCompensationLogs>true</EnableCompensationLogs>
+  <EnableCompensationLogs>false</EnableCompensationLogs>
 
   <!-- Замораживать и физику: тела Havok замороженных гридов переводятся в Fixed и не стоят ничего.
        Сам грид статичным не становится. Переключается на лету. -->

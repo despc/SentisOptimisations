@@ -83,7 +83,7 @@ namespace SentisOptimisationsPlugin.CrashFix
                 Fixed.Add(method.DeclaringType?.FullName + "." + method.Name);
             }
             patchManager.Commit();
-            Log.Info("Torch re-emit leave fix applied to " + affected.Count + " patched methods: " + string.Join(", ", Fixed));
+            if (global::SentisOptimisations.DiagLog.On) Log.Info("Torch re-emit leave fix applied to " + affected.Count + " patched methods: " + string.Join(", ", Fixed));
         }
 
         /// <summary>Transpiler: a nop after a leave Torch would drop makes it emit that leave, with its target.</summary>

@@ -34,7 +34,7 @@ namespace Optimizer.Optimizations
             if (threads <= 0) return;
             threads = Math.Min(threads, Environment.ProcessorCount);
             if (__result != threads)
-                SentisOptimisationsPlugin.SentisOptimisationsPlugin.Log.Info($"Havok threads: {threads} (Physics threads)");
+                if (global::SentisOptimisations.DiagLog.On) SentisOptimisationsPlugin.SentisOptimisationsPlugin.Log.Info($"Havok threads: {threads} (Physics threads)");
             __result = threads;
         }
     }

@@ -168,7 +168,7 @@ namespace Optimizer.Optimizations
             // it fits. Nothing to schedule - the collector's own timing is left alone.
             if (System.Runtime.GCSettings.IsServerGC)
             {
-                SentisOptimisationsPlugin.SentisOptimisationsPlugin.Log.Info("GcScheduler: server GC, no collections scheduled");
+                if (global::SentisOptimisations.DiagLog.On) SentisOptimisationsPlugin.SentisOptimisationsPlugin.Log.Info("GcScheduler: server GC, no collections scheduled");
                 return;
             }
             var update = typeof(MySandboxGame).GetMethod("Update",

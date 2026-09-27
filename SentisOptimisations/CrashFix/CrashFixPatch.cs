@@ -235,7 +235,7 @@ namespace SentisOptimisationsPlugin.CrashFix
 
                 var left = clientReplicables.Count;
                 if (left > 0 || sw.ElapsedMilliseconds >= SlowRemoveClientMs)
-                    SentisOptimisationsPlugin.Log.Warn(
+                    if (global::SentisOptimisations.DiagLog.On) SentisOptimisationsPlugin.Log.Warn(
                         $"Client logout cleanup: {before} replicables, {left} left behind, {sw.ElapsedMilliseconds} ms");
             }
             catch (Exception e)

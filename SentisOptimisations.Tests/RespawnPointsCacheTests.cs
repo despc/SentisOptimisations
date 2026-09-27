@@ -21,6 +21,13 @@ namespace SentisOptimisations.Tests
         }
 
         [Fact]
+        public void A_list_tests_points_itself_while_it_has_time()
+        {
+            Assert.True(RespawnPointsCache.MayTest(2_000, 1_000_000));
+            Assert.False(RespawnPointsCache.MayTest(3_000, 1_000_000));
+        }
+
+        [Fact]
         public void An_answer_for_a_point_that_moved_is_not_used()
         {
             Assert.False(RespawnPointsCache.Usable(Tested, Tested.AddSeconds(5), 3));
