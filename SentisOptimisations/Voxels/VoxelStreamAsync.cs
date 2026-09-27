@@ -95,6 +95,21 @@ namespace SentisOptimisationsPlugin
             long entityId;
             MyObjectBuilder_EntityBase builder = null;
 
+            // A changed voxel map is always sent with its data, whatever the client is said to have cached: the
+            // game sends "take it from your cache" to a client it believes holds the storage, and a client whose
+            // cached copy is gone (or never written) fails to load it ("Failed to load voxel from cache"), never
+            // confirms the replicable and hangs in the respawn screen until it reconnects.
+            try
+            {
+                var changedVoxel = _voxel(__instance);
+                if (cachedData != null && changedVoxel?.Storage != null && (changedVoxel.ContentChanged || changedVoxel.BeforeContentChanged))
+                    cachedData.Remove(changedVoxel.StorageName);
+            }
+            catch (Exception e)
+            {
+                Log.Warn(e, "Voxel stream: the client's cache could not be set aside");
+            }
+
             try
             {
                 voxel = _voxel(__instance);
