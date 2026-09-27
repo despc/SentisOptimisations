@@ -230,7 +230,7 @@ namespace SentisOptimisationsPlugin
             _verified++;
             if (same)
             {
-                Log.Info($"Parallel voxel save checked: {vanilla.Length / 1024} KB the same as the game's; {oursMs:0.0} ms against {vanillaMs:0.0} ms");
+                if (global::SentisOptimisations.DiagLog.On) Log.Info($"Parallel voxel save checked: {vanilla.Length / 1024} KB the same as the game's; {oursMs:0.0} ms against {vanillaMs:0.0} ms");
                 if (_verified >= Verifications) VerifiedOnce.Mark("ParallelVoxelSave");
             }
             else

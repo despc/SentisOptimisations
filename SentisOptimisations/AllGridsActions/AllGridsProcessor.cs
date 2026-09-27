@@ -50,7 +50,7 @@ namespace SentisOptimisationsPlugin.AllGridsActions
         {
             try
             {
-                Log.Info("CheckLoop started");
+                if (global::SentisOptimisations.DiagLog.On) Log.Info("CheckLoop started");
                 while (!CancellationTokenSource.Token.IsCancellationRequested)
                 {
                     try
@@ -75,7 +75,7 @@ namespace SentisOptimisationsPlugin.AllGridsActions
             try
             {
                 await Task.Delay(SentisOptimisationsPlugin.Config.DelayBeforeFreezerStartSec * 1000);
-                Log.Info("Freezer Loop started");
+                if (global::SentisOptimisations.DiagLog.On) Log.Info("Freezer Loop started");
                 while (!CancellationTokenSource.Token.IsCancellationRequested)
                 {
                     try

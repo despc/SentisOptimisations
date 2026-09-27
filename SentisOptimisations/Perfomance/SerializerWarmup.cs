@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Reflection;
 using NLog;
 using VRage.Game;
@@ -23,6 +24,11 @@ namespace SentisOptimisationsPlugin
     ///
     /// So the same write is done here once at world load, into a stream that is thrown away, where
     /// nobody is watching the frame rate.
+    ///
+    /// The same goes for the arguments of the game's network events (the methods marked <c>[Event]</c>): the first
+    /// placement of a block after the start sent its <c>BuildBlocksClient</c> with serializers built right then - the
+    /// first placement cost 60 ms on the stand, 10 ms with them built at the start. Each argument type of every event
+    /// is written once here as well; a type that cannot be made up is left to its first use, as before.
     /// </summary>
     public static class SerializerWarmup
     {
@@ -54,8 +60,9 @@ namespace SentisOptimisationsPlugin
                         });
                 }
 
+                var (warmed, failed) = WarmEventArguments();
                 WarmedMs = (Stopwatch.GetTimestamp() - startedAt) * 1000.0 / Stopwatch.Frequency;
-                Log.Info($"Object builder serializers warmed up in {WarmedMs:F0} ms; the first player to join no longer pays it");
+                if (global::SentisOptimisations.DiagLog.On) Log.Info($"Serializers warmed up in {WarmedMs:F0} ms: object builders, and {warmed} argument types of the network events ({failed} left to their first use)");
             }
             catch (Exception e)
             {
@@ -86,6 +93,55 @@ namespace SentisOptimisationsPlugin
             {
                 Log.Warn(e, "Could not warm up the serializer of " + typeof(T).Name);
             }
+        }
+
+        /// <summary>Every argument type of the game's network events written once; how many were, and how many could not be.</summary>
+        private static (int Warmed, int Failed) WarmEventArguments()
+        {
+            var eventAttribute = typeof(VRage.Network.EventAttribute);
+            var write = typeof(MySerializer).GetMethods(BindingFlags.Static | BindingFlags.Public)
+                .First(m => m.Name == nameof(MySerializer.Write) && m.IsGenericMethodDefinition && m.GetParameters().Length == 3);
+            var types = new HashSet<Type>();
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                var name = assembly.GetName().Name;
+                if (!name.StartsWith("Sandbox") && !name.StartsWith("SpaceEngineers") && !name.StartsWith("VRage")) continue;
+                Type[] all;
+                try { all = assembly.GetTypes(); }
+                catch (ReflectionTypeLoadException e) { all = e.Types.Where(t => t != null).ToArray(); }
+                foreach (var type in all)
+                foreach (var method in type.GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
+                {
+                    if (!method.IsDefined(eventAttribute, false)) continue;
+                    foreach (var parameter in method.GetParameters())
+                    {
+                        var t = parameter.ParameterType;
+                        if (t.IsByRef || t.ContainsGenericParameters || t.IsPointer || t == typeof(object)) continue;
+                        types.Add(t);
+                    }
+                }
+            }
+            int warmed = 0, failed = 0;
+            using (var stream = new BitStream())
+            {
+                foreach (var type in types)
+                {
+                    stream.ResetWrite();
+                    try
+                    {
+                        var value = type.IsValueType ? Activator.CreateInstance(type) : Empty(type);
+                        if (value != null && !type.IsValueType) FillNulls(value, 0, new HashSet<object>());
+                        write.MakeGenericMethod(type).Invoke(null, new[] { stream, value, null });
+                        warmed++;
+                    }
+                    catch
+                    {
+                        // the serializer is built before the write; a value it will not take still leaves it built
+                        failed++;
+                    }
+                }
+            }
+            return (warmed, failed);
         }
 
         private const int FillDepth = 4;

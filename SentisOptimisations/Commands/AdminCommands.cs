@@ -120,7 +120,7 @@ namespace SentisOptimisations.Commands
                             {
                                 try
                                 {
-                                    SentisOptimisationsPlugin.SentisOptimisationsPlugin.Log.Info($"Cleaned projector {myProjectorBase.CustomName} on grid {myCubeGrid.DisplayName}");
+                                    if (global::SentisOptimisations.DiagLog.On) SentisOptimisationsPlugin.SentisOptimisationsPlugin.Log.Info($"Cleaned projector {myProjectorBase.CustomName} on grid {myCubeGrid.DisplayName}");
                                     myProjectorBase.Enabled = false;
                                     ((Sandbox.ModAPI.IMyProjector)myProjectorBase).SetProjectedGrid(null);
                                 }

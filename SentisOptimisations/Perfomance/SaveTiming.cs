@@ -74,7 +74,7 @@ namespace SentisOptimisationsPlugin
             if (_started == 0) return;
             var total = Now - _started;
             _started = 0;
-            SentisOptimisationsPlugin.Log.Info(
+            if (global::SentisOptimisations.DiagLog.On) SentisOptimisationsPlugin.Log.Info(
                 $"Save snapshot: {Ms(total):0.0} ms - checkpoint {Ms(_checkpoint):0.0}, entities {Ms(_sector):0.0}, voxels {Ms(_voxels):0.0} ({_voxelCalls} passes; " +
                 $"{_dataCount} changed storages written, {_dataBytes / 1024} KB in {Ms(_dataTicks):0.0} ms), " +
                 $"rest {Ms(total - _checkpoint - _sector - _voxels):0.0}; collections {GC.CollectionCount(0) - _gc0}/{GC.CollectionCount(1) - _gc1}/{GC.CollectionCount(2) - _gc2}");

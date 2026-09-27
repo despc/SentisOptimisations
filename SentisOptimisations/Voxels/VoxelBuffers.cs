@@ -190,7 +190,7 @@ namespace SentisOptimisationsPlugin
             System.Threading.Interlocked.Increment(ref _verified);
             if (same)
             {
-                Log.Info($"Pooled voxel write checked: {vanilla.Length / 1024} KB the same as the game's");
+                if (global::SentisOptimisations.DiagLog.On) Log.Info($"Pooled voxel write checked: {vanilla.Length / 1024} KB the same as the game's");
                 if (_verified >= Verifications) VerifiedOnce.Mark("VoxelBuffers");
             }
             else

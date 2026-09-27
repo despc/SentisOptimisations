@@ -61,7 +61,7 @@ public class ShipToolsAsyncQueues
         var token = CancellationTokenSource.Token;
         try
         {
-            Log.Info("Ship Tools loop started");
+            if (global::SentisOptimisations.DiagLog.On) Log.Info("Ship Tools loop started");
             foreach (var action in _actions.GetConsumingEnumerable(token))
             {
                 try
