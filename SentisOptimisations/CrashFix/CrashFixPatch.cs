@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -169,6 +169,22 @@ namespace SentisOptimisationsPlugin.CrashFix
                 harmony.Patch(method, finalizer: new HarmonyMethod(finalizer));
             }
 
+            // A connector re-made its detector and tied it to its grid on the first frame of the world, right after a
+            // plugin had moved its group out of the ground (SGI fall-through): a NullReferenceException in
+            // CreateBodyConstraint took the old server down on every load. The connector is left without its detector
+            // for that frame, and what was null goes to the log.
+            var MethodConnectorOnceBeforeFrame = typeof(MyShipConnector).GetMethod(nameof(MyShipConnector.UpdateOnceBeforeFrame),
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly) ?? throw new MissingMethodException("MyShipConnector.UpdateOnceBeforeFrame");
+            // The cause, seen on the old server: the connector's own (ejector) body without its Havok body - a
+            // MyPhysicsBody whose RigidBody is null. Both CreateBodyConstraint and UpdateHavokCollisionSystemID reach
+            // into it; such a body is taken off the connector first (its detector for docking is a body of its own).
+            var brokenEjector = new HarmonyMethod(typeof(CrashFixPatch).GetMethod(nameof(DropBrokenEjectorBody), BindingFlags.Static | BindingFlags.NonPublic));
+            harmony.Patch(MethodConnectorOnceBeforeFrame, prefix: brokenEjector, finalizer: new HarmonyMethod(typeof(CrashFixPatch).GetMethod(nameof(ConnectorFinalizer),
+                BindingFlags.Static | BindingFlags.NonPublic)));
+            var MethodConnectorCollisionId = typeof(MyShipConnector).GetMethod("UpdateHavokCollisionSystemID",
+                BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly) ?? throw new MissingMethodException("MyShipConnector.UpdateHavokCollisionSystemID");
+            harmony.Patch(MethodConnectorCollisionId, prefix: brokenEjector);
+
             var MethodRemoveClient = typeof(MyReplicationServer).GetMethod
                 ("RemoveClient", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
             ctx.GetPattern(MethodRemoveClient).Prefixes.Add(
@@ -187,6 +203,44 @@ namespace SentisOptimisationsPlugin.CrashFix
             return null;
         }
         
+        private static void DropBrokenEjectorBody(MyShipConnector __instance)
+        {
+            try
+            {
+                var body = __instance.Physics;
+                if (body == null || body.RigidBody != null) return;
+                __instance.Physics = null;
+                SentisOptimisationsPlugin.Log.Warn("Connector " + __instance.EntityId + " on '" + __instance.CubeGrid?.DisplayName + "' (" + __instance.CubeGrid?.EntityId +
+                                                   ") had an ejector body without its Havok body; taken off (no ejector until the block reloads)");
+            }
+            catch (Exception e)
+            {
+                SentisOptimisationsPlugin.Log.Error(e, "DropBrokenEjectorBody");
+            }
+        }
+
+        private static Exception ConnectorFinalizer(Exception __exception, MyShipConnector __instance)
+        {
+            if (__exception == null) return null;
+            try
+            {
+                var grid = __instance?.CubeGrid;
+                var gridBody = grid?.Physics;
+                var dummy = typeof(MyShipConnector).GetField("m_connectorDummy", BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(__instance) as Sandbox.Engine.Physics.MyPhysicsBody;
+                SentisOptimisationsPlugin.Log.Error(__exception, "Connector " + __instance?.EntityId + " '" + __instance?.CustomName + "' on '" + grid?.DisplayName + "' (" + grid?.EntityId +
+                    ", closed " + grid?.Closed + ", marked " + grid?.MarkedForClose + ", in scene " + grid?.InScene + "): grid body " + (gridBody == null ? "null" :
+                    "enabled " + gridBody.Enabled + ", rigid body " + (gridBody.RigidBody != null) + ", in world " + gridBody.IsInWorld + ", static " + gridBody.IsStatic) +
+                    "; own body " + (__instance?.Physics == null ? "null" : "enabled " + __instance.Physics.Enabled + ", rigid body " + (__instance.Physics.RigidBody != null)) +
+                    "; detector " + (dummy == null ? "null" : "enabled " + dummy.Enabled + ", rigid body " + (dummy.RigidBody != null) + ", in world " + dummy.IsInWorld) +
+                    " - left without its detector this frame");
+            }
+            catch (Exception e)
+            {
+                SentisOptimisationsPlugin.Log.Error(__exception, "Connector UpdateOnceBeforeFrame (" + e.Message + ")");
+            }
+            return null;
+        }
+
         public static Exception SuppressDispatchExceptionFinalizer(Exception __exception)
         {
             if (__exception != null)
