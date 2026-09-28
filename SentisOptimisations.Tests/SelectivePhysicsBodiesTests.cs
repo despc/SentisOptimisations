@@ -18,6 +18,24 @@ namespace SentisOptimisations.Tests
         }
 
         [Fact]
+        public void A_character_nobody_controls_does_not_keep_its_cluster_stepped()
+        {
+            Assert.False(SelectivePhysicsBodies.Stepped(dead: false, controlled: false));
+        }
+
+        [Fact]
+        public void A_controlled_character_keeps_its_cluster_stepped()
+        {
+            Assert.True(SelectivePhysicsBodies.Stepped(dead: false, controlled: true));
+        }
+
+        [Fact]
+        public void A_dead_character_does_not_keep_its_cluster_stepped()
+        {
+            Assert.False(SelectivePhysicsBodies.Stepped(dead: true, controlled: true));
+        }
+
+        [Fact]
         public void Without_selective_updates_every_cluster_is_walked()
         {
             Assert.True(SelectivePhysicsBodies.Walk(selective: false, clusterStepped: false));

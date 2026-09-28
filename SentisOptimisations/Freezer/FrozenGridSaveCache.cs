@@ -36,7 +36,9 @@ namespace SentisOptimisationsPlugin.Freezer
     /// "Frozen" is not fully immutable, measured on the save_perf fixture: timers keep ticking for a
     /// moment right after a grid is frozen, so only grids frozen for at least
     /// <see cref="MinFrozenFrames"/> are prepared; and the presence tiers of a grid change while it is
-    /// frozen, so they are copied from the grid when the prepared builder is used.
+    /// frozen, so they are copied from the grid when the prepared builder is used, and so is the NPC claim
+    /// timer. What else counts game time on in a frozen grid - a safe zone's upkeep, a seated character -
+    /// keeps the grid out of the preparation.
     /// </summary>
     [PatchShim]
     public static class FrozenGridSaveCache
@@ -193,13 +195,48 @@ namespace SentisOptimisationsPlugin.Freezer
             foreach (var id in FreezeLogic.FrozenGrids)
             {
                 if (!FreezeLogic.FrozenAtFrame.TryGetValue(id, out var frozenAt) || frame - frozenAt < MinFrozenFrames) continue;
-                if (MyEntities.TryGetEntityById(id, out MyCubeGrid grid) && grid.Save && !grid.MarkedForClose && !grid.Closed)
+                if (MyEntities.TryGetEntityById(id, out MyCubeGrid grid) && grid.Save && !grid.MarkedForClose && !grid.Closed && !HasSafeZone(grid) && !HasOccupant(grid) && !HasCombatAi(grid))
                     _toCollect.Add(grid);
             }
             _collectIndex = 0;
             _collectionFrames = 0;
             _collectionMaxFrameMs = 0;
             _collecting = true;
+        }
+
+        private static readonly VRage.ObjectBuilders.MyObjectBuilderType SafeZoneBlockType =
+            typeof(ObjectBuilders.SafeZone.MyObjectBuilder_SafeZoneBlock);
+
+        /// <summary>
+        /// A safe zone block writes the time left of its upkeep counted from the moment of the save
+        /// (<c>MySafeZoneComponent</c>: the deadline minus the game time), so its builder is out of date a frame
+        /// after it is made - frozen or not (frozen_save_perf: 19 prepared builders 350 ms behind). Such a grid is
+        /// built in the snapshot itself.
+        /// </summary>
+        private static bool HasSafeZone(MyCubeGrid grid) =>
+            grid.BlocksCounters.TryGetValue(SafeZoneBlockType, out var count) && count > 0;
+
+        private static readonly VRage.ObjectBuilders.MyObjectBuilderType CombatAiType =
+            typeof(Sandbox.Common.ObjectBuilders.MyObjectBuilder_OffensiveCombatBlock);
+
+        /// <summary>
+        /// An AI offensive block: its hit-and-run state is saved relative to the current frame
+        /// (<c>RunAwayStartedFrame</c>, "so many frames ago"), a different number every frame (frozen_save_perf,
+        /// 28.09.2026: NPC drones). Such a grid is built in the snapshot itself.
+        /// </summary>
+        private static bool HasCombatAi(MyCubeGrid grid) =>
+            grid.BlocksCounters.TryGetValue(CombatAiType, out var count) && count > 0;
+
+        /// <summary>
+        /// Someone in a seat or a cryo chamber: the character is saved inside the cockpit's builder, and a character
+        /// is never frozen - its survival buffs count game time on (frozen_save_perf, 28.09.2026: a rover's pilot
+        /// 1.6 s behind). Such a grid is built in the snapshot itself.
+        /// </summary>
+        private static bool HasOccupant(MyCubeGrid grid)
+        {
+            foreach (var cockpit in grid.GetFatBlocks<Sandbox.Game.Entities.MyCockpit>())
+                if (cockpit.Pilot != null) return true;
+            return false;
         }
 
         /// <summary>What a block of a frozen grid costs to build, learned as they are built.</summary>
@@ -252,6 +289,10 @@ namespace SentisOptimisationsPlugin.Freezer
             {
                 gridBuilder.GridPresenceTier = grid.GridPresenceTier;
                 gridBuilder.PlayerPresenceTier = grid.PlayerPresenceTier;
+                // the NPC claim timer runs in its session system, frozen grid or not (frozen_save_perf, 28.09.2026:
+                // 60 frames behind); read where MyCubeGrid.GetObjectBuilder reads it
+                if (gridBuilder.IsNpcSpawnedGrid)
+                    gridBuilder.NPCGridClaimElapsed = Sandbox.Game.World.MySession.Static.NPCGridClaimSystem?.GetFramesElapsed(grid.EntityId);
             }
             if (VerifyPreparedBuilders) Verify(grid, builder);
             LastSnapshotPreparedGrids++;
@@ -264,17 +305,34 @@ namespace SentisOptimisationsPlugin.Freezer
             var actual = Xml(prepared);
             if (expected == actual) return;
             LastVerifyMismatches++;
-            if (LastVerifyFirstDifference != null) return;
+            try
+            {
+                // the whole pair, to look at by hand (test hook only; %TEMP%rozen_verify)
+                var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "frozen_verify");
+                System.IO.Directory.CreateDirectory(dir);
+                System.IO.File.WriteAllText(System.IO.Path.Combine(dir, grid.EntityId + ".fresh.xml"), expected);
+                System.IO.File.WriteAllText(System.IO.Path.Combine(dir, grid.EntityId + ".prepared.xml"), actual);
+            }
+            catch (Exception) { }
             var a = expected.Split((char)10);
             var b = actual.Split((char)10);
+            string first = null;
             for (var i = 0; i < Math.Min(a.Length, b.Length); i++)
                 if (a[i] != b[i])
                 {
-                    LastVerifyFirstDifference = grid.DisplayName + " line " + i + ": fresh '" + a[i].Trim() + "' prepared '" + b[i].Trim() + "'";
-                    return;
+                    first = first ?? grid.DisplayName + " line " + i + ": fresh '" + a[i].Trim() + "' prepared '" + b[i].Trim() + "'";
+                    var tag = System.Text.RegularExpressions.Regex.Match(a[i], @"<(\w+)").Groups[1].Value;
+                    VerifyTags.TryGetValue(tag, out var seen);
+                    VerifyTags[tag] = seen + 1;
                 }
-            LastVerifyFirstDifference = grid.DisplayName + ": length " + a.Length + " vs " + b.Length;
+            if (a.Length != b.Length) first = first ?? grid.DisplayName + ": length " + a.Length + " vs " + b.Length;
+            _verifyFirst = _verifyFirst ?? first;
+            // every field that differs, with how many lines: what else counts time on in a frozen grid
+            LastVerifyFirstDifference = _verifyFirst + " | fields: " + string.Join(", ", VerifyTags.OrderByDescending(t => t.Value).Select(t => t.Key + " " + t.Value));
         }
+
+        private static readonly Dictionary<string, int> VerifyTags = new Dictionary<string, int>();
+        private static string _verifyFirst;
 
         private static string Xml(MyObjectBuilder_Base builder)
         {
@@ -292,6 +350,8 @@ namespace SentisOptimisationsPlugin.Freezer
             LastSnapshotStaleGrids = 0;
             LastVerifyMismatches = 0;
             LastVerifyFirstDifference = null;
+            VerifyTags.Clear();
+            _verifyFirst = null;
             LastSnapshotBuiltGridIds = new HashSet<long>();
         }
 

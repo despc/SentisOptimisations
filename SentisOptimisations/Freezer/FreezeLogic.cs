@@ -654,9 +654,14 @@ public class FreezeLogic
 
     private void UnregisterRecursive(MyEntity e)
     {
+        // the mark first, so nothing puts it back meanwhile (FrozenUpdateGuard); then off the updates twice: an
+        // entity with an add pending in the update lists (its update needs changed this frame) loses only that
+        // pending add to the first call and keeps running (MyParallelEntityUpdateOrchestrator.RemoveEntity) -
+        // frozen sensors and connectors updated on for good that way (28.09.2026)
+        e.Flags |= FrozenUpdateGuard.FrozenMark;
+        MyEntities.UnregisterForUpdate(e);
         MyEntities.UnregisterForUpdate(e);
         (e.GameLogic as IMyGameLogicComponent)?.UnregisterForUpdate();
-        e.Flags |= (EntityFlags)4;
         if (e.Hierarchy == null) return;
 
         foreach (var child in e.Hierarchy.Children) UnregisterRecursive((MyEntity)child.Container.Entity);
@@ -664,9 +669,10 @@ public class FreezeLogic
 
     private void RegisterRecursive(MyEntity e)
     {
+        // the mark first: while it is on, the update lists do not take the entity in (FrozenUpdateGuard)
+        e.Flags &= ~FrozenUpdateGuard.FrozenMark;
         MyEntities.RegisterForUpdate(e);
         (e.GameLogic as IMyGameLogicComponent)?.RegisterForUpdate();
-        e.Flags &= ~(EntityFlags)4;
         if (e.Hierarchy == null) return;
 
         foreach (var child in e.Hierarchy.Children) RegisterRecursive((MyEntity)child.Container.Entity);
