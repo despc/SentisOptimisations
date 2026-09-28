@@ -37,7 +37,7 @@ namespace SentisOptimisations.DelayedLogic
 
         public void OnUnloading()
         {
-            CancellationTokenSource.Cancel();
+            CancellationTokenSource?.Cancel();   // (not made when the world never loaded)
         }
 
         public void DelayedLogicLoop()
