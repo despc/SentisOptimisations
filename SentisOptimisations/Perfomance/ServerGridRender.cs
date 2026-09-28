@@ -19,6 +19,10 @@ namespace Optimizer.Optimizations
     /// The cells are still kept up to date - parts are added and removed as before, off the game
     /// thread - only the final rebuild is skipped, and the dirty list is emptied so nothing asks
     /// for it again. Nothing on the server reads the instance data.
+    ///
+    /// Nor does a block added to the world rebuild its cell (<c>MyCubeGridRenderCell.RebuildInstanceParts</c>
+    /// from the block's render component): a grid of 2700 blocks spawned whole rebuilt its cells block after
+    /// block, ~30 ms of the frame it came in.
     /// </summary>
     [PatchShim]
     public static class ServerGridRender
@@ -45,7 +49,15 @@ namespace Optimizer.Optimizations
             if (rebuild == null) throw new MissingMethodException("MyCubeGridRenderData.RebuildDirtyCells(RenderFlags)");
             ctx.GetPattern(rebuild).Prefixes.Add(typeof(ServerGridRender).GetMethod(nameof(RebuildDirtyCellsPrefix),
                 BindingFlags.Static | BindingFlags.NonPublic));
+
+            var cellRebuild = typeof(MyCubeGridRenderCell).GetMethod("RebuildInstanceParts",
+                BindingFlags.Instance | BindingFlags.Public, null, new[] { typeof(RenderFlags) }, null);
+            if (cellRebuild == null) throw new MissingMethodException("MyCubeGridRenderCell.RebuildInstanceParts(RenderFlags)");
+            ctx.GetPattern(cellRebuild).Prefixes.Add(typeof(ServerGridRender).GetMethod(nameof(SkipPrefix),
+                BindingFlags.Static | BindingFlags.NonPublic));
         }
+
+        private static bool SkipPrefix() => false;
 
         private static bool RebuildDirtyCellsPrefix(MyCubeGridRenderData __instance)
         {
