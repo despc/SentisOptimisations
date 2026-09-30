@@ -17,6 +17,10 @@ namespace Optimizer.Optimizations
     /// While the wheel's grid is asleep the update is skipped; the wheel stays on the list, so the
     /// moment the vehicle wakes up (a pilot, a hit, anything that activates the body) the update
     /// runs again as before.
+    ///
+    /// The same goes for a wheel whose grid is in a physics world the game does not step (see SelectivePhysicsBodies):
+    /// a body there never falls asleep, so the wheel ran its update - the steering logic included - for a vehicle that
+    /// cannot move. 1.6 s + 1.8 s of 120 on the old server with nobody on it.
     /// </summary>
     [PatchShim]
     public static class WheelSleepUpdate
@@ -34,8 +38,9 @@ namespace Optimizer.Optimizations
 
         private static bool UpdateBeforeSimulationPrefix(MyCubeBlock __instance)
         {
-            var physics = __instance.CubeGrid?.Physics;
-            return physics == null || physics.IsActive;
+            var grid = __instance.CubeGrid;
+            var physics = grid?.Physics;
+            return physics == null || physics.IsActive && !SelectivePhysicsBodies.InUnstepped(grid);
         }
     }
 }

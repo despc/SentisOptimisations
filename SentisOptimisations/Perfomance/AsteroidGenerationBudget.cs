@@ -79,7 +79,8 @@ namespace SentisOptimisationsPlugin
         {
             if (Queue.Count == 0) return;
             var started = Stopwatch.GetTimestamp();
-            var budget = (long)(BudgetMs * Stopwatch.Frequency / 1000);
+            // no more than the frame has left (a step always)
+            var budget = (long)(Optimizer.Optimizations.FrameClock.Allowed(BudgetMs, 0.3) * Stopwatch.Frequency / 1000);
             do
             {
                 var next = Queue.Dequeue();

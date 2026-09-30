@@ -59,6 +59,8 @@ namespace SentisOptimisationsPlugin
             Instance = this;
             DelayedProcessor.Instance = DelayedProcessor;
             Log.Info("Init SentisOptimisationsPlugin");
+            // first, before the plugins' patches are committed: Torch's patch jumps one instruction each
+            CrashFix.TorchJumpFix.Install();
             MyFakes.ENABLE_SCRAP = false;
             MySimpleProfiler.ENABLE_SIMPLE_PROFILER = false;
             // Full collections in the background, not stopping the game thread: with the default mode a blocking

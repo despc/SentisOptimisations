@@ -129,7 +129,10 @@ namespace Optimizer.Optimizations
                         __instance.MinLimit, __instance.MaxLimit))
                     return true;
 
-                if (((MySession.Static.GameplayFrameCounter + (int)__instance.EntityId) & (DampEveryFrames - 1)) == 0)
+                // where the world is not stepped nothing sways (and nothing falls asleep either, so the look would
+                // always find the stack awake): 0.8 s of 120 on the old server
+                if (((MySession.Static.GameplayFrameCounter + (int)__instance.EntityId) & (DampEveryFrames - 1)) == 0 &&
+                    !SelectivePhysicsBodies.InUnstepped(__instance.CubeGrid))
                     DampWobble(__instance);
                 _stopMovingSound(__instance);
                 if ((__instance.NeedsUpdate & MyEntityUpdateEnum.EACH_10TH_FRAME) != 0)

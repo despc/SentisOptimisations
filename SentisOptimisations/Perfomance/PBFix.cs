@@ -1,4 +1,5 @@
 using System;
+using Sandbox.Game.World;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -97,6 +98,7 @@ namespace SentisOptimisationsPlugin
 
         internal static void PatchImpl(PatchContext ctx)
         {
+            SubscribeFrameEnd();
             const BindingFlags any = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
             const BindingFlags statics = BindingFlags.Static | BindingFlags.NonPublic;
             var self = typeof(PBFix);
@@ -280,10 +282,17 @@ namespace SentisOptimisationsPlugin
         /// <summary>
         /// Runs the script and charges the time to the block. A collection during the run makes the
         /// measurement meaningless, so the run is counted but its time is dropped.
+        ///
+        /// Only a run on the game thread is measured. A script also runs elsewhere - its Save() when the grid's
+        /// builder is made, which a parallel world save did on its workers - and the punishment damages the block
+        /// and remakes its Havok bodies: done off the game thread that corrupted native memory and crashed the
+        /// server (28-29.09.2026).
         /// </summary>
         private static MyProgrammableBlock.ScriptTerminationReason Run(MyProgrammableBlock pb,
             Action<IMyGridProgram> action, out string response)
         {
+            if (MySandboxGame.Static?.UpdateThread != System.Threading.Thread.CurrentThread)
+                return RunCore(pb, action, out response);
             var collections = GC.CollectionCount(0) + GC.CollectionCount(1) + GC.CollectionCount(2);
             var startedAt = Stopwatch.GetTimestamp();
             try
@@ -294,8 +303,44 @@ namespace SentisOptimisationsPlugin
             {
                 var ms = (Stopwatch.GetTimestamp() - startedAt) * 1000.0 / Stopwatch.Frequency;
                 var noisy = GC.CollectionCount(0) + GC.CollectionCount(1) + GC.CollectionCount(2) != collections;
-                Measure(pb, ms, noisy);
+                if (Optimizer.Optimizations.FrameClock.Active) Pending.Add(new PendingRun { Pb = pb, Ms = ms, Noisy = noisy });
+                else Measure(pb, ms, noisy);
             }
+        }
+
+        private struct PendingRun
+        {
+            public MyProgrammableBlock Pb;
+            public double Ms;
+            public bool Noisy;
+        }
+
+        // this frame's runs, judged when the frame is over (game thread)
+        private static readonly List<PendingRun> Pending = new List<PendingRun>();
+        private static bool _subscribed;
+
+        /// <summary>Frames whose script runs were not counted (a collection, a save, a spike), for the GUI and the stand.</summary>
+        public static long NoisyFramesSkipped;
+
+        /// <summary>
+        /// The runs of a frame count only when the frame was an ordinary one. In a frame with a garbage collection, during
+        /// a world save, or in a spike (a save's snapshot, a big grid spawned) a script's time says more about the frame
+        /// than about the script: a script over its budget only in such frames was punished for the server's own load.
+        /// </summary>
+        private static void OnFrameEnded(double frameMs, bool noisyFrame)
+        {
+            if (Pending.Count == 0) return;
+            if (noisyFrame) NoisyFramesSkipped++;
+            foreach (var run in Pending)
+                Measure(run.Pb, run.Ms, run.Noisy || noisyFrame);
+            Pending.Clear();
+        }
+
+        internal static void SubscribeFrameEnd()
+        {
+            if (_subscribed) return;
+            _subscribed = true;
+            Optimizer.Optimizations.FrameClock.FrameEnded += OnFrameEnded;
         }
 
         private static void Measure(MyProgrammableBlock pb, double ms, bool noisy)
@@ -337,7 +382,31 @@ namespace SentisOptimisationsPlugin
             }
         }
 
+        /// <summary>Frames between the verdict and the punishment.</summary>
+        private const int PunishDelayFrames = 30;
+
+        // the blocks with a punishment on its way (from any thread)
+        private static readonly ConcurrentDictionary<long, byte> PunishPending = new ConcurrentDictionary<long, byte>();
+
+        /// <summary>
+        /// The punishment is done <see cref="PunishDelayFrames"/> frames later on the game thread: it changes the world
+        /// (the block damaged, its Havok bodies remade), which must never happen on another thread - a script also runs
+        /// where it is measured, and done off the game thread it corrupted native memory (28-29.09.2026) - and not in the
+        /// heavy frame in which the script was caught either.
+        /// </summary>
         private static void Punish(MyProgrammableBlock pb, long ownerId, string what, double ms, double load)
+        {
+            if (!PunishPending.TryAdd(pb.EntityId, 0)) return;
+            var at = (MySession.Static?.GameplayFrameCounter ?? 0) + PunishDelayFrames;
+            MySandboxGame.Static?.Invoke(() =>
+            {
+                PunishPending.TryRemove(pb.EntityId, out _);
+                if (pb.MarkedForClose || pb.Closed) return;
+                PunishNow(pb, ownerId, what, ms, load);
+            }, "PBFix.Punish", at);
+        }
+
+        private static void PunishNow(MyProgrammableBlock pb, long ownerId, string what, double ms, double load)
         {
             // Read the counters before forgetting the block, or the message reports zeroes.
             var overruns = PbLoad.Overruns(pb);
@@ -357,6 +426,7 @@ namespace SentisOptimisationsPlugin
         {
             var info = typeof(MyProgrammableBlock).GetField(field, BindingFlags.Instance | BindingFlags.NonPublic);
             if (info == null) throw new MissingFieldException("MyProgrammableBlock." + field);
+            global::SentisOptimisationsPlugin.Accessors.CheckRead(info, typeof(T));
             var method = new DynamicMethod("Get" + field, typeof(T), new[] { typeof(MyProgrammableBlock) },
                 typeof(MyProgrammableBlock), true);
             var il = method.GetILGenerator();
@@ -371,6 +441,7 @@ namespace SentisOptimisationsPlugin
         {
             var info = typeof(MyProgrammableBlock).GetField(field, BindingFlags.Instance | BindingFlags.NonPublic);
             if (info == null) throw new MissingFieldException("MyProgrammableBlock." + field);
+            global::SentisOptimisationsPlugin.Accessors.CheckWrite(info, typeof(T));
             var method = new DynamicMethod("Set" + field, null, new[] { typeof(MyProgrammableBlock), typeof(T) },
                 typeof(MyProgrammableBlock), true);
             var il = method.GetILGenerator();
@@ -394,6 +465,9 @@ namespace SentisOptimisationsPlugin
             var field = typeof(TOwner).GetField(name, any);
             var property = field == null ? typeof(TOwner).GetProperty(name, any) : null;
             if (field == null && property == null) throw new MissingFieldException(typeof(TOwner).Name + "." + name);
+            if (field != null) global::SentisOptimisationsPlugin.Accessors.CheckRead(field, typeof(TField));
+            else if (!global::SentisOptimisationsPlugin.Accessors.Compatible(property.PropertyType, typeof(TField)))
+                throw new InvalidCastException(typeof(TOwner).Name + "." + name + " is " + property.PropertyType.FullName + ", not read as " + typeof(TField).FullName);
             var method = new DynamicMethod("Get" + name, typeof(TField), new[] { typeof(TOwner) }, typeof(TOwner), true);
             var il = method.GetILGenerator();
             il.Emit(OpCodes.Ldarg_0);
