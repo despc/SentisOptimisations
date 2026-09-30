@@ -111,7 +111,9 @@ public static class CompensationCatchUp
                     if (b.Closed || b.MarkedForClose) { CompensationTracker.Forget(b.EntityId); return true; }
                     return CompensationTracker.IsFrozen(b.EntityId) || Owed(b) == 0;
                 });
-                while (job.Blocks.Count > 0 && watch.Elapsed.TotalMilliseconds < BudgetMs)
+                // no more than the frame has left (a step always)
+                var budgetMs = Optimizer.Optimizations.FrameClock.Allowed(BudgetMs, 0.2);
+                while (job.Blocks.Count > 0 && watch.Elapsed.TotalMilliseconds < budgetMs)
                 {
                     var before = job.Steps;
                     Step(job);

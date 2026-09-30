@@ -49,6 +49,24 @@ namespace Optimizer.Optimizations
     /// queues a box query into Havok every 10 frames (<c>MyLandingGear.FindBodyParallel</c>); where nothing moves the
     /// answer cannot change - 2.9 s of 185 on the old server. A gear ready to lock is left to the game.
     ///
+    /// Nor are its thrusters worked out there. A grid's thrust component recomputes every frame, on the parallel updates,
+    /// the thrust of each direction, the dampeners, the power and fuel it takes (<c>MyThrusterBlockThrustComponent</c>),
+    /// and takes itself off the updates only when the thrust is zero - never for a ship hanging on its thrusters or
+    /// holding still with dampeners. Where the forces are left out anyway it was work for nothing: 26 s of 64 s of the
+    /// parallel updates on the old server with nobody on it (dotTrace, 28.09.2026). The component stays scheduled and
+    /// takes up where it was on the first stepped frame.
+    ///
+    /// The same goes for a connector looking for another to lock to (<c>MyShipConnector.TryAttach</c>, a query into the
+    /// world every 40 frames) and for a sensor looking over its field (<c>MySensorBlock.UpdateAfterSimulation10</c>: the
+    /// pruning tree and Havok shape tests every 10 frames) - 0.8 s and 1 s of 120 on the old server. Nothing comes or
+    /// goes where nothing moves; they look again on the first stepped frame.
+    ///
+    /// Nor does a rotor, a hinge, a piston or a wheel there measure how far its top has drifted from where it should be, to
+    /// break off past its safety limit (<c>MyMechanicalConnectionBlockBase.CheckSafetyDetach</c>, 1.2 s of 120 on the old
+    /// server): nothing drifts where nothing moves. A block with no constraint is left to the game (the same method takes
+    /// it off the per-frame updates). The gyroscopes are not skipped: left out while the cluster stood, they threw a subgrid
+    /// of the freezer_physics rig at 87 m/s on the first stepped frame.
+    ///
     /// And when no cluster is stepped at all, the step is not started: <c>MyPhysics.StepWorldsParallel</c> woke
     /// Havok's thread pool, ran an empty job queue and waited for it every frame - ~1 ms a frame on a server with
     /// nobody on it.
@@ -63,6 +81,7 @@ namespace Optimizer.Optimizations
         private static Func<MyPhysics, bool> _updateKinematic;
         /// <summary>The Havok worlds the game did not step this frame; replaced whole, read from the parallel updates.</summary>
         private static volatile HashSet<HkWorld> _unstepped = new HashSet<HkWorld>();
+
 
         public static void Patch(PatchContext ctx) => global::SentisOptimisations.PatchGuard.Run("SelectivePhysicsBodies", ctx, PatchImpl);
 
@@ -91,10 +110,38 @@ namespace Optimizer.Optimizations
             ctx.GetPattern(findBody).Prefixes.Add(typeof(SelectivePhysicsBodies).GetMethod(nameof(GearFindBodyPrefix), BindingFlags.Static | BindingFlags.NonPublic));
             ctx.GetPattern(M("StepWorldsParallel")).Prefixes.Add(typeof(SelectivePhysicsBodies).GetMethod(nameof(StepPrefix), BindingFlags.Static | BindingFlags.NonPublic));
             ctx.GetPattern(M("IsClusterActive", typeof(int), typeof(int))).Prefixes.Add(typeof(SelectivePhysicsBodies).GetMethod(nameof(ClusterActivePrefix), BindingFlags.Static | BindingFlags.NonPublic));
+            var thrustType = typeof(Sandbox.Game.Entities.MyCubeGrid).Assembly.GetType("Sandbox.Game.EntityComponents.MyThrusterBlockThrustComponent", true);
+            var thrustUpdate = thrustType.GetMethod("UpdateBeforeSimulation", any, null, Type.EmptyTypes, null)
+                               ?? throw new MissingMethodException("MyThrusterBlockThrustComponent", "UpdateBeforeSimulation");
+            ctx.GetPattern(thrustUpdate).Prefixes.Add(typeof(SelectivePhysicsBodies).GetMethod(nameof(ThrustPrefix), BindingFlags.Static | BindingFlags.NonPublic));
+            var tryAttach = typeof(Sandbox.Game.Entities.Cube.MyShipConnector).GetMethod("TryAttach", any, null, new[] { typeof(long?) }, null)
+                            ?? throw new MissingMethodException("MyShipConnector", "TryAttach");
+            ctx.GetPattern(tryAttach).Prefixes.Add(typeof(SelectivePhysicsBodies).GetMethod(nameof(ConnectorSeekPrefix), BindingFlags.Static | BindingFlags.NonPublic));
+            var sensorUpdate = typeof(Sandbox.Game.Entities.Blocks.MySensorBlock).GetMethod("UpdateAfterSimulation10", any, null, Type.EmptyTypes, null)
+                               ?? throw new MissingMethodException("MySensorBlock", "UpdateAfterSimulation10");
+            ctx.GetPattern(sensorUpdate).Prefixes.Add(typeof(SelectivePhysicsBodies).GetMethod(nameof(BlockPrefix), BindingFlags.Static | BindingFlags.NonPublic));
+            var mechanical = typeof(Sandbox.Game.Entities.Blocks.MyMechanicalConnectionBlockBase);
+            var safety = mechanical.GetMethod("CheckSafetyDetach", any, null, Type.EmptyTypes, null)
+                         ?? throw new MissingMethodException("MyMechanicalConnectionBlockBase", "CheckSafetyDetach");
+            _constraint = Getter<Sandbox.Game.Entities.Blocks.MyMechanicalConnectionBlockBase, HkConstraint>(
+                mechanical.GetProperty("Constraint", any) ?? throw new MissingMemberException("MyMechanicalConnectionBlockBase", "Constraint"));
+            ctx.GetPattern(safety).Prefixes.Add(typeof(SelectivePhysicsBodies).GetMethod(nameof(SafetyDetachPrefix), BindingFlags.Static | BindingFlags.NonPublic));
             var pistonMove = typeof(Sandbox.Game.Entities.Blocks.MyPistonBase).GetMethod("UpdatePosition", any, null, new[] { typeof(bool) }, null)
                              ?? throw new MissingMethodException("MyPistonBase", "UpdatePosition");
             ctx.GetPattern(pistonMove).Prefixes.Add(typeof(SelectivePhysicsBodies).GetMethod(nameof(PistonMovePrefix), BindingFlags.Static | BindingFlags.NonPublic));
         }
+
+        private static Func<Sandbox.Game.Entities.Blocks.MyMechanicalConnectionBlockBase, HkConstraint> _constraint;
+
+        private static Func<TOwner, T> Getter<TOwner, T>(PropertyInfo property)
+        {
+            var arg = Expression.Parameter(typeof(TOwner), "owner");
+            return Expression.Lambda<Func<TOwner, T>>(Expression.Property(arg, property), arg).Compile();
+        }
+
+        /// <summary>A mechanical block with its constraint in a world that is not stepped does not check how far its top drifted.</summary>
+        private static bool SafetyDetachPrefix(Sandbox.Game.Entities.Blocks.MyMechanicalConnectionBlockBase __instance) =>
+            _constraint(__instance) == null || !InUnstepped(__instance.CubeGrid);
 
         private static Func<MyPhysics, T> Getter<T>(FieldInfo field)
         {
@@ -195,10 +242,22 @@ namespace Optimizer.Optimizations
             }
         }
 
+        /// <summary>The thrust of a grid in a world that is not stepped is not worked out.</summary>
+        private static bool ThrustPrefix(VRage.Game.Components.MyEntityComponentBase __instance) =>
+            !InUnstepped(__instance.Entity as Sandbox.Game.Entities.MyCubeGrid);
+
+        /// <summary>A connector in a world that is not stepped does not look for another (a given one is left to the game).</summary>
+        private static bool ConnectorSeekPrefix(Sandbox.Game.Entities.Cube.MyShipConnector __instance, long? otherConnectorId) =>
+            otherConnectorId.HasValue || !InUnstepped(__instance.CubeGrid);
+
+        /// <summary>A block of a grid in a world that is not stepped skips this update.</summary>
+        private static bool BlockPrefix(Sandbox.Game.Entities.MyCubeBlock __instance) => !InUnstepped(__instance.CubeGrid);
+
         /// <summary>A wheel on a grid in a world that is not stepped is not driven.</summary>
         private static bool WheelDrivePrefix(Sandbox.Game.Entities.Cube.MyMotorSuspension __instance) => !InUnstepped(__instance.CubeGrid);
 
-        private static bool InUnstepped(Sandbox.Game.Entities.MyCubeGrid grid)
+        /// <summary>Whether the grid's body is in a Havok world the game did not step this frame.</summary>
+        internal static bool InUnstepped(Sandbox.Game.Entities.MyCubeGrid grid)
         {
             var unstepped = _unstepped;
             if (unstepped.Count == 0) return false;

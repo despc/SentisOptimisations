@@ -135,6 +135,8 @@ namespace SentisOptimisationsPlugin
             if (!nodesField.IsInitOnly) throw new InvalidOperationException("MySparseOctree.m_nodes is not readonly: its instance may change");
             Func<object, TResult> Read<TResult>(Type owner, FieldInfo field)
             {
+                if (field.FieldType == typeof(byte) ? typeof(TResult) != typeof(int) : !global::SentisOptimisationsPlugin.Accessors.Compatible(field.FieldType, typeof(TResult)))
+                    throw new InvalidCastException(owner.Name + "." + field.Name + " is " + field.FieldType.Name + ", not read as " + typeof(TResult).Name);
                 var getter = new DynamicMethod("Read" + field.Name, typeof(TResult), new[] { typeof(object) }, storage, true);
                 var g = getter.GetILGenerator();
                 g.Emit(OpCodes.Ldarg_0);

@@ -177,6 +177,7 @@ namespace Optimizer.Optimizations
         // DynamicMethod, because the field is readonly.
         private static Action<object, T> BuildSetter<T>(Type owner, FieldInfo field)
         {
+            global::SentisOptimisationsPlugin.Accessors.CheckWrite(field, typeof(T));
             var method = new DynamicMethod("Set" + field.Name, null, new[] { typeof(object), typeof(T) }, owner.Module, true);
             var il = method.GetILGenerator();
             il.Emit(OpCodes.Ldarg_0);

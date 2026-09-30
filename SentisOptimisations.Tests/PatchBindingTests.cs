@@ -158,7 +158,7 @@ namespace SentisOptimisations.Tests
             {
                 foreach (var p in r.Patch.GetParameters())
                 {
-                    if (p.Name == null || specials.Contains(p.Name) || (p.Name.StartsWith("___")))
+                    if (p.Name == null || specials.Contains(p.Name) || p.Name.StartsWith("___") || p.Name.StartsWith("__field_"))
                         continue;
                     if (!r.Original.GetParameters().Any(tp => tp.Name == p.Name))
                         bad.Add($"{r}: '{p.Name}'");

@@ -236,9 +236,10 @@ namespace SentisOptimisations.Tests
                         errors.Add($"{patch.Name}: __prefixSkipped must be bool");
                     continue;
                 }
-                if (name.StartsWith("___"))
+                // a field of the instance: Harmony's ___name, Torch's __field_name
+                if (name.StartsWith("___") || name.StartsWith("__field_"))
                 {
-                    var fieldName = name.Substring(3);
+                    var fieldName = name.StartsWith("___") ? name.Substring(3) : name.Substring(8);
                     if (!FieldExists(original.DeclaringType, fieldName))
                         errors.Add($"{patch.Name}: field '{fieldName}' (from {name}) not found on {original.DeclaringType?.Name} or bases");
                     continue;

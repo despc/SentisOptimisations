@@ -60,7 +60,8 @@ namespace SentisOptimisationsPlugin
             if (toDelete == null || toDelete.Count <= 1) return true;
             var nextFrame = (HashSet<MyEntity>)_nextFrame.GetValue(null);
             var started = Stopwatch.GetTimestamp();
-            var budget = (long)(BudgetMs * Stopwatch.Frequency / 1000);
+            // no more than the frame has left (one entity always, as before)
+            var budget = (long)(Optimizer.Optimizations.FrameClock.Allowed(BudgetMs, 0) * Stopwatch.Frequency / 1000);
             var deleted = 0;
             MyEntities.CloseAllowed = true;
             try

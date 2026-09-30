@@ -246,12 +246,14 @@ namespace SentisOptimisationsPlugin.Freezer
         {
             var watch = Stopwatch.StartNew();
             var done = 0;
-            while (_collectIndex < _toCollect.Count && watch.Elapsed.TotalMilliseconds < FrameBudgetMs)
+            // no more than the frame has left (a grid always)
+            var budgetMs = Optimizer.Optimizations.FrameClock.Allowed(FrameBudgetMs, 0.3);
+            while (_collectIndex < _toCollect.Count && watch.Elapsed.TotalMilliseconds < budgetMs)
             {
                 var grid = _toCollect[_collectIndex];
                 // the next grid only if it should fit in what is left of the budget (at least one a frame): the
                 // last grid of a frame took it to 5-8 ms before every save
-                if (done > 0 && watch.Elapsed.TotalMilliseconds + grid.BlocksCount * _msPerBlock > FrameBudgetMs) break;
+                if (done > 0 && watch.Elapsed.TotalMilliseconds + grid.BlocksCount * _msPerBlock > budgetMs) break;
                 _collectIndex++;
                 if (grid.MarkedForClose || grid.Closed || !FreezeLogic.FrozenGrids.Contains(grid.EntityId)) continue;
                 var gridStarted = watch.Elapsed.TotalMilliseconds;

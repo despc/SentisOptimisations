@@ -25,6 +25,16 @@ namespace Optimizer.Optimizations
     /// and sequential builders serialize to identical XML. If a parallel build ever throws, the
     /// snapshot is rebuilt sequentially and parallel saving is disabled until the server restarts.
     ///
+    /// A grid whose builder runs code that is not the game's own is built on the game thread, in order, as in
+    /// vanilla: a programmable block's builder runs the player's script (<c>MyProgrammableBlock.UpdateStorage</c> calls
+    /// the script's Save()), and a mod's game logic may override GetObjectBuilder. Neither is thread-safe. Scripts ran
+    /// on sixteen workers at once, and a script whose Save() the plugin measured as too slow (a collection in the
+    /// middle) was punished there - its block damaged, its Havok bodies closed and made again off the game thread. On
+    /// the old server that corrupted native memory: a clr stub overwritten, a stack walk overrun, an access violation
+    /// in Havok - seven crashes on 28-29.09.2026, every one of them seconds after a save.
+    /// A frozen grid is still built on the workers, programmable block or not: most of a big world is frozen, and the
+    /// punishment that did the damage is never done off the game thread any more (PBFix).
+    ///
     /// Measured (64 grids, 32k blocks): the snapshot frame went from 135-151 ms to ~77 ms. The rest is
     /// garbage collection triggered by the builders themselves (6-7 gen0 + 2 gen1 in that frame).
     /// GC.TryStartNoGCRegion around the build is not an option: it starts with a full blocking
@@ -82,8 +92,10 @@ namespace Optimizer.Optimizations
                 entities[i].BeforeSave();
                 if (grid != null)
                 {
-                    grids.Add(i);
                     FrozenGridSaveCache.RecordBuiltInSnapshot(grid);
+                    // user or mod code in the builder: here, on the game thread - unless the grid is frozen
+                    if (!FreezeLogic.FrozenGrids.Contains(grid.EntityId) && RunsForeignCode(grid)) builders[i] = grid.GetObjectBuilder();
+                    else grids.Add(i);
                 }
                 else builders[i] = entities[i].GetObjectBuilder();
             }
@@ -102,6 +114,49 @@ namespace Optimizer.Optimizations
             FrozenGridSaveCache.EndSnapshot();
             __result = new List<MyObjectBuilder_EntityBase>(builders);
             return false;
+        }
+
+        private static readonly MyObjectBuilderType ProgrammableBlockType = typeof(Sandbox.Common.ObjectBuilders.MyObjectBuilder_MyProgrammableBlock);
+        private static readonly Dictionary<Type, bool> OverridesBuilder = new Dictionary<Type, bool>();
+        private static FieldInfo _compositeLogics;
+
+        /// <summary>
+        /// Whether building the grid runs code that is not the game's: a programmable block (the script's Save()) or a
+        /// mod game logic that overrides GetObjectBuilder. Game thread.
+        /// </summary>
+        public static bool RunsForeignCode(MyCubeGrid grid)
+        {
+            if (grid.BlocksCounters.TryGetValue(ProgrammableBlockType, out var pbs) && pbs > 0) return true;
+            foreach (var block in grid.GetFatBlocks())
+                if (block.GameLogic is VRage.Game.Components.MyGameLogicComponent logic && ModLogicBuilds(logic)) return true;
+            return false;
+        }
+
+        private static bool ModLogicBuilds(VRage.Game.Components.MyGameLogicComponent logic)
+        {
+            if (logic is Sandbox.Game.Entities.MyCompositeGameLogicComponent composite)
+            {
+                _compositeLogics = _compositeLogics ?? typeof(Sandbox.Game.Entities.MyCompositeGameLogicComponent)
+                    .GetField("m_logicComponents", BindingFlags.Instance | BindingFlags.NonPublic);
+                if (_compositeLogics?.GetValue(composite) is System.Collections.IEnumerable parts)
+                {
+                    foreach (var part in parts)
+                        if (part is VRage.Game.Components.MyGameLogicComponent inner && ModLogicBuilds(inner)) return true;
+                    return false;
+                }
+                return true;
+            }
+            var type = logic.GetType();
+            if (!OverridesBuilder.TryGetValue(type, out var overrides))
+            {
+                var method = type.GetMethod("GetObjectBuilder", BindingFlags.Instance | BindingFlags.Public, null, new[] { typeof(bool) }, null);
+                var declaring = method?.DeclaringType?.Assembly;
+                // the game's own logic types live in the game's assemblies; a mod's are compiled at load
+                overrides = method != null && declaring != typeof(VRage.Game.Components.MyGameLogicComponent).Assembly &&
+                            declaring != typeof(MyCubeGrid).Assembly && declaring != typeof(SpaceEngineers.Game.Entities.Blocks.MyTimerBlock).Assembly;
+                OverridesBuilder[type] = overrides;
+            }
+            return overrides;
         }
 
         /// <summary>Same selection as vanilla MyEntities.Save.</summary>
