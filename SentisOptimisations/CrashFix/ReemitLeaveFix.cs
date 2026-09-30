@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
+using HarmonyLib;
 using NLog;
 using Torch.Managers.PatchManager;
 using Torch.Managers.PatchManager.MSIL;
@@ -31,9 +32,10 @@ namespace SentisOptimisationsPlugin.CrashFix
     /// <item>MySessionComponentContractSystem.UpdateAfterSimulation: the end of a loop falls into the
     /// body of <c>while (queue.Count &gt; 0) queue.Dequeue()</c> and throws on an empty queue.</item>
     /// </list>
-    /// Once every plugin has patched, each re-emitted method is checked, and where a dropped leave
-    /// would land somewhere else than its target a transpiler puts a nop after it: Torch then emits
-    /// the leave itself, with its own target.
+    /// Right before each Torch commit (and once at install for the methods patched earlier) every
+    /// newly patched method is checked, and where a dropped leave would land somewhere else than its
+    /// target a transpiler puts a nop after it: Torch then emits the leave itself, with its own target.
+    /// Everything goes into the startup commits; the fix never commits anything on a running server.
     /// </summary>
     public static class ReemitLeaveFix
     {
@@ -48,10 +50,45 @@ namespace SentisOptimisationsPlugin.CrashFix
         public static readonly MethodInfo KeepLeavesMethod =
             typeof(ReemitLeaveFix).GetMethod(nameof(KeepLeaves), BindingFlags.Static | BindingFlags.Public);
 
-        /// <summary>Checks every re-emitted method and fixes those the bug redirects. Call once all plugins have patched.</summary>
-        public static void Apply(PatchManager patchManager)
+            private static PatchContext _context;
+        private static readonly HashSet<MethodBase> Checked = new HashSet<MethodBase>();
+
+        /// <summary>
+        /// Checks the methods patched so far and, through a prefix on Torch's commit, those of every later commit, all
+        /// before they are re-emitted: the fix goes into the same commit, and nothing is committed only for it.
+        /// </summary>
+        public static void Install(PatchManager patchManager)
         {
-            if (patchManager == null) return;
+            try
+            {
+                if (patchManager == null) throw new ArgumentNullException(nameof(patchManager));
+                _context = patchManager.AcquireContext();
+                var commit = typeof(PatchManager).GetMethod("CommitInternal", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
+                             ?? throw new MissingMethodException(nameof(PatchManager), "CommitInternal");
+                CheckPatterns();
+                CrashFixPatch.harmony.Patch(commit, prefix: new HarmonyMethod(typeof(ReemitLeaveFix).GetMethod(nameof(CommitPrefix), BindingFlags.Static | BindingFlags.NonPublic)));
+            }
+            catch (Exception e)
+            {
+                Log.Error(e, "Torch re-emit leave fix could not be installed");
+            }
+        }
+
+        private static void CommitPrefix()
+        {
+            try
+            {
+                CheckPatterns();
+            }
+            catch (Exception e)
+            {
+                Log.Error(e, "Torch re-emit leave fix failed");
+            }
+        }
+
+        /// <summary>Adds the fix to each patched method not checked yet that the bug redirects; the next commit re-emits it with it.</summary>
+        private static void CheckPatterns()
+        {
             var patterns = typeof(PatchManager).GetField("_rewritePatterns", BindingFlags.Static | BindingFlags.NonPublic)
                 ?.GetValue(null) as IDictionary;
             if (patterns == null)
@@ -60,30 +97,29 @@ namespace SentisOptimisationsPlugin.CrashFix
                 return;
             }
 
-            var affected = new List<MethodBase>();
-            foreach (var entry in Entries(patterns))
+            var added = new List<string>();
+            lock (patterns)
             {
-                var method = (MethodBase)entry.Key;
-                if (HasFix(entry.Value)) continue;
-                try
+                foreach (var entry in Entries(patterns))
                 {
-                    if (Redirects(method)) affected.Add(method);
-                }
-                catch (Exception e)
-                {
-                    Log.Warn("Torch re-emit leave fix: could not read " + method.DeclaringType?.FullName + "." + method.Name + ": " + e.Message);
+                    var method = (MethodBase)entry.Key;
+                    if (!Checked.Add(method) || HasFix(entry.Value)) continue;
+                    try
+                    {
+                        if (!Redirects(method)) continue;
+                    }
+                    catch (Exception e)
+                    {
+                        Log.Warn("Torch re-emit leave fix: could not read " + method.DeclaringType?.FullName + "." + method.Name + ": " + e.Message);
+                        continue;
+                    }
+                    _context.GetPattern(method).Transpilers.Add(KeepLeavesMethod);
+                    added.Add(method.DeclaringType?.FullName + "." + method.Name);
                 }
             }
-            if (affected.Count == 0) return;
-
-            var context = patchManager.AcquireContext();
-            foreach (var method in affected)
-            {
-                context.GetPattern(method).Transpilers.Add(KeepLeavesMethod);
-                Fixed.Add(method.DeclaringType?.FullName + "." + method.Name);
-            }
-            patchManager.Commit();
-            if (global::SentisOptimisations.DiagLog.On) Log.Info("Torch re-emit leave fix applied to " + affected.Count + " patched methods: " + string.Join(", ", Fixed));
+            if (added.Count == 0) return;
+            Fixed.AddRange(added);
+            if (global::SentisOptimisations.DiagLog.On) Log.Info("Torch re-emit leave fix added to " + added.Count + " patched methods: " + string.Join(", ", added));
         }
 
         /// <summary>Transpiler: a nop after a leave Torch would drop makes it emit that leave, with its target.</summary>

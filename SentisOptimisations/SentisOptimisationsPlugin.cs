@@ -61,6 +61,8 @@ namespace SentisOptimisationsPlugin
             Log.Info("Init SentisOptimisationsPlugin");
             // first, before the plugins' patches are committed: Torch's patch jumps one instruction each
             CrashFix.TorchJumpFix.Install();
+            // also before them: the fix goes into the same commits, see ReemitLeaveFix
+            CrashFix.ReemitLeaveFix.Install(torch.Managers.GetManager<Torch.Managers.PatchManager.PatchManager>());
             MyFakes.ENABLE_SCRAP = false;
             MySimpleProfiler.ENABLE_SIMPLE_PROFILER = false;
             // Full collections in the background, not stopping the game thread: with the default mode a blocking
@@ -131,15 +133,6 @@ namespace SentisOptimisationsPlugin
             {
                 if (newState != TorchSessionState.Loaded)
                     return;
-                // Every plugin has patched by now; see ReemitLeaveFix.
-                try
-                {
-                    CrashFix.ReemitLeaveFix.Apply(Torch.Managers.GetManager<Torch.Managers.PatchManager.PatchManager>());
-                }
-                catch (Exception e)
-                {
-                    Log.Error(e, "Torch re-emit leave fix failed");
-                }
                 Optimizer.Optimizations.PhysicsLoadMonitor.Reset();
                 SerializerWarmup.Run();
                 PluginJitWarmup.Run();

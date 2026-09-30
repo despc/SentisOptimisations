@@ -193,13 +193,32 @@ namespace SentisOptimisationsPlugin.CrashFix
         }
 
 
-        public static Exception SuppressExceptionFinalizer(Exception __exception)
-        {
-            if (__exception != null && SentisOptimisationsPlugin.Config.EnableMainDebugLogs)
-            {
-                SentisOptimisationsPlugin.Log.Error(__exception, "SuppressedException ");
-            }
+        // When each suppressed exception (method and type) was last written, so one thrown every frame is a line in 10 s.
+        private static readonly ConcurrentDictionary<string, DateTime> SuppressedLogged = new ConcurrentDictionary<string, DateTime>();
+        private const double SuppressedLogEverySec = 10;
 
+        /// <summary>
+        /// Keeps the server up past an exception in the patched method - and always says so: the method stopped half way,
+        /// and what it left undone (a grid half split by a grinder, blocks an explosion half took off) is where to look
+        /// when something odd follows. Only when the debug logs were on did it use to be written.
+        /// </summary>
+        public static Exception SuppressExceptionFinalizer(Exception __exception, MethodBase __originalMethod)
+        {
+            if (__exception == null) return null;
+            try
+            {
+                var key = __originalMethod?.DeclaringType?.Name + "." + __originalMethod?.Name + ": " + __exception.GetType().Name;
+                var now = DateTime.UtcNow;
+                if (!SuppressedLogged.TryGetValue(key, out var last) || (now - last).TotalSeconds >= SuppressedLogEverySec)
+                {
+                    SuppressedLogged[key] = now;
+                    SentisOptimisationsPlugin.Log.Error(__exception, "SuppressedException in " + key + " (the method stopped where it threw)");
+                }
+            }
+            catch
+            {
+                // the log must not throw from a finalizer
+            }
             return null;
         }
         
