@@ -708,63 +708,66 @@ public class FreezeLogic
         }
     }
 
+    /// <summary>Frozen groups the FreezePhysics switch goes through each frame.</summary>
+    private const int FreezePhysicsGroupsPerFrame = 25;
+
+    /// <summary>
+    /// FreezePhysics turned on or off: the physics of the frozen groups frozen or thawed with it, a few groups a frame.
+    /// Each batch reads the switch when it runs - one group every 2 frames took 10-15 s on the stand's ~450 frozen
+    /// grids, and an "off" still going through thawed the groups an "on" had frozen in the meantime (freezer_physics:
+    /// "FreezePhysics on: 0/12 grids physics-frozen").
+    /// </summary>
     public static void UpdateFreezePhysics(bool freezePhysicsEnabled)
     {
-        DelayedProcessor.Instance.AddDelayedAction(DateTime.Now, () =>
+        MyAPIGateway.Utilities.InvokeOnGameThread(() =>
         {
-            MyAPIGateway.Utilities.InvokeOnGameThread(() =>
+            var gridsList = new HashSet<long>(FrozenGrids);
+            var groups = new List<HashSet<IMyCubeGrid>>();
+            while (gridsList.Count > 0)
             {
-                var gridsList = new HashSet<long>(FrozenGrids);
-                int i = 0;
-
-
-                List<HashSet<IMyCubeGrid>> groups = new List<HashSet<IMyCubeGrid>>();
-                while (gridsList.Count > 0)
+                var gridEntityId = gridsList.FirstElement();
+                if (!(MyEntities.GetEntityById(gridEntityId) is MyCubeGrid grid))
                 {
-                    var gridEntityId = gridsList.FirstElement();
-                    if (!(MyEntities.GetEntityById(gridEntityId) is MyCubeGrid grid))
-                    {
-                        gridsList.Remove(gridEntityId);
-                        continue;
-                    }
-                    HashSet<IMyCubeGrid> group = new HashSet<IMyCubeGrid>();
-                    MyAPIGateway.GridGroups.GetGroup(grid, GridLinkTypeEnum.Physical, group);
-                    group.ForEach(cubeGrid => gridsList.Remove(cubeGrid.EntityId));
-                    groups.Add(group);
+                    gridsList.Remove(gridEntityId);
+                    continue;
                 }
+                var group = new HashSet<IMyCubeGrid>();
+                MyAPIGateway.GridGroups.GetGroup(grid, GridLinkTypeEnum.Physical, group);
+                group.ForEach(cubeGrid => gridsList.Remove(cubeGrid.EntityId));
+                groups.Add(group);
+            }
 
-                foreach (var group in groups)
+            for (var from = 0; from < groups.Count; from += FreezePhysicsGroupsPerFrame)
+            {
+                var batch = groups.Skip(from).Take(FreezePhysicsGroupsPerFrame).ToList();
+                MyAPIGateway.Utilities.InvokeOnGameThread(() =>
                 {
-                    i += 2;
-                    MyAPIGateway.Utilities.InvokeOnGameThread(() =>
-                    {
-                        var grids = group.Select(cubeGrid => (MyCubeGrid)cubeGrid).ToHashSet();
-                        // Only a group frozen as a whole gets its physics frozen (see CanFreezePhysics).
-                        var freezePhysics = freezePhysicsEnabled &&
-                                            grids.All(g => FrozenGrids.Contains(g.EntityId)) &&
-                                            CanFreezePhysics(grids, wholeGroup: true);
-                        foreach (var myCubeGrid in grids)
-                        {
-                            if (myCubeGrid.Closed || myCubeGrid.Physics == null || myCubeGrid.IsStatic)
-                            {
-                                continue;
-                            }
-
-                            if (freezePhysics)
-                            {
-                                if (FrozenPhysicsGrids.Contains(myCubeGrid.EntityId)) continue;
-                                myCubeGrid.Physics.SetSpeeds(Vector3.Zero, Vector3.Zero);
-                                DoFreezePhysics(myCubeGrid);
-                            }
-                            else if (!freezePhysicsEnabled)
-                            {
-                                DoUnfreezePhysics(myCubeGrid);
-                            }
-                        }
-                    }, StartAt: (int)MySandboxGame.Static.SimulationFrameCounter + i);
-                }
-            });
+                    var enabled = SentisOptimisationsPlugin.Config.FreezePhysics;
+                    foreach (var group in batch) UpdateGroupFreezePhysics(group, enabled);
+                }, StartAt: (int)MySandboxGame.Static.SimulationFrameCounter + 1 + from / FreezePhysicsGroupsPerFrame);
+            }
         });
+    }
+
+    private static void UpdateGroupFreezePhysics(HashSet<IMyCubeGrid> group, bool enabled)
+    {
+        var grids = group.Select(cubeGrid => (MyCubeGrid)cubeGrid).ToHashSet();
+        // Only a group frozen as a whole gets its physics frozen (see CanFreezePhysics).
+        var freezePhysics = enabled && grids.All(g => FrozenGrids.Contains(g.EntityId)) && CanFreezePhysics(grids, wholeGroup: true);
+        foreach (var myCubeGrid in grids)
+        {
+            if (myCubeGrid.Closed || myCubeGrid.Physics == null || myCubeGrid.IsStatic) continue;
+            if (freezePhysics)
+            {
+                if (FrozenPhysicsGrids.Contains(myCubeGrid.EntityId)) continue;
+                myCubeGrid.Physics.SetSpeeds(Vector3.Zero, Vector3.Zero);
+                DoFreezePhysics(myCubeGrid);
+            }
+            else if (!enabled)
+            {
+                DoUnfreezePhysics(myCubeGrid);
+            }
+        }
     }
     
     
