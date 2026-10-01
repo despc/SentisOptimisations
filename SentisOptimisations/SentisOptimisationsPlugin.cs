@@ -265,6 +265,7 @@ namespace SentisOptimisationsPlugin
 
         public override void Update()
         {
+            Optimizer.Optimizations.GameThreadCores.Apply();
             Optimizer.Optimizations.GrinderPatches.Flush();
             Freezer.CpuLoadPeak.Sample(MySandboxGame.Static.CPULoad);
             Optimizer.Optimizations.WelderOptimization.RunDeferred();
