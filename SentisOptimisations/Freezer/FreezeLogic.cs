@@ -719,6 +719,9 @@ public class FreezeLogic
     /// </summary>
     public static void UpdateFreezePhysics(bool freezePhysicsEnabled)
     {
+        // The setter runs when the config is read at Init too, before there is a game to call: nothing is frozen
+        // then. Throwing there failed the whole config load and Torch went on with the defaults (01.10.2026).
+        if (MyAPIGateway.Utilities == null || MySession.Static == null) return;
         MyAPIGateway.Utilities.InvokeOnGameThread(() =>
         {
             var gridsList = new HashSet<long>(FrozenGrids);
