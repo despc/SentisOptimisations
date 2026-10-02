@@ -17,5 +17,16 @@ namespace SentisOptimisations.Tests
             var config = (MainConfig)new XmlSerializer(typeof(MainConfig)).Deserialize(new StringReader(xml));
             Assert.True(config.FreezePhysics);
         }
+
+        [Fact]
+        public void Game_thread_on_fast_cores_is_on_unless_the_config_turns_it_off()
+        {
+            var serializer = new XmlSerializer(typeof(MainConfig));
+            var old = (MainConfig)serializer.Deserialize(new StringReader("<?xml version=\"1.0\"?><MainConfig></MainConfig>"));
+            Assert.True(old.GameThreadOnFastCores);
+            var off = (MainConfig)serializer.Deserialize(new StringReader(
+                "<?xml version=\"1.0\"?><MainConfig><GameThreadOnFastCores>false</GameThreadOnFastCores></MainConfig>"));
+            Assert.False(off.GameThreadOnFastCores);
+        }
     }
 }

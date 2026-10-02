@@ -11,7 +11,8 @@ namespace Optimizer.Optimizations
     /// than the "favored" ones (on an i7-13700K logical 8-11 reach 5.4 GHz). The thread's CPU sets are set once, from
     /// the first frame: the performance cores of the highest efficiency class, of them the ones of the highest
     /// scheduling class (favored), at least two physical cores, one logical processor of each - the sibling would share
-    /// the core. A CPU whose cores are all alike is left alone. Windows 10 and later; game thread.
+    /// the core. A CPU whose cores are all alike is left alone. Windows 10 and later; game thread. Off with
+    /// <c>Game thread on fast cores</c>; as it is done once, a change takes effect after a restart.
     /// </summary>
     public static class GameThreadCores
     {
@@ -24,6 +25,11 @@ namespace Optimizer.Optimizations
             _done = true;
             try
             {
+                if (SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config?.GameThreadOnFastCores == false)
+                {
+                    SentisOptimisationsPlugin.SentisOptimisationsPlugin.Log.Info("Game thread left to Windows (Game thread on fast cores is off)");
+                    return;
+                }
                 var sets = Read();
                 if (sets.Count == 0) return;
                 var ids = Choose(sets);
