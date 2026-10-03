@@ -43,13 +43,14 @@ namespace Optimizer.Optimizations
             ? (Action<MyGasGenerator>)Delegate.CreateDelegate(typeof(Action<MyGasGenerator>), SetRemainingCapacitiesMethod, false)
             : null;
         private static readonly Func<MyGasGenerator, float> GetIceAmount = BuildIceGetter();
+        private static readonly Func<MyGasGenerator, bool> GetIsProducing = BuildProducingGetter();
 
         public static void Patch(PatchContext ctx) =>
             global::SentisOptimisations.PatchGuard.Run("GasGeneratorUpdate", ctx, PatchImpl);
 
         internal static void PatchImpl(PatchContext ctx)
         {
-            if (SetRemainingCapacities == null || GetIceAmount == null || SinkUpdateMethod == null) return;
+            if (SetRemainingCapacities == null || GetIceAmount == null || GetIsProducing == null || SinkUpdateMethod == null) return;
             var update = typeof(MyGasGenerator).GetMethod(nameof(MyGasGenerator.UpdateAfterSimulation),
                 BindingFlags.Instance | BindingFlags.Public, null, Type.EmptyTypes, null);
             ctx.GetPattern(update).Transpilers.Add(typeof(GasGeneratorUpdate).GetMethod(nameof(UpdateAfterSimulationTranspiler),
@@ -66,6 +67,18 @@ namespace Optimizer.Optimizations
             il.Emit(OpCodes.Ldfld, field);
             il.Emit(OpCodes.Ret);
             return (Func<MyGasGenerator, float>)method.CreateDelegate(typeof(Func<MyGasGenerator, float>));
+        }
+
+        private static Func<MyGasGenerator, bool> BuildProducingGetter()
+        {
+            var field = typeof(MyGasGenerator).GetField("m_isProducing", BindingFlags.Instance | BindingFlags.NonPublic);
+            if (field == null || field.FieldType != typeof(bool)) return null;
+            var method = new DynamicMethod("GetIsProducing", typeof(bool), new[] { typeof(MyGasGenerator) }, typeof(MyGasGenerator), true);
+            var il = method.GetILGenerator();
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Ldfld, field);
+            il.Emit(OpCodes.Ret);
+            return (Func<MyGasGenerator, bool>)method.CreateDelegate(typeof(Func<MyGasGenerator, bool>));
         }
 
         /// <summary>
@@ -108,11 +121,15 @@ namespace Optimizer.Optimizations
 
         /// <summary>
         /// The generator's frame out of <see cref="PeriodFrames"/>, or any frame on which it is down
-        /// to its last second of ice and about to stop producing.
+        /// to its last second of ice and about to stop producing - and every frame of a generator
+        /// that is not producing. An idle generator gets this update once, after it is loaded or
+        /// switched: skipped then, the gas left in its ice was never written into the source, and
+        /// after a server restart a generator full of ice gave nothing until its inventory changed.
         /// </summary>
         private static bool Due(MyGasGenerator generator)
         {
             if (!Sync.IsDedicated) return true;
+            if (!GetIsProducing(generator)) return true;
             if ((MySandboxGame.Static.SimulationFrameCounter + (ulong)generator.EntityId) % PeriodFrames == 0) return true;
             var definition = generator.BlockDefinition as MyOxygenGeneratorDefinition;
             return definition != null && GetIceAmount(generator) <= definition.IceConsumptionPerSecond;
