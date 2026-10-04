@@ -25,7 +25,8 @@ namespace Optimizer.Optimizations
     ///
     /// Nor does a block added to the world rebuild its cell (<c>MyCubeGridRenderCell.RebuildInstanceParts</c>
     /// from the block's render component): a grid of 2700 blocks spawned whole rebuilt its cells block after
-    /// block, ~30 ms of the frame it came in.
+    /// block, ~30 ms of the frame it came in. Only a cell's first rebuild runs - it gives the cell the cull object
+    /// that turrets and other blocks with moving parts tie their subparts to.
     ///
     /// Nor are the glowing parts of a block's subparts recoloured (<c>MyEntity.SetEmissivePartsForSubparts</c>: render
     /// messages for every subpart, recursively). A hydrogen engine sets its emissive state every frame through its
@@ -66,13 +67,23 @@ namespace Optimizer.Optimizations
             var cellRebuild = typeof(MyCubeGridRenderCell).GetMethod("RebuildInstanceParts",
                 BindingFlags.Instance | BindingFlags.Public, null, new[] { typeof(RenderFlags) }, null);
             if (cellRebuild == null) throw new MissingMethodException("MyCubeGridRenderCell.RebuildInstanceParts(RenderFlags)");
-            ctx.GetPattern(cellRebuild).Prefixes.Add(typeof(ServerGridRender).GetMethod(nameof(SkipPrefix),
+            ctx.GetPattern(cellRebuild).Prefixes.Add(typeof(ServerGridRender).GetMethod(nameof(CellRebuildPrefix),
                 BindingFlags.Static | BindingFlags.NonPublic));
             SkipEmissive(ctx);
             SkipPanelDrawing(ctx);
         }
 
         private static bool SkipPrefix() => false;
+
+        /// <summary>
+        /// A cell's first rebuild still runs: it is what gives the cell its cull object, and the blocks with moving
+        /// parts tie their subparts to it (<c>MyLargeTurretBase.UpdateOnceBeforeFrame</c>: the cell rebuilt when it has
+        /// none, then <c>Render.SetParent(0, cell.ParentCullObject)</c>). A subpart tied to no cull object is no child,
+        /// and <c>MyLargeTurretBase.RotateModels</c> returns at once for it: the turret's barrel never turned on the
+        /// server, its aim, its line of sight and its bullets stayed where it pointed when placed - turrets shot their
+        /// own base and the players beside it and never a wolf (stand and production, 04.10.2026; scenario turret_wolf).
+        /// </summary>
+        private static bool CellRebuildPrefix(MyCubeGridRenderCell __instance) => __instance.ParentCullObject == uint.MaxValue;
 
         private static Func<MyMultiTextPanelComponent, List<MyTextPanelComponent>> _panels;
         private static Func<MyTextPanelComponent, bool> _spritesDirty;
