@@ -53,12 +53,22 @@ namespace SentisOptimisationsPlugin
         /// <summary>Runs needed before the per-frame average is trusted enough to punish by it.</summary>
         private const int RunsBeforeLoadCounts = 10;
 
+
+        /// <summary>
+        /// The first runs of a script instance, not measured at all: its first calls into collections of its own types are
+        /// compiled to machine code then (what PbCompile cannot prepare ahead), and it sets itself up. Isy's Inventory
+        /// Manager, compiled ahead: 3.6, 6.1 and 10.4 ms in its first twelve runs, never over 2 ms after - three over the
+        /// limit, one short of being taken apart (stand, scenario pb_iim, 04.10.2026). A count of runs, not a time: each run is
+        /// cut off by the game's instruction limit, so ten of them cannot hold the server for long.
+        /// </summary>
+        public const int UnmeasuredRuns = 10;
+
         /// <summary>A block that has not run for this many frames is no longer counted as a load.</summary>
         private const ulong IdleFrames = 600;
 
         private const uint WindowMask = (1u << WindowRuns) - 1u;
 
-        private sealed class Stats
+        public sealed class Stats
         {
             public double LoadMsPerFrame;
             public double LastMs;
@@ -67,6 +77,8 @@ namespace SentisOptimisationsPlugin
             public int Runs;
             public uint Window;
             public DateTime LastWarned;
+            public object Program;          // the script instance the runs are of: a new one (recompiled) begins anew
+            public int LoadSamples;         // runs in the per-frame average (the first run of an instance is not one)
         }
 
         private static readonly ConcurrentDictionary<MyProgrammableBlock, Stats> Blocks =
@@ -84,24 +96,48 @@ namespace SentisOptimisationsPlugin
         /// <param name="maxLoadMsPerFrame">Threshold for the time per frame; 0 disables it.</param>
         /// <param name="overrunsBeforePunish">Overruns inside the window that are still tolerated.</param>
         public static PbVerdict Record(MyProgrammableBlock pb, double ms, bool noisy,
-            double maxRunMs, double maxLoadMsPerFrame, int overrunsBeforePunish)
+            double maxRunMs, double maxLoadMsPerFrame, int overrunsBeforePunish, object program = null)
         {
             var stats = Blocks.GetOrAdd(pb, _ => new Stats());
-            var frame = MySandboxGame.Static.SimulationFrameCounter;
-            var frames = stats.LastFrame == 0 || frame <= stats.LastFrame ? 1UL : frame - stats.LastFrame;
+            return Record(stats, MySandboxGame.Static.SimulationFrameCounter, ms, noisy, maxRunMs, maxLoadMsPerFrame, overrunsBeforePunish, program);
+        }
+
+        /// <summary><see cref="Record(MyProgrammableBlock, double, bool, double, double, int, object)"/> on a block's counters at a frame (for tests).</summary>
+        public static PbVerdict Record(Stats stats, ulong frame, double ms, bool noisy,
+            double maxRunMs, double maxLoadMsPerFrame, int overrunsBeforePunish, object program)
+        {
+            if (program != null && !ReferenceEquals(program, stats.Program))
+            {
+                // another script instance (recompiled, switched off and on): its own record
+                stats.Program = program;
+                stats.Runs = 0;
+                stats.Window = 0;
+                stats.LoadMsPerFrame = 0;
+                stats.LastFrame = 0;
+                stats.LoadSamples = 0;
+            }
+            // (no frames since an earlier run for the first run of an instance: its time is not spread over frames it
+            // did not wait, and it does not start the per-frame average - taken as a run every frame, the 3 ms first run
+            // of Isy's Inventory Manager put it at 3 ms of every frame, still over the limit ten runs on)
+            var firstRun = stats.LastFrame == 0;
+            var frames = firstRun || frame <= stats.LastFrame ? 1UL : frame - stats.LastFrame;
             stats.LastFrame = frame;
             stats.Runs++;
 
+            if (stats.Runs <= UnmeasuredRuns) return PbVerdict.Ok;
             if (noisy) return PbVerdict.Ok;
-
             stats.LastMs = ms;
             if (ms > stats.PeakMs) stats.PeakMs = ms;
-            var perFrame = ms / frames;
-            stats.LoadMsPerFrame = stats.Runs == 1
-                ? perFrame
-                : stats.LoadMsPerFrame + (perFrame - stats.LoadMsPerFrame) * Alpha;
+            if (!firstRun)
+            {
+                var perFrame = ms / frames;
+                stats.LoadSamples++;
+                stats.LoadMsPerFrame = stats.LoadSamples == 1
+                    ? perFrame
+                    : stats.LoadMsPerFrame + (perFrame - stats.LoadMsPerFrame) * Alpha;
+            }
 
-            var overLoad = maxLoadMsPerFrame > 0 && stats.Runs >= RunsBeforeLoadCounts &&
+            var overLoad = maxLoadMsPerFrame > 0 && stats.LoadSamples >= RunsBeforeLoadCounts &&
                            stats.LoadMsPerFrame > maxLoadMsPerFrame;
             var over = ms > maxRunMs || overLoad;
             stats.Window = ((stats.Window << 1) | (over ? 1u : 0u)) & WindowMask;
