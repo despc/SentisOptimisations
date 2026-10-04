@@ -71,6 +71,7 @@ namespace SentisOptimisationsPlugin
         private static readonly Func<MyProgrammableBlock, IMyGridProgram> Instance = Getter<IMyGridProgram>("m_instance");
         private static readonly Func<MyProgrammableBlock, bool> NeedsInstantiation = Getter<bool>("m_needsInstantiation");
         private static readonly Action<MyProgrammableBlock, bool> SetNeedsInstantiation = Setter<bool>("m_needsInstantiation");
+        private static readonly Action<MyProgrammableBlock, IMyGridProgram> SetInstance = Setter<IMyGridProgram>("m_instance");
         private static readonly Func<MyProgrammableBlock, object> CompilerErrors = Getter<object>("m_compilerErrors");
         private static readonly Func<MyProgrammableBlock, string> StorageData = Getter<string>("m_storageData");
         private static readonly Func<MyProgrammableBlock, object> TerminalWrapper = Getter<object>("m_terminalWrapper");
@@ -119,6 +120,15 @@ namespace SentisOptimisationsPlugin
                 .GetMethod("RecalculateOwnersInternal", BindingFlags.Instance | BindingFlags.NonPublic);
             ctx.GetPattern(ownership).Prefixes.Add(self.GetMethod(nameof(RecalculateOwnersInternalPatched), statics));
 
+            try
+            {
+                PbCompile.Bind();
+                _offThreadCompile = true;
+            }
+            catch (Exception e)
+            {
+                Log.Error(e, "PBFix: scripts are compiled on the game thread, as vanilla does");
+            }
             ctx.GetPattern(typeof(MyProgrammableBlock).GetMethod("Compile", BindingFlags.Instance | BindingFlags.NonPublic))
                 .Prefixes.Add(self.GetMethod(nameof(CompileActionPatched), statics));
         }
@@ -135,14 +145,18 @@ namespace SentisOptimisationsPlugin
         /// server that is already too much, so the number is rewritten to a tenth as the script is
         /// compiled.
         /// </summary>
-        private static bool CompileActionPatched(MyProgrammableBlock __instance, string program)
+        private static bool CompileActionPatched(MyProgrammableBlock __instance, string program, string storage, bool instantiate)
         {
             try
             {
-                if (program == null || !program.Contains("double maxCurrentMs = 0.5;")) return true;
-                UpdateProgramStringMethod.Invoke(__instance,
-                    new object[] { program.Replace("double maxCurrentMs = 0.5;", "double maxCurrentMs = 0.1;") });
-                return false;
+                if (program != null && program.Contains("double maxCurrentMs = 0.5;"))
+                {
+                    UpdateProgramStringMethod.Invoke(__instance,
+                        new object[] { program.Replace("double maxCurrentMs = 0.5;", "double maxCurrentMs = 0.1;") });
+                    return false;
+                }
+                // the compile on a worker and the script compiled to machine code there (PbCompile); vanilla where it cannot
+                return !(_offThreadCompile && PbCompile.Start(__instance, program, storage, instantiate));
             }
             catch (Exception e)
             {
@@ -175,11 +189,15 @@ namespace SentisOptimisationsPlugin
         {
             try
             {
-                if (MySandboxGame.Static.UpdateThread != Thread.CurrentThread &&
-                    MyVRage.Platform.Scripting.ReportIncorrectBehaviour(MyCommonTexts.ModRuleViolation_PBParallelInvocation))
+                // A run off the game thread (the script's Save() as a frozen grid's builder is made on a worker in a
+                // parallel world save) is noted once. Vanilla reports it to MyModWatchdog.ReportIncorrectBehaviour, which
+                // outside a mod's context reads no mod (ModInfo[0]) and throws: that threw here, and the block was switched
+                // off for it - players' blocks went off at every save (production, 04.10.2026).
+                if (MySandboxGame.Static.UpdateThread != Thread.CurrentThread && !_parallelRunNoted)
                 {
-                    MyLog.Default.Log(MyLogSeverity.Error,
-                        "PB invoked from parallel thread (logged only once)!" + Environment.NewLine + Environment.StackTrace);
+                    _parallelRunNoted = true;
+                    Log.Warn("PB " + __instance.CustomName + " on " + __instance.CubeGrid?.DisplayName +
+                             " run off the game thread (noted once):" + Environment.NewLine + Environment.StackTrace);
                 }
 
                 if (IsRunning(__instance))
@@ -199,6 +217,26 @@ namespace SentisOptimisationsPlugin
 
                 __instance.DetailedInfo.Clear();
                 EchoOutput(__instance).Clear();
+
+                // The grid not yet in its logical group (it is being added to the world - pasted, spawned, streamed in -
+                // and something asked the block to run before its first frame): nothing to run against yet. The run is
+                // put off, the instantiation still to come with the block's first update, as vanilla has it. (Taken on,
+                // the instance was made, its constructor's run threw on the missing group, and the block was switched
+                // off with no constructor run and no update frequency: the script never ran again, even switched on.)
+                if (MyCubeGridGroups.Static.Logical.GetGroup(__instance.CubeGrid) == null)
+                {
+                    // an instance made already (its constructor's run is this one): dropped, to be made again with the
+                    // block's next update, once the grid has its group - else it stood with no constructor run, never to run
+                    if (Instance(__instance) != null)
+                    {
+                        SetInstance(__instance, null);
+                        SetNeedsInstantiation(__instance, true);
+                        __instance.NeedsUpdate |= VRage.ModAPI.MyEntityUpdateEnum.EACH_FRAME;
+                    }
+                    response = MyTexts.GetString(MySpaceTexts.ProgrammableBlock_Exception_NoAssembly);
+                    __result = MyProgrammableBlock.ScriptTerminationReason.NoScript;
+                    return false;
+                }
 
                 var assembly = CurrentAssembly(__instance);
                 if (assembly == null)
@@ -270,9 +308,13 @@ namespace SentisOptimisationsPlugin
             }
             catch (Exception e)
             {
-                Log.Warn(e, "RunSandboxedProgramActionPatched Exception " + __instance.DisplayName +
-                            " grid " + __instance.CubeGrid?.DisplayName);
-                __instance.Enabled = false;
+                // An exception here is this prefix's own, not the script's (the script's are caught inside the run and
+                // end it as vanilla does): the block is left on, the run just not made this time.
+                if (WarnDue(__instance.EntityId))
+                    Log.Warn(e, "RunSandboxedProgramActionPatched Exception " + __instance.DisplayName +
+                                " grid " + __instance.CubeGrid?.DisplayName + "; run from:" + Environment.NewLine + Environment.StackTrace);
+                response = e.Message;
+                __result = MyProgrammableBlock.ScriptTerminationReason.None;
                 return false;
             }
         }
@@ -317,6 +359,19 @@ namespace SentisOptimisationsPlugin
 
         // this frame's runs, judged when the frame is over (game thread)
         private static readonly List<PendingRun> Pending = new List<PendingRun>();
+
+        private static bool _parallelRunNoted;
+        private static bool _offThreadCompile;
+        private static readonly ConcurrentDictionary<long, DateTime> FailureWarned = new ConcurrentDictionary<long, DateTime>();
+
+        /// <summary>True at most once a minute for a block: a failing run of a script on Update1 would flood the log.</summary>
+        private static bool WarnDue(long entityId)
+        {
+            var now = DateTime.UtcNow;
+            if (FailureWarned.TryGetValue(entityId, out var last) && now - last < TimeSpan.FromMinutes(1)) return false;
+            FailureWarned[entityId] = now;
+            return true;
+        }
         private static bool _subscribed;
 
         /// <summary>Frames whose script runs were not counted (a collection, a save, a spike), for the GUI and the stand.</summary>
@@ -349,7 +404,7 @@ namespace SentisOptimisationsPlugin
             {
                 var config = SentisOptimisationsPlugin.Config;
                 var verdict = PbLoad.Record(pb, ms, noisy, config.ScriptsMaxExecTime, config.ScriptsMaxMsPerFrame,
-                    config.ScriptOvertimeExecTimesBeforePunish);
+                    config.ScriptOvertimeExecTimesBeforePunish, Instance(pb));
                 if (verdict == PbVerdict.Ok || MySandboxGame.Static.SimulationFrameCounter <= FramesBeforePunish) return;
 
                 if (!config.EnableScriptsPunish) return;

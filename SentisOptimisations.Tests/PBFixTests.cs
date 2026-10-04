@@ -1,3 +1,4 @@
+using System.Linq;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -101,5 +102,81 @@ public class PBFixTests
     public void The_verdict_window_is_a_window_and_not_a_running_total()
     {
         Assert.InRange(PbLoad.WindowRuns, 2, 32);
+    }
+
+    // ------------------------------------------------------------------ a script's start
+
+    /// <summary>
+    /// Isy's Inventory Manager's first runs after it was switched on, ms, its code compiled to machine code before its first
+    /// run (PbCompile; stand, scenario pb_iim_watch, 04.10.2026): three over 2 ms, then none in three minutes.
+    /// </summary>
+    private static readonly double[] IimStart = { 3.311, 0.057, 0.028, 0.679, 1.192, 6.335, 0.301, 0.072, 0.231, 0.025, 0.023, 8.830, 0.025, 0.193, 0.015 };
+
+    private static PbVerdict Run(PbLoad.Stats stats, ref ulong frame, double ms, object program, ulong every = 10)
+    {
+        frame += every;
+        return PbLoad.Record(stats, frame, ms, false, 2, 0.5, 3, program);
+    }
+
+    [Fact]
+    public void A_script_compiled_ahead_is_not_punished_for_its_start()
+    {
+        var stats = new PbLoad.Stats();
+        var program = new object();
+        ulong frame = 0;
+        var verdicts = IimStart.Select(ms => Run(stats, ref frame, ms, program)).ToList();
+        while (frame < 3 * 60 * 60) verdicts.Add(Run(stats, ref frame, 0.06, program));
+        Assert.DoesNotContain(PbVerdict.Punish, verdicts);
+    }
+
+    [Fact]
+    public void A_script_heavy_from_its_start_is_punished_at_once()
+    {
+        var stats = new PbLoad.Stats();
+        var program = new object();
+        ulong frame = 0;
+        var punishedAt = 0;
+        for (var i = 1; i <= 100 && punishedAt == 0; i++)
+            if (Run(stats, ref frame, 5.0, program, 1) == PbVerdict.Punish) punishedAt = i;
+        // its first ten runs not measured, then the fourth over the limit
+        Assert.Equal(PbLoad.UnmeasuredRuns + 4, punishedAt);
+    }
+
+    [Fact]
+    public void A_script_light_per_run_but_on_every_frame_is_punished_by_its_load()
+    {
+        var stats = new PbLoad.Stats();
+        var program = new object();
+        ulong frame = 0;
+        var punishedAt = 0;
+        for (var i = 1; i <= 200 && punishedAt == 0; i++)
+            if (Run(stats, ref frame, 1.5, program, 1) == PbVerdict.Punish) punishedAt = i;
+        Assert.InRange(punishedAt, PbLoad.UnmeasuredRuns + 10, PbLoad.UnmeasuredRuns + 20);
+    }
+
+    [Fact]
+    public void The_first_ten_runs_are_not_measured()
+    {
+        var stats = new PbLoad.Stats();
+        var program = new object();
+        ulong frame = 0;
+        var verdicts = new List<PbVerdict>();
+        for (var i = 0; i < PbLoad.UnmeasuredRuns; i++) verdicts.Add(Run(stats, ref frame, 30.0, program, 1));
+        for (var i = 0; i < 30; i++) verdicts.Add(Run(stats, ref frame, 0.05, program));
+        Assert.All(verdicts, v => Assert.Equal(PbVerdict.Ok, v));
+        Assert.True(stats.LoadMsPerFrame < 0.05, stats.LoadMsPerFrame.ToString());
+    }
+
+    [Fact]
+    public void A_recompiled_script_has_its_ten_unmeasured_runs_again()
+    {
+        var stats = new PbLoad.Stats();
+        ulong frame = 0;
+        var first = new object();
+        for (var i = 0; i < 50; i++) Run(stats, ref frame, 0.06, first);
+        var second = new object();
+        var verdicts = new List<PbVerdict>();
+        for (var i = 0; i < PbLoad.UnmeasuredRuns; i++) verdicts.Add(Run(stats, ref frame, 30.0, second));
+        Assert.All(verdicts, v => Assert.Equal(PbVerdict.Ok, v));
     }
 }
