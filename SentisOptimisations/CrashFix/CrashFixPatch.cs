@@ -159,6 +159,15 @@ namespace SentisOptimisationsPlugin.CrashFix
             harmony.Patch(MethodCheckIdentitiesTrash, finalizer: new HarmonyMethod(finalizerDispatch));
             harmony.Patch(MethodWolfTargetAttack, finalizer: new HarmonyMethod(finalizerDispatch));
             
+            // A hand drill in the hands of a body no player controls (a character left in the world by a client that is
+            // gone - with the bots' plugin not loaded, the bots' bodies): its 100-frame update asks its owner's steam id,
+            // and the owner is null. The exception came out of the entities' dispatch (below), which stops the whole pass:
+            // every entity after the drill missed that update, three times in two seconds, and each one was a line in the
+            // log. The drill without an owner has nothing to update (its ore detector serves its owner's HUD).
+            var MethodHandDrillUpdate100 = typeof(MyHandDrill).GetMethod(nameof(MyHandDrill.UpdateBeforeSimulation100),
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly) ?? throw new MissingMethodException("MyHandDrill.UpdateBeforeSimulation100");
+            harmony.Patch(MethodHandDrillUpdate100, prefix: new HarmonyMethod(typeof(CrashFixPatch).GetMethod(nameof(HandDrillWithOwner), BindingFlags.Static | BindingFlags.NonPublic)));
+
             // A client that leaves in the middle of an update makes these throw, and the server
             // must not go down with it. They came here when the async streaming send was removed.
             foreach (var name in new[] { "FilterStateSync", "RefreshReplicable", "RemoveClientReplicable", "AddClientReplicable" })
@@ -260,14 +269,41 @@ namespace SentisOptimisationsPlugin.CrashFix
             return null;
         }
 
+        /// <summary>Whether the hand drill has an owner to update for (see where it is patched).</summary>
+        private static bool HandDrillWithOwner(MyHandDrill __instance) => __instance.Owner != null;
+
+        /// <summary>
+        /// Keeps the server up past an exception out of the entities' dispatch (and the other loops it guards). The pass
+        /// stopped where it threw - what came after in it missed this update - so it is always said, but one kind of
+        /// exception (its type and where it was thrown) once in ten seconds with the count: the same one every pass was
+        /// three hundred lines in three minutes.
+        /// </summary>
         public static Exception SuppressDispatchExceptionFinalizer(Exception __exception)
         {
-            if (__exception != null)
+            if (__exception == null) return null;
+            try
             {
-                SentisOptimisationsPlugin.Log.Error(__exception, "SuppressedException ");
+                var trace = __exception.StackTrace ?? "";
+                var end = trace.IndexOf('\n');
+                var key = __exception.GetType().Name + (end > 0 ? trace.Substring(0, end) : trace).Trim();
+                var now = DateTime.UtcNow;
+                var count = SuppressedCount.AddOrUpdate(key, 1, (k, n) => n + 1);
+                if (!SuppressedLogged.TryGetValue(key, out var last) || (now - last).TotalSeconds >= SuppressedLogEverySec)
+                {
+                    SuppressedLogged[key] = now;
+                    SuppressedCount[key] = 0;
+                    SentisOptimisationsPlugin.Log.Error(__exception, "SuppressedException " + (count > 1 ? "(" + count + " of the kind since the last line) " : "") +
+                                                                     "- the pass stopped where it threw");
+                }
+            }
+            catch
+            {
+                // the log must not throw from a finalizer
             }
             return null;
         }
+
+        private static readonly ConcurrentDictionary<string, int> SuppressedCount = new ConcurrentDictionary<string, int>();
 
         // A cleanup this slow (one frame) is worth a line in the log.
         private const long SlowRemoveClientMs = 16;
