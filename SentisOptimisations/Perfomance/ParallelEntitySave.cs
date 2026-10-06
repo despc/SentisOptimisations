@@ -32,8 +32,10 @@ namespace Optimizer.Optimizations
     /// middle) was punished there - its block damaged, its Havok bodies closed and made again off the game thread. On
     /// the old server that corrupted native memory: a clr stub overwritten, a stack walk overrun, an access violation
     /// in Havok - seven crashes on 28-29.09.2026, every one of them seconds after a save.
-    /// A frozen grid is still built on the workers, programmable block or not: most of a big world is frozen, and the
-    /// punishment that did the damage is never done off the game thread any more (PBFix).
+    /// A frozen grid is still built on the workers (most of a big world is frozen, and the punishment that did the
+    /// damage is never done off the game thread any more: PBFix) - unless a script on it has a Save() with code in it
+    /// (ScriptSaveCode): what a script does there, it must not do off the game thread. The Save() of the template
+    /// every script starts from is empty, and most scripts have that one or none.
     ///
     /// Measured (64 grids, 32k blocks): the snapshot frame went from 135-151 ms to ~77 ms. The rest is
     /// garbage collection triggered by the builders themselves (6-7 gen0 + 2 gen1 in that frame).
@@ -93,8 +95,9 @@ namespace Optimizer.Optimizations
                 if (grid != null)
                 {
                     FrozenGridSaveCache.RecordBuiltInSnapshot(grid);
-                    // user or mod code in the builder: here, on the game thread - unless the grid is frozen
-                    if (!FreezeLogic.FrozenGrids.Contains(grid.EntityId) && RunsForeignCode(grid)) builders[i] = grid.GetObjectBuilder();
+                    // user or mod code in the builder: here, on the game thread. Of a frozen grid, only a script's
+                    // Save() that does something
+                    if (FreezeLogic.FrozenGrids.Contains(grid.EntityId) ? ScriptSaves(grid) : RunsForeignCode(grid)) builders[i] = grid.GetObjectBuilder();
                     else grids.Add(i);
                 }
                 else builders[i] = entities[i].GetObjectBuilder();
@@ -129,6 +132,15 @@ namespace Optimizer.Optimizations
             if (grid.BlocksCounters.TryGetValue(ProgrammableBlockType, out var pbs) && pbs > 0) return true;
             foreach (var block in grid.GetFatBlocks())
                 if (block.GameLogic is VRage.Game.Components.MyGameLogicComponent logic && ModLogicBuilds(logic)) return true;
+            return false;
+        }
+
+        /// <summary>Whether a programmable block of the grid has a script whose Save() has code in it. Game thread.</summary>
+        public static bool ScriptSaves(MyCubeGrid grid)
+        {
+            if (!grid.BlocksCounters.TryGetValue(ProgrammableBlockType, out var pbs) || pbs <= 0) return false;
+            foreach (var block in grid.GetFatBlocks())
+                if (block is Sandbox.Game.Entities.Blocks.MyProgrammableBlock pb && SentisOptimisationsPlugin.PBFix.SaveHasCode(pb)) return true;
             return false;
         }
 

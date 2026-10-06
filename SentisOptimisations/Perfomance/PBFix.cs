@@ -180,6 +180,16 @@ namespace SentisOptimisationsPlugin
         }
 
         /// <summary>
+        /// Whether saving the block runs code of its script: the block's builder calls the script's Save() when there
+        /// is a script and it has one (MyProgrammableBlock.UpdateStorage), and a Save() with nothing in it does nothing.
+        /// </summary>
+        public static bool SaveHasCode(MyProgrammableBlock pb)
+        {
+            var program = Instance(pb);
+            return program != null && program.HasSaveMethod && Optimizer.Optimizations.ScriptSaveCode.HasCode(program.GetType());
+        }
+
+        /// <summary>
         /// Replaces <c>MyProgrammableBlock.RunSandboxedProgramAction</c>: the same sequence as vanilla,
         /// with the ownership refresh made conditional and the time of the run measured.
         /// </summary>
@@ -190,10 +200,10 @@ namespace SentisOptimisationsPlugin
             try
             {
                 // A run off the game thread (the script's Save() as a frozen grid's builder is made on a worker in a
-                // parallel world save) is noted once. Vanilla reports it to MyModWatchdog.ReportIncorrectBehaviour, which
+                // parallel world save) is noted once, with the diagnostic logs on (it is how the save is made, not a fault). Vanilla reports it to MyModWatchdog.ReportIncorrectBehaviour, which
                 // outside a mod's context reads no mod (ModInfo[0]) and throws: that threw here, and the block was switched
                 // off for it - players' blocks went off at every save (production, 04.10.2026).
-                if (MySandboxGame.Static.UpdateThread != Thread.CurrentThread && !_parallelRunNoted)
+                if (global::SentisOptimisations.DiagLog.On && !_parallelRunNoted && MySandboxGame.Static.UpdateThread != Thread.CurrentThread)
                 {
                     _parallelRunNoted = true;
                     Log.Warn("PB " + __instance.CustomName + " on " + __instance.CubeGrid?.DisplayName +
