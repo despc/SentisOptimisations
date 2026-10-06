@@ -38,6 +38,28 @@ public class WindTurbineRaysTests
     }
 
     [Fact]
+    public void Turbines_that_started_together_do_not_cast_in_the_same_frames()
+    {
+        // two turbines of a world loaded at frame 0, asked every ten frames (the grid's shared wind component)
+        var first = WindTurbineRays.NewState();
+        var second = WindTurbineRays.NewState();
+        var together = 0;
+        ulong lastFirst = 0, lastSecond = 0;
+        for (ulong frame = 0; frame < 20000; frame += 10)
+        {
+            var a = WindTurbineRays.Due(first, frame, WindTurbineRays.IdlePeriod, 9, 40);
+            var b = WindTurbineRays.Due(second, frame, WindTurbineRays.IdlePeriod, 9, 170);
+            if (frame < 200) continue;      // the first round of both, not held back
+            if (a && b) together++;
+            // and never sooner than a period after its own last one
+            if (a) { Assert.True(frame - lastFirst >= (ulong)WindTurbineRays.IdlePeriod); lastFirst = frame; }
+            if (b) { Assert.True(frame - lastSecond >= (ulong)WindTurbineRays.IdlePeriod); lastSecond = frame; }
+        }
+        Assert.Equal(0, together);
+        Assert.True(lastFirst > 19000 && lastSecond > 19000, "both keep casting");
+    }
+
+    [Fact]
     public void A_full_round_stays_within_seconds()
     {
         // nine rays: 9 s where a player sees the turbine, 45 s where none does
