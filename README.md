@@ -23,6 +23,10 @@
 
 ## Установка
 
+- Готовый архив плагина - на странице [Releases](https://github.com/despc/SentisOptimisations/releases): положите его
+  в папку `Plugins` как есть и перезапустите Torch. Внутри плагин, `0Harmony.dll`, `manifest.xml`, лицензия.
+- Релиз собирает GitHub Actions по тегу вида `v1.2.3` (`.github/workflows/release.yml`); ту же сборку у себя делает
+  `tools\release.ps1 -Version v1.2.3`.
 - Настройки хранятся в `Instance\SentisOptimisations.cfg` и правятся в GUI Torch по вкладкам.
 - В GUI показывается статистика: CPU, число замороженных гридов, время физики
   (`Physics: X.XX ms/frame`) и секция `Scripts` с самыми тяжёлыми программными блоками.
