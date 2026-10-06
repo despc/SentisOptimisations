@@ -207,13 +207,15 @@ namespace SentisOptimisationsPlugin.CrashFix
         private const double SuppressedLogEverySec = 10;
 
         /// <summary>
-        /// Keeps the server up past an exception in the patched method - and always says so: the method stopped half way,
-        /// and what it left undone (a grid half split by a grinder, blocks an explosion half took off) is where to look
-        /// when something odd follows. Only when the debug logs were on did it use to be written.
+        /// Keeps the server up past an exception in the patched method. The method stopped half way, and what it left
+        /// undone (a grid half split by a grinder, blocks an explosion half took off) is where to look when something odd
+        /// follows: it is written with the diagnostic logs on (asked for, 06.10.2026: a production log read these as
+        /// errors of the plugin, one of the game's own every time).
         /// </summary>
         public static Exception SuppressExceptionFinalizer(Exception __exception, MethodBase __originalMethod)
         {
             if (__exception == null) return null;
+            if (!global::SentisOptimisations.DiagLog.On) return null;
             try
             {
                 var key = __originalMethod?.DeclaringType?.Name + "." + __originalMethod?.Name + ": " + __exception.GetType().Name;
@@ -274,13 +276,14 @@ namespace SentisOptimisationsPlugin.CrashFix
 
         /// <summary>
         /// Keeps the server up past an exception out of the entities' dispatch (and the other loops it guards). The pass
-        /// stopped where it threw - what came after in it missed this update - so it is always said, but one kind of
-        /// exception (its type and where it was thrown) once in ten seconds with the count: the same one every pass was
-        /// three hundred lines in three minutes.
+        /// stopped where it threw - what came after in it missed this update. Written with the diagnostic logs on, one
+        /// kind of exception (its type and where it was thrown) once in ten seconds with the count: the same one every
+        /// pass was three hundred lines in three minutes.
         /// </summary>
         public static Exception SuppressDispatchExceptionFinalizer(Exception __exception)
         {
             if (__exception == null) return null;
+            if (!global::SentisOptimisations.DiagLog.On) return null;
             try
             {
                 var trace = __exception.StackTrace ?? "";
