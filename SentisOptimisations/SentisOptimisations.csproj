@@ -69,6 +69,8 @@
 
   <ItemGroup>
     <None Include="manifest.xml" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\LICENSE" Link="LICENSE" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\NOTICE" Link="NOTICE" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
