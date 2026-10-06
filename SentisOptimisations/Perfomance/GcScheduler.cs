@@ -124,6 +124,15 @@ namespace Optimizer.Optimizations
             if (pauseMs > 0) LearnPause(pauseMs);
         }
 
+        /// <summary>
+        /// Call when the collection asked for did not run (the runtime does none while its background collection of the
+        /// whole heap is in progress): asked again no sooner than after the usual interval, nothing learned.
+        /// </summary>
+        public void OnSkippedByRuntime()
+        {
+            _framesSinceCollect = 0;
+        }
+
         private void LearnPause(double pauseMs)
         {
             _pauseEstimateMs += PauseSmoothing * (pauseMs - _pauseEstimateMs);
@@ -157,6 +166,8 @@ namespace Optimizer.Optimizations
         public static double TotalPauseMs;
         public static double MaxPauseMs;
         public static long FramesOverBudgetWithPause;
+        /// <summary>Collections asked for and not run: a background collection was in progress.</summary>
+        public static long SkippedForBackground;
 
         public static void Patch(PatchContext ctx) =>
             global::SentisOptimisations.PatchGuard.Run("GcScheduler", ctx, PatchImpl);
@@ -191,9 +202,23 @@ namespace Optimizer.Optimizations
                 var workMs = (Stopwatch.GetTimestamp() - _frameStart) * 1000.0 / Stopwatch.Frequency;
                 if (!Decider.OnFrameEnd(GC.CollectionCount(0), GC.GetAllocatedBytesForCurrentThread(), workMs)) return;
                 var pauseStart = Stopwatch.GetTimestamp();
-                GC.Collect(0, GCCollectionMode.Forced, blocking: true);
+                var gen0Before = GC.CollectionCount(0);
+                // Not "blocking": a gen0 collection stops the threads either way, the word only says what to do while
+                // the runtime's background collection of the whole heap is in progress. Blocking waits for it to end
+                // (clr!GCHeap::GarbageCollect waits on background_gc_done_event) - on a heap of 2.9 GB that was the
+                // game thread stopped for 0.3-0.85 s once in 100 s, every background collection (a test world,
+                // 06.10.2026; dotTrace: all of GC.Collect's time here was those waits). Not blocking returns at once
+                // then, with nothing collected.
+                GC.Collect(0, GCCollectionMode.Forced, blocking: false);
+                var gen0After = GC.CollectionCount(0);
+                if (gen0After == gen0Before)
+                {
+                    Decider.OnSkippedByRuntime();
+                    SkippedForBackground++;
+                    return;
+                }
                 var pauseMs = (Stopwatch.GetTimestamp() - pauseStart) * 1000.0 / Stopwatch.Frequency;
-                Decider.OnCollectedByScheduler(pauseMs, GC.CollectionCount(0));
+                Decider.OnCollectedByScheduler(pauseMs, gen0After);
                 Collections++;
                 TotalPauseMs += pauseMs;
                 if (pauseMs > MaxPauseMs) MaxPauseMs = pauseMs;

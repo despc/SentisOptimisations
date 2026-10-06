@@ -46,6 +46,23 @@ public class GcScheduleDeciderTests
     }
 
     [Fact]
+    public void A_collection_the_runtime_skipped_is_asked_for_again_only_after_the_interval()
+    {
+        var decider = new GcScheduleDecider();
+        long gen0 = 0;
+        LearnNaturalBudget(decider, ref gen0, 100 * Mb, 3);
+        Assert.True(decider.OnFrameEnd(gen0, 1000 * Mb + 70 * Mb, workMs: 1));
+        var estimate = decider.PauseEstimateMs;
+
+        // a background collection is in progress: nothing was collected, the counter stands
+        decider.OnSkippedByRuntime();
+        for (var i = 1; i < GcScheduleDecider.MinIntervalFrames; i++)
+            Assert.False(decider.OnFrameEnd(gen0, 1000 * Mb + 70 * Mb, workMs: 1));
+        Assert.True(decider.OnFrameEnd(gen0, 1000 * Mb + 70 * Mb, workMs: 1));
+        Assert.Equal(estimate, decider.PauseEstimateMs);
+    }
+
+    [Fact]
     public void Does_not_collect_while_the_median_window_is_cold()
     {
         var decider = new GcScheduleDecider();
