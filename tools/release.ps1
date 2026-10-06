@@ -1,6 +1,6 @@
 # Builds the plugin in Release and packs it the way Torch takes a plugin: a zip with the dll, its manifest and what it
 # needs beside it at the root. Used by the release workflow (.github/workflows/release.yml) and by hand:
-#   powershell -ExecutionPolicy Bypass -File tools\release.ps1 -Version v1.2.3
+#   powershell -ExecutionPolicy Bypass -File tools\release.ps1 -Version 1.2.3
 # -SeRoot is the folder with Torch and DedicatedServer64 (the game's libraries the plugin is built against).
 param(
     [Parameter(Mandatory = $true)][string]$Version,
@@ -10,7 +10,8 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 
-if ($Version -notmatch '^v(\d+\.\d+\.\d+)([-.][0-9A-Za-z.-]+)?$') { throw "The version is to look like v1.2.3 (got '$Version')" }
+# (this repository's tags have no "v": 1.1.0; both forms are taken)
+if ($Version -notmatch '^v?(\d+\.\d+\.\d+)([-.][0-9A-Za-z.-]+)?$') { throw "The version is to look like 1.2.3 or v1.2.3 (got '$Version')" }
 $number = $Matches[1]
 $repo = Split-Path -Parent $PSScriptRoot
 foreach ($needed in "$SeRoot\Torch.dll", "$SeRoot\DedicatedServer64\Sandbox.Game.dll") {
@@ -33,7 +34,7 @@ Copy-Item (Join-Path $repo "$Plugin\lib\0Harmony.dll") -Destination $stage
 # the manifest with the version of this release (Torch shows it in its list of plugins)
 $manifest = Get-Content (Join-Path $bin 'manifest.xml') -Raw
 if ($manifest -notmatch '<Version>[^<]*</Version>') { throw 'manifest.xml has no <Version>' }
-$manifest = $manifest -replace '<Version>[^<]*</Version>', "<Version>$Version</Version>"
+$manifest = $manifest -replace '<Version>[^<]*</Version>', "<Version>v$($Version.TrimStart('v'))</Version>"
 [IO.File]::WriteAllText((Join-Path $stage 'manifest.xml'), $manifest, (New-Object Text.UTF8Encoding $false))
 if (-not (Test-Path (Join-Path $stage "$Plugin.dll"))) { throw "$Plugin.dll is not in the build" }
 
