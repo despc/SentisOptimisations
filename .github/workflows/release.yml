@@ -1,4 +1,5 @@
-# A tag v1.2.3 pushed to the repository builds the plugin and publishes a release with SentisOptimisations-v1.2.3.zip:
+# A tag 1.2.3 (or v1.2.3) pushed to the repository builds the plugin and publishes a release with
+# SentisOptimisations-1.2.3.zip:
 # the zip goes into Torch's Plugins folder as it is.
 #
 # The plugin is built against the libraries of Space Engineers Dedicated Server and Torch, which are not in the
@@ -10,12 +11,12 @@ name: Release
 
 on:
   push:
-    tags: ['v*']
+    tags: ['[0-9]*.[0-9]*.[0-9]*', 'v[0-9]*.[0-9]*.[0-9]*']
   workflow_dispatch:
     inputs:
       version:
         description: Version to stamp the build with (no release is made)
-        default: v0.0.0-manual
+        default: 0.0.0-manual
         required: true
 
 permissions:
