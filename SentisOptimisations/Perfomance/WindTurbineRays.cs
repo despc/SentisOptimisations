@@ -26,6 +26,12 @@ namespace Optimizer.Optimizations
     /// much later. The first round of rays of a turbine (a new one starts with no clearance measured) is not
     /// held back, so a turbine just built comes up to power as fast as before; after a restart the
     /// measured clearances come back with the save.
+    ///
+    /// The turbines do not cast in step. Counted from the server's start they all came due in the same frame: every
+    /// 300 frames all the turbines of the world cast together, and every ninth time it was the ray down to the ground,
+    /// the costly one (a list of hits through 25 m of voxels, 7-11 ms each with the others beside it) - a physics step
+    /// of 12-17 ms exactly every 45 s on a world with no player (a test world, 06.10.2026, 13 such rays in the frame).
+    /// Each turbine's round is shifted once by a part of the period that comes from its entity id.
     /// </summary>
     [PatchShim]
     public static class WindTurbineRays
@@ -38,7 +44,7 @@ namespace Optimizer.Optimizations
 
         private sealed class Rays
         {
-            public ulong LastFrame;
+            public ulong NextFrame;
             public int Count;
         }
 
@@ -64,19 +70,21 @@ namespace Optimizer.Optimizations
             if (RayRunning != null && (bool)RayRunning.GetValue(__instance)) return true;
             var grid = __instance.CubeGrid;
             var period = grid == null || grid.PlayerPresenceTier == MyUpdateTiersPlayerPresence.Normal ? SeenPeriod : IdlePeriod;
-            return Due(ByTurbine.GetOrCreateValue(__instance), MySandboxGame.Static.SimulationFrameCounter, period, __instance.RayEffectivities?.Length ?? 0);
+            return Due(ByTurbine.GetOrCreateValue(__instance), MySandboxGame.Static.SimulationFrameCounter, period, __instance.RayEffectivities?.Length ?? 0,
+                (int)((ulong)__instance.EntityId % IdlePeriod));
         }
 
         /// <summary>
         /// Whether a turbine may cast now: always for its first round of rays, then once a period. Records
-        /// the cast when it may.
+        /// the cast when it may. The first wait after the first round is longer by the turbine's own
+        /// <paramref name="shift"/> (frames, taken within the period), which is what keeps the turbines out of step.
         /// </summary>
-        public static bool Due(object state, ulong frame, int period, int raysPerRound)
+        public static bool Due(object state, ulong frame, int period, int raysPerRound, int shift = 0)
         {
             var rays = (Rays)state;
-            if (rays.Count >= raysPerRound && frame - rays.LastFrame < (ulong)period) return false;
-            rays.LastFrame = frame;
+            if (rays.Count >= raysPerRound && frame < rays.NextFrame) return false;
             if (rays.Count < int.MaxValue) rays.Count++;
+            rays.NextFrame = frame + (ulong)period + (rays.Count == raysPerRound && period > 0 ? (ulong)(Math.Abs(shift) % period) : 0UL);
             return true;
         }
 
