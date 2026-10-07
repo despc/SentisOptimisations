@@ -15,11 +15,15 @@ namespace SentisOptimisationsPlugin
     /// The grid storage of the Services Terminal checks a grid on the server when the grid is sent, not only before.
     ///
     /// The client asks the server to check a grid first (<c>ValidateGridEndpoint</c>: the whole <c>ValidateGrid</c> -
-    /// the grid is the sender's, within the limits, not static, its inventories empty where items are not allowed,
-    /// the sender's storage not full) and then sends the store request with the grid's id. The server ran that second
-    /// request (<c>StoreGridTrusted</c>) with only part of the check. Here the same <c>ValidateGrid</c> runs again
-    /// at that point; a grid that does not pass is not stored, and the sender gets the reason back as the game
-    /// sends it for any refused request. What passes goes on to the game's own handling unchanged.
+    /// the grid is the sender's, within the limits, not static, the sender's storage not full) and then sends the
+    /// store request with the grid's id. The server ran that second request (<c>StoreGridTrusted</c>) with only part
+    /// of the check. Here the same <c>ValidateGrid</c> runs again at that point; a grid that does not pass is not
+    /// stored, and the sender gets the reason back as the game sends it for any refused request. What passes goes on
+    /// to the game's own handling unchanged.
+    ///
+    /// <c>InventoryIssue</c> passes: it is not a refusal. <c>ValidateGrid</c> gives it alone, only when every other
+    /// check passed and items are not allowed in the storage; the client then asks "drop the inventory?", and
+    /// <c>StoreGridTrusted</c> drops the items (<c>DropInventories</c>: a loot bag or floating objects) before storing.
     ///
     /// The requests about a grid already in storage name its record by id, and the server did not match the record
     /// with the sender: fetching it back (which makes the sender its owner), its check, deleting it, sharing it. Here
@@ -66,6 +70,13 @@ namespace SentisOptimisationsPlugin
             var terminalGrid = (terminal.Entity as MyCubeBlock)?.CubeGrid;
             return (MyGridStorageRequestResult)_validate.Invoke(null, new[] { grid, terminalGrid, identity, _session.GetValue(terminal) });
         }
+
+        /// <summary>
+        /// Whether a store request goes on after <see cref="Check"/>: on success, and on <c>InventoryIssue</c> alone -
+        /// the game drops the items itself before storing. Together with any other flag it is refused.
+        /// </summary>
+        public static bool MayStore(MyGridStorageRequestResult result) =>
+            result == MyGridStorageRequestResult.Success || result == MyGridStorageRequestResult.InventoryIssue;
 
         /// <summary>Whether a player may fetch a stored record back: theirs, or shared with their faction by its owner.</summary>
         public static bool MayFetch(MyStoredGridData record, long identityId) =>
@@ -158,7 +169,7 @@ namespace SentisOptimisationsPlugin
                 if (identity == null) return true;          // the game refuses it itself
                 var grid = MyEntities.GetEntityById(entityId) as MyCubeGrid;
                 var result = Check(__instance, grid, identity);
-                if (result == MyGridStorageRequestResult.Success) return true;
+                if (MayStore(result)) return true;
                 Log.Warn($"Grid storage: '{grid?.DisplayName}' ({entityId}) not stored for '{identity.DisplayName}' ({sender.Value}): {result}");
                 __instance.OnGridStorageDepositRequestFinished(result, sender.Value);
                 return false;
