@@ -1,3 +1,4 @@
+using Sandbox.ModAPI;
 using SentisOptimisationsPlugin;
 using Xunit;
 
@@ -51,6 +52,26 @@ namespace SentisOptimisations.Tests
             GridStorageServerCheck.MayFetch(Owner, true, Mate, (a, b) => { askedOwner = a; askedPlayer = b; return true; });
             Assert.Equal(Owner, askedOwner);
             Assert.Equal(Mate, askedPlayer);
+        }
+
+        [Fact]
+        public void A_grid_that_passes_is_stored()
+        {
+            Assert.True(GridStorageServerCheck.MayStore(MyGridStorageRequestResult.Success));
+        }
+
+        [Fact]
+        public void A_grid_with_items_is_stored_the_game_drops_them()
+        {
+            Assert.True(GridStorageServerCheck.MayStore(MyGridStorageRequestResult.InventoryIssue));
+        }
+
+        [Fact]
+        public void A_grid_that_fails_a_check_is_not_stored()
+        {
+            Assert.False(GridStorageServerCheck.MayStore(MyGridStorageRequestResult.OwnershipIssue));
+            Assert.False(GridStorageServerCheck.MayStore(MyGridStorageRequestResult.GridsPerPlayerLimitReached));
+            Assert.False(GridStorageServerCheck.MayStore(MyGridStorageRequestResult.InventoryIssue | MyGridStorageRequestResult.OwnershipIssue));
         }
 
         [Fact]
