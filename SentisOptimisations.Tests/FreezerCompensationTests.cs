@@ -27,6 +27,19 @@ namespace SentisOptimisations.Tests
             Assert.NotNull(field.GetValue(null));
         }
 
+        [Theory]
+        [InlineData(6, 3_000_000L, 1_000_000L, 3)]      // six queued, three held: three (the ingots of six were given)
+        [InlineData(3, 1_000_000L, 1_000_000L, 1)]
+        [InlineData(2, 5_000_000L, 1_000_000L, 2)]      // no more than asked for
+        [InlineData(4, 0L, 1_000_000L, 0)]
+        [InlineData(4, 999_999L, 1_000_000L, 0)]        // not a whole item
+        [InlineData(4, 5_000_000L, 2_000_000L, 2)]      // a recipe that makes two at a time
+        [InlineData(4, 1_000_000L, 0L, 4)]              // a result of nothing does not limit
+        public void Disassembly_takes_apart_no_more_than_is_held(int wanted, long held, long perBatch, int expected)
+        {
+            Assert.Equal(expected, FreezerPatches.BatchesHeld(wanted, held, perBatch));
+        }
+
         // ---------------------------------------------------------------- tracker behavior
 
         [Fact]
