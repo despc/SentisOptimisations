@@ -119,9 +119,28 @@ public static class FreezerPatches
     private static bool ConsumeVanillaProduction(long blockId) =>
         _vanillaProductionPasses != null && _vanillaProductionPasses.Remove(blockId);
 
+    /// <summary>
+    /// How many batches may be taken apart: no more than asked for, and no more than the items held make up
+    /// (raw amounts, millionths; a batch of nothing does not limit).
+    /// </summary>
+    public static int BatchesHeld(int wanted, long heldRaw, long perBatchRaw)
+    {
+        if (perBatchRaw <= 0) return wanted;
+        var held = heldRaw <= 0 ? 0 : heldRaw / perBatchRaw;
+        return held < wanted ? (int)held : wanted;
+    }
+
     private static bool FinishDisassembling(MyBlueprintDefinitionBase blueprint, int count,
         MyAssembler __instance)
     {
+        // No more than the items that are there. The pass counts batches by the time that went by and by the
+        // queue, and checks the inventory for one batch only (CheckInventory): an assembler with three computers
+        // and six of them queued gave the ingots of six and took three (prod, 04.10.2026: "disassemble
+        // ComputerComponent made Ingot/Iron +0.999996 but Component/Computer took 3 of 6"; 05.10: 1 of 3).
+        foreach (MyBlueprintDefinitionBase.Item result in blueprint.Results)
+            count = BatchesHeld(count, __instance.OutputInventory.GetItemAmount(result.Id).RawValue, result.Amount.RawValue);
+        if (count <= 0) return false;
+
         var action = delegate(MyInventoryBase @base)
         {
             _OutputInventory_ContentsChanged.Invoke(__instance, new object[]{ @base});
