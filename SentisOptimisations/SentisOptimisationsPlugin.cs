@@ -154,16 +154,17 @@ namespace SentisOptimisationsPlugin
 
         public async void InitShieldApi()
         {
-            _shieldApiCts?.Cancel();
-            var cts = _shieldApiCts = new System.Threading.CancellationTokenSource();
+            var cts = new System.Threading.CancellationTokenSource();
+            CancelShieldApiWait(System.Threading.Interlocked.Exchange(ref _shieldApiCts, cts));
             try
             {
                 await Task.Delay(60000, cts.Token);
                 // the delay resumes on a pool thread, and the session may have been unloaded meanwhile:
-                // ModAPI is touched only on the game thread and only while the session is alive
+                // ModAPI is touched only on the game thread and only while this wait is still the current one
+                // (unloading clears it, a new load replaces it - the source itself is disposed by then)
                 MySandboxGame.Static?.Invoke(() =>
                 {
-                    if (cts.IsCancellationRequested || MySession.Static == null || MyAPIGateway.Utilities == null)
+                    if (_shieldApiCts != cts || MySession.Static == null || MyAPIGateway.Utilities == null)
                         return;
                     try
                     {
@@ -182,12 +183,27 @@ namespace SentisOptimisationsPlugin
             {
                 Log.Error(e);
             }
+            finally
+            {
+                cts.Dispose();
+            }
+        }
+
+        private static void CancelShieldApiWait(System.Threading.CancellationTokenSource cts)
+        {
+            try
+            {
+                cts?.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                // the wait is already over
+            }
         }
 
         private void UnloadShieldApi()
         {
-            _shieldApiCts?.Cancel();
-            _shieldApiCts = null;
+            CancelShieldApiWait(System.Threading.Interlocked.Exchange(ref _shieldApiCts, null));
             try
             {
                 if (MyAPIGateway.Utilities != null)
