@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Collections.Generic;
 using System.Reflection;
 using Sandbox.Engine.Utils;
@@ -84,10 +85,11 @@ namespace Optimizer.Optimizations
         private static readonly Dictionary<(long welder, long grid), Reach> Reaches = new Dictionary<(long, long), Reach>();
         private static readonly HashSet<MySlimBlock> Scratch = new HashSet<MySlimBlock>();
 
-        // the welder whose ActivateCommon is running, and the frame it started in
-        private static MyShipWelder _welder;
-        private static long _frame = -1;
-        private static bool _inner;
+        // the welder whose ActivateCommon is running, and the frame it started in: each thread's own, as several
+        // welders may be activating at once in different threads (see ThreadGate)
+        [ThreadStatic] private static MyShipWelder _welder;
+        [ThreadStatic] private static long _frame;
+        [ThreadStatic] private static bool _inner;
 
         public static long FullScans;
         public static long CachedScans;
@@ -127,6 +129,15 @@ namespace Optimizer.Optimizations
         private static void ActivateCommonSuffix() => _welder = null;
 
         private static bool BlocksInSpherePrefix(MyCubeGrid __instance, ref BoundingSphereD sphere,
+            HashSet<MySlimBlock> blocks)
+        {
+            if (_welder == null) return true;
+            // the logs and the reaches are shared by every welder
+            using (global::SentisOptimisations.ThreadGate.Enter())
+                return BlocksInSphere(__instance, ref sphere, blocks);
+        }
+
+        private static bool BlocksInSphere(MyCubeGrid __instance, ref BoundingSphereD sphere,
             HashSet<MySlimBlock> blocks)
         {
             var welder = _welder;
@@ -277,16 +288,22 @@ namespace Optimizer.Optimizations
             var captured = log;
             log.OnAdded = block =>
             {
-                if (captured.Added.Count >= MaxLog)
+                using (global::SentisOptimisations.ThreadGate.Enter())
                 {
-                    // everyone behind this point walks the grid again
-                    captured.Base += captured.Added.Count;
-                    captured.Added.Clear();
+                    if (captured.Added.Count >= MaxLog)
+                    {
+                        // everyone behind this point walks the grid again
+                        captured.Base += captured.Added.Count;
+                        captured.Added.Clear();
+                    }
+                    captured.Added.Add(block);
                 }
-                captured.Added.Add(block);
             };
-            log.OnRemoved = _ => captured.Removed++;
-            log.OnClose = _ => Forget(captured);
+            log.OnRemoved = _ => Interlocked.Increment(ref captured.Removed);
+            log.OnClose = _ =>
+            {
+                using (global::SentisOptimisations.ThreadGate.Enter()) Forget(captured);
+            };
             grid.OnBlockAdded += log.OnAdded;
             grid.OnBlockRemoved += log.OnRemoved;
             grid.OnMarkForClose += log.OnClose;

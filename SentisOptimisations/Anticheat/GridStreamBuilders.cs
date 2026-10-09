@@ -416,7 +416,9 @@ namespace SentisOptimisationsPlugin
         private static void Subscribe(Entry entry)
         {
             entry.BlockChanged = _ => entry.StructureStale = true;
-            entry.BlockDirty = block => entry.DirtyBlocks.Add(block);
+            // (blocks of a grid are updated on that grid's thread when the clusters run side by side; a grid's
+            // blocks can be reached from another grid's through the conveyors: locked)
+            entry.BlockDirty = block => { lock (entry.DirtyBlocks) entry.DirtyBlocks.Add(block); };
             entry.GridChanged = _ => entry.StructureStale = true;
             entry.Closing = _ => entry.StructureStale = true;
             var grid = entry.Grid;
@@ -478,7 +480,8 @@ namespace SentisOptimisationsPlugin
         {
             var grid = block?.CubeGrid;
             if (grid == null) return;
-            if (Entries.TryGetValue(grid.EntityId, out var entry)) entry.DirtyBlocks.Add(block);
+            if (Entries.TryGetValue(grid.EntityId, out var entry))
+                lock (entry.DirtyBlocks) entry.DirtyBlocks.Add(block);
         }
 
         /// <summary>

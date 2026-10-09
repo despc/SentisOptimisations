@@ -77,7 +77,7 @@ namespace Optimizer.Optimizations
                 if (!Wait(__instance.FramesFromLastTrigger, step, __instance.TimerTickInFrames, FrameClock.ElapsedMs)) return true;
                 // the vanilla count, without the round
                 __instance.FramesFromLastTrigger += step;
-                Waited++;
+                System.Threading.Interlocked.Increment(ref Waited);
                 return false;
             }
             catch (Exception)
