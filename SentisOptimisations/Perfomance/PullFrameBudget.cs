@@ -18,6 +18,12 @@ namespace Optimizer.Optimizations
 
         public bool TryAcquire(long frame, int limit, bool starving, float fill)
         {
+            // refineries may be updated on several threads at once (SentisClusters): one budget for them all
+            lock (_requestFills) return TryAcquireLocked(frame, limit, starving, fill);
+        }
+
+        private bool TryAcquireLocked(long frame, int limit, bool starving, float fill)
+        {
             if (frame != _frame)
             {
                 _threshold = frame == _frame + 1 ? ThresholdFor(limit) : float.MaxValue;

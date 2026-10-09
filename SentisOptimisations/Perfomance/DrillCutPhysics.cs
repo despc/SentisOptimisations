@@ -135,19 +135,27 @@ namespace Optimizer.Optimizations
             if (coord.Lod != 0 || MySandboxGame.Static?.UpdateThread != Thread.CurrentThread ||
                 !KeptPending.Remove((__instance, coord.CoordInLod)))
                 return true;
-            if (!HeldMeshes.TryGetValue(__instance, out var held))
-                HeldMeshes[__instance] = held = new Dictionary<Vector3I, HkBvCompressedMeshShape>();
-            if (held.TryGetValue(coord.CoordInLod, out var older)) Release(older);
-            if (!childShape.IsZero) childShape.Base.AddReference();
-            held[coord.CoordInLod] = childShape;
+            // (the held meshes are taken by the voxel bodies' updates, which may run on other threads: locked)
+            lock (HeldMeshes)
+            {
+                if (!HeldMeshes.TryGetValue(__instance, out var held))
+                    HeldMeshes[__instance] = held = new Dictionary<Vector3I, HkBvCompressedMeshShape>();
+                if (held.TryGetValue(coord.CoordInLod, out var older)) Release(older);
+                if (!childShape.IsZero) childShape.Base.AddReference();
+                held[coord.CoordInLod] = childShape;
+            }
             HeldMeshCount++;
             return false;
         }
 
         private static void UpdateAfterSimulation10Suffix(object __instance)
         {
-            if (HeldMeshes.Count == 0 || !HeldMeshes.TryGetValue(__instance, out var held)) return;
-            HeldMeshes.Remove(__instance);
+            Dictionary<Vector3I, HkBvCompressedMeshShape> held;
+            lock (HeldMeshes)
+            {
+                if (HeldMeshes.Count == 0 || !HeldMeshes.TryGetValue(__instance, out held)) return;
+                HeldMeshes.Remove(__instance);
+            }
             var rigidBody = GetRigidBody0(__instance);
             if (rigidBody == null)
             {
@@ -174,6 +182,12 @@ namespace Optimizer.Optimizations
 
         /// <summary>Drops held meshes of cells in a range that is being invalidated the vanilla way.</summary>
         private static void DropHeld(object body, Vector3I min, Vector3I max)
+        {
+            lock (HeldMeshes)
+                DropHeldLocked(body, min, max);
+        }
+
+        private static void DropHeldLocked(object body, Vector3I min, Vector3I max)
         {
             if (HeldMeshes.Count == 0 || !HeldMeshes.TryGetValue(body, out var held)) return;
             List<Vector3I> drop = null;

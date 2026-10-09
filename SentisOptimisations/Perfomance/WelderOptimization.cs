@@ -108,6 +108,14 @@ namespace Optimizer.Optimizations
 
         private static bool Activate(MyShipWelder __instance, ref bool __result, HashSet<MySlimBlock> targets)
         {
+            // its scratch lists, caches and the frame's build budget are shared by every welder: one welder at a
+            // time when welders are updated on several threads (ThreadGate)
+            using (global::SentisOptimisations.ThreadGate.Enter())
+                return ActivateGated(__instance, ref __result, targets);
+        }
+
+        private static bool ActivateGated(MyShipWelder __instance, ref bool __result, HashSet<MySlimBlock> targets)
+        {
         try
         {
             __result = false; //it affects only sound;
