@@ -83,10 +83,14 @@ namespace Optimizer.Optimizations
 
         private static readonly Dictionary<long, GridLog> Logs = new Dictionary<long, GridLog>();
         private static readonly Dictionary<(long welder, long grid), Reach> Reaches = new Dictionary<(long, long), Reach>();
-        private static readonly HashSet<MySlimBlock> Scratch = new HashSet<MySlimBlock>();
+        // the logs and the reaches are dictionaries for every welder: taken under this, briefly; what a welder does with
+        // its own reach and its target grid's log is its cluster's thread's
+        private static readonly object Shared = new object();
+        [ThreadStatic] private static HashSet<MySlimBlock> _scratch;
+        private static HashSet<MySlimBlock> Scratch => _scratch ?? (_scratch = new HashSet<MySlimBlock>());
 
         // the welder whose ActivateCommon is running, and the frame it started in: each thread's own, as several
-        // welders may be activating at once in different threads (see ThreadGate)
+        // welders may be activating at once in different threads (SentisClusters)
         [ThreadStatic] private static MyShipWelder _welder;
         [ThreadStatic] private static long _frame;
         [ThreadStatic] private static bool _inner;
@@ -132,9 +136,7 @@ namespace Optimizer.Optimizations
             HashSet<MySlimBlock> blocks)
         {
             if (_welder == null) return true;
-            // the logs and the reaches are shared by every welder
-            using (global::SentisOptimisations.ThreadGate.Enter())
-                return BlocksInSphere(__instance, ref sphere, blocks);
+            return BlocksInSphere(__instance, ref sphere, blocks);
         }
 
         private static bool BlocksInSphere(MyCubeGrid __instance, ref BoundingSphereD sphere,
@@ -153,7 +155,7 @@ namespace Optimizer.Optimizations
             if (__instance.Projector != null)
             {
                 blocks.Clear();
-                PreviewsSkipped++;
+                System.Threading.Interlocked.Increment(ref PreviewsSkipped);
                 return false;
             }
 
@@ -165,7 +167,7 @@ namespace Optimizer.Optimizations
             catch (Exception e)
             {
                 SentisOptimisationsPlugin.SentisOptimisationsPlugin.Log.Error(e, "welder target cache failed");
-                Reaches.Clear();
+                lock (Shared) Reaches.Clear();
                 return true;
             }
         }
@@ -174,18 +176,20 @@ namespace Optimizer.Optimizations
             HashSet<MySlimBlock> blocks)
         {
             var frame = MySession.Static.GameplayFrameCounter;
-            var log = LogOf(grid);
+            GridLog log;
+            lock (Shared) log = LogOf(grid);
             log.Verify();
             var localCenter = Vector3D.Transform(sphere.Center, grid.PositionComp.WorldMatrixNormalizedInv);
 
             var key = (welder.EntityId, grid.EntityId);
             Reach reach;
-            if (!Reaches.TryGetValue(key, out reach))
-            {
-                if (Reaches.Count > 2048) Purge(frame);
-                reach = new Reach();
-                Reaches[key] = reach;
-            }
+            lock (Shared)
+                if (!Reaches.TryGetValue(key, out reach))
+                {
+                    if (Reaches.Count > 2048) Purge(frame);
+                    reach = new Reach();
+                    Reaches[key] = reach;
+                }
 
             if (reach.Grid != grid || reach.Radius != sphere.Radius || reach.Seen < log.Base ||
                 frame - reach.Frame > RefreshFrames + (welder.EntityId & 1023) ||
@@ -204,7 +208,7 @@ namespace Optimizer.Optimizations
                 reach.Frame = frame;
                 reach.Seen = log.End;
                 reach.SweepFrame = -SweepFrames;
-                FullScans++;
+                System.Threading.Interlocked.Increment(ref FullScans);
             }
             else
             {
@@ -221,7 +225,7 @@ namespace Optimizer.Optimizations
                     }
                     reach.Seen = log.End;
                 }
-                CachedScans++;
+                System.Threading.Interlocked.Increment(ref CachedScans);
             }
 
             // Once a second every kept block is looked at again - that is where damage shows up -
@@ -302,7 +306,7 @@ namespace Optimizer.Optimizations
             log.OnRemoved = _ => Interlocked.Increment(ref captured.Removed);
             log.OnClose = _ =>
             {
-                using (global::SentisOptimisations.ThreadGate.Enter()) Forget(captured);
+                lock (Shared) Forget(captured);
             };
             grid.OnBlockAdded += log.OnAdded;
             grid.OnBlockRemoved += log.OnRemoved;
