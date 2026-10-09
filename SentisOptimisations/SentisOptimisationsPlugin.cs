@@ -116,6 +116,7 @@ namespace SentisOptimisationsPlugin
         {
             if (newState == TorchSessionState.Unloading)
             {
+                UnloadShieldApi();
                 AllGridsProcessor.OnUnloading();
                 Optimizer.Optimizations.GrinderPatches.ClearAll();
                 GasTankOptimisations.ClearAll();
@@ -149,12 +150,48 @@ namespace SentisOptimisationsPlugin
             }
         }
 
+        private System.Threading.CancellationTokenSource _shieldApiCts;
+
         public async void InitShieldApi()
         {
+            _shieldApiCts?.Cancel();
+            var cts = _shieldApiCts = new System.Threading.CancellationTokenSource();
             try
             {
-                await Task.Delay(60000);
-                SApi.Load();
+                await Task.Delay(60000, cts.Token);
+                // the delay resumes on a pool thread, and the session may have been unloaded meanwhile:
+                // ModAPI is touched only on the game thread and only while the session is alive
+                MySandboxGame.Static?.Invoke(() =>
+                {
+                    if (cts.IsCancellationRequested || MySession.Static == null || MyAPIGateway.Utilities == null)
+                        return;
+                    try
+                    {
+                        SApi.Load();
+                    }
+                    catch (Exception e)
+                    {
+                        Log.Error(e);
+                    }
+                }, "SentisShieldApiLoad");
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception e)
+            {
+                Log.Error(e);
+            }
+        }
+
+        private void UnloadShieldApi()
+        {
+            _shieldApiCts?.Cancel();
+            _shieldApiCts = null;
+            try
+            {
+                if (MyAPIGateway.Utilities != null)
+                    SApi.Unload();
             }
             catch (Exception e)
             {
