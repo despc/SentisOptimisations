@@ -143,7 +143,9 @@ namespace SentisOptimisationsPlugin
 
         /// <summary>
         /// Every method and constructor of the assembly compiled to machine code, none run: what the script's runs would
-        /// otherwise do at their first calls. Generic definitions are left (they need their type arguments). The count prepared.
+        /// otherwise do at their first calls. Generic definitions are left (they need their type arguments), and so are the
+        /// script's types with a static constructor or static field initializers (preparing them would run it). The count
+        /// prepared.
         /// </summary>
         public static int Prepare(Assembly assembly)
         {
@@ -154,6 +156,12 @@ namespace SentisOptimisationsPlugin
             foreach (var type in types)
             {
                 if (type.ContainsGenericParameters) continue;
+                // PrepareMethod runs the type's initializer: here, off the game thread and outside a run, where the
+                // instruction counter the game put into a static constructor's body throws - and a type initializer that
+                // threw throws for good ("The type initializer for 'Settings' threw an exception", 10.10.2026). Such a
+                // type's methods are left for their first calls, as before. The compiler's own types (the lambdas' cache
+                // "<>c") are prepared: their initializer is the compiler's, not the script's, and has no counter in it.
+                if (type.TypeInitializer != null && !type.IsDefined(typeof(CompilerGeneratedAttribute), false)) continue;
                 const BindingFlags declared = BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
                 foreach (var method in type.GetMethods(declared))
                 {
