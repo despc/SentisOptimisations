@@ -26,18 +26,25 @@ namespace Optimizer.Optimizations
         /// <summary>Whether this welder may still build in this frame.</summary>
         public bool CanConsume(long frame, int limit, long owner)
         {
-            BeginFrame(frame);
-            if (limit < 1) limit = 1;
-            return _used < limit && !_builtThisFrame.Contains(owner);
+            // welders of different clusters ask at once (SentisClusters)
+            lock (_builtThisFrame)
+            {
+                BeginFrame(frame);
+                if (limit < 1) limit = 1;
+                return _used < limit && !_builtThisFrame.Contains(owner);
+            }
         }
 
         /// <summary>Takes one build out of the frame's budget.</summary>
         public bool TryConsume(long frame, int limit, long owner)
         {
-            if (!CanConsume(frame, limit, owner)) return false;
-            _used++;
-            _builtThisFrame.Add(owner);
-            return true;
+            lock (_builtThisFrame)
+            {
+                if (!CanConsume(frame, limit, owner)) return false;
+                _used++;
+                _builtThisFrame.Add(owner);
+                return true;
+            }
         }
 
         private void BeginFrame(long frame)

@@ -108,14 +108,6 @@ namespace Optimizer.Optimizations
 
         private static bool Activate(MyShipWelder __instance, ref bool __result, HashSet<MySlimBlock> targets)
         {
-            // its scratch lists, caches and the frame's build budget are shared by every welder: one welder at a
-            // time when welders are updated on several threads (ThreadGate)
-            using (global::SentisOptimisations.ThreadGate.Enter())
-                return ActivateGated(__instance, ref __result, targets);
-        }
-
-        private static bool ActivateGated(MyShipWelder __instance, ref bool __result, HashSet<MySlimBlock> targets)
-        {
         try
         {
             __result = false; //it affects only sound;
@@ -150,14 +142,19 @@ namespace Optimizer.Optimizations
         }
 
 
-        // Welders activate on the game thread only, one at a time, so the scratch collections of an
-        // activation are shared instead of allocated for each of them: an idle welder activates
-        // every quarter second whether or not it finds anything to weld.
-        private static readonly Dictionary<string, int> MissingComponents = new Dictionary<string, int>();
-        private static readonly HashSet<MySlimBlock> TargetsToWeld = new HashSet<MySlimBlock>();
-        private static readonly List<MyWelder.ProjectionRaycastData> ProjectedBlocks = new List<MyWelder.ProjectionRaycastData>();
-        private static readonly List<MyEntity> GridsInSphere = new List<MyEntity>();
-        private static readonly Dictionary<MyDefinitionId, int> ComponentsToPull = new Dictionary<MyDefinitionId, int>();
+        // The scratch collections of an activation are kept instead of allocated for each of them: an idle welder
+        // activates every quarter second whether or not it finds anything to weld. One set a thread: with SentisClusters
+        // welders of different clusters activate at once, each on its cluster's thread.
+        [ThreadStatic] private static Dictionary<string, int> _missingComponents;
+        [ThreadStatic] private static HashSet<MySlimBlock> _targetsToWeld;
+        [ThreadStatic] private static List<MyWelder.ProjectionRaycastData> _projectedBlocks;
+        [ThreadStatic] private static List<MyEntity> _gridsInSphere;
+        [ThreadStatic] private static Dictionary<MyDefinitionId, int> _componentsToPull;
+        private static Dictionary<string, int> MissingComponents => _missingComponents ?? (_missingComponents = new Dictionary<string, int>());
+        private static HashSet<MySlimBlock> TargetsToWeld => _targetsToWeld ?? (_targetsToWeld = new HashSet<MySlimBlock>());
+        private static List<MyWelder.ProjectionRaycastData> ProjectedBlocks => _projectedBlocks ?? (_projectedBlocks = new List<MyWelder.ProjectionRaycastData>());
+        private static List<MyEntity> GridsInSphere => _gridsInSphere ?? (_gridsInSphere = new List<MyEntity>());
+        private static Dictionary<MyDefinitionId, int> ComponentsToPull => _componentsToPull ?? (_componentsToPull = new Dictionary<MyDefinitionId, int>());
         /// <summary>
         /// The cells of a projection one welder can reach, and where it stopped testing them.
         ///
@@ -186,12 +183,16 @@ namespace Optimizer.Optimizations
 
         private static Reach ReachOf(long welderId)
         {
-            Reach reach;
-            if (Reaches.TryGetValue(welderId, out reach)) return reach;
-            if (Reaches.Count > 512) Reaches.Clear();   // tools come and go; this is only a cache
-            reach = new Reach();
-            Reaches[welderId] = reach;
-            return reach;
+            // one dictionary for every welder; a welder's own reach is only its own thread's
+            lock (Reaches)
+            {
+                Reach reach;
+                if (Reaches.TryGetValue(welderId, out reach)) return reach;
+                if (Reaches.Count > 512) Reaches.Clear();   // tools come and go; this is only a cache
+                reach = new Reach();
+                Reaches[welderId] = reach;
+                return reach;
+            }
         }
 
         public static void ActivateInternal(MyShipWelder welder, HashSet<MySlimBlock> targets)
@@ -350,7 +351,8 @@ namespace Optimizer.Optimizations
                     welder.EntityId))
             {
                 WelderDiagnostics.Count(ref WelderDiagnostics.NoPermit);
-                if (DeferredIds.Add(welder.EntityId)) Deferred.Enqueue(welder);
+                lock (Deferred)
+                    if (DeferredIds.Add(welder.EntityId)) Deferred.Enqueue(welder);
                 return;
             }
 
@@ -374,12 +376,17 @@ namespace Optimizer.Optimizations
                 var frame = MySession.Static.GameplayFrameCounter;
                 var limit = Math.Max(1, config.ProjectionBuildsPerFrame);
                 var scans = 0;
-                while (Deferred.Count > 0 && scans < limit)
+                while (scans < limit)
                 {
-                    var welder = Deferred.Peek();
-                    if (!ProjectionBudget.CanConsume(frame, limit, welder.EntityId)) break;
-                    Deferred.Dequeue();
-                    DeferredIds.Remove(welder.EntityId);
+                    MyShipWelder welder;
+                    lock (Deferred)
+                    {
+                        if (Deferred.Count == 0) break;
+                        welder = Deferred.Peek();
+                        if (!ProjectionBudget.CanConsume(frame, limit, welder.EntityId)) break;
+                        Deferred.Dequeue();
+                        DeferredIds.Remove(welder.EntityId);
+                    }
                     if (!config.WelderTweaksEnabled || welder.MarkedForClose || welder.Closed || !welder.IsWorking)
                         continue;
                     scans++;
@@ -389,8 +396,11 @@ namespace Optimizer.Optimizations
             }
             catch (Exception e)
             {
-                Deferred.Clear();
-                DeferredIds.Clear();
+                lock (Deferred)
+                {
+                    Deferred.Clear();
+                    DeferredIds.Clear();
+                }
                 SentisOptimisationsPlugin.SentisOptimisationsPlugin.Log.Error(e);
             }
         }
@@ -510,7 +520,8 @@ namespace Optimizer.Optimizations
             var preview = projector?.ProjectedGrid;
             if (preview == null || built == null) return;
             ProjectionFrontierState state;
-            if (!ProjectionFrontiers.TryGetValue(projector.EntityId, out state)) return;
+            lock (ProjectionFrontiers)
+                if (!ProjectionFrontiers.TryGetValue(projector.EntityId, out state)) return;
             var min = built.Min;
             var max = built.Max;
             foreach (var direction in NeighborDirections)
@@ -552,12 +563,15 @@ namespace Optimizer.Optimizations
         private static ProjectionFrontierState FrontierState(MyProjectorBase projector, MyCubeGrid preview,
             long frame)
         {
+            // one dictionary for every projection; a projection's own state is only its welders' thread's (the welders
+            // of a projection are in its cluster)
             ProjectionFrontierState state;
-            if (!ProjectionFrontiers.TryGetValue(projector.EntityId, out state))
-            {
-                state = new ProjectionFrontierState();
-                ProjectionFrontiers[projector.EntityId] = state;
-            }
+            lock (ProjectionFrontiers)
+                if (!ProjectionFrontiers.TryGetValue(projector.EntityId, out state))
+                {
+                    state = new ProjectionFrontierState();
+                    ProjectionFrontiers[projector.EntityId] = state;
+                }
             // A build takes one block out of the preview, and that must not throw away what the
             // search has learnt: it used to, on every build, and the queue of blocks next to fresh
             // ones was emptied before anyone got to it - on a real ship the welders were left
@@ -570,14 +584,15 @@ namespace Optimizer.Optimizations
                 state.Compact();
             state.LastSeenFrame = frame;
 
-            if (ProjectionFrontiers.Count > 32)
-            {
-                var stale = ProjectionFrontiers
-                    .Where(pair => frame - pair.Value.LastSeenFrame > 600 || pair.Value.Preview == null ||
-                                   pair.Value.Preview.Closed)
-                    .Select(pair => pair.Key).ToList();
-                foreach (var key in stale) ProjectionFrontiers.Remove(key);
-            }
+            lock (ProjectionFrontiers)
+                if (ProjectionFrontiers.Count > 32)
+                {
+                    var stale = ProjectionFrontiers
+                        .Where(pair => frame - pair.Value.LastSeenFrame > 600 || pair.Value.Preview == null ||
+                                       pair.Value.Preview.Closed)
+                        .Select(pair => pair.Key).ToList();
+                    foreach (var key in stale) ProjectionFrontiers.Remove(key);
+                }
             return state;
         }
 
