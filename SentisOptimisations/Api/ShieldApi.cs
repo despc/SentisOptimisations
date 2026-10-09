@@ -90,6 +90,7 @@ namespace SentisOptimisationsPlugin
                 MyAPIGateway.Utilities.UnregisterMessageHandler(Channel, HandleMessage);
             }
             IsReady = false;
+            _apiInit = false;
         }
 
         public void ApiLoad(IReadOnlyDictionary<string, Delegate> delegates)
