@@ -49,3 +49,33 @@ public class AsteroidNearReplicationTests
     }
 }
 }
+
+namespace SentisOptimisations.Tests
+{
+public class VoxelStreamNearestFirstTests
+{
+    [Fact]
+    public void A_voxel_map_round_the_player_is_due_the_next_frame()
+    {
+        Assert.Equal(101, SentisOptimisationsPlugin.VoxelStreamNearestFirst.Due(100, 0));
+    }
+
+    [Fact]
+    public void Nearer_is_never_due_later_than_farther()
+    {
+        long last = 0;
+        for (var d = 0.0; d <= 20000; d += 37)
+        {
+            var due = SentisOptimisationsPlugin.VoxelStreamNearestFirst.Due(1000, d);
+            Assert.True(due >= last);
+            last = due;
+        }
+    }
+
+    [Fact]
+    public void Fifteen_kilometres_is_within_a_second_and_a_half()
+    {
+        Assert.InRange(SentisOptimisationsPlugin.VoxelStreamNearestFirst.Due(0, 15000), 1, 90);
+    }
+}
+}
