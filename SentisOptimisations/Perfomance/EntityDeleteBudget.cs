@@ -66,6 +66,19 @@ namespace SentisOptimisationsPlugin
             MyEntities.CloseAllowed = true;
             try
             {
+                // A planet's physics sector goes at once, whatever the budget. Its entity id is made from the sector's
+                // place, so the planet makes it anew under the same id; while the closed one waited here its id stayed
+                // taken, the new one threw DuplicateIdException (swallowed by CrashFixPatch), and the ground under the
+                // grids there was gone: hundreds of grids thawed by the freezer fell to the planet's centre (10.10.2026).
+                foreach (var sector in toDelete.Where(IsPlanetSector).ToList())
+                {
+                    using (MyEntities.EntityCloseLock.AcquireExclusiveUsing())
+                    {
+                        if (sector.Pinned) continue;
+                        RaiseDelete(sector);
+                        sector.Delete();
+                    }
+                }
                 // the game's own loop, but for the time it may take
                 while (toDelete.Count > 0 && GoOn(deleted, Stopwatch.GetTimestamp() - started, budget))
                 {
@@ -100,6 +113,9 @@ namespace SentisOptimisationsPlugin
             _nextFrame.SetValue(null, toDelete);
             return false;
         }
+
+        /// <summary>A physics sector of a planet (MyVoxelPhysics, internal to the game).</summary>
+        public static bool IsPlanetSector(MyEntity entity) => entity is MyVoxelBase && entity.GetType().Name == "MyVoxelPhysics";
 
         private static FieldInfo _onEntityDelete;
 
