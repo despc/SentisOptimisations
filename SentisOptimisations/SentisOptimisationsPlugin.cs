@@ -116,6 +116,7 @@ namespace SentisOptimisationsPlugin
         {
             if (newState == TorchSessionState.Unloading)
             {
+                UnloadShieldApi();
                 AllGridsProcessor.OnUnloading();
                 Optimizer.Optimizations.GrinderPatches.ClearAll();
                 GasTankOptimisations.ClearAll();
@@ -149,12 +150,64 @@ namespace SentisOptimisationsPlugin
             }
         }
 
+        private System.Threading.CancellationTokenSource _shieldApiCts;
+
         public async void InitShieldApi()
+        {
+            var cts = new System.Threading.CancellationTokenSource();
+            CancelShieldApiWait(System.Threading.Interlocked.Exchange(ref _shieldApiCts, cts));
+            try
+            {
+                await Task.Delay(60000, cts.Token);
+                // the delay resumes on a pool thread, and the session may have been unloaded meanwhile:
+                // ModAPI is touched only on the game thread and only while this wait is still the current one
+                // (unloading clears it, a new load replaces it - the source itself is disposed by then)
+                MySandboxGame.Static?.Invoke(() =>
+                {
+                    if (_shieldApiCts != cts || MySession.Static == null || MyAPIGateway.Utilities == null)
+                        return;
+                    try
+                    {
+                        SApi.Load();
+                    }
+                    catch (Exception e)
+                    {
+                        Log.Error(e);
+                    }
+                }, "SentisShieldApiLoad");
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception e)
+            {
+                Log.Error(e);
+            }
+            finally
+            {
+                cts.Dispose();
+            }
+        }
+
+        private static void CancelShieldApiWait(System.Threading.CancellationTokenSource cts)
         {
             try
             {
-                await Task.Delay(60000);
-                SApi.Load();
+                cts?.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                // the wait is already over
+            }
+        }
+
+        private void UnloadShieldApi()
+        {
+            CancelShieldApiWait(System.Threading.Interlocked.Exchange(ref _shieldApiCts, null));
+            try
+            {
+                if (MyAPIGateway.Utilities != null)
+                    SApi.Unload();
             }
             catch (Exception e)
             {
