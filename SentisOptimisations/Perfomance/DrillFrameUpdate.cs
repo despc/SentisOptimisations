@@ -115,7 +115,7 @@ namespace Optimizer.Optimizations
         public static void MarkMoved(MyShipDrill drill)
         {
             if (MySandboxGame.Static?.UpdateThread == Thread.CurrentThread)
-                Moved.Add(drill);
+                lock (Moved) Moved.Add(drill);
             else
                 GetDrillBase(drill)?.UpdatePosition(drill.WorldMatrix);
         }
@@ -124,13 +124,17 @@ namespace Optimizer.Optimizations
 
         private static void EnsurePosition(MyShipDrill drill)
         {
-            if (Moved.Count == 0 || MySandboxGame.Static?.UpdateThread != Thread.CurrentThread || !Moved.Remove(drill)) return;
+            // the update may run in a thread of a cluster (SentisClusters): the drill moved by the physics of the game
+            // thread is caught up wherever its update runs
+            if (Moved.Count == 0) return;
+            lock (Moved)
+                if (!Moved.Remove(drill)) return;
             GetDrillBase(drill)?.UpdatePosition(drill.WorldMatrix);
         }
 
         private static void ClosingPrefix(MyShipDrill __instance)
         {
-            if (Moved.Count > 0 && MySandboxGame.Static?.UpdateThread == Thread.CurrentThread) Moved.Remove(__instance);
+            if (Moved.Count > 0) lock (Moved) Moved.Remove(__instance);
         }
     }
 }
