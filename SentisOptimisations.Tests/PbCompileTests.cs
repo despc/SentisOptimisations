@@ -63,6 +63,16 @@ public class PbCompileTests
         public static string Text = "text";
     }
 
+    /// <summary>A script's Program with <c>static readonly string[] Names = ...</c>: field initializers only, no script code in them.</summary>
+    private class ProgramWithStaticFields
+    {
+        private static readonly string[] Names = { "a", "b" };
+        private static readonly System.Collections.Generic.List<int> Seen = new System.Collections.Generic.List<int>();
+        private int _runs;
+        public void Main(string argument) { _runs++; Seen.Add(Names.Length + argument.Length); }
+        public int Runs() => _runs;
+    }
+
     private static Type[] TypesOf(Assembly assembly)
     {
         try { return assembly.GetTypes(); }
@@ -83,6 +93,22 @@ public class PbCompileTests
         Assert.False(StaticConstructorProbe.Ran, "Prepare ran a script's type initializer, off the game thread and outside a run");
         Assert.Equal(1, WithStaticConstructor.Get());   // the script's own first call runs it, as vanilla
         Assert.True(StaticConstructorProbe.Ran);
+    }
+
+    [Fact]
+    public void A_type_with_field_initializers_alone_is_prepared()
+    {
+        // its Main, Runs and constructor: compiled here, not at the first run on the game thread
+        Assert.Equal(3, PbCompile.PrepareTypes(new[] { typeof(ProgramWithStaticFields) }));
+    }
+
+    [Theory]
+    [InlineData(typeof(WithStaticConstructor))]                 // a static constructor of its own: the game's counter is in it
+    [InlineData(typeof(FieldInitializerCallsScriptMethod))]     // field initializers that run the script's code
+    [InlineData(typeof(FieldInitializerReadsAnotherScriptTypesStatics))]
+    public void A_type_whose_initializer_runs_the_scripts_code_is_not_prepared(Type type)
+    {
+        Assert.Equal(0, PbCompile.PrepareTypes(new[] { type }));
     }
 
     [Theory]

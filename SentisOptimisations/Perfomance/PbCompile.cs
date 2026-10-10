@@ -160,8 +160,8 @@ namespace SentisOptimisationsPlugin
 
         /// <summary>
         /// The methods and constructors of the types compiled to machine code. Generic definitions are left (they need
-        /// their type arguments), and so are the script's types with a static constructor or static field initializers
-        /// (preparing them would run it). The count prepared.
+        /// their type arguments), and so are the script's types with a static constructor of their own and those whose
+        /// field initializers run the script's code (preparing them would run it). The count prepared.
         /// </summary>
         public static int PrepareTypes(IEnumerable<Type> types)
         {
@@ -172,9 +172,12 @@ namespace SentisOptimisationsPlugin
                 // PrepareMethod runs the type's initializer: here, off the game thread and outside a run, where the
                 // instruction counter the game put into a static constructor's body throws - and a type initializer that
                 // threw throws for good ("The type initializer for 'Settings' threw an exception", 10.10.2026). Such a
-                // type's methods are left for their first calls, as before. The compiler's own types (the lambdas' cache
-                // "<>c") are prepared: their initializer is the compiler's, not the script's, and has no counter in it.
-                if (type.TypeInitializer != null && !type.IsDefined(typeof(CompilerGeneratedAttribute), false)) continue;
+                // type's methods are left for their first calls, as before. Field initializers alone (beforefieldinit)
+                // have no counter in them - the game rewrites constructors and methods, not field initializers - so a type
+                // with only those is prepared unless they call the script's code: the script's Program with any
+                // "static readonly string[] ..." was left whole, its Main and all, for the game thread. The compiler's own
+                // types (the lambdas' cache "<>c") are among them.
+                if (type.TypeInitializer != null && ((type.Attributes & TypeAttributes.BeforeFieldInit) == 0 || RunsScriptCodeAhead(type))) continue;
                 const BindingFlags declared = BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
                 foreach (var method in type.GetMethods(declared))
                 {
