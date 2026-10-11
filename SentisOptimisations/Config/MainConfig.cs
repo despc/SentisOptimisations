@@ -10,6 +10,9 @@ namespace SentisOptimisationsPlugin
         //optimisations
         private bool _gasTankOptimisation = true;
         private bool _safeZoneGridTracking = true;
+        private bool _mechanicalTopCheck = true;
+        private bool _dockedDampenersCalm = true;
+        private bool _dockedCollisionsOff = true;
         
         //welders
         private bool _welderTweaksEnabled = true;
@@ -103,6 +106,27 @@ namespace SentisOptimisationsPlugin
         {
             get => _safeZoneGridTracking;
             set => SetValue(ref _safeZoneGridTracking, value);
+        }
+
+        [DisplayTab(Name = "Rotor head check", GroupName = "Fixes", Tab = "Performance", Order = 0, Description = "After a rotor, hinge or advanced rotor is placed or given a head from the terminal, its head is checked for a few seconds: one off its place, tilted, not attached or without its constraint is put back where the stator puts it and attached again, and the clients are sent the connection again. Takes effect at once")]
+        public bool MechanicalTopCheck
+        {
+            get => _mechanicalTopCheck;
+            set => SetValue(ref _mechanicalTopCheck, value);
+        }
+
+        [DisplayTab(Name = "Docked grids calm", GroupName = "Fixes", Tab = "Performance", Order = 0, Description = "A grid locked by a connector to another dynamic grid does not dampen while the whole locked group stands (under 5 cm/s): its dampeners kicked against the lock every frame and the docked grids shook. Gravity is still held. Takes effect at once")]
+        public bool DockedDampenersCalm
+        {
+            get => _dockedDampenersCalm;
+            set => SetValue(ref _dockedDampenersCalm, value);
+        }
+
+        [DisplayTab(Name = "Docked grids do not collide", GroupName = "Fixes", Tab = "Performance", Order = 0, Description = "Grids locked by connectors do not collide with each other, as a rotor's head with its stator: where their hulls reached into each other, the lock and the contact fought (shaking) and threw them apart when the lock let go. After parting, the collisions come back once the shapes are clear. Takes effect at once")]
+        public bool DockedCollisionsOff
+        {
+            get => _dockedCollisionsOff;
+            set => SetValue(ref _dockedCollisionsOff, value);
         }
         
          //=================================================================================================
