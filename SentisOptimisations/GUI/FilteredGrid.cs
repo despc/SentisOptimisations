@@ -9,6 +9,7 @@ using System.Windows.Data;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using Torch.Views;
 using VRage.Serialization;
 
@@ -192,9 +193,16 @@ namespace SOPlugin.GUI
                     }
                     else if (property.GetSetMethod() == null && !(propertyType.IsGenericType && typeof(ICollection).IsAssignableFrom(propertyType.GetGenericTypeDefinition())) || descriptor?.ReadOnly == true)
                     {
-                        valueControl = new TextBlock();
+                        var shown = new TextBlock();
+                        valueControl = shown;
                         var binding = new Binding(property.Name) { Mode = BindingMode.OneWay };
                         valueControl.SetBinding(TextBlock.TextProperty, binding);
+                        // A read-only value is a live one (a queue, a counter): read anew every second while it is on
+                        // screen. Not through PropertyChanged - Torch saves the config file on every one of those.
+                        var refresh = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+                        refresh.Tick += (sender, args) => shown.GetBindingExpression(TextBlock.TextProperty)?.UpdateTarget();
+                        shown.Loaded += (sender, args) => refresh.Start();
+                        shown.Unloaded += (sender, args) => refresh.Stop();
                     }
                     else if (propertyType == typeof(bool) || propertyType == typeof(bool?))
                     {

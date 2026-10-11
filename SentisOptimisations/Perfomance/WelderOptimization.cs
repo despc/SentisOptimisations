@@ -330,8 +330,8 @@ namespace Optimizer.Optimizations
                 return;
             }
 
-            // Do not run the expensive projector/CanBuild scan when another welder has already
-            // spent the global materialization budget for this simulation frame - but do not drop
+            // Do not run the expensive projector/CanBuild scan when another welder of the same player
+            // has already spent the player's materialization budget for this frame - but do not drop
             // the turn either. Welders of one ship activate in the same frame, a quarter of a
             // second apart, so with one build a frame the second and the third tool of a ship lost
             // every turn they had: three welders built as fast as one. They wait for the next
@@ -339,52 +339,106 @@ namespace Optimizer.Optimizations
             // cap puts it and the ship's speed where its welders put it.
             if (!ProjectionBudget.CanConsume(MySession.Static.GameplayFrameCounter,
                     SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.ProjectionBuildsPerFrame,
-                    welder.EntityId))
+                    welder.EntityId, welder.OwnerId))
             {
                 WelderDiagnostics.Count(ref WelderDiagnostics.NoPermit);
-                if (DeferredIds.Add(welder.EntityId)) Deferred.Enqueue(welder);
+                if (DeferredIds.Add(welder.EntityId))
+                {
+                    if (!Deferred.TryGetValue(welder.OwnerId, out var queue))
+                        Deferred[welder.OwnerId] = queue = new Queue<MyShipWelder>();
+                    queue.Enqueue(welder);
+                }
                 return;
             }
 
             ScanAndBuild(welder);
         }
 
-        private static readonly Queue<MyShipWelder> Deferred = new Queue<MyShipWelder>();
+        // The welders turned away by their player's frame budget, a queue per player (the welder's owner).
+        private static readonly Dictionary<long, Queue<MyShipWelder>> Deferred = new Dictionary<long, Queue<MyShipWelder>>();
         private static readonly HashSet<long> DeferredIds = new HashSet<long>();
+        private static readonly List<long> DeferredPlayers = new List<long>();
+        private static readonly List<KeyValuePair<long, int>> WaitingByPlayer = new List<KeyValuePair<long, int>>();
+        // The most welders each player had waiting at once in this second: a queue lives a frame or two, so a
+        // look at one frame would show nobody most of the time.
+        private static readonly Dictionary<long, int> WaitingMax = new Dictionary<long, int>();
+        private const long WaitingRefreshFrames = 60;
+        private static volatile string _waiting = NoneWaiting;
+        private const string NoneWaiting = "-";
 
         /// <summary>
-        /// Once a frame, from the plugin's update: the welders that were turned away by the frame
-        /// budget get their scan now, while this frame still has room. No more scans than the
-        /// budget has builds, so a queue of tools that find nothing cannot turn into a long frame.
+        /// The players whose welders waited in the last second for a frame with room to build a projected block, and
+        /// the most of their welders waiting at once: "name: count, ...", the longest queue first; "-" when nobody
+        /// waited. Shown on the settings page; made on the game thread once a second.
+        /// </summary>
+        public static string Waiting => _waiting;
+
+        /// <summary>
+        /// Once a frame, from the plugin's update: the welders that were turned away by their player's
+        /// frame budget get their scan now, while the player's frame still has room. No more scans a
+        /// player than the budget has builds, so a queue of tools that find nothing cannot turn into a
+        /// long frame.
         /// </summary>
         public static void RunDeferred()
         {
+            var frame = MySession.Static.GameplayFrameCounter;
+            if (frame % WaitingRefreshFrames == 0)
+            {
+                _waiting = DescribeWaiting();
+                WaitingMax.Clear();
+            }
             if (Deferred.Count == 0) return;
+            foreach (var pair in Deferred)
+                if (!WaitingMax.TryGetValue(pair.Key, out var most) || most < pair.Value.Count)
+                    WaitingMax[pair.Key] = pair.Value.Count;
             try
             {
                 var config = SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config;
-                var frame = MySession.Static.GameplayFrameCounter;
                 var limit = Math.Max(1, config.ProjectionBuildsPerFrame);
-                var scans = 0;
-                while (Deferred.Count > 0 && scans < limit)
+                DeferredPlayers.Clear();
+                DeferredPlayers.AddRange(Deferred.Keys);
+                foreach (var player in DeferredPlayers)
                 {
-                    var welder = Deferred.Peek();
-                    if (!ProjectionBudget.CanConsume(frame, limit, welder.EntityId)) break;
-                    Deferred.Dequeue();
-                    DeferredIds.Remove(welder.EntityId);
-                    if (!config.WelderTweaksEnabled || welder.MarkedForClose || welder.Closed || !welder.IsWorking)
-                        continue;
-                    scans++;
-                    WelderDiagnostics.Count(ref WelderDiagnostics.DeferredScans);
-                    ScanAndBuild(welder);
+                    var queue = Deferred[player];
+                    var scans = 0;
+                    while (queue.Count > 0 && scans < limit)
+                    {
+                        var welder = queue.Peek();
+                        if (!ProjectionBudget.CanConsume(frame, limit, welder.EntityId, welder.OwnerId)) break;
+                        queue.Dequeue();
+                        DeferredIds.Remove(welder.EntityId);
+                        if (!config.WelderTweaksEnabled || welder.MarkedForClose || welder.Closed || !welder.IsWorking)
+                            continue;
+                        scans++;
+                        WelderDiagnostics.Count(ref WelderDiagnostics.DeferredScans);
+                        ScanAndBuild(welder);
+                    }
+                    if (queue.Count == 0) Deferred.Remove(player);
                 }
             }
             catch (Exception e)
             {
                 Deferred.Clear();
                 DeferredIds.Clear();
+                _waiting = NoneWaiting;
                 SentisOptimisationsPlugin.SentisOptimisationsPlugin.Log.Error(e);
             }
+        }
+
+        private static string DescribeWaiting()
+        {
+            if (WaitingMax.Count == 0) return NoneWaiting;
+            WaitingByPlayer.Clear();
+            WaitingByPlayer.AddRange(WaitingMax);
+            WaitingByPlayer.Sort((a, b) => b.Value.CompareTo(a.Value));
+            var text = new System.Text.StringBuilder();
+            foreach (var pair in WaitingByPlayer)
+            {
+                if (text.Length > 0) text.Append(", ");
+                var name = pair.Key == 0 ? "nobody" : MySession.Static.Players.TryGetIdentity(pair.Key)?.DisplayName ?? pair.Key.ToString();
+                text.Append(name).Append(": ").Append(pair.Value);
+            }
+            return text.ToString();
         }
 
         private static void ScanAndBuild(MyShipWelder welder)
@@ -464,7 +518,7 @@ namespace Optimizer.Optimizations
                 // one simulation frame and their synchronous Build costs otherwise stack.
                 if (!ProjectionBudget.TryConsume(MySession.Static.GameplayFrameCounter,
                         SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.ProjectionBuildsPerFrame,
-                        welder.EntityId))
+                        welder.EntityId, welder.OwnerId))
                 {
                     WelderDiagnostics.Count(ref WelderDiagnostics.BudgetSpent);
                     break;
@@ -578,7 +632,7 @@ namespace Optimizer.Optimizations
             var w = welder.WorldMatrix;
             var d = (MyShipWelderDefinition) (welder.BlockDefinition);
             BoundingSphereD boundingSphereD = new BoundingSphereD(
-                w.Translation + w.Forward * (welder.CubeGrid.GridSize * 1.5f + d.SensorOffset),
+                w.Translation + w.Forward * (welder.CubeGrid.GridSize * 1.5f + d.SensorOffset) + ShipToolPatch.GetWelderSphereShift(welder),
                 ShipToolPatch.GetWelderRadius(welder));
             var list = ProjectedBlocks;
             list.Clear();
