@@ -25,6 +25,7 @@ using Torch.Utils;
 using VRage.Game;
 using VRage.Game.Entity;
 using VRage.Game.ModAPI;
+using VRage.Game.Models;
 using VRage.ModAPI;
 using VRage.Utils;
 using VRageMath;
@@ -94,6 +95,31 @@ namespace SentisOptimisationsPlugin.ShipTool
             }
         
             return false;
+        }
+
+        /// <summary>
+        /// How far (world space) the welder's sphere stands from where the game puts it: the model's "detector_shiptool"
+        /// dummy moved <c>SensorOffset</c> along its forward (<c>MyShipToolBase.LoadDummies</c>). SentisGameplayImprovements
+        /// moves the sphere forward by its live setting; the projection search follows it. Zero when nobody moved it.
+        /// </summary>
+        public static Vector3D GetWelderSphereShift(MyShipWelder welder)
+        {
+            if (_detectorSphere == null)
+                return Vector3D.Zero;
+            var definition = (MyShipToolDefinition)welder.BlockDefinition;
+            var model = MyModels.GetModelOnlyDummies(definition.Model);
+            if (model?.Dummies == null)
+                return Vector3D.Zero;
+            foreach (var dummy in model.Dummies)
+            {
+                if (!dummy.Key.ToLower().Contains("detector_shiptool"))
+                    continue;
+                var matrix = dummy.Value.Matrix * welder.PositionComp.LocalMatrixRef;
+                var game = matrix.Translation + matrix.Forward * definition.SensorOffset;
+                var shift = _detectorSphere.Invoke(welder).Center - game;
+                return shift.LengthSquared() < 1e-6f ? Vector3D.Zero : Vector3D.TransformNormal(shift, welder.CubeGrid.WorldMatrix);
+            }
+            return Vector3D.Zero;
         }
 
         public static float GetWelderRadius(MyShipWelder welder)

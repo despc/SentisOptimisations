@@ -140,12 +140,16 @@ namespace SentisOptimisationsPlugin
         [DisplayTab(Name = "Self Welding", GroupName = "Welder Tweaks", Tab = "Welder Optimizations", Order = 5, Description = "Welder can weld it self")]
         public bool WelderTweaksSelfWelding { get => _welderSelfWelding; set => SetValue(ref _welderSelfWelding, value); }
 
-        [DisplayTab(Name = "Projection builds per frame", GroupName = "Welder Tweaks", Tab = "Welder Optimizations", Order = 6, Description = "Global server-wide limit for projection block materialization per simulation frame. Minimum 1; runtime adjustable.")]
+        [DisplayTab(Name = "Projection builds per frame per player", GroupName = "Welder Tweaks", Tab = "Welder Optimizations", Order = 6, Description = "How many projected blocks one player's welders (the welder's owner) materialize per simulation frame. Minimum 1; runtime adjustable.")]
         public int ProjectionBuildsPerFrame
         {
             get => _projectionBuildsPerFrame;
             set => SetValue(ref _projectionBuildsPerFrame, value < 1 ? 1 : value);
         }
+
+        // Shown, not saved: no setter, so the config file never holds it; the settings page reads it anew every second.
+        [DisplayTab(Name = "Welders waiting to build a projection block", GroupName = "Welder Tweaks", Tab = "Welder Optimizations", Order = 7, Description = "Live, by player, the most at once in the last second: welders that found no room in their player's projection build budget for the frame and wait for the next frame with room; each builds at most one block when its turn comes. Only the players who have such welders.")]
+        public string ProjectionBuildsWaiting => Optimizer.Optimizations.WelderOptimization.Waiting;
 
         
         ///Freezer
