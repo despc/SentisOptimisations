@@ -1,8 +1,13 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
+using Havok;
 using HarmonyLib;
+using Sandbox.Engine.Physics;
 using Sandbox.Game.Entities.Blocks;
 using Torch.Managers.PatchManager;
+using VRageMath;
 
 namespace SentisOptimisationsPlugin.CrashFix
 {
@@ -74,6 +79,38 @@ namespace SentisOptimisationsPlugin.CrashFix
             }
         }
 
+        private static readonly MethodInfo AddShapesForPistonTop = typeof(MyPistonBase).Assembly
+            .GetType("Sandbox.Game.Entities.Cube.MyCubeBlockCollector")?.GetMethod("AddShapesForPistonTop", BindingFlags.Static | BindingFlags.Public);
+
+        /// <summary>
+        /// The bodies at the head's place, as <c>MyPistonBase.CanPlaceTop</c> looks for them, and which of them have no entity or
+        /// an entity without physics (the check reads the physics of each). Only when the check threw.
+        /// </summary>
+        private static string Touching(MyPistonBase piston, MyAttachableTopBlockBase top)
+        {
+            try
+            {
+                var subpart = piston?.Subpart3;
+                var shapes = top?.ModelCollision?.HavokCollisionShapes;
+                if (subpart?.Model == null || shapes == null || AddShapesForPistonTop == null) return "not looked";
+                Vector3D at = subpart.WorldMatrix.Translation + piston.WorldMatrix.Up * subpart.Model.BoundingBoxSize.Y;
+                if (subpart.Model.Dummies.TryGetValue("TopBlock", out var dummy)) at = ((MatrixD)dummy.Matrix * subpart.WorldMatrix).Translation;
+                var list = new List<HkShape>();
+                AddShapesForPistonTop.Invoke(null, new object[] { top.SlimBlock, shapes, list });
+                if (list.Count == 0) return "the head has no shape";
+                var rotation = Quaternion.CreateFromForwardUp(piston.WorldMatrix.Forward, piston.WorldMatrix.Up);
+                var hits = new List<HkBodyCollision>();
+                MyPhysics.GetPenetrationsShape(list[0], ref at, ref rotation, hits, 15);
+                var odd = hits.Select(h => h.GetCollisionEntity()).Select(e => e == null ? "a body without an entity" : e.Physics == null ? $"{e.GetType().Name} '{e.DisplayName}' without physics" : null)
+                    .Where(s => s != null).ToList();
+                return $"{hits.Count} bodies" + (odd.Count == 0 ? "" : ": " + string.Join(", ", odd));
+            }
+            catch (Exception e)
+            {
+                return "looking threw " + e.GetType().Name;
+            }
+        }
+
         private static Exception CanPlaceTopFinalizer(Exception __exception, MyPistonBase __instance, MyAttachableTopBlockBase topBlock, ref bool __result)
         {
             if (__exception == null) return null;
@@ -87,10 +124,12 @@ namespace SentisOptimisationsPlugin.CrashFix
                     _logged = now;
                     var subpart = __instance?.Subpart3;
                     SentisOptimisationsPlugin.Log.Warn(__exception,
-                        $"PistonTopPlacement: the head of piston '{__instance?.CustomName}' on {__instance?.CubeGrid?.DisplayName} not placed: its check threw " +
-                        $"(third subpart {(subpart == null ? "missing" : subpart.Model == null ? "without a model" : "there")}, " +
-                        $"head collision {(topBlock?.ModelCollision?.HavokCollisionShapes == null ? "missing" : topBlock.ModelCollision.HavokCollisionShapes.Length + " shapes")}, " +
-                        $"piston built {__instance?.SlimBlock?.BuildLevelRatio:0.00})");
+                        $"PistonTopPlacement: the head of piston '{__instance?.CustomName}' ({__instance?.BlockDefinition?.Id.SubtypeName}) on {__instance?.CubeGrid?.DisplayName} " +
+                        $"not placed: its check threw (third subpart {(subpart == null ? "missing" : subpart.Model == null ? "without a model" : "there")}, " +
+                        $"head {(topBlock == null ? "missing" : topBlock.Model == null ? "without a model" : topBlock.BlockDefinition?.Id.SubtypeName)}, " +
+                        $"head collision {(topBlock?.ModelCollision == null ? "missing" : topBlock.ModelCollision.HavokCollisionShapes == null ? "without shapes" : topBlock.ModelCollision.HavokCollisionShapes.Length + " shapes")}, " +
+                        $"piston built {__instance?.SlimBlock?.BuildLevelRatio:0.00}, in scene {__instance?.InScene}, grid physics {(__instance?.CubeGrid?.Physics == null ? "none" : "there")}; " +
+                        $"what the head's place touches: {Touching(__instance, topBlock)})");
                 }
             }
             catch

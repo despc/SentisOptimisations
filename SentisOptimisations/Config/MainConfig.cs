@@ -11,6 +11,7 @@ namespace SentisOptimisationsPlugin
         private bool _gasTankOptimisation = true;
         private bool _safeZoneGridTracking = true;
         private bool _mechanicalTopCheck = true;
+        private bool _conveyorReach = true;
         private bool _dockedDampenersCalm = true;
         private bool _dockedCollisionsOff = true;
         
@@ -106,6 +107,13 @@ namespace SentisOptimisationsPlugin
         {
             get => _safeZoneGridTracking;
             set => SetValue(ref _safeZoneGridTracking, value);
+        }
+
+        [DisplayTab(Name = "Conveyor reach cache", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "\"Can the conveyor bring this item from there to here\" (CanTransferItemTo, IsConnectedTo, transfers through conveyors: the freezer's assemblers, scripts, mods) answered from one search of the network per destination, item and owner instead of a search of the whole network per pair; the answers are vanilla's. Off: vanilla. Takes effect at once")]
+        public bool ConveyorReach
+        {
+            get => _conveyorReach;
+            set => SetValue(ref _conveyorReach, value);
         }
 
         [DisplayTab(Name = "Rotor head check", GroupName = "Fixes", Tab = "Performance", Order = 0, Description = "After a rotor, hinge or advanced rotor is placed or given a head from the terminal, its head is checked for a few seconds: one off its place, tilted, not attached or without its constraint is put back where the stator puts it and attached again, and the clients are sent the connection again. Takes effect at once")]
