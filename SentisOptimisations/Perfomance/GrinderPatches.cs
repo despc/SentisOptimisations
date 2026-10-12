@@ -32,7 +32,8 @@ namespace Optimizer.Optimizations
     /// 7-14 ms the first time each model is needed (seen in freezer_stress... in grinder_perf worst
     /// frames). MyCubeBlockDefinition.PreloadConstructionModels only asks the renderer, which a
     /// dedicated server does not have, so the same call now also queues the stage models of that
-    /// block onto a background thread, where MyModels loads them under its own lock.
+    /// block onto a background thread (a Havok thread, for their collision shapes), where MyModels
+    /// loads them under its own lock.
     /// </summary>
     [PatchShim]
     public static class GrinderPatches
@@ -230,10 +231,26 @@ namespace Optimizer.Optimizations
 
         private static void PreloadLoop()
         {
+            // A model reads its collision shapes only on a thread Havok knows (MyModel.LoadData checks
+            // HkBaseSystem.IsThreadInitialized) and counts as loaded either way: a stage model loaded here without
+            // this stayed without collision until a restart, and a piston head built from it threw in
+            // MyPistonBase.CanPlaceTop - the bots' pistons never got a head again, rotor heads made as frames got a
+            // whole cube of collision inside the stator and slid off it (12.10.2026). The game registers its own
+            // "Entity creation thread" the same way. A throw here would end the process (a thread of our own), so
+            // without Havok nothing is preloaded: the game then loads each model itself, on the game thread.
+            try
+            {
+                Havok.HkBaseSystem.InitThread(System.Threading.Thread.CurrentThread.Name);
+            }
+            catch (Exception e)
+            {
+                SentisOptimisationsPlugin.SentisOptimisationsPlugin.Log.Error(e, "GrinderPatches preload: no Havok on the loader thread, construction models not preloaded");
+            }
             foreach (var block in ToPreload.GetConsumingEnumerable())
             {
                 try
                 {
+                    if (!Havok.HkBaseSystem.IsThreadInitialized) continue;
                     foreach (var stage in block.BuildProgressModels)
                         if (!string.IsNullOrEmpty(stage?.File))
                             VRage.Game.Models.MyModels.GetModelOnlyData(stage.File);
