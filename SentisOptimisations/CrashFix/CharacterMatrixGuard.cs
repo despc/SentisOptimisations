@@ -100,9 +100,12 @@ namespace SentisOptimisationsPlugin.CrashFix
                 if (fixedWhat == null) return;
                 _corrected = __instance;
                 _fixes++;
+                // (under "Diagnostic logs": the guard puts the matrix right either way; the line with its stack, once a minute
+                // for every bot hopping on its jetpack, read in the log as an error of the server's)
+                if (!global::SentisOptimisations.DiagLog.On) return;
                 if ((DateTime.UtcNow - _loggedAt).TotalSeconds < 60) return;
                 _loggedAt = DateTime.UtcNow;
-                SentisOptimisationsPlugin.Log.Error("CharacterMatrixGuard: " + (entity?.DisplayName ?? "?") + " (" + entity?.EntityId + "): " + fixedWhat +
+                SentisOptimisationsPlugin.Log.Warn("CharacterMatrixGuard: " + (entity?.DisplayName ?? "?") + " (" + entity?.EntityId + "): " + fixedWhat +
                                                     " (" + _fixes + " put right since the last report)\n" + Environment.StackTrace);
                 _fixes = 0;
             }
