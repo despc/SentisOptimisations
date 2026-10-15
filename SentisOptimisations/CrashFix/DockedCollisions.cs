@@ -27,6 +27,13 @@ namespace SentisOptimisationsPlugin.CrashFix
     /// still reach into each other - they drift apart instead of being thrown - and its own collisions come back once they
     /// are clear (or after <see cref="ReleaseSeconds"/> at the most). Switched on and off in the plugin's settings
     /// (<c>DockedCollisionsOff</c>) at any time: off, every grid it holds gets its own collisions back.
+    ///
+    /// The grid's blocks that have bodies of their own - door leaves, a connector's sensor, a piston's head, a wheel's
+    /// suspension - are put in their grid's collision group by the game when it changes (<c>OnHavokSystemIDChanged</c>,
+    /// as a connector's physics weld does); a filter set on the body itself tells nobody, and so it is told here. Without
+    /// it a door on a grid locked to a static one (15.10.2026, in a safe zone on the server) kept its leaves in the old
+    /// group: they collided with their own grid, stood a metre off where they are drawn and stopped the player in an
+    /// open door, and a leaf touching the grid while the door closed opened it again, for good (docked_door).
     /// </summary>
     [PatchShim]
     public static class DockedCollisions
@@ -45,6 +52,11 @@ namespace SentisOptimisationsPlugin.CrashFix
             public int Sub = -1, DontCollide;
         }
 
+        private static readonly Action<MyCubeGrid, int> HavokSystemIDChanged =
+            typeof(MyCubeGrid).GetMethod("HavokSystemIDChanged", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, new[] { typeof(int) }, null) is { } method
+                ? (Action<MyCubeGrid, int>)Delegate.CreateDelegate(typeof(Action<MyCubeGrid, int>), method, false)
+                : null;
+
         private static readonly Dictionary<long, Held> Pairs = new Dictionary<long, Held>();
         private static readonly List<long> Done = new List<long>();
         private static bool _scanned;
@@ -55,6 +67,7 @@ namespace SentisOptimisationsPlugin.CrashFix
         public static void Patch(PatchContext ctx) => global::SentisOptimisations.PatchGuard.Run("DockedCollisions", ctx, c =>
         {
             const BindingFlags any = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+            if (HavokSystemIDChanged == null) throw new MissingMethodException("MyCubeGrid.HavokSystemIDChanged(int)");
             var weld = typeof(MyShipConnector).GetMethod("Weld", any, null, new[] { typeof(MatrixD?) }, null)
                        ?? throw new MissingMethodException("MyShipConnector.Weld(MatrixD?)");
             c.GetPattern(weld).Suffixes.Add(typeof(DockedCollisions).GetMethod(nameof(WeldSuffix), BindingFlags.Static | BindingFlags.NonPublic));
@@ -154,6 +167,7 @@ namespace SentisOptimisationsPlugin.CrashFix
             if (body.GetCollisionFilterInfo() == wanted) return;
             body.SetCollisionFilterInfo(wanted);
             MyPhysics.RefreshCollisionFilter(light.Physics);
+            HavokSystemIDChanged(light, heavy.Physics.HavokCollisionSystemID);
             Applied++;
         }
 
@@ -167,6 +181,7 @@ namespace SentisOptimisationsPlugin.CrashFix
             if (body.GetCollisionFilterInfo() == own) return;
             body.SetCollisionFilterInfo(own);
             MyPhysics.RefreshCollisionFilter(light.Physics);
+            HavokSystemIDChanged(light, light.Physics.HavokCollisionSystemID);
         }
 
         /// <summary>Whether the two grids' shapes still reach into each other.</summary>

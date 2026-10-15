@@ -326,6 +326,7 @@ namespace SentisOptimisationsPlugin
             Optimizer.Optimizations.SafeZoneGridTracking.Tick();
             CrashFix.MechanicalTopCheck.Tick();
             CrashFix.DockedCollisions.Tick();
+            ReplicableResend.Tick();
             RespawnPointsCache.Tick();
             FaunaSpawnPrefetch.Tick();
         }
