@@ -31,6 +31,13 @@ namespace Optimizer.Optimizations
     /// the front of its queue and it is served at the normal rate again, so opening a terminal shows
     /// the contents without the idle wait. The client's own character and the entity it controls are
     /// never held back, and neither is anything but inventories.
+    ///
+    /// An inventory held back is parked off the client's queue (<c>MyClient.DirtyQueue</c>, a binary heap): on the
+    /// replication test the held-back inventories were 13 800 of the 14 500 entries of each client's heap, and every
+    /// operation on it - the frame's due entries taken out, each change put in - went through all those levels. Parked,
+    /// it waits in the client's list of the second it is due in (<see cref="ClientView"/>) and is put in the queue by
+    /// the game's own scheduling then, or at once when the client opens something. A parked entry whose group the
+    /// client no longer has (the replicable left it) is dropped.
     /// </summary>
     [PatchShim]
     public static class IdleInventorySync
@@ -69,6 +76,8 @@ namespace Optimizer.Optimizations
         private static readonly Action<MyReplicationServer, object, MyStateDataEntry, long, bool> ScheduleSync = BuildScheduleSync();
         private static readonly Func<MyReplicationServer, long> SyncFrame = BuildSyncFrame();
         private static readonly Func<MyStateDataEntry, long> EntryPriority = BuildEntryPriority();
+        private static readonly Func<object, IMyReplicable, int> LayerSendInterval = BuildLayerSendInterval();
+        private static readonly Func<MyReplicationServer, IMyReplicable, bool> Postponed = BuildPostponed();
         /// <summary>The server seen by the last frame, so a test can ask about the queues.</summary>
         private static MyReplicationServer _server;
 
@@ -94,39 +103,115 @@ namespace Optimizer.Optimizations
         private static bool ScheduleStateGroupSyncPrefix(MyReplicationServer __instance, object client,
             MyStateDataEntry groupEntry, long currentTime, bool allowReplicableRemoval)
         {
-            if (_rescheduling || !ShouldDelay(client, groupEntry))
+            if (_rescheduling || groupEntry?.Group == null || groupEntry.Group.GetType() != InventoryGroupType)
             {
                 Normal++;
-                return true;
+                return !Schedule(__instance, client, groupEntry, currentTime);
             }
+            if (!ShouldDelay(client, groupEntry))
+            {
+                // served the normal way now (the client opened something, came near): out of the parking
+                if (Views.TryGetValue(client, out var near)) near.Parked.Remove(groupEntry);
+                Normal++;
+                return !Schedule(__instance, client, groupEntry, currentTime);
+            }
+            var view = Views.GetOrCreateValue(client);
             // Already waiting for its turn: leave it there. The game moves a queued entry to whichever
             // time is sooner, and every change of a busy inventory schedules it again, so with a new
             // random delay each time the soonest of dozens of draws won and the idle interval was
             // never reached (measured: 768 thousand inventory writes a minute at 1800 frames, the
             // same as at 600).
-            if (DirtyQueue(client).Contains(groupEntry))
+            if (view.Parked.ContainsKey(groupEntry) || DirtyQueue(client).Contains(groupEntry))
             {
                 Kept++;
                 return false;
             }
-            // The game's own scheduling, only from a later frame, so the layer's interval, its random
+            // Parked till a later frame, then the game's own scheduling, so the layer's interval, its random
             // spread and the removal of replicables that left the layer all still apply.
             Delayed++;
-            _rescheduling = true;
-            try
-            {
-                // Spread over the whole idle interval: shifting every inventory by the same amount only
-                // moves the pile-up, and a frame that serves a client's 400 inventories at once is
-                // exactly what this is meant to prevent.
-                var delay = MyRandom.Instance.Next(1, (int)(IdleSendIntervalFrames * 2));
-                ScheduleSync(__instance, client, groupEntry, currentTime + delay, allowReplicableRemoval);
-            }
-            finally
-            {
-                _rescheduling = false;
-            }
+            // Spread over the whole idle interval: shifting every inventory by the same amount only
+            // moves the pile-up, and a frame that serves a client's 400 inventories at once is
+            // exactly what this is meant to prevent.
+            view.Park(groupEntry, currentTime + MyRandom.Instance.Next(1, (int)(IdleSendIntervalFrames * 2)));
             return false;
         }
+
+        [ThreadStatic] private static object _lastClient;
+        [ThreadStatic] private static ClientView _lastView;
+
+        /// <summary>
+        /// The game's ScheduleStateGroupSync for a replicable whose layer the client knows, with the client's controlled
+        /// and character replicables as read once this frame (<see cref="SendUpdatePrefix"/>): the game reads both on
+        /// every call, each through the player and its entity in dictionaries - in the replication test's join that was
+        /// a tenth of the network tick. False leaves the call to the game: a client not seen this frame yet, a replicable
+        /// with no layer (the game decides whether it leaves the client).
+        /// </summary>
+        private static bool Schedule(MyReplicationServer server, object client, MyStateDataEntry entry, long currentTime)
+        {
+            var owner = entry?.Owner;
+            if (owner == null || entry.Group == null) return false;
+            ClientView view;
+            if (ReferenceEquals(client, _lastClient)) view = _lastView;
+            else
+            {
+                if (!Views.TryGetValue(client, out view)) return false;
+                _lastClient = client;
+                _lastView = view;
+            }
+            if (!view.Known) return false;
+            var replicable = owner.GetParent() ?? owner;
+            var interval = LayerSendInterval(client, replicable);
+            if (interval < 0) return false;
+            var frames = replicable == view.Controlled || replicable == view.Character ? 1
+                : entry.Group.IsHighPriority ? Math.Max(interval >> 4, 1) : interval;
+            var due = MyRandom.Instance.Next(1, frames * 2) + currentTime;
+            var queue = DirtyQueue(client);
+            var valid = owner.IsValid || Postponed(server, owner);
+            if (!queue.Contains(entry))
+            {
+                if (valid) queue.Enqueue(entry, due);
+            }
+            else if (valid)
+            {
+                if (due < EntryPriority(entry)) queue.UpdatePriority(entry, due);
+            }
+            else queue.Remove(entry);
+            return true;
+        }
+
+        /// <summary>The parked entries due by this frame put in the client's queue by the game's scheduling.</summary>
+        private static void ReleaseDue(MyReplicationServer server, object client, ClientView view, long frame)
+        {
+            var second = frame / FramesPerSlot;
+            if (view.NextSlot == 0) view.NextSlot = second;
+            for (; view.NextSlot <= second; view.NextSlot++)
+            {
+                if (!view.Slots.TryGetValue(view.NextSlot, out var slot)) continue;
+                view.Slots.Remove(view.NextSlot);
+                foreach (var entry in slot)
+                {
+                    // (parked once more or taken out since: its own slot is another, or none)
+                    if (!view.Parked.TryGetValue(entry, out var due) || due / FramesPerSlot != view.NextSlot) continue;
+                    view.Parked.Remove(entry);
+                    if (!Current(client, entry)) continue;
+                    _rescheduling = true;
+                    try
+                    {
+                        ScheduleSync(server, client, entry, frame, true);
+                    }
+                    finally
+                    {
+                        _rescheduling = false;
+                    }
+                }
+                slot.Clear();
+                view.Spare.Push(slot);
+            }
+        }
+
+        // (the client still has this group, through this very entry: a replicable that left and came back has a new one)
+        private static bool Current(object client, MyStateDataEntry entry) =>
+            StateGroups(client).TryGetValue(entry.Group, out var current) && ReferenceEquals(current, entry);
 
         /// <summary>Once a frame: whoever just opened something gets their inventories at once.</summary>
         private static void SendUpdatePrefix(MyReplicationServer __instance)
@@ -140,7 +225,8 @@ namespace Optimizer.Optimizations
                 var view = Views.GetOrCreateValue(client);
                 var state = ClientState(client) as MyClientState;
                 var looking = state?.ContextEntity != null;
-                if (looking && !view.Looking) WakeInventories(client, frame);
+                if (looking && !view.Looking) WakeInventories(client, view, frame);
+                else if (view.Parked.Count > 0) ReleaseDue(__instance, client, view, frame);
                 view.Looking = looking;
                 // Each of these looks the player up, and the replicable after it, in dictionaries; they
                 // are read here once a frame instead of on every inventory scheduled for the client.
@@ -151,9 +237,16 @@ namespace Optimizer.Optimizations
             }
         }
 
-        private static void WakeInventories(object client, long frame)
+        private static void WakeInventories(object client, ClientView view, long frame)
         {
             var queue = DirtyQueue(client);
+            foreach (var entry in view.Parked.Keys)
+            {
+                // (counted below with the queued ones)
+                if (!Current(client, entry) || queue.Contains(entry)) continue;
+                queue.Enqueue(entry, frame);
+            }
+            view.Unpark();
             foreach (var pair in StateGroups(client))
             {
                 if (pair.Key == null || pair.Key.GetType() != InventoryGroupType) continue;
@@ -175,6 +268,61 @@ namespace Optimizer.Optimizations
             return value;
         }
 
+        private static readonly HashSet<MyStateDataEntry> Suspects = new HashSet<MyStateDataEntry>();
+
+        /// <summary>
+        /// For a test: every state group a client still has something to be sent of (<c>IsStillDirty</c>; streams aside)
+        /// must wait for it - in the client's queue, or parked here; one that waits nowhere is never sent. A group can be
+        /// dirty and not queued for a moment (an ack lost, the group back in the server's dirty groups till the next
+        /// pass), so a group counts as lost only when it was so at the previous call too. Returns the groups looked at,
+        /// dirty, queued, parked, lost, and the first lost one's type.
+        /// </summary>
+        public static string VerifyQueues(out long lost)
+        {
+            lost = 0;
+            if (_server == null) return "no server seen";
+            long groups = 0, dirty = 0, queued = 0, parked = 0, overdue = 0;
+            string first = null;
+            var frame = SyncFrame(_server);
+            var now = new HashSet<MyStateDataEntry>();
+            var clients = (System.Collections.IDictionary)ClientStatesField.GetValue(_server);
+            foreach (var client in clients.Values)
+            {
+                var endpoint = ClientState(client).EndpointId;
+                var queue = DirtyQueue(client);
+                Views.TryGetValue(client, out var view);
+                foreach (var pair in StateGroups(client))
+                {
+                    var group = pair.Key;
+                    if (group == null || group.IsStreaming) continue;
+                    groups++;
+                    bool still;
+                    try { still = group.IsStillDirty(endpoint); }
+                    catch { continue; }
+                    if (!still) continue;
+                    dirty++;
+                    if (queue.Contains(pair.Value)) { queued++; continue; }
+                    if (view != null && view.Parked.TryGetValue(pair.Value, out var due))
+                    {
+                        parked++;
+                        // (parked past its second and not put back: as good as lost)
+                        if (due + 3 * FramesPerSlot >= frame) continue;
+                        overdue++;
+                        lost++;
+                        if (first == null) first = "overdue " + group.GetType().Name + " of " + pair.Value.Owner?.GetType().Name;
+                        continue;
+                    }
+                    now.Add(pair.Value);
+                    if (!Suspects.Contains(pair.Value)) continue;
+                    lost++;
+                    if (first == null) first = group.GetType().Name + " of " + pair.Value.Owner?.GetType().Name;
+                }
+            }
+            Suspects.Clear();
+            Suspects.UnionWith(now);
+            return $"groups={groups} dirty={dirty} queued={queued} parked={parked} (overdue {overdue}) not waiting={now.Count} lost={lost}" + (first != null ? $" (first: {first})" : "");
+        }
+
         /// <summary>How many inventories of this client are queued, and how many are due within so many frames.</summary>
         public static long[] InventoryQueueState(MyClientStateBase state, long withinFrames)
         {
@@ -186,6 +334,12 @@ namespace Optimizer.Optimizations
                 if (!ReferenceEquals(ClientState(client), state)) continue;
                 var queue = DirtyQueue(client);
                 long queued = 0, due = 0;
+                if (Views.TryGetValue(client, out var view))
+                    foreach (var parked in view.Parked)
+                    {
+                        queued++;
+                        if (parked.Value - frame <= withinFrames) due++;
+                    }
                 foreach (var pair in StateGroups(client))
                 {
                     if (pair.Key == null || pair.Key.GetType() != InventoryGroupType) continue;
@@ -249,6 +403,29 @@ namespace Optimizer.Optimizations
             return Expression.Lambda<Func<MyStateDataEntry, long>>(Expression.Field(entry, field), entry).Compile();
         }
 
+        // (client.ReplicableToLayer[replicable].Descriptor.SendInterval, or -1 when the client has no layer for it)
+        private static Func<object, IMyReplicable, int> BuildLayerSendInterval()
+        {
+            var client = Expression.Parameter(typeof(object), "client");
+            var replicable = Expression.Parameter(typeof(IMyReplicable), "replicable");
+            var map = Expression.Field(Expression.Convert(client, ClientType), "ReplicableToLayer");
+            var layerType = map.Type.GetGenericArguments()[1];
+            var layer = Expression.Variable(layerType, "layer");
+            var found = Expression.Call(map, map.Type.GetMethod("TryGetValue"), replicable, layer);
+            var interval = Expression.Field(Expression.Field(layer, "Descriptor"), "SendInterval");
+            var body = Expression.Block(new[] { layer }, Expression.Condition(found, interval, Expression.Constant(-1)));
+            return Expression.Lambda<Func<object, IMyReplicable, int>>(body, client, replicable).Compile();
+        }
+
+        private static Func<MyReplicationServer, IMyReplicable, bool> BuildPostponed()
+        {
+            var server = Expression.Parameter(typeof(MyReplicationServer), "server");
+            var replicable = Expression.Parameter(typeof(IMyReplicable), "replicable");
+            var set = Expression.Field(server, ServerType.GetField("m_postponedDestructionReplicables", BindingFlags.Instance | BindingFlags.NonPublic));
+            var body = Expression.Call(set, set.Type.GetMethod("Contains"), replicable);
+            return Expression.Lambda<Func<MyReplicationServer, IMyReplicable, bool>>(body, server, replicable).Compile();
+        }
+
         private static Func<MyReplicationServer, long> BuildSyncFrame()
         {
             var field = typeof(MyReplicationLayer).GetField("SyncFrameCounter", BindingFlags.Instance | BindingFlags.NonPublic);
@@ -256,8 +433,41 @@ namespace Optimizer.Optimizations
             return Expression.Lambda<Func<MyReplicationServer, long>>(Expression.Field(server, field), server).Compile();
         }
 
+        /// <summary>A parked entry waits in the list of its second.</summary>
+        private const long FramesPerSlot = 60;
+
         private sealed class ClientView
         {
+            /// <summary>Parked entries and the frame each is due at.</summary>
+            public readonly Dictionary<MyStateDataEntry, long> Parked = new Dictionary<MyStateDataEntry, long>();
+            /// <summary>Parked entries by the second they are due in; one parked again stays in its old list too, the frame in <see cref="Parked"/> decides.</summary>
+            public readonly Dictionary<long, List<MyStateDataEntry>> Slots = new Dictionary<long, List<MyStateDataEntry>>();
+            public readonly Stack<List<MyStateDataEntry>> Spare = new Stack<List<MyStateDataEntry>>();
+            public long NextSlot;
+
+            public void Park(MyStateDataEntry entry, long due)
+            {
+                // (due in a second already gone through - this one, with a delay of a few frames: the next second's list,
+                // or nothing would take it out)
+                if (NextSlot != 0 && due / FramesPerSlot < NextSlot) due = NextSlot * FramesPerSlot;
+                Parked[entry] = due;
+                var second = due / FramesPerSlot;
+                if (!Slots.TryGetValue(second, out var slot))
+                    Slots[second] = slot = Spare.Count > 0 ? Spare.Pop() : new List<MyStateDataEntry>();
+                slot.Add(entry);
+            }
+
+            public void Unpark()
+            {
+                Parked.Clear();
+                foreach (var slot in Slots.Values)
+                {
+                    slot.Clear();
+                    Spare.Push(slot);
+                }
+                Slots.Clear();
+            }
+
             public bool Known;
             public bool Looking;
             public IMyReplicable Controlled;
