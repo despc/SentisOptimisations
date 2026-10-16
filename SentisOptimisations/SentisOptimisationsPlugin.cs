@@ -135,6 +135,7 @@ namespace SentisOptimisationsPlugin
                 if (newState != TorchSessionState.Loaded)
                     return;
                 Optimizer.Optimizations.PhysicsLoadMonitor.Reset();
+                Optimizer.Optimizations.PhysicsCost.Reset();
                 SerializerWarmup.Run();
                 PluginJitWarmup.Run();
                 AllGridsProcessor.OnLoaded();

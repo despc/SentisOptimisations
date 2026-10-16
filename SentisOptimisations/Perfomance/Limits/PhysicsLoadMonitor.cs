@@ -11,11 +11,10 @@ namespace Optimizer.Optimizations
     /// How long the physics step of the game thread takes, measured continuously and for free.
     ///
     /// Measured is <c>MyPhysics.Simulate</c>: the ray casts, the cluster upkeep, the Havok step of
-    /// every cluster and the work queued behind it - everything physics costs the game thread. Per
-    /// cluster there is nothing to read: with Havok's parallel scheduling, the default on a dedicated
-    /// server, all active clusters go through one job queue. So the whole time is measured exactly,
-    /// at the cost of two timestamps a frame, and the physics guard splits it between grid groups by
-    /// their share of the work (see <see cref="PhysicsGuard"/>).
+    /// every cluster and the work queued behind it - everything physics costs the game thread. The
+    /// whole time is measured exactly, at the cost of two timestamps a frame, and the physics guard
+    /// splits it between grid groups by <see cref="PhysicsCost"/> (the clusters timed now and then,
+    /// within a cluster by work).
     ///
     /// This replaces sampling the third-party Profiler plugin for ten frames every thirty seconds:
     /// the load is now known at all times instead of within a sampling window, and nothing is
@@ -70,8 +69,10 @@ namespace Optimizer.Optimizations
 
         private static void StepSuffix()
         {
-            var us = (long)((Stopwatch.GetTimestamp() - _startedAt) * TicksToMicroseconds);
+            var ticks = Stopwatch.GetTimestamp() - _startedAt;
+            var us = (long)(ticks * TicksToMicroseconds);
             if (us < 0) return;
+            PhysicsCost.CountStep(ticks);
             var frames = Interlocked.Increment(ref _frames);
             // The first frame of a world seeds the average instead of dragging it up from zero.
             var average = frames == 1 ? us : (long)(_averageUs + (us - _averageUs) * Alpha);
