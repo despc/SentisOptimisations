@@ -51,16 +51,23 @@ public class PhysicsGuardTests
     }
 
     [Fact]
-    public void A_group_is_charged_for_its_share_of_the_active_bodies()
+    public void The_share_SentisWatcher_reads_has_its_shape()
     {
-        // stepMs * cost / totalCost, the arithmetic the guard applies to the measured step.
-        Assert.Equal(1.0, Share(stepMs: 4.0, cost: 5, totalCost: 20), 6);
-        Assert.Equal(4.0, Share(stepMs: 4.0, cost: 20, totalCost: 20), 6);
-        // Bodies that are nobody's grid stay in the denominator, so a group is never overcharged.
-        Assert.True(Share(stepMs: 4.0, cost: 5, totalCost: 40) < Share(stepMs: 4.0, cost: 5, totalCost: 20));
+        // SentisWatcher draws the grids' physics by this very method, through a Func<double, Dictionary<long, double>, int>.
+        var share = typeof(Optimizer.Optimizations.PhysicsCost).GetMethod("Share", new[] { typeof(double), typeof(System.Collections.Generic.Dictionary<long, double>) });
+        Assert.NotNull(share);
+        Assert.True(share.IsStatic && share.IsPublic);
+        Assert.Equal(typeof(int), share.ReturnType);
     }
 
-    private static double Share(double stepMs, double cost, double totalCost) => stepMs * cost / totalCost;
+    [Fact]
+    public void The_members_the_clusters_are_timed_with_exist()
+    {
+        Assert.NotNull(typeof(MyPhysics).GetMethod("StepWorldsParallel", Any, null, Type.EmptyTypes, null));
+        Assert.NotNull(typeof(MyPhysics).GetMethod("IsClusterActive", Any, null, new[] { typeof(int), typeof(int) }, null));
+        Assert.Equal(typeof(HkJobQueue), typeof(MyPhysics).GetField("m_jobQueue", Any | BindingFlags.Static)?.FieldType);
+        Assert.Equal(typeof(HkJobThreadPool), typeof(MyPhysics).GetField("m_threadPool", Any | BindingFlags.Static)?.FieldType);
+    }
 
     [Fact]
     public void The_guard_reports_at_most_a_handful_of_groups_per_check()

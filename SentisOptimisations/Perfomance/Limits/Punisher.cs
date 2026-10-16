@@ -50,14 +50,9 @@ namespace SentisOptimisationsPlugin
 
             if (Hit(_timeToAlarm, minEntityId) > SentisOptimisationsPlugin.Config.PhysicsChecksBeforePunish / 2)
             {
-                ChatUtils.SendTo(ownerId,
-                    "Warning. Grid(s) " + gridNames + " has an increased impact on server performance,\n" +
-                    " when the load increases, the structure will be converted into a station");
-                MyVisualScriptLogicProvider.ShowNotification(
-                    "Warning. Grid(s) " + gridNames + " has an increased impact on server performance,\n" +
-                    " when the load increases, the structure will be converted into a station", 5000,
-                    "Red",
-                    ownerId);
+                var warning = "Внимание. Грид(ы) " + gridNames + " заметно нагружают физику сервера.\n" +
+                              "Если нагрузка вырастет, постройка будет превращена в станцию";
+                Tell(ownerId, warning, 5000);
                 _timeToAlarm.Remove(minEntityId);
             }
         }
@@ -69,12 +64,8 @@ namespace SentisOptimisationsPlugin
             var ownerId = PlayerUtils.GetOwner(grids);
             var playerIdentity = PlayerUtils.GetPlayerIdentity(ownerId);
             var playerName = playerIdentity == null ? "---" : playerIdentity.DisplayName;
-            ChatUtils.SendTo(ownerId,
-                "Attention. Grid(s) " + gridNames + " has a HUGE impact on server performance");
-            MyVisualScriptLogicProvider.ShowNotification(
-                "Attention. Grid(s) " + gridNames + " has a HUGE impact on server performance", 10000,
-                "Red",
-                ownerId);
+            var attention = "Внимание! Грид(ы) " + gridNames + " ОЧЕНЬ сильно нагружают физику сервера";
+            Tell(ownerId, attention, 10000);
 
             Log.Error("Grid " + gridNames + " of player " + playerName + " make lot of physics problems");
 
@@ -93,6 +84,25 @@ namespace SentisOptimisationsPlugin
             var playerIdentity = PlayerUtils.GetPlayerIdentity(ownerId);
             var playerName = playerIdentity == null ? "---" : playerIdentity.DisplayName;
             Log.Error("Grid(s) " + gridNames + " of player " + playerName + " make lot of physics problems");
+        }
+
+        /// <summary>
+        /// Writes to the owner and to everyone of the owner's faction, in chat and on screen. Nobody when there is
+        /// no owner: to the game a chat message for player 0 is a message for all.
+        /// </summary>
+        private static void Tell(long ownerId, string message, int notificationMs)
+        {
+            if (ownerId == 0) return;
+            var to = new HashSet<long> { ownerId };
+            var faction = MySession.Static.Factions.GetPlayerFaction(ownerId);
+            if (faction != null)
+                foreach (var member in faction.Members.Keys)
+                    if (member != 0) to.Add(member);
+            foreach (var id in to)
+            {
+                ChatUtils.SendTo(id, message);
+                MyVisualScriptLogicProvider.ShowNotification(message, notificationMs, "Red", id);
+            }
         }
 
         /// <summary>
@@ -162,15 +172,8 @@ namespace SentisOptimisationsPlugin
                 Log.Error(ex, "()Exception in RaiseEvent.");
             }
 
-            if (myCubeGrid.BigOwners.Count > 0)
-            {
-                ChatUtils.SendTo(myCubeGrid.BigOwners[0],
-                    "Grid " + myCubeGrid.DisplayName + " converted to station cause high performance issue");
-                MyVisualScriptLogicProvider.ShowNotification(
-                    "Grid " + myCubeGrid.DisplayName + " converted to station cause high performance issue", 10000,
-                    "Red",
-                    myCubeGrid.BigOwners[0]);
-            }
+            Tell(PlayerUtils.GetOwner(myCubeGrid),
+                "Грид " + myCubeGrid.DisplayName + " превращён в станцию: он сильно нагружал сервер", 10000);
 
             Log.Error("Grid " + myCubeGrid.DisplayName + " Converted To Static");
         }
