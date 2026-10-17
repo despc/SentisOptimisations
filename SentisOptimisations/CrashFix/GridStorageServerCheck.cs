@@ -30,11 +30,17 @@ namespace SentisOptimisationsPlugin
     /// they follow the rule the game itself uses to list the records to a player: fetched back by its owner, or by a
     /// member of the owner's faction when the owner shared it; deleted and shared only by its owner. A request that
     /// does not match is dropped (a fetch is answered "not found", the same as for a record that is not there).
+    ///
+    /// A store request during a save of the world (<see cref="GridStorageSaveWindow"/>) is refused before anything else:
+    /// the sender gets <c>UnspecifiedStorageIssue</c> and a private chat message to try again after the save.
     /// </summary>
     [PatchShim]
     public static class GridStorageServerCheck
     {
         private static readonly Logger Log = LogManager.GetCurrentClassLogger();
+
+        /// <summary>What the player is told when a store request comes during a save of the world.</summary>
+        public const string SavingMessage = "Идёт сохранение мира, грид не убран в хранилище. Попробуйте ещё раз через несколько секунд.";
 
         private static MethodInfo _validate;
         private static FieldInfo _session;
@@ -168,6 +174,14 @@ namespace SentisOptimisationsPlugin
                 var identity = MySession.Static.Players.TryGetIdentity(MySession.Static.Players.TryGetIdentityId(sender.Value));
                 if (identity == null) return true;          // the game refuses it itself
                 var grid = MyEntities.GetEntityById(entityId) as MyCubeGrid;
+                if (GridStorageSaveWindow.Saving)
+                {
+                    // a grid stored during a save loses its files (GridStorageSaveWindow); nothing is dropped or queued
+                    Log.Info($"Grid storage: '{grid?.DisplayName}' ({entityId}) not stored for '{identity.DisplayName}' ({sender.Value}): the world is being saved");
+                    __instance.OnGridStorageDepositRequestFinished(MyGridStorageRequestResult.UnspecifiedStorageIssue, sender.Value);
+                    global::SentisOptimisations.ChatUtils.SendTo(identity.IdentityId, SavingMessage, "Хранилище");
+                    return false;
+                }
                 var result = Check(__instance, grid, identity);
                 if (MayStore(result)) return true;
                 Log.Warn($"Grid storage: '{grid?.DisplayName}' ({entityId}) not stored for '{identity.DisplayName}' ({sender.Value}): {result}");
