@@ -51,7 +51,7 @@ namespace SentisOptimisationsPlugin
             if (Hit(_timeToAlarm, minEntityId) > SentisOptimisationsPlugin.Config.PhysicsChecksBeforePunish / 2)
             {
                 var warning = "Внимание. Грид(ы) " + gridNames + " заметно нагружают физику сервера.\n" +
-                              "Если нагрузка вырастет, постройка будет превращена в станцию";
+                              "Если нагрузка вырастет, постройка будет конвертирована в станцию";
                 Tell(ownerId, warning, 5000);
                 _timeToAlarm.Remove(minEntityId);
             }
@@ -173,7 +173,7 @@ namespace SentisOptimisationsPlugin
             }
 
             Tell(PlayerUtils.GetOwner(myCubeGrid),
-                "Грид " + myCubeGrid.DisplayName + " превращён в станцию: он сильно нагружал сервер", 10000);
+                "Грид " + myCubeGrid.DisplayName + " конвертирован в станцию: он сильно нагружал сервер", 10000);
 
             Log.Error("Grid " + myCubeGrid.DisplayName + " Converted To Static");
         }
