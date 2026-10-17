@@ -193,12 +193,13 @@ namespace SentisOptimisationsPlugin
         /// The client's check of a grid during a save: a grid that would be stored is refused, so the player is not asked
         /// to drop the inventory for nothing; a grid refused for its own reason keeps that reason.
         /// </summary>
-        private static void ValidateSuffix(MyIdentity callerIdentity, ref MyGridStorageRequestResult __result)
+        private static void ValidateSuffix(MyCubeGrid grid, MyIdentity callerIdentity, ref MyGridStorageRequestResult __result)
         {
             try
             {
                 if (!MayStore(__result) || !GridStorageSaveWindow.Saving) return;
                 __result = MyGridStorageRequestResult.UnspecifiedStorageIssue;
+                Log.Info($"Grid storage: '{grid?.DisplayName}' ({grid?.EntityId}) not stored for '{callerIdentity?.DisplayName}' ({callerIdentity?.IdentityId}): the world is being saved (check)");
                 if (callerIdentity != null) TellSaving(callerIdentity.IdentityId);
             }
             catch (Exception e)
