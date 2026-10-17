@@ -23,6 +23,7 @@ namespace SentisOptimisationsPlugin
 
         //physics profile антипалочная защита
         private bool _enablePhysicsGuard = true;
+        private bool _disablePhysicsMonitor;
         private float _physicsMsToAlert = 1.5f;
         private float _physicsMsToPunish = 2f;
         private float _physicsMsToPunishImmediately = 5f;
@@ -95,6 +96,14 @@ namespace SentisOptimisationsPlugin
             set => SetValue(ref _enablePhysicsGuard, value);
         }
         
+        [DisplayTab(Name = "Выключить мониторинг физики", GroupName = "Performance", Tab = "Performance", Order = 0,
+            Description = "The physics step as the game does it: no cluster stepped alone and timed, no contacts counted, no physics guard. To check whether something is from the monitor; applies from the next frame")]
+        public bool DisablePhysicsMonitor
+        {
+            get => _disablePhysicsMonitor;
+            set => SetValue(ref _disablePhysicsMonitor, value);
+        }
+
         [DisplayTab(Name = "Gas Tank Optimisation", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Gas Tank Optimisation")]
         public bool GasTankOptimisation
         {
