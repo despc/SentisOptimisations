@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Reflection;
+using HarmonyLib;
 using NLog;
 using Sandbox.Game.Entities;
 using Sandbox.Game.World;
@@ -30,11 +33,26 @@ namespace SentisOptimisationsPlugin
     /// they follow the rule the game itself uses to list the records to a player: fetched back by its owner, or by a
     /// member of the owner's faction when the owner shared it; deleted and shared only by its owner. A request that
     /// does not match is dropped (a fetch is answered "not found", the same as for a record that is not there).
+    ///
+    /// During a save of the world (<see cref="GridStorageSaveWindow"/>) a grid is not stored. The client's check
+    /// (<c>ValidateGrid</c>) answers <c>UnspecifiedStorageIssue</c> then, so the player is told before being asked to
+    /// drop the inventory; a store request that comes anyway is refused before anything else (nothing dropped, nothing
+    /// queued). Either way the player gets a private chat message to try again later, at most once in
+    /// <see cref="SavingMessageEvery"/>.
     /// </summary>
     [PatchShim]
     public static class GridStorageServerCheck
     {
         private static readonly Logger Log = LogManager.GetCurrentClassLogger();
+
+        /// <summary>What the player is told when a store request comes during a save of the world.</summary>
+        public const string SavingMessage = "The world is being saved, try again later.";
+
+        /// <summary>The least time between two <see cref="SavingMessage"/>s to one player (one goes on every click of "Store" otherwise).</summary>
+        public static readonly TimeSpan SavingMessageEvery = TimeSpan.FromSeconds(5);
+
+        private static readonly Harmony Harmony = new Harmony("SentisOptimisations.GridStorageServerCheck");
+        private static readonly Dictionary<long, long> SavingTold = new Dictionary<long, long>();
 
         private static MethodInfo _validate;
         private static FieldInfo _session;
@@ -62,6 +80,18 @@ namespace SentisOptimisationsPlugin
             ctx.GetPattern(Handler("ValidateRetrievalEndpoint", typeof(Guid))).Prefixes.Add(Own(nameof(RetrievalCheckPrefix)));
             ctx.GetPattern(Handler("DeleteGridEndpoint", typeof(Guid))).Prefixes.Add(Own(nameof(OwnerOnlyPrefix)));
             ctx.GetPattern(Handler("SetOwnershipKindEndpoint", typeof(Guid), typeof(Sandbox.ModAPI.MyStoredGridOwnershipKind))).Prefixes.Add(Own(nameof(OwnerOnlyPrefix)));
+
+            // Last and on its own: the checks above are access rules and stay whatever happens to this one.
+            // By Harmony, not Torch: a Torch suffix with a ref __result of a struct threw in the patched method itself
+            // (AsteroidNearReplication, 10.10.2026).
+            try
+            {
+                Harmony.Patch(_validate, postfix: new HarmonyMethod(Own(nameof(ValidateSuffix))));
+            }
+            catch (Exception e)
+            {
+                Log.Error(e, "Grid storage: the save check of the client's grid check is not patched; a store during a save is still refused");
+            }
         }
 
         /// <summary>The game's own check of a grid for storage, as the terminal would run it for this identity.</summary>
@@ -159,6 +189,41 @@ namespace SentisOptimisationsPlugin
             }
         }
 
+        /// <summary>
+        /// The client's check of a grid during a save: a grid that would be stored is refused, so the player is not asked
+        /// to drop the inventory for nothing; a grid refused for its own reason keeps that reason.
+        /// </summary>
+        private static void ValidateSuffix(MyCubeGrid grid, MyIdentity callerIdentity, ref MyGridStorageRequestResult __result)
+        {
+            try
+            {
+                if (!MayStore(__result) || !GridStorageSaveWindow.Saving) return;
+                __result = MyGridStorageRequestResult.UnspecifiedStorageIssue;
+                Log.Info($"Grid storage: '{grid?.DisplayName}' ({grid?.EntityId}) not stored for '{callerIdentity?.DisplayName}' ({(callerIdentity == null ? 0 : MySession.Static.Players.TryGetSteamId(callerIdentity.IdentityId))}): the world is being saved (check)");
+                if (callerIdentity != null) TellSaving(callerIdentity.IdentityId);
+            }
+            catch (Exception e)
+            {
+                Log.Error(e, "Grid storage: the save check of a grid failed; the game's answer is kept");
+            }
+        }
+
+        /// <summary>Whether a player is told about a save now: not told in the last <c>everyTicks</c> (as of <c>now</c>); a yes is noted.</summary>
+        public static bool DueSavingMessage(Dictionary<long, long> told, long identityId, long now, long everyTicks)
+        {
+            if (told.TryGetValue(identityId, out var last) && now - last < everyTicks) return false;
+            told[identityId] = now;
+            return true;
+        }
+
+        internal static void TellSaving(long identityId)
+        {
+            bool due;
+            lock (SavingTold)
+                due = DueSavingMessage(SavingTold, identityId, Stopwatch.GetTimestamp(), (long)(SavingMessageEvery.TotalSeconds * Stopwatch.Frequency));
+            if (due) global::SentisOptimisations.ChatUtils.SendTo(identityId, SavingMessage, "Grid storage");
+        }
+
         private static bool StorePrefix(MyGridsStorageEntityComponent __instance, long entityId)
         {
             try
@@ -168,6 +233,14 @@ namespace SentisOptimisationsPlugin
                 var identity = MySession.Static.Players.TryGetIdentity(MySession.Static.Players.TryGetIdentityId(sender.Value));
                 if (identity == null) return true;          // the game refuses it itself
                 var grid = MyEntities.GetEntityById(entityId) as MyCubeGrid;
+                if (GridStorageSaveWindow.Saving)
+                {
+                    // a grid stored during a save loses its files (GridStorageSaveWindow); nothing is dropped or queued
+                    Log.Info($"Grid storage: '{grid?.DisplayName}' ({entityId}) not stored for '{identity.DisplayName}' ({sender.Value}): the world is being saved");
+                    __instance.OnGridStorageDepositRequestFinished(MyGridStorageRequestResult.UnspecifiedStorageIssue, sender.Value);
+                    TellSaving(identity.IdentityId);
+                    return false;
+                }
                 var result = Check(__instance, grid, identity);
                 if (MayStore(result)) return true;
                 Log.Warn($"Grid storage: '{grid?.DisplayName}' ({entityId}) not stored for '{identity.DisplayName}' ({sender.Value}): {result}");

@@ -82,5 +82,23 @@ namespace SentisOptimisations.Tests
             Assert.False(GridStorageServerCheck.MayChange(Owner, Stranger));
             Assert.False(GridStorageServerCheck.MayChange(0, 0));
         }
+
+        [Fact]
+        public void A_player_is_told_about_a_save_at_most_once_in_the_interval()
+        {
+            var told = new System.Collections.Generic.Dictionary<long, long>();
+            Assert.True(GridStorageServerCheck.DueSavingMessage(told, Owner, 100, 50));
+            Assert.False(GridStorageServerCheck.DueSavingMessage(told, Owner, 149, 50));
+            Assert.True(GridStorageServerCheck.DueSavingMessage(told, Owner, 150, 50));
+        }
+
+        [Fact]
+        public void Each_player_is_told_about_a_save_on_their_own()
+        {
+            var told = new System.Collections.Generic.Dictionary<long, long>();
+            Assert.True(GridStorageServerCheck.DueSavingMessage(told, Owner, 100, 50));
+            Assert.True(GridStorageServerCheck.DueSavingMessage(told, Mate, 110, 50));
+            Assert.False(GridStorageServerCheck.DueSavingMessage(told, Owner, 120, 50));
+        }
     }
 }
