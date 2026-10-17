@@ -94,7 +94,8 @@ namespace SentisOptimisationsPlugin
                 var grid = _grid.GetValue(__instance) as MyCubeGrid;
                 var sender = _endpoint.GetValue(__instance) as ulong?;
                 var identityId = sender.HasValue ? MySession.Static.Players.TryGetIdentityId(sender.Value) : 0;
-                SentisOptimisationsPlugin.Log.Info($"Grid storage: queued '{grid?.DisplayName}' ({grid?.EntityId}) not stored for {identityId} ({sender}): the world is being saved");
+                var name = identityId == 0 ? null : MySession.Static.Players.TryGetIdentity(identityId)?.DisplayName;
+                SentisOptimisationsPlugin.Log.Info($"Grid storage: '{grid?.DisplayName}' ({grid?.EntityId}) not stored for '{name}' ({sender}): the world is being saved (queued)");
                 _notify.Invoke(__instance, new object[] { MyGridStorageRequestResult.UnspecifiedStorageIssue });
                 if (identityId != 0) GridStorageServerCheck.TellSaving(identityId);
             }
