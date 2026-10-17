@@ -38,7 +38,7 @@ namespace SentisOptimisations.Tests
         public void An_extra_close_does_not_break_the_next_save()
         {
             var window = new GridStorageSaveWindow.SaveWindow();
-            window.Close();
+            Assert.False(window.Close());
             window.Open();
             Assert.True(window.IsOpen);
             window.Close();

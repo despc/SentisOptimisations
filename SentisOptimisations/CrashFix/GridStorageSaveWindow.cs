@@ -2,7 +2,10 @@ using System;
 using System.Linq;
 using System.Reflection;
 using HarmonyLib;
+using Sandbox.Game.Entities;
 using Sandbox.Game.World;
+using Sandbox.ModAPI;
+using SpaceEngineers.Game.SessionComponents;
 using Torch.Managers.PatchManager;
 
 namespace SentisOptimisationsPlugin
@@ -21,11 +24,10 @@ namespace SentisOptimisationsPlugin
     ///
     /// Here a <c>Save</c> holds <see cref="Saving"/> open from its start to its end, however it ends (a finalizer: a
     /// save that throws closes it too); <see cref="GridStorageServerCheck"/> refuses to store a grid while it is open.
-    /// Fetching grids back goes on during a save: it only reads the files.
-    ///
-    /// A store request accepted just before a save starts is not covered: the game writes its files a frame or so later,
-    /// while the save copies them only after writing the world, seconds later - it would take a queue of hundreds of
-    /// requests for one to be written that late.
+    /// A store request accepted before the save and come to its turn during it (the game takes one request a frame, and
+    /// at a low sim speed a queue of a few dozen lasts seconds) is refused here, where the game writes the files
+    /// (<c>StoreRequest.Dispatch</c>); its grid stays in the world. Fetching grids back goes on during a save: it only
+    /// reads the files.
     /// </summary>
     [PatchShim]
     public static class GridStorageSaveWindow
@@ -49,12 +51,59 @@ namespace SentisOptimisationsPlugin
                 throw new MissingMethodException($"MySessionSnapshot.Save: {saves.Count} found, 1 expected");
             HarmonyMethod Own(string name) => new HarmonyMethod(typeof(GridStorageSaveWindow).GetMethod(name, BindingFlags.Static | BindingFlags.NonPublic));
             Harmony.Patch(saves[0], prefix: Own(nameof(SavePrefix)), finalizer: Own(nameof(SaveFinalizer)));
+
+            // the point where the files are written: on its own, the window and the refusals of new requests work without it
+            try
+            {
+                var request = typeof(MyGridsStorageSessionComponent).GetNestedType("StoreRequest", BindingFlags.NonPublic)
+                              ?? throw new TypeLoadException("MyGridsStorageSessionComponent.StoreRequest");
+                var dispatch = request.GetMethod("Dispatch", instance, null, new[] { typeof(MyGridsStorageSessionComponent) }, null)
+                               ?? throw new MissingMethodException("StoreRequest.Dispatch");
+                _notify = request.GetMethod("Notify", instance, null, new[] { typeof(MyGridStorageRequestResult) }, null)
+                          ?? throw new MissingMethodException("StoreRequest.Notify");
+                _grid = request.GetField("GridToStore", instance) ?? throw new MissingFieldException("StoreRequest.GridToStore");
+                _endpoint = request.BaseType?.GetField("m_callerEndpointId", instance) ?? throw new MissingFieldException("StorageRequestBase.m_callerEndpointId");
+                Harmony.Patch(dispatch, prefix: Own(nameof(DispatchPrefix)));
+            }
+            catch (Exception e)
+            {
+                SentisOptimisationsPlugin.Log.Error(e, "Grid storage: queued store requests are not checked for a save; new ones still are");
+            }
         }
+
+        private static MethodInfo _notify;
+        private static FieldInfo _grid, _endpoint;
 
         private static void SavePrefix() => Window.Open();
 
         // (no __exception: an exception of the save goes on as it is)
-        private static void SaveFinalizer() => Window.Close();
+        private static void SaveFinalizer()
+        {
+            if (!Window.Close()) SentisOptimisationsPlugin.Log.Warn("Grid storage: a save ended that was not seen starting");
+        }
+
+        /// <summary>
+        /// A store request accepted before a save and come to its turn during it: refused as a new one would be (its grid
+        /// stays; the items were already dropped by the game when it was accepted).
+        /// </summary>
+        private static bool DispatchPrefix(object __instance)
+        {
+            if (!Saving) return true;
+            try
+            {
+                var grid = _grid.GetValue(__instance) as MyCubeGrid;
+                var sender = _endpoint.GetValue(__instance) as ulong?;
+                var identityId = sender.HasValue ? MySession.Static.Players.TryGetIdentityId(sender.Value) : 0;
+                SentisOptimisationsPlugin.Log.Info($"Grid storage: queued '{grid?.DisplayName}' ({grid?.EntityId}) not stored for {identityId} ({sender}): the world is being saved");
+                _notify.Invoke(__instance, new object[] { MyGridStorageRequestResult.UnspecifiedStorageIssue });
+                if (identityId != 0) GridStorageServerCheck.TellSaving(identityId);
+            }
+            catch (Exception e)
+            {
+                SentisOptimisationsPlugin.Log.Error(e, "Grid storage: a queued store request during a save could not be answered; it is dropped");
+            }
+            return false;
+        }
 
         /// <summary>Whether a save is running: open from the start of a save to its end, until the last of overlapping saves ends.</summary>
         public sealed class SaveWindow
@@ -67,11 +116,14 @@ namespace SentisOptimisationsPlugin
                 lock (_lock) _depth++;
             }
 
-            public void Close()
+            /// <summary>Ends a save; false when no save was open (the count stays at 0).</summary>
+            public bool Close()
             {
                 lock (_lock)
                 {
-                    if (_depth > 0) _depth--;
+                    if (_depth == 0) return false;
+                    _depth--;
+                    return true;
                 }
             }
 

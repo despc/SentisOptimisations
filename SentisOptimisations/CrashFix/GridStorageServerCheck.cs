@@ -48,7 +48,7 @@ namespace SentisOptimisationsPlugin
         /// <summary>What the player is told when a store request comes during a save of the world.</summary>
         public const string SavingMessage = "The world is being saved, try again later.";
 
-        /// <summary>The least time between two <see cref="SavingMessage"/>s to one player (the client checks a grid often).</summary>
+        /// <summary>The least time between two <see cref="SavingMessage"/>s to one player (one goes on every click of "Store" otherwise).</summary>
         public static readonly TimeSpan SavingMessageEvery = TimeSpan.FromSeconds(5);
 
         private static readonly Harmony Harmony = new Harmony("SentisOptimisations.GridStorageServerCheck");
@@ -72,9 +72,6 @@ namespace SentisOptimisationsPlugin
             if (_validate.ReturnType != typeof(MyGridStorageRequestResult) || _validate.GetParameters().Length != 4)
                 throw new InvalidOperationException("MyGridsStorageEntityComponent.ValidateGrid is not what GridStorageServerCheck knows");
             ctx.GetPattern(store).Prefixes.Add(typeof(GridStorageServerCheck).GetMethod(nameof(StorePrefix), BindingFlags.Static | BindingFlags.NonPublic));
-            // by Harmony, not Torch: a Torch suffix with a ref __result of a struct threw in the patched method itself
-            // (AsteroidNearReplication, 10.10.2026)
-            Harmony.Patch(_validate, postfix: new HarmonyMethod(typeof(GridStorageServerCheck).GetMethod(nameof(ValidateSuffix), BindingFlags.Static | BindingFlags.NonPublic)));
 
             MethodInfo Handler(string name, params Type[] args) =>
                 type.GetMethod(name, instance, null, args, null) ?? throw new MissingMethodException("MyGridsStorageEntityComponent." + name);
@@ -83,6 +80,18 @@ namespace SentisOptimisationsPlugin
             ctx.GetPattern(Handler("ValidateRetrievalEndpoint", typeof(Guid))).Prefixes.Add(Own(nameof(RetrievalCheckPrefix)));
             ctx.GetPattern(Handler("DeleteGridEndpoint", typeof(Guid))).Prefixes.Add(Own(nameof(OwnerOnlyPrefix)));
             ctx.GetPattern(Handler("SetOwnershipKindEndpoint", typeof(Guid), typeof(Sandbox.ModAPI.MyStoredGridOwnershipKind))).Prefixes.Add(Own(nameof(OwnerOnlyPrefix)));
+
+            // Last and on its own: the checks above are access rules and stay whatever happens to this one.
+            // By Harmony, not Torch: a Torch suffix with a ref __result of a struct threw in the patched method itself
+            // (AsteroidNearReplication, 10.10.2026).
+            try
+            {
+                Harmony.Patch(_validate, postfix: new HarmonyMethod(Own(nameof(ValidateSuffix))));
+            }
+            catch (Exception e)
+            {
+                Log.Error(e, "Grid storage: the save check of the client's grid check is not patched; a store during a save is still refused");
+            }
         }
 
         /// <summary>The game's own check of a grid for storage, as the terminal would run it for this identity.</summary>
@@ -180,12 +189,15 @@ namespace SentisOptimisationsPlugin
             }
         }
 
-        /// <summary>The client's check of a grid during a save: refused, so the player is not asked to drop the inventory for nothing.</summary>
+        /// <summary>
+        /// The client's check of a grid during a save: a grid that would be stored is refused, so the player is not asked
+        /// to drop the inventory for nothing; a grid refused for its own reason keeps that reason.
+        /// </summary>
         private static void ValidateSuffix(MyIdentity callerIdentity, ref MyGridStorageRequestResult __result)
         {
             try
             {
-                if (!GridStorageSaveWindow.Saving) return;
+                if (!MayStore(__result) || !GridStorageSaveWindow.Saving) return;
                 __result = MyGridStorageRequestResult.UnspecifiedStorageIssue;
                 if (callerIdentity != null) TellSaving(callerIdentity.IdentityId);
             }
@@ -203,7 +215,7 @@ namespace SentisOptimisationsPlugin
             return true;
         }
 
-        private static void TellSaving(long identityId)
+        internal static void TellSaving(long identityId)
         {
             bool due;
             lock (SavingTold)
