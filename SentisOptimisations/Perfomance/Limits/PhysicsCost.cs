@@ -135,7 +135,10 @@ namespace Optimizer.Optimizations
         /// <summary>The clusters stepped together as the game does, ms a frame (frames with no cluster timed, averaged), and the start of this frame's.</summary>
         private static double _plainMs;
         private static long _plainStart;
-        private static bool _measureBroken, _measuredThisFrame;
+        private static bool _measureBroken, _measuredThisFrame, _wasOff;
+
+        /// <summary>The monitor turned off on the plugin's page: the step is the game's own, nothing is counted.</summary>
+        internal static bool Off => SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config?.DisablePhysicsMonitor == true;
 
         /// <summary>For the stand's tests: the clusters' steps are timed (true unless a test turns it off).</summary>
         internal static bool ClusterTiming = true;
@@ -183,7 +186,7 @@ namespace Optimizer.Optimizations
         {
             try
             {
-                if (!(__instance.Entity is MyCubeGrid grid)) return;
+                if (Off || !(__instance.Entity is MyCubeGrid grid)) return;
                 var other = value.GetOtherEntity(grid);
                 var frame = Sandbox.MySandboxGame.Static?.SimulationFrameCounter ?? 0UL;
                 if (other is MyVoxelBase) VoxelTouch[grid.EntityId] = frame;
@@ -299,6 +302,18 @@ namespace Optimizer.Optimizations
         /// <summary>Now and then: one cluster stepped alone and timed, then the rest as the game does.</summary>
         private static bool StepWorldsPrefix(MyPhysics __instance)
         {
+            if (Off)
+            {
+                _plainStart = 0;
+                _wasOff = true;
+                return true;
+            }
+            if (_wasOff)
+            {
+                // what was measured before the monitor was off is not now's
+                _wasOff = false;
+                Reset();
+            }
             _plainStart = Stopwatch.GetTimestamp();
             if (!ClusterTiming || _measureBroken) return true;
             var frame = Sandbox.MySandboxGame.Static?.SimulationFrameCounter ?? 0UL;

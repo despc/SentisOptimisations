@@ -60,7 +60,7 @@ namespace SentisOptimisationsPlugin
         /// <summary>Called from the background loop; does nothing while the physics step is healthy.</summary>
         public static void Check()
         {
-            if (!SentisOptimisationsPlugin.Config.EnablePhysicsGuard) return;
+            if (!SentisOptimisationsPlugin.Config.EnablePhysicsGuard || Optimizer.Optimizations.PhysicsCost.Off) return;
             if (Waiting(DateTime.UtcNow, _loadedAt)) return;
             if (Optimizer.Optimizations.PhysicsLoadMonitor.Frames == 0) return;
 
