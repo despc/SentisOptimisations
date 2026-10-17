@@ -1,7 +1,7 @@
 using System;
-using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
+using HarmonyLib;
 using Sandbox.Game.World;
 using Torch.Managers.PatchManager;
 
@@ -19,21 +19,25 @@ namespace SentisOptimisationsPlugin
     /// file 'gs-...' not present in staging folder" seconds after "... was stored by ...", inside an autosave - four
     /// grids in three days.
     ///
-    /// Here a <c>Save</c> holds <see cref="Saving"/> open from its start to its end; <see cref="GridStorageServerCheck"/>
-    /// refuses a store request while it is open (before the game drops the grid's items or queues the request), and
-    /// the player is told to try again after the save. A save that does not come back (it threw) holds it no longer
-    /// than <see cref="MaxWait"/>. Fetching grids back goes on during a save: it only reads the files.
+    /// Here a <c>Save</c> holds <see cref="Saving"/> open from its start to its end, however it ends (a finalizer: a
+    /// save that throws closes it too); <see cref="GridStorageServerCheck"/> refuses to store a grid while it is open.
+    /// Fetching grids back goes on during a save: it only reads the files.
+    ///
+    /// A store request accepted just before a save starts is not covered: the game writes its files a frame or so later,
+    /// while the save copies them only after writing the world, seconds later - it would take a queue of hundreds of
+    /// requests for one to be written that late.
     /// </summary>
     [PatchShim]
     public static class GridStorageSaveWindow
     {
-        /// <summary>The longest a save holds the storage (a save of this world takes about 25 s).</summary>
-        public static readonly TimeSpan MaxWait = TimeSpan.FromMinutes(3);
+        internal static readonly SaveWindow Window = new SaveWindow();
 
-        internal static readonly SaveWindow Window = new SaveWindow((long)(MaxWait.TotalSeconds * Stopwatch.Frequency));
+        // by Harmony, not Torch: a Torch suffix does not run when the method throws, and a save that throws has to close
+        // the window too
+        private static readonly Harmony Harmony = new Harmony("SentisOptimisations.GridStorageSaveWindow");
 
         /// <summary>Whether a save of the world is running now.</summary>
-        public static bool Saving => Window.IsOpen(Stopwatch.GetTimestamp());
+        public static bool Saving => Window.IsOpen;
 
         public static void Patch(PatchContext ctx) => global::SentisOptimisations.PatchGuard.Run("GridStorageSaveWindow", ctx, PatchImpl);
 
@@ -43,36 +47,24 @@ namespace SentisOptimisationsPlugin
             var saves = typeof(MySessionSnapshot).GetMethods(instance).Where(m => m.Name == "Save" && m.ReturnType == typeof(bool)).ToList();
             if (saves.Count != 1)
                 throw new MissingMethodException($"MySessionSnapshot.Save: {saves.Count} found, 1 expected");
-            MethodInfo Own(string name) => typeof(GridStorageSaveWindow).GetMethod(name, BindingFlags.Static | BindingFlags.NonPublic);
-            ctx.GetPattern(saves[0]).Prefixes.Add(Own(nameof(SavePrefix)));
-            ctx.GetPattern(saves[0]).Suffixes.Add(Own(nameof(SaveSuffix)));
+            HarmonyMethod Own(string name) => new HarmonyMethod(typeof(GridStorageSaveWindow).GetMethod(name, BindingFlags.Static | BindingFlags.NonPublic));
+            Harmony.Patch(saves[0], prefix: Own(nameof(SavePrefix)), finalizer: Own(nameof(SaveFinalizer)));
         }
 
-        private static void SavePrefix() => Window.Open(Stopwatch.GetTimestamp());
+        private static void SavePrefix() => Window.Open();
 
-        private static void SaveSuffix() => Window.Close();
+        // (no __exception: an exception of the save goes on as it is)
+        private static void SaveFinalizer() => Window.Close();
 
-        /// <summary>
-        /// Whether a save is running: open from the start of a save to its end, the latest start counting when saves
-        /// overlap; past <c>maxTicks</c> since the latest start it counts as closed (a save that threw never closes).
-        /// </summary>
+        /// <summary>Whether a save is running: open from the start of a save to its end, until the last of overlapping saves ends.</summary>
         public sealed class SaveWindow
         {
             private readonly object _lock = new object();
-            private readonly long _maxTicks;
             private int _depth;
-            private long _since;
 
-            public SaveWindow(long maxTicks) => _maxTicks = maxTicks;
-
-            public void Open(long now)
+            public void Open()
             {
-                lock (_lock)
-                {
-                    if (_depth > 0 && now - _since > _maxTicks) _depth = 0;
-                    _depth++;
-                    _since = now;
-                }
+                lock (_lock) _depth++;
             }
 
             public void Close()
@@ -83,11 +75,11 @@ namespace SentisOptimisationsPlugin
                 }
             }
 
-            public bool IsOpen(long now)
+            public bool IsOpen
             {
-                lock (_lock)
+                get
                 {
-                    return _depth > 0 && now - _since <= _maxTicks;
+                    lock (_lock) return _depth > 0;
                 }
             }
         }
