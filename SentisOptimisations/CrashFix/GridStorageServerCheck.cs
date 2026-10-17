@@ -199,7 +199,7 @@ namespace SentisOptimisationsPlugin
             {
                 if (!MayStore(__result) || !GridStorageSaveWindow.Saving) return;
                 __result = MyGridStorageRequestResult.UnspecifiedStorageIssue;
-                Log.Info($"Grid storage: '{grid?.DisplayName}' ({grid?.EntityId}) not stored for '{callerIdentity?.DisplayName}' ({callerIdentity?.IdentityId}): the world is being saved (check)");
+                Log.Info($"Grid storage: '{grid?.DisplayName}' ({grid?.EntityId}) not stored for '{callerIdentity?.DisplayName}' ({(callerIdentity == null ? 0 : MySession.Static.Players.TryGetSteamId(callerIdentity.IdentityId))}): the world is being saved (check)");
                 if (callerIdentity != null) TellSaving(callerIdentity.IdentityId);
             }
             catch (Exception e)
