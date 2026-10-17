@@ -40,7 +40,7 @@ namespace SentisOptimisationsPlugin
         private static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
         /// <summary>What the player is told when a store request comes during a save of the world.</summary>
-        public const string SavingMessage = "Идёт сохранение мира, грид не убран в хранилище. Попробуйте ещё раз через несколько секунд.";
+        public const string SavingMessage = "The world is being saved, try again later.";
 
         private static MethodInfo _validate;
         private static FieldInfo _session;
@@ -179,7 +179,7 @@ namespace SentisOptimisationsPlugin
                     // a grid stored during a save loses its files (GridStorageSaveWindow); nothing is dropped or queued
                     Log.Info($"Grid storage: '{grid?.DisplayName}' ({entityId}) not stored for '{identity.DisplayName}' ({sender.Value}): the world is being saved");
                     __instance.OnGridStorageDepositRequestFinished(MyGridStorageRequestResult.UnspecifiedStorageIssue, sender.Value);
-                    global::SentisOptimisations.ChatUtils.SendTo(identity.IdentityId, SavingMessage, "Хранилище");
+                    global::SentisOptimisations.ChatUtils.SendTo(identity.IdentityId, SavingMessage, "Grid storage");
                     return false;
                 }
                 var result = Check(__instance, grid, identity);
