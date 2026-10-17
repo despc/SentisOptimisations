@@ -103,4 +103,16 @@ public class PhysicsGuardTests
         Assert.NotNull(groups);
         Assert.Equal(typeof(GridLinkTypeEnum), groups.GetParameters().Single().ParameterType);
     }
+    [Theory]
+    // a cluster beside a longer one adds nothing; one that is the step adds all of its time; a second's noise no less than nothing
+    [InlineData(1.1, 1.9, 1.95, 0.05)]
+    [InlineData(2.4, 1.0, 3.3, 2.3)]
+    [InlineData(1.0, 3.0, 2.5, 0.0)]
+    [InlineData(1.0, 0.0, 5.0, 1.0)]
+    [InlineData(1.0, 0.5, 0.0, 1.0)]
+    public void A_cluster_adds_the_plain_step_less_the_others(double alone, double others, double plain, double adds)
+    {
+        var added = (double)typeof(Optimizer.Optimizations.PhysicsCost).GetMethod("Added", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, new object[] { alone, others, plain });
+        Assert.Equal(adds, added, 6);
+    }
 }
