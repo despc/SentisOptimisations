@@ -43,7 +43,7 @@ namespace SentisOptimisations.Commands
 
         /// <summary>A grid name contains the query, ignoring case.</summary>
         public static bool NameMatches(string name, string query) =>
-            !string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(query) &&
+            !string.IsNullOrEmpty(name) && !string.IsNullOrWhiteSpace(query) &&
             name.IndexOf(query.Trim(), StringComparison.OrdinalIgnoreCase) >= 0;
 
         public static string Size(long bytes)
