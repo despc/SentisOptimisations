@@ -217,6 +217,17 @@ namespace Optimizer.Optimizations
             GridTouchDynamic.TryGetValue(grid.EntityId, out var dynamic) && dynamic ? GridTouchWork / 2 : GridTouchWork;
 
         /// <summary>For the stand's tests: a grid's work by its parts - shapes, touches, the ground under it.</summary>
+        /// <summary>
+        /// Whether the grid's body touched voxels in the last <paramref name="frames"/> frames; null when nothing is counted
+        /// (the monitor switched off).
+        /// </summary>
+        internal static bool? TouchedVoxels(long gridId, ulong frames)
+        {
+            if (Off) return null;
+            var frame = Sandbox.MySandboxGame.Static?.SimulationFrameCounter ?? 0UL;
+            return VoxelTouch.TryGetValue(gridId, out var at) && frame - at <= frames;
+        }
+
         internal static string Describe(MyCubeGrid grid)
         {
             var frame = Sandbox.MySandboxGame.Static?.SimulationFrameCounter ?? 0UL;

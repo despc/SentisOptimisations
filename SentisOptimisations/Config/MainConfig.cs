@@ -29,6 +29,8 @@ namespace SentisOptimisationsPlugin
         private float _physicsMsToPunishImmediately = 5f;
         private int _physicsChecksBeforePunish = 5;
         private float _checkInsideVoxel = 0.2f;
+        private bool _voxelCoarseNearShips;
+        private float _voxelCoarseMinGridMs = 0.8f;
 
         
         //Freezer
@@ -96,12 +98,28 @@ namespace SentisOptimisationsPlugin
             set => SetValue(ref _enablePhysicsGuard, value);
         }
         
-        [DisplayTab(Name = "Выключить мониторинг физики", GroupName = "Performance", Tab = "Performance", Order = 0,
+        [DisplayTab(Name = "Disable physics monitor", GroupName = "Performance", Tab = "Performance", Order = 0,
             Description = "The physics step as the game does it: no cluster stepped alone and timed, no contacts counted, no physics guard. To check whether something is from the monitor; applies from the next frame")]
         public bool DisablePhysicsMonitor
         {
             get => _disablePhysicsMonitor;
             set => SetValue(ref _disablePhysicsMonitor, value);
+        }
+
+        [DisplayTab(Name = "Coarse voxels near heavy grids", GroupName = "Performance", Tab = "Performance", Order = 0,
+            Description = "Asteroid rock round a big ship (all large grids, no wheels, awake, not touching the rock) whose physics load is over the threshold below collides by a coarser mesh (the game's LOD1, voxels of 2 m); nothing else near it meets it. Off: never; what is coarse goes back to fine")]
+        public bool VoxelCoarseNearShips
+        {
+            get => _voxelCoarseNearShips;
+            set => SetValue(ref _voxelCoarseNearShips, value);
+        }
+
+        [DisplayTab(Name = "Grid physics ms to coarse voxels", GroupName = "Performance", Tab = "Performance", Order = 0,
+            Description = "The physics load of a grid group (its share of the physics step, as the physics guard and SentisWatcher count it) from which the rock round it is made coarse; it stays coarse until the load is under half of this")]
+        public float VoxelCoarseMinGridMs
+        {
+            get => _voxelCoarseMinGridMs;
+            set => SetValue(ref _voxelCoarseMinGridMs, value);
         }
 
         [DisplayTab(Name = "Gas Tank Optimisation", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Gas Tank Optimisation")]

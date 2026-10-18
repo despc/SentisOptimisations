@@ -1,4 +1,5 @@
 using System;
+using Havok;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -39,8 +40,8 @@ namespace Optimizer.Optimizations
         private static readonly ConditionalWeakTable<MyVoxelPhysicsBody, Asked> ByBody = new ConditionalWeakTable<MyVoxelPhysicsBody, Asked>();
         private static int _anyAsked;
 
-        // Read by SentisTests.
-        public static long Held;
+        // Read by SentisTests: meshes kept; cells Havok asked for in the middle of a query or step (made there and then).
+        public static long Held, AskedCells;
 
         public static void Patch(PatchContext ctx) =>
             global::SentisOptimisations.PatchGuard.Run("VoxelShapeHold", ctx, PatchImpl);
@@ -56,8 +57,9 @@ namespace Optimizer.Optimizations
         }
 
         // Havok calls it from a query or its step, on the game thread or a worker
-        private static void RequestPrefix(MyVoxelPhysicsBody __instance)
+        private static void RequestPrefix(MyVoxelPhysicsBody __instance, HkShapeBatch info)
         {
+            Interlocked.Add(ref AskedCells, info.Count);
             var game = MySandboxGame.Static;
             if (game == null) return;
             Volatile.Write(ref ByBody.GetOrCreateValue(__instance).Frame, (long)game.SimulationFrameCounter);
