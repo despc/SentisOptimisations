@@ -424,6 +424,19 @@ public class FreezeLogic
                         grid != null && !grid.Closed && !grid.MarkedForClose && !grid.IsPreview &&
                         grid.Parent == null && !FrozenGrids.Contains(grid.EntityId)).ToList();
                     var freezePhysics = SentisOptimisationsPlugin.Config.FreezePhysics && CanFreezePhysics(grids);
+                    // A grid hanging on its thrusters in gravity falls once frozen by logic alone: its body stays
+                    // dynamic, its thrusters stop. Its physics is frozen too whatever Freeze Physics says, or it is
+                    // left to the game when that cannot be done. A bot's flying drill, saved in a hole on the stand,
+                    // fell 19 m to the hole's end right after the load, before the bots were back (19.10.2026).
+                    if (!freezePhysics && realyNeedToFreezeGrids.Any(HangsOnThrust))
+                    {
+                        if (!CanFreezePhysics(grids))
+                        {
+                            Log("Not frozen, hangs on its thrusters: " + string.Join(", ", realyNeedToFreezeGrids.Select(g => g.DisplayName)));
+                            return;
+                        }
+                        freezePhysics = true;
+                    }
                     var frame = MySandboxGame.Static.SimulationFrameCounter;
                     foreach (var grid in realyNeedToFreezeGrids)
                     {
@@ -570,6 +583,18 @@ public class FreezeLogic
     /// <summary>A grid whose body the game itself keeps fixed: static, or held by a landing gear.</summary>
     private static bool KeptFixed(MyCubeGrid grid) =>
         grid.IsStatic || grid.Physics?.RigidBody == null || grid.Physics.RigidBody.IsFixed && !FrozenPhysicsGrids.Contains(grid.EntityId);
+
+    /// <summary>A dynamic grid in natural gravity held up by its thrusters: dampeners on, a thruster working.</summary>
+    private static bool HangsOnThrust(MyCubeGrid grid)
+    {
+        if (KeptFixed(grid)) return false;
+        var thrust = grid.Components.Get<Sandbox.Game.GameSystems.MyEntityThrustComponent>();
+        if (thrust == null || !thrust.DampenersEnabled) return false;
+        if (Sandbox.Game.GameSystems.MyGravityProviderSystem.CalculateNaturalGravityInPoint(grid.PositionComp.WorldAABB.Center).LengthSquared() < 0.25f) return false;
+        foreach (var block in grid.GetFatBlocks())
+            if (block is Sandbox.Game.Entities.MyThrust thruster && thruster.IsWorking) return true;
+        return false;
+    }
 
     /// <summary>Not static, but fixed by the game - not by the freezer: a landing gear holds it.</summary>
     private static bool HeldByGear(MyCubeGrid grid) =>
