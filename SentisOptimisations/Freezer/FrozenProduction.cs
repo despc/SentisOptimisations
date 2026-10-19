@@ -234,6 +234,12 @@ public static class FrozenProduction
     }
 
     /// <summary>On the game thread, as the grid starts updating again.</summary>
+    /// <summary>How long the networks for the last thaws took to work out, ms (for the freezer's heavy-thaw warning).</summary>
+    internal static double LastNetworkMs;
+
+    /// <summary>The blocks compensated in the last thaws by their type: how many, how long, ms (game thread).</summary>
+    internal static readonly Dictionary<string, (int Count, double Ms)> LastKinds = new Dictionary<string, (int, double)>();
+
     public static void OnThawed(MyCubeGrid grid, ulong frame)
     {
         try
@@ -258,13 +264,22 @@ public static class FrozenProduction
                 }
 
                 if (seconds <= 0) continue;
-                network = network ?? Network.For(grid, frame);
+                if (network == null)
+                {
+                    var t = System.Diagnostics.Stopwatch.GetTimestamp();
+                    network = Network.For(grid, frame);
+                    LastNetworkMs += (System.Diagnostics.Stopwatch.GetTimestamp() - t) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+                }
                 var gasBefore = _gasCompensated;
                 var fuelBefore = _fuelBurned;
+                var kindStart = System.Diagnostics.Stopwatch.GetTimestamp();
                 if (block is MyGasGenerator generator) CompensateGenerator(generator, seconds, stamp, network);
                 else if (block is MyOxygenFarm farm) CompensateFarm(farm, seconds, stamp, network);
                 else if (block is MyReactor reactor) CompensateReactor(reactor, seconds, stamp, network);
                 else if (block is MyGasFueledPowerProducer engine) CompensateEngine(engine, seconds, stamp, network);
+                var kind = block.GetType().Name;
+                LastKinds.TryGetValue(kind, out var was);
+                LastKinds[kind] = (was.Count + 1, was.Ms + (System.Diagnostics.Stopwatch.GetTimestamp() - kindStart) * 1000.0 / System.Diagnostics.Stopwatch.Frequency);
                 if (_gasCompensated != gasBefore || _fuelBurned != fuelBefore)
                     (done ??= new List<string>()).Add($"'{block.DisplayNameText}' {seconds:0} s: " +
                         (_gasCompensated != gasBefore ? $"{_gasCompensated - gasBefore} L gas" : "") +
@@ -377,6 +392,11 @@ public static class FrozenProduction
             public MyCubeBlock Representative;
             public List<MyGasTank> Tanks;
             public List<MyInventory> Inventories;
+            /// <summary>
+            /// The endpoints that reach the representative and that it reaches (its strongly connected part of the
+            /// conveyors): each of them reaches just what it does. Null when the walks could not be had.
+            /// </summary>
+            public HashSet<IMyConveyorEndpoint> Members;
         }
 
         private readonly List<MyGasTank> _tanks = new();
@@ -481,14 +501,44 @@ public static class FrozenProduction
             return reachable;
         }
 
+        /// <summary>
+        /// With the compensation logs on: the block's tanks and inventories as its network has them, against a path looked
+        /// for from it to each (the old way, slow) - said when they differ.
+        /// </summary>
+        public void CheckAgainstPaths(MyCubeBlock block)
+        {
+            var group = GroupFor(block);
+            var tanks = _tanks.Where(tank => tank == block || Reaches(block, tank)).ToList();
+            if (LineCount(block) == 0) tanks = _tanks.ToList();
+            var inventories = _inventories.Where(inventory => inventory.Owner is MyCubeBlock owner && Reaches(block, owner)).ToList();
+            var tanksOff = tanks.Count(t => !group.Tanks.Contains(t)) + group.Tanks.Count(t => !tanks.Contains(t));
+            var inventoriesOff = inventories.Count(i => !group.Inventories.Contains(i)) + group.Inventories.Count(i => !inventories.Contains(i));
+            FreezeLogic.CompensationLogs($"Frozen production check: '{block.DisplayNameText}' on {block.CubeGrid.DisplayName}: tanks {group.Tanks.Count} (by paths {tanks.Count}, {tanksOff} differ), " +
+                                         $"inventories {group.Inventories.Count} (by paths {inventories.Count}, {inventoriesOff} differ), network of {group.Members?.Count.ToString() ?? "-"} endpoints");
+        }
+
         /// <summary>The conveyor network this block sits on, worked out once per network.</summary>
+        // (each network by two walks over the conveyors - from its first block, and to it with the lines turned round -
+        // not a path looked for from each block to each tank and inventory: 89 gas generators on a grid of 7681 blocks
+        // took 230 ms on its thaw, a path of 2.5 ms looked for for each, every two and a half minutes it woke up - the
+        // stand, 19.10.2026. A line can carry one way only (its conductivity, FORWARD/BACKWARD), so a block is taken for
+        // the same network only when it reaches the first block and that one reaches it: then both reach the same.)
         private Group GroupFor(MyCubeBlock block)
         {
+            var at = Endpoint(block);
             foreach (var known in _groups)
-                if (known.Representative == block || Reaches(block, known.Representative))
-                    return known;
+            {
+                if (known.Representative == block) return known;
+                if (known.Members != null && at != null) { if (known.Members.Contains(at)) return known; }
+                else if (Reaches(block, known.Representative)) return known;
+            }
 
-            var tanks = _tanks.Where(tank => tank == block || Reaches(block, tank)).ToList();
+            var reach = ReachableFrom(at, false);
+            var reachedBy = reach != null ? ReachableFrom(at, true) : null;
+            HashSet<IMyConveyorEndpoint> members = null;
+            if (reach != null && reachedBy != null) { members = new HashSet<IMyConveyorEndpoint>(reach); members.IntersectWith(reachedBy); }
+            bool Reached(MyCubeBlock other) => reach != null ? Endpoint(other) is IMyConveyorEndpoint e && reach.Contains(e) : Reaches(block, other);
+            var tanks = _tanks.Where(tank => tank == block || Reached(tank)).ToList();
             // An oxygen farm's conveyor endpoint carries no lines at all, so pathfinding takes it
             // nowhere while vanilla still feeds the tanks around it. Such a block is served by
             // everything wired to it. A generator, which does have lines, keeps to its own conveyor
@@ -500,7 +550,8 @@ public static class FrozenProduction
             {
                 Representative = block,
                 Tanks = tanks,
-                Inventories = _inventories.Where(inventory => inventory.Owner is MyCubeBlock owner && Reaches(block, owner)).ToList(),
+                Inventories = _inventories.Where(inventory => inventory.Owner is MyCubeBlock owner && Reached(owner)).ToList(),
+                Members = members,
             };
             _groups.Add(group);
             return group;
@@ -522,6 +573,7 @@ public static class FrozenProduction
             if (gas.IceToGasRatio <= 0) continue;
 
             var tanks = network.TanksFor(generator, gas.Id, out var room);
+            if (SentisOptimisationsPlugin.Config.EnableCompensationLogs) network.CheckAgainstPaths(generator);
             if (room <= 0) continue;
 
             var ice = network.FuelFor(generator, IceId, out var iceAvailable);
@@ -690,6 +742,52 @@ public static class FrozenProduction
         block is IMyConveyorEndpointBlock endpoint && endpoint.ConveyorEndpoint != null
             ? endpoint.ConveyorEndpoint.GetLineCount()
             : 0;
+
+    private static IMyConveyorEndpoint Endpoint(MyCubeBlock block) => (block as IMyConveyorEndpointBlock)?.ConveyorEndpoint;
+
+    /// <summary>
+    /// All the endpoints a walk over the conveyors from here reaches, by the rule the game's path finder walks by (a line
+    /// that works, in the way its conductivity lets: MyConveyorLine.GetOtherVertex); turned round, all those whose walk
+    /// reaches here. Sorters' filters are not looked at - as Reachable without them did. Game thread.
+    /// (Walked here, not by the game's path finder turned round with MyConveyorLine.InvertedConductivity: that is one
+    /// flag for the whole game, flipped by the game outside any lock while it maps the conveyors - with it flipped by the
+    /// freezer too, a running O2/H2 generator's hydrogen stopped reaching its tank, freeze_production, 19.10.2026.)
+    /// </summary>
+    private static HashSet<IMyConveyorEndpoint> ReachableFrom(IMyConveyorEndpoint from, bool turnedRound)
+    {
+        if (from == null) return null;
+        try
+        {
+            var seen = new HashSet<IMyConveyorEndpoint> { from };
+            var queue = new Queue<IMyConveyorEndpoint>();
+            queue.Enqueue(from);
+            while (queue.Count > 0)
+            {
+                var at = queue.Dequeue();
+                if (!(at is VRage.Algorithms.IMyPathVertex<IMyConveyorEndpoint> vertex)) continue;
+                for (var i = 0; i < vertex.GetNeighborCount(); i++)
+                {
+                    var edge = vertex.GetEdge(i);
+                    if (edge == null) continue;
+                    IMyConveyorEndpoint next;
+                    if (!turnedRound) next = edge.GetOtherVertex(at);
+                    else
+                    {
+                        // the other end, whichever way the line carries; taken when the line carries from it to here
+                        var other = edge is MyConveyorLine line ? (line.GetEndpoint(0) == at ? line.GetEndpoint(1) : line.GetEndpoint(0)) : edge.GetOtherVertex(at);
+                        next = other != null && edge.GetOtherVertex(other) == at ? other : null;
+                    }
+                    if (next != null && seen.Add(next)) queue.Enqueue(next);
+                }
+            }
+            return seen;
+        }
+        catch (Exception e)
+        {
+            SentisOptimisationsPlugin.Log.Warn(e, "Frozen production: the conveyors could not be walked; paths are looked for one by one");
+            return null;
+        }
+    }
 
     private static bool Reaches(MyCubeBlock from, MyCubeBlock to) =>
         from is IMyConveyorEndpointBlock a && to is IMyConveyorEndpointBlock b &&

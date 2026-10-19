@@ -233,26 +233,41 @@ public class FreezeLogic
                 }
 
                 Log("Unfreeze grid " + grid.DisplayName);
+                var t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+                var physicsFrozen = FrozenPhysicsGrids.Contains(grid.EntityId);
                 FrozenGridSaveCache.Invalidate(grid.EntityId);
                 FrozenGrids.Remove(grid.EntityId);
                 FrozenAtFrame.TryRemove(grid.EntityId, out _);
                 InFreezeQueue.Remove(grid.EntityId);
                 CompensateFrozenFrames(grid);
+                var t1 = System.Diagnostics.Stopwatch.GetTimestamp();
 
                 // Whatever the config or the group is now: a body the freezer made fixed goes back to
                 // dynamic. Gating this on FreezePhysics or on "the group has a fixed grid" left bodies
                 // fixed for good on a non-static grid once either changed while it was frozen.
                 DoUnfreezePhysics(grid);
+                var t2 = System.Diagnostics.Stopwatch.GetTimestamp();
                 RegisterRecursive(grid);
                 grid.PlayerPresenceTier = MyUpdateTiersPlayerPresence.Normal;
+                var t3 = System.Diagnostics.Stopwatch.GetTimestamp();
+                // (a heavy thaw said always: 370-440 ms frames of it on the stand, 19.10.2026, whose not known)
+                double Ms(long a, long b) => (b - a) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+                if (Ms(t0, t3) > 50)
+                    SentisOptimisationsPlugin.Log.Warn($"Freezer: thawing {grid.DisplayName} ({grid.BlocksCount} blocks, {(grid.IsStatic ? "static" : grid.GridSizeEnum.ToString())}, physics frozen {physicsFrozen}) took {Ms(t0, t3):0} ms: compensation {Ms(t0, t1):0} (frozen production {LastThawProductionMs:0}, its networks {FrozenProduction.LastNetworkMs:0}; {string.Join(", ", FrozenProduction.LastKinds.OrderByDescending(k => k.Value.Ms).Select(k => $"{k.Key} x{k.Value.Count} {k.Value.Ms:0}"))}), body {Ms(t1, t2):0}, updates {Ms(t2, t3):0}");
             }
         });
     }
 
+    private static double LastThawProductionMs;
+
     private static void CompensateFrozenFrames(MyCubeGrid grid)
     {
         var frame = MySandboxGame.Static.SimulationFrameCounter;
+        var t = System.Diagnostics.Stopwatch.GetTimestamp();
+        FrozenProduction.LastNetworkMs = 0;
+        FrozenProduction.LastKinds.Clear();
         FrozenProduction.OnThawed(grid, frame);
+        LastThawProductionMs = (System.Diagnostics.Stopwatch.GetTimestamp() - t) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
         foreach (var myCubeBlock in grid.GetFatBlocks())
         {
             if (!(myCubeBlock is MyFunctionalBlock))
