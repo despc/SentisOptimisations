@@ -156,5 +156,33 @@ namespace SentisOptimisations.Tests
             Assert.True(Math.Abs((double)flush[1] - perFlush) < 1e-6,
                 "flush loses gas: handed over " + flush[1] + " of " + perFlush);
         }
+
+        // ------------- finding: a held transfer did not count, and the tank stopped its updates for good
+        [Fact]
+        public void GasTank_held_transfers_must_count_for_the_tank()
+        {
+            PluginHarness.SetConfig("GasTankOptimisation", true);
+            var prefix = typeof(GasTankOptimisations).GetMethod("TankTransferPrefix",
+                BindingFlags.Static | BindingFlags.NonPublic);
+            var sum = typeof(Sandbox.Game.Entities.Blocks.MyGasTank).GetField("m_prevSumTotalTransfer",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.True(sum != null, "MyGasTank.m_prevSumTotalTransfer is gone: see what the tank's 100-frame update looks at now");
+            var tank = System.Runtime.Serialization.FormatterServices
+                .GetUninitializedObject(typeof(Sandbox.Game.Entities.Blocks.MyGasTank));
+            typeof(GasTankOptimisations).GetMethod("Flush", BindingFlags.Static | BindingFlags.Public)
+                .Invoke(null, new object[] { tank });
+
+            // The tank's 100-frame update stops its per-frame updates when the sum is zero: held transfers
+            // must be in it as the skipped originals would have put them.
+            for (int i = 0; i < 6; i++)
+                Assert.False((bool)prefix.Invoke(null, new object[] { tank, 2.0 }), "handed over after " + (i + 1) + " transfers");
+            Assert.True(Math.Abs((double)sum.GetValue(tank) - 12.0) < 1e-6,
+                "the tank counts " + sum.GetValue(tank) + " of the 12 held: its 100-frame update takes it for idle");
+
+            // The flow stops: the next update, with nothing to transfer, hands over what is held.
+            object[] idle = { tank, 0.0 };
+            Assert.True((bool)prefix.Invoke(null, idle), "an update with nothing to transfer was held");
+            Assert.True(Math.Abs((double)idle[1] - 12.0) < 1e-6, "the idle update handed over " + idle[1] + " of the 12 held");
+        }
     }
 }

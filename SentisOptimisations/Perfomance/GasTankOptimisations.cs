@@ -21,7 +21,14 @@ namespace SentisOptimisationsPlugin
     /// vent was switched off, the world is unloading - is flushed by the next tick that touches it or
     /// by <see cref="Flush"/>, and what it owes is applied in full. The previous version kept its
     /// slivers in a list until thirty more arrived, so a tank that went quiet at twenty-nine simply
-    /// lost them.
+    /// lost them. A tank's update with nothing to transfer hands over what it still holds.
+    ///
+    /// A held transfer still counts for the tank's own bookkeeping (<c>m_prevSumTotalTransfer</c>,
+    /// added up by <c>ExecuteGasTransfer</c>). Every 100 frames a tank that saw no transfer since the
+    /// last time stops its per-frame updates, and nothing restarts them while its input stays the same.
+    /// The withheld calls left the sum at zero: a tank whose 100-frame check came before its first
+    /// batch of thirty stopped for good - its generator went on making gas and burning ice, the gas
+    /// went nowhere (found by reg_generator_pulls_ice: 1000 kg of ice into a tank left empty).
     /// </summary>
     [PatchShim]
     public static class GasTankOptimisations
@@ -78,6 +85,8 @@ namespace SentisOptimisationsPlugin
 
         private static readonly Action<MyGasTank, double> ExecuteTankTransfer =
             Accessors.Method<MyGasTank, Action<MyGasTank, double>>("ExecuteGasTransfer");
+        private static readonly Func<MyGasTank, double> PrevSumTotalTransfer = Accessors.Field<MyGasTank, double>("m_prevSumTotalTransfer");
+        private static readonly Action<MyGasTank, double> SetPrevSumTotalTransfer = Accessors.SetField<MyGasTank, double>("m_prevSumTotalTransfer");
         private static readonly Action<MyAirVent, float> ExecuteVentTransfer =
             Accessors.Method<MyAirVent, Action<MyAirVent, float>>("Transfer");
 
@@ -87,6 +96,8 @@ namespace SentisOptimisationsPlugin
         {
             if (ExecuteTankTransfer == null || ExecuteVentTransfer == null)
                 throw new InvalidOperationException("GasTankOptimisations: the gas transfer methods could not be bound");
+            if (PrevSumTotalTransfer == null || SetPrevSumTotalTransfer == null)
+                throw new InvalidOperationException("GasTankOptimisations: MyGasTank.m_prevSumTotalTransfer could not be bound");
 
             const BindingFlags instance = BindingFlags.Instance | BindingFlags.NonPublic;
             const BindingFlags statics = BindingFlags.Static | BindingFlags.NonPublic;
@@ -100,7 +111,12 @@ namespace SentisOptimisationsPlugin
 
         private static bool TankTransferPrefix(MyGasTank __instance, ref double totalTransfer)
         {
-            if (!Gather(__instance, totalTransfer, out var total)) return false;
+            if (!Gather(__instance, totalTransfer, out var total))
+            {
+                // what the skipped original would have counted: the tank keeps its per-frame updates
+                SetPrevSumTotalTransfer(__instance, PrevSumTotalTransfer(__instance) + totalTransfer);
+                return false;
+            }
             totalTransfer = total;
             return true;
         }
@@ -121,7 +137,15 @@ namespace SentisOptimisationsPlugin
             total = amount;
             try
             {
-                if (_flushing || !SentisOptimisationsPlugin.Config.GasTankOptimisation || amount == 0.0) return true;
+                if (_flushing || !SentisOptimisationsPlugin.Config.GasTankOptimisation) return true;
+                if (amount == 0.0)
+                {
+                    // the flow has stopped: what is still held goes through with this update
+                    if (Batches.TryGetValue(block.EntityId, out var held))
+                        lock (held)
+                            held.Take(out total);
+                    return true;
+                }
                 var batch = Batches.GetOrAdd(block.EntityId, _ => new Batch());
                 lock (batch)
                 {
