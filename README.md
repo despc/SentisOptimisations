@@ -1,4 +1,7 @@
 # SentisOptimisations
+Плагин разработан для сервера Sentis Project
+https://discord.gg/VeAUrnYmU6
+https://sentis-project.online
 
 Плагин Torch для Space Engineers, который снимает нагрузку с сервера: заморозка гридов без игроков
 (фризер), бюджеты и разнесение по кадрам тяжёлой работы (сварка проекций, заводы, буры, резаки,
