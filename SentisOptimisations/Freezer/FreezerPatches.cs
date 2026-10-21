@@ -130,8 +130,9 @@ public static class FreezerPatches
         return held < wanted ? (int)held : wanted;
     }
 
-    private static bool FinishDisassembling(MyBlueprintDefinitionBase blueprint, int count,
-        MyAssembler __instance)
+    /// <summary>Takes apart up to <paramref name="count"/> batches; how many it took apart.</summary>
+    private static int FinishDisassembling(MyBlueprintDefinitionBase blueprint, int count,
+        MyAssembler __instance, bool keepQueue = false)
     {
         // No more than the items that are there. The pass counts batches by the time that went by and by the
         // queue, and checks the inventory for one batch only (CheckInventory): an assembler with three computers
@@ -139,12 +140,12 @@ public static class FreezerPatches
         // ComputerComponent made Ingot/Iron +0.999996 but Component/Computer took 3 of 6"; 05.10: 1 of 3).
         foreach (MyBlueprintDefinitionBase.Item result in blueprint.Results)
             count = BatchesHeld(count, __instance.OutputInventory.GetItemAmount(result.Id).RawValue, result.Amount.RawValue);
-        if (count <= 0) return false;
+        if (count <= 0) return 0;
 
-        var action = delegate(MyInventoryBase @base)
-        {
-            _OutputInventory_ContentsChanged.Invoke(__instance, new object[]{ @base});
-        };
+        // The game's own handler, as the game takes it off while it takes the items apart (in repeat it rebuilds the
+        // queue from the output on every change). A delegate of the same method on the same block equals the one
+        // subscribed: a lambda calling it did not, so "-=" took nothing off and every pass's "+=" added one more.
+        var action = (Action<MyInventoryBase>)Delegate.CreateDelegate(typeof(Action<MyInventoryBase>), __instance, _OutputInventory_ContentsChanged);
 
         if (__instance.RepeatEnabled)
         {
@@ -157,7 +158,7 @@ public static class FreezerPatches
         {
             if (queueItem.Blueprint == blueprint)
             {
-                __instance.RemoveQueueItemRequest(m_queue.IndexOf(queueItem), count);
+                if (!keepQueue) __instance.RemoveQueueItemRequest(m_queue.IndexOf(queueItem), count);
                 __instance.easySetField("m_currentQueueItem", new MyProductionBlock.QueueItem?());
                 break;
             }
@@ -175,7 +176,7 @@ public static class FreezerPatches
             MyObjectBuilder_PhysicalObject newObject = (MyObjectBuilder_PhysicalObject) MyObjectBuilderSerializerKeen.CreateNewObject(prerequisite.Id.TypeId, prerequisite.Id.SubtypeName);
             __instance.InputInventory.AddItems(prerequisite.Amount * myFixedPoint * count, (MyObjectBuilder_Base) newObject);
         }
-        return false;
+        return count;
     }
 
     private static bool GetComponentsFromConveyorPatch(MyAssembler __instance)
@@ -542,6 +543,12 @@ public static class FreezerPatches
     /// framesFromLastTrigger is consumed here, so vanilla production for this tick is skipped
     /// (prefix returns false).
     /// </summary>
+    /// <summary>
+    /// The most items one production pass of an assembler makes, whatever the time owed: a blueprint of no time, or a
+    /// pass owed hours, must not hold the game thread. The time left over is not made up.
+    /// </summary>
+    public const int MaxItemsPerPass = 5000;
+
     private static void AsyncUpdateAssemblerProduction(MyAssembler __instance, uint framesFromLastTrigger,
         bool forceUpdate)
     {
@@ -565,6 +572,7 @@ public static class FreezerPatches
             (Sync<int, SyncDirection.FromServer>)__instance.easyGetField("m_currentItemIndex");
         List<MyProductionBlock.QueueItem> m_queue =
             (List<MyProductionBlock.QueueItem>)__instance.easyGetField("m_queue");
+        int madeInPass = 0, madeOfItem = 0;
         while ((num1 > 0.0 || forceUpdate && !flag) && idx < m_queue.Count)
         {
             flag = true;
@@ -605,10 +613,30 @@ public static class FreezerPatches
                     (float)Math.Round((1.0 - __instance.CurrentProgress) * blueprintProductionTime);
                 if ((double)num1 >= num2)
                 {
-                    if (__instance.RepeatEnabled)
-                        __instance.InsertQueueItemRequest(-1, blueprint);
-
-                    if (assemblingCount.TryGetValue(blueprint, out var count))
+                    // In repeat the game puts each item made back at the end of the queue. Not here, item by item: the
+                    // put-back adds to the queue item counted against (same blueprint, last place), its amount grew with
+                    // the count and the pass ran on until the time ran out - a thawed assembler in repeat inserted
+                    // queue items (each an event to every client) for over 60 s and Torch's watchdog killed the server
+                    // (21.10.2026). The queue is left as it is (below); meanwhile the pass goes round the queue as the
+                    // game does in repeat: an item done, the next one, after the last the first again.
+                    // Disassembly in repeat is the game's taking each item off the queue (it rebuilds the queue from the
+                    // output when that changes): only assembly goes round.
+                    if (++madeInPass > MaxItemsPerPass) break;
+                    if (__instance.RepeatEnabled && !__instance.DisassembleEnabled)
+                    {
+                        if (madeOfItem >= m_currentQueueItem.Value.Amount)
+                        {
+                            idx = (idx + 1) % m_queue.Count;
+                            madeOfItem = 0;
+                            --madeInPass;
+                            __instance.easySetField("m_currentQueueItem", new MyProductionBlock.QueueItem?());
+                            continue;
+                        }
+                        madeOfItem++;
+                        assemblingCount.TryGetValue(blueprint, out var made);
+                        assemblingCount[blueprint] = made + 1;
+                    }
+                    else if (assemblingCount.TryGetValue(blueprint, out var count))
                     {
                         if (count >= m_currentQueueItem.Value.Amount)
                         {
@@ -639,16 +667,15 @@ public static class FreezerPatches
         {
             var bp = assemblingEntry.Key;
             var count = assemblingEntry.Value;
-            if (__instance.DisassembleEnabled)
-            {
-                // Propagate failures to the outer fail-closed prefix. Swallowing here would mark a
-                // partially-mutated compensation batch as successfully applied.
-                FinishDisassembling(bp, count, __instance);
-            }
-            else
-            {
-                FinishAssembling(bp, count, __instance);
-            }
+            // Propagate failures to the outer fail-closed prefix. Swallowing here would mark a
+            // partially-mutated compensation batch as successfully applied.
+            // Assembling in repeat the queue stays as it is: the game takes each item made off its front and puts it
+            // back at its end. Taking the batch off here and putting it back would not even cancel out: the pass goes
+            // round the queue, so it makes more of an item than the queue holds, and the removal takes no more than is
+            // there. Taking apart, repeat or not, the game takes each item off the queue: so here.
+            var keepQueue = __instance.RepeatEnabled && !__instance.DisassembleEnabled;
+            if (__instance.DisassembleEnabled) FinishDisassembling(bp, count, __instance, keepQueue);
+            else FinishAssembling(bp, count, __instance, keepQueue);
 
         }
 
@@ -663,7 +690,8 @@ public static class FreezerPatches
     }
 
 
-    private static void FinishAssembling(MyBlueprintDefinitionBase blueprint, int count, MyAssembler assembler)
+    /// <summary>Assembles up to <paramref name="count"/> batches; how many it assembled (0 when the materials are not all there).</summary>
+    private static int FinishAssembling(MyBlueprintDefinitionBase blueprint, int count, MyAssembler assembler, bool keepQueue = false)
     {
         MyFixedPoint myFixedPoint = (MyFixedPoint)(1f / assembler.GetEfficiencyMultiplierForBlueprint(blueprint));
         bool allPrereqExists = true;
@@ -728,7 +756,7 @@ public static class FreezerPatches
 
         if (!allPrereqExists)
         {
-            return;
+            return 0;
         }
         List<MyProductionBlock.QueueItem> m_queue =
             (List<MyProductionBlock.QueueItem>)assembler.easyGetField("m_queue");
@@ -736,7 +764,7 @@ public static class FreezerPatches
         {
             if (queueItem.Blueprint == blueprint)
             {
-                assembler.RemoveQueueItemRequest(m_queue.IndexOf(queueItem), countWithReqs);
+                if (!keepQueue) assembler.RemoveQueueItemRequest(m_queue.IndexOf(queueItem), countWithReqs);
                 assembler.easySetField("m_currentQueueItem", new MyProductionBlock.QueueItem?());
                 break;
             }
@@ -759,7 +787,7 @@ public static class FreezerPatches
             {
                 if (global::SentisOptimisations.DiagLog.On) SentisOptimisationsPlugin.Log.Warn($"Assembler '{assembler.DisplayNameText}' on '{assembler.CubeGrid.DisplayName}': " +
                                                     $"{byItem.Key.SubtypeName} planned {planned} but only {i2r.Key.GetItemAmount(byItem.Key)} there - nothing made this pass");
-                return;
+                return 0;
             }
         }
         foreach (var i2r in inventoriesToRemove)
@@ -781,6 +809,7 @@ public static class FreezerPatches
                     assembler.Name, assembler.CubeGrid.Name, newObject.TypeId.ToString(), newObject.SubtypeName,
                     result.Amount.ToIntSafe() * countWithReqs);
         }
+        return countWithReqs;
     }
 
     // Whether the conveyor brings an item from an inventory to the assembler of the pass under way. Asked only of the

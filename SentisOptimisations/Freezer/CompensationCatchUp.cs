@@ -265,8 +265,12 @@ public static class CompensationCatchUp
         if (!CompensationTracker.TryTakeCompensation(assembler.EntityId, StepFrames, out var frames)) return false;
         job.Count(assembler, frames);
         UpdateProductionAssembler.Invoke(assembler, new object[] { frames, false });
-        if (assembler.UseConveyorSystem && assembler.OutputInventory.VolumeFillFactor > 0.25f)
-            MyGridConveyorSystem.PushAnyRequest(assembler, assembler.OutputInventory);
+        // What is made goes on, as the game sends it: assembling, the output (the components); taking apart, the input
+        // (the ingots). Taking apart the output holds what is still to be taken apart: pushed out, it was gone from the
+        // assembler, and in repeat the game queues what the output holds - a thawed one stopped with nothing queued.
+        var made = assembler.DisassembleEnabled ? assembler.InputInventory : assembler.OutputInventory;
+        if (assembler.UseConveyorSystem && made.VolumeFillFactor > 0.25f)
+            MyGridConveyorSystem.PushAnyRequest(assembler, made);
         return true;
     }
 

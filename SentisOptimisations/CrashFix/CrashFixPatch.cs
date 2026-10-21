@@ -168,6 +168,20 @@ namespace SentisOptimisationsPlugin.CrashFix
                 BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly) ?? throw new MissingMethodException("MyHandDrill.UpdateBeforeSimulation100");
             harmony.Patch(MethodHandDrillUpdate100, prefix: new HarmonyMethod(typeof(CrashFixPatch).GetMethod(nameof(HandDrillWithOwner), BindingFlags.Static | BindingFlags.NonPublic)));
 
+            // A character's radiation damage is done a frame later (MyRadiationStat.DoRadiationDamage queues it with
+            // MySandboxGame.Invoke): a character deleted in between (closed and deleted at the end of that frame, as when a
+            // player leaves or a body goes) left the queued call without its stats, and its NullReferenceException took the
+            // server down (21.10.2026, the stand, after the regression's cleanup). The call is dropped for a character that
+            // is gone.
+            var radiation = typeof(SpaceEngineers.Game.EntityComponents.GameLogic.MyRadiationStat);
+            _radiationStat = radiation.GetProperty("m_radiationStat", BindingFlags.Instance | BindingFlags.NonPublic)?.GetGetMethod(true);
+            var radiationDamage = radiation.GetMethods(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly)
+                .Where(m => m.Name.StartsWith("<DoRadiationDamage>", StringComparison.Ordinal) && m.GetParameters().Length == 0).ToList();
+            if (_radiationStat == null || radiationDamage.Count != 1)
+                SentisOptimisationsPlugin.Log.Warn("CrashFixPatch: MyRadiationStat's queued damage is not what it knows (" + radiationDamage.Count + " found): not guarded");
+            else
+                harmony.Patch(radiationDamage[0], prefix: new HarmonyMethod(typeof(CrashFixPatch).GetMethod(nameof(RadiationOfLiveCharacter), BindingFlags.Static | BindingFlags.NonPublic)));
+
             // A client that leaves in the middle of an update makes these throw, and the server
             // must not go down with it. They came here when the async streaming send was removed.
             foreach (var name in new[] { "FilterStateSync", "RefreshReplicable", "RemoveClientReplicable", "AddClientReplicable" })
@@ -269,6 +283,22 @@ namespace SentisOptimisationsPlugin.CrashFix
                 SentisOptimisationsPlugin.Log.Error(__exception, "Connector UpdateOnceBeforeFrame (" + e.Message + ")");
             }
             return null;
+        }
+
+        private static MethodInfo _radiationStat;
+
+        /// <summary>Whether a queued radiation damage still has its character and its stat to go by (see where it is patched).</summary>
+        private static bool RadiationOfLiveCharacter(object __instance)
+        {
+            try
+            {
+                var character = (__instance as Sandbox.Game.MyStatLogic)?.Character as VRage.Game.Entity.MyEntity;
+                return character != null && !character.MarkedForClose && !character.Closed && _radiationStat.Invoke(__instance, null) != null;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         /// <summary>Whether the hand drill has an owner to update for (see where it is patched).</summary>
