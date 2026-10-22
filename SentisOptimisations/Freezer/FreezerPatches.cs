@@ -194,6 +194,8 @@ public static class FreezerPatches
             {
                 try
                 {
+                    // a frame later: the assembler may be gone by now (its inventories are then null)
+                    if (__instance.Closed || __instance.MarkedForClose || __instance.InputInventory == null) return;
                     AsyncCollectAssemblerRequiredItems(__instance, timerFramesFromLastTrigger);
                 }
                 catch (Exception e)
