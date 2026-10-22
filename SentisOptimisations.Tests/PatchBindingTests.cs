@@ -124,22 +124,6 @@ namespace SentisOptimisations.Tests
         }
 
         [Fact]
-        public void Replicables_patches_every_CalculateLayerOfReplicable_overload_in_game()
-        {
-            // game currently has 2 overloads; if a third appears, this pins that we notice
-            var myClient = AppDomain.CurrentDomain.GetAssemblies()
-                .Select(a => a.GetType("VRage.Network.MyClient")).FirstOrDefault(x => x != null);
-            Assert.NotNull(myClient);
-            var gameOverloads = myClient.GetMethods(
-                    BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly)
-                    .Where(m => m.Name == "CalculateLayerOfReplicable").Select(m => m.GetParameters().Length).OrderBy(x => x).ToList();
-            var patched = RowsFor("CalculateLayerOfReplicable")
-                .Select(r => r.Original.GetParameters().Length).Distinct().OrderBy(x => x).ToList();
-            Assert.NotEmpty(gameOverloads);
-            Assert.Equal(gameOverloads, patched);
-        }
-
-        [Fact]
         public void FuckScriptThief_targets_serialize_with_matching_names()
         {
             var rows = RowsFor("Serialize").Where(r => r.Shim.Name.Contains("FuckScriptThief")).ToList();

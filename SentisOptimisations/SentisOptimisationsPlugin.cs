@@ -122,7 +122,6 @@ namespace SentisOptimisationsPlugin
                 GasTankOptimisations.ClearAll();
                 _voxelStreamCache.OnUnloading();
                 SerializerWarmup.Reset();
-                ReplicablesPatch.ClearAll();
                 Freezer.WakeRequests.ClearAll();
                 Freezer.FrozenProduction.ClearAll();
                 DelayedProcessor.OnUnloading();

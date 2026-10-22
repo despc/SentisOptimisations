@@ -207,62 +207,6 @@ public class QueueLoopTests
 }
 
 /// <summary>
-/// The player-distance patch: its targets, and the shape of its prefixes. The previous version took
-/// __result by value in one of them, so that half of the patch silently did nothing.
-/// </summary>
-public class ReplicablesPatchTests
-{
-    private const BindingFlags Any = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
-
-    private static Type ClientType =>
-        typeof(VRage.Network.MyReplicationServer).Assembly.GetType("VRage.Network.MyClient");
-
-    [Fact]
-    public void The_patched_methods_and_the_client_state_exist()
-    {
-        Assert.NotNull(ClientType);
-        var state = ClientType.GetField("State", Any);
-        Assert.NotNull(state);
-        Assert.True(typeof(VRage.Network.MyClientStateBase).IsAssignableFrom(state.FieldType));
-
-        var layers = ClientType.GetMethods(Any | BindingFlags.DeclaredOnly)
-            .Where(m => m.Name == "CalculateLayerOfReplicable").ToList();
-        Assert.NotEmpty(layers);
-        foreach (var method in layers)
-            Assert.Equal(typeof(VRage.Network.IMyReplicable), method.GetParameters()[0].ParameterType);
-
-        var add = typeof(VRage.Network.MyReplicationServer).GetMethod("AddReplicableToLayer",
-            Any | BindingFlags.DeclaredOnly);
-        Assert.NotNull(add);
-        Assert.Equal(typeof(bool), add.ReturnType);
-        Assert.Equal(new[] { "rep", "layer", "client" },
-            add.GetParameters().Select(p => p.Name).ToArray());
-    }
-
-    [Fact]
-    public void Both_prefixes_take_the_result_by_reference()
-    {
-        foreach (var name in new[] { "CalculateLayerOfReplicablePatched", "AddReplicableToLayerPatched" })
-        {
-            var prefix = typeof(SentisOptimisationsPlugin.ReplicablesPatch)
-                .GetMethod(name, BindingFlags.Static | BindingFlags.NonPublic);
-            Assert.True(prefix != null, name + " is gone");
-            var result = prefix.GetParameters().Single(p => p.Name == "__result");
-            Assert.True(result.ParameterType.IsByRef,
-                name + " takes __result by value, so whatever it assigns never leaves the method");
-        }
-    }
-
-    [Fact]
-    public void The_distance_comes_from_the_world_and_not_from_the_plugin_config()
-    {
-        Assert.NotNull(typeof(VRage.Game.MyObjectBuilder_SessionSettings).GetField("SyncDistance"));
-        Assert.True(typeof(SentisOptimisationsPlugin.MainConfig).GetProperty("PlayersSyncDistance") == null,
-            "the plugin still has its own sync distance setting");
-    }
-}
-
-/// <summary>
 /// The two places a player is present at: what the anchors are built from, and what the replication
 /// suffix reads to give the player's own surroundings the same layers as the ship they steer.
 /// </summary>
@@ -345,17 +289,6 @@ public class PrefixParameterNameTests
     [Fact]
     public void The_replication_prefixes_use_the_games_parameter_names()
     {
-        var clientType = typeof(VRage.Network.MyReplicationServer).Assembly.GetType("VRage.Network.MyClient");
-        foreach (var layer in clientType.GetMethods(Any | BindingFlags.DeclaredOnly)
-                     .Where(m => m.Name == "CalculateLayerOfReplicable"))
-        {
-            AssertNamesMatch(layer, typeof(SentisOptimisationsPlugin.ReplicablesPatch)
-                .GetMethod("CalculateLayerOfReplicablePatched", Statics));
-        }
-
-        AssertNamesMatch(
-            typeof(VRage.Network.MyReplicationServer).GetMethod("AddReplicableToLayer", Any | BindingFlags.DeclaredOnly),
-            typeof(SentisOptimisationsPlugin.ReplicablesPatch).GetMethod("AddReplicableToLayerPatched", Statics));
         AssertNamesMatch(
             typeof(VRage.Network.MyReplicationServer).GetMethod("AddForClient", BindingFlags.Instance | BindingFlags.NonPublic),
             typeof(SentisOptimisationsPlugin.ReplicableAddBudget).GetMethod("AddForClientPrefix", Statics));
