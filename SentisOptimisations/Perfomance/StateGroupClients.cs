@@ -57,17 +57,19 @@ namespace Optimizer.Optimizations
         public static void Patch(PatchContext ctx) =>
             global::SentisOptimisations.PatchGuard.Run("StateGroupClients", ctx, PatchImpl);
 
+        // By Harmony, not Torch: CrashFixPatch has a Harmony finalizer on these methods, and a Torch patch on the same
+        // method throws a Harmony one out (the jump written last runs; patch_conflicts, 22.10.2026).
+        private static readonly HarmonyLib.Harmony Harmony = new HarmonyLib.Harmony("SentisOptimisations.StateGroupClients");
+
         internal static void PatchImpl(PatchContext ctx)
         {
             const BindingFlags instance = BindingFlags.Instance | BindingFlags.NonPublic;
             const BindingFlags anyStatic = BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public;
             var self = typeof(StateGroupClients);
-            ctx.GetPattern(ServerType.GetMethod("AddClientReplicable", instance))
-                .Suffixes.Add(self.GetMethod(nameof(AddClientReplicableSuffix), anyStatic));
-            ctx.GetPattern(ServerType.GetMethod("RemoveClientReplicable", instance))
-                .Suffixes.Add(self.GetMethod(nameof(RemoveClientReplicableSuffix), anyStatic));
-            ctx.GetPattern(ServerType.GetMethod("ApplyDirtyGroups", instance))
-                .Prefixes.Add(self.GetMethod(nameof(ApplyDirtyGroupsPrefix), anyStatic));
+            HarmonyLib.HarmonyMethod Own(string name) => new HarmonyLib.HarmonyMethod(self.GetMethod(name, anyStatic));
+            Harmony.Patch(ServerType.GetMethod("AddClientReplicable", instance), postfix: Own(nameof(AddClientReplicableSuffix)));
+            Harmony.Patch(ServerType.GetMethod("RemoveClientReplicable", instance), postfix: Own(nameof(RemoveClientReplicableSuffix)));
+            Harmony.Patch(ServerType.GetMethod("ApplyDirtyGroups", instance), prefix: Own(nameof(ApplyDirtyGroupsPrefix)));
         }
 
         private static void AddClientReplicableSuffix(MyReplicationServer __instance, IMyReplicable replicable, object client)

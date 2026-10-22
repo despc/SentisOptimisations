@@ -22,8 +22,14 @@ namespace SentisOptimisationsPlugin
     /// file 'gs-...' not present in staging folder" seconds after "... was stored by ...", inside an autosave - four
     /// grids in three days.
     ///
-    /// Here a <c>Save</c> holds <see cref="Saving"/> open from its start to its end, however it ends (a finalizer: a
-    /// save that throws closes it too); <see cref="GridStorageServerCheck"/> refuses to store a grid while it is open.
+    /// Here a <c>Save</c> holds <see cref="Saving"/> open from its start to its end (a Torch prefix and suffix);
+    /// <see cref="GridStorageServerCheck"/> refuses to store a grid while it is open. A save that throws skips the
+    /// suffix: a window open longer than <see cref="SaveWindow.Longest"/> is taken as closed (a save never takes that
+    /// long), with a warning in the log.
+    ///
+    /// By Torch, not Harmony: VirtualGarage puts a Torch suffix on the same <c>MySessionSnapshot.Save</c>, and Torch,
+    /// writing its jump into the method after Harmony, threw Harmony's patch out - the window never opened (found by the
+    /// stand's <c>reg_grid_storage_save</c>, 22.10.2026; VirtualGarage's patch is from 22.09, this one from 17.10).
     /// A store request accepted before the save and come to its turn during it (the game takes one request a frame, and
     /// at a low sim speed a queue of a few dozen lasts seconds) is refused here, where the game writes the files
     /// (<c>StoreRequest.Dispatch</c>); its grid stays in the world. Fetching grids back goes on during a save: it only
@@ -34,8 +40,7 @@ namespace SentisOptimisationsPlugin
     {
         internal static readonly SaveWindow Window = new SaveWindow();
 
-        // by Harmony, not Torch: a Torch suffix does not run when the method throws, and a save that throws has to close
-        // the window too
+        // the write of a store request's files (StoreRequest.Dispatch), which nothing else patches
         private static readonly Harmony Harmony = new Harmony("SentisOptimisations.GridStorageSaveWindow");
 
         /// <summary>Whether a save of the world is running now.</summary>
@@ -49,8 +54,11 @@ namespace SentisOptimisationsPlugin
             var saves = typeof(MySessionSnapshot).GetMethods(instance).Where(m => m.Name == "Save" && m.ReturnType == typeof(bool)).ToList();
             if (saves.Count != 1)
                 throw new MissingMethodException($"MySessionSnapshot.Save: {saves.Count} found, 1 expected");
-            HarmonyMethod Own(string name) => new HarmonyMethod(typeof(GridStorageSaveWindow).GetMethod(name, BindingFlags.Static | BindingFlags.NonPublic));
-            Harmony.Patch(saves[0], prefix: Own(nameof(SavePrefix)), finalizer: Own(nameof(SaveFinalizer)));
+            MethodInfo Mine(string name) => typeof(GridStorageSaveWindow).GetMethod(name, BindingFlags.Static | BindingFlags.NonPublic);
+            HarmonyMethod Own(string name) => new HarmonyMethod(Mine(name));
+            var pattern = ctx.GetPattern(saves[0]);
+            pattern.Prefixes.Add(Mine(nameof(SavePrefix)));
+            pattern.Suffixes.Add(Mine(nameof(SaveSuffix)));
 
             // the point where the files are written: on its own, the window and the refusals of new requests work without it
             try
@@ -74,13 +82,17 @@ namespace SentisOptimisationsPlugin
         private static MethodInfo _notify;
         private static FieldInfo _grid, _endpoint;
 
-        private static void SavePrefix() => Window.Open();
+        private static void SavePrefix()
+        {
+            if (Window.Open(Now)) SentisOptimisationsPlugin.Log.Warn("Grid storage: a save window open for longer than a save takes was taken as closed (a save that threw?)");
+        }
 
-        // (no __exception: an exception of the save goes on as it is)
-        private static void SaveFinalizer()
+        private static void SaveSuffix()
         {
             if (!Window.Close()) SentisOptimisationsPlugin.Log.Warn("Grid storage: a save ended that was not seen starting");
         }
+
+        private static long Now => System.Diagnostics.Stopwatch.GetTimestamp();
 
         /// <summary>
         /// A store request accepted before a save and come to its turn during it: refused as a new one would be (its grid
@@ -106,16 +118,43 @@ namespace SentisOptimisationsPlugin
             return false;
         }
 
-        /// <summary>Whether a save is running: open from the start of a save to its end, until the last of overlapping saves ends.</summary>
+        /// <summary>
+        /// Whether a save is running: open from the start of a save to its end, until the last of overlapping saves ends.
+        /// Open for longer than <see cref="Longest"/> since the last save began, it is taken as closed (a save that threw
+        /// has no end).
+        /// </summary>
         public sealed class SaveWindow
         {
-            private readonly object _lock = new object();
-            private int _depth;
+            /// <summary>Longer than any save: the server's take 10-25 s.</summary>
+            public static readonly TimeSpan Longest = TimeSpan.FromMinutes(10);
 
-            public void Open()
+            private readonly object _lock = new object();
+            private readonly Func<long> _now;
+            private int _depth;
+            private long _openedAt;
+
+            /// <param name="now">the clock, in Stopwatch ticks (the tests' own)</param>
+            public SaveWindow(Func<long> now = null)
             {
-                lock (_lock) _depth++;
+                _now = now ?? System.Diagnostics.Stopwatch.GetTimestamp;
             }
+
+            /// <summary>A save begins; true when an earlier window had outlived <see cref="Longest"/> and was dropped first.</summary>
+            public bool Open(long now = -1)
+            {
+                lock (_lock)
+                {
+                    if (now < 0) now = _now();
+                    var dropped = Expired(now);
+                    if (dropped) _depth = 0;
+                    _depth++;
+                    _openedAt = now;
+                    return dropped;
+                }
+            }
+
+            private bool Expired(long now) =>
+                _depth > 0 && now - _openedAt > (long)(Longest.TotalSeconds * System.Diagnostics.Stopwatch.Frequency);
 
             /// <summary>Ends a save; false when no save was open (the count stays at 0).</summary>
             public bool Close()
@@ -132,7 +171,7 @@ namespace SentisOptimisationsPlugin
             {
                 get
                 {
-                    lock (_lock) return _depth > 0;
+                    lock (_lock) return _depth > 0 && !Expired(_now());
                 }
             }
         }

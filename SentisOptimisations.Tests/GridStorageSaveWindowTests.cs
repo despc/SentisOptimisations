@@ -44,5 +44,23 @@ namespace SentisOptimisations.Tests
             window.Close();
             Assert.False(window.IsOpen);
         }
+
+        [Fact]
+        public void A_save_that_never_ended_does_not_keep_it_open_for_ever()
+        {
+            long now = 0;
+            var second = System.Diagnostics.Stopwatch.Frequency;
+            var window = new GridStorageSaveWindow.SaveWindow(() => now);
+            Assert.False(window.Open(now));
+            now += 60 * second;
+            Assert.True(window.IsOpen);
+            now += (long)GridStorageSaveWindow.SaveWindow.Longest.TotalSeconds * second;
+            Assert.False(window.IsOpen);
+            // the next save drops it and holds the window itself
+            Assert.True(window.Open(now));
+            Assert.True(window.IsOpen);
+            window.Close();
+            Assert.False(window.IsOpen);
+        }
     }
 }

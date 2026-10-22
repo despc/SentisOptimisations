@@ -108,9 +108,12 @@ namespace SentisOptimisationsPlugin
                 .Suffixes.Add(typeof(GridStreamBuilders).GetMethod(nameof(InventoryChangedSuffix), anyStatic));
             var propertyGroup = typeof(MyCubeGrid).Assembly
                 .GetType("Sandbox.Game.Replication.StateGroups.MyPropertySyncStateGroup", true);
-            ctx.GetPattern(propertyGroup.GetMethod("Notify", BindingFlags.Instance | BindingFlags.NonPublic))
-                .Suffixes.Add(typeof(GridStreamBuilders).GetMethod(nameof(PropertyChangedSuffix), anyStatic));
+            // by Harmony, not Torch: CrashFixPatch has a Harmony finalizer on Notify, which a Torch patch would throw out
+            Harmony.Patch(propertyGroup.GetMethod("Notify", BindingFlags.Instance | BindingFlags.NonPublic),
+                postfix: new HarmonyLib.HarmonyMethod(typeof(GridStreamBuilders).GetMethod(nameof(PropertyChangedSuffix), anyStatic)));
         }
+
+        private static readonly HarmonyLib.Harmony Harmony = new HarmonyLib.Harmony("SentisOptimisations.GridStreamBuilders");
 
         /// <summary>Game thread only: called while the replication server serializes a grid for a client.</summary>
         public static MyObjectBuilder_CubeGrid Get(MyCubeGrid grid, IMyReplicable replicable, Endpoint forClient, Access access, long frame)

@@ -166,7 +166,8 @@ namespace SentisOptimisationsPlugin.CrashFix
             // log. The drill without an owner has nothing to update (its ore detector serves its owner's HUD).
             var MethodHandDrillUpdate100 = typeof(MyHandDrill).GetMethod(nameof(MyHandDrill.UpdateBeforeSimulation100),
                 BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly) ?? throw new MissingMethodException("MyHandDrill.UpdateBeforeSimulation100");
-            harmony.Patch(MethodHandDrillUpdate100, prefix: new HarmonyMethod(typeof(CrashFixPatch).GetMethod(nameof(HandDrillWithOwner), BindingFlags.Static | BindingFlags.NonPublic)));
+            // by Torch, not Harmony: SentisAi has a Torch prefix on it, which writes over a Harmony patch (patch_conflicts)
+            ctx.GetPattern(MethodHandDrillUpdate100).Prefixes.Add(typeof(CrashFixPatch).GetMethod(nameof(HandDrillWithOwner), BindingFlags.Static | BindingFlags.NonPublic));
 
             // A character's radiation damage is done a frame later (MyRadiationStat.DoRadiationDamage queues it with
             // MySandboxGame.Invoke): a character deleted in between (closed and deleted at the end of that frame, as when a

@@ -27,8 +27,11 @@ namespace SentisOptimisationsPlugin
         {
             var method = typeof(MyFloatingObjects).GetMethod("CheckObjectInVoxel", BindingFlags.Instance | BindingFlags.NonPublic, null, Type.EmptyTypes, null)
                          ?? throw new MissingMethodException("MyFloatingObjects.CheckObjectInVoxel");
-            ctx.GetPattern(method).Prefixes.Add(typeof(FloatingInVoxelCheck).GetMethod(nameof(Prefix), BindingFlags.Static | BindingFlags.NonPublic));
+            // by Harmony, not Torch: ExplosionsPatch has a Harmony finalizer on it, which a Torch patch would throw out
+            Harmony.Patch(method, prefix: new HarmonyLib.HarmonyMethod(typeof(FloatingInVoxelCheck).GetMethod(nameof(Prefix), BindingFlags.Static | BindingFlags.NonPublic)));
         }
+
+        private static readonly HarmonyLib.Harmony Harmony = new HarmonyLib.Harmony("SentisOptimisations.FloatingInVoxelCheck");
 
         /// <summary>Whether the check runs on this frame.</summary>
         public static bool RunsOn(int frame) => frame % Every == 0;
