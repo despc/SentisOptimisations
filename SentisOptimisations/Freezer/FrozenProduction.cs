@@ -27,7 +27,9 @@ namespace SentisOptimisationsPlugin.Freezer;
 ///
 ///  * an O2/H2 generator turning ice into gas,
 ///  * an oxygen farm turning sunlight into oxygen,
-///  * a farm plot growing a plant.
+///  * a farm plot growing a plant,
+///  * a jump drive charging (its charge is added a hundred frames at a time, from the power it gets, with no
+///    clock behind it: a drive left half empty by a player who went stayed half empty for good).
 ///
 /// The first two are handed the gas they would have made, limited by what could really have
 /// happened: the ice that was actually there, and the room the tanks on their conveyor network
@@ -157,6 +159,16 @@ public static class FrozenProduction
         public static double SecondsFor(double megawattHours, double megawatts) =>
             megawattHours <= 0 || megawatts <= 0 ? 0 : megawattHours * 3600 / megawatts;
 
+        /// <summary>
+        /// The charge, in MWh, a jump drive takes over the period: the power it was getting, times the time, times its
+        /// efficiency (vanilla's MyJumpDrive.StorePower), never past what it lacks for a jump.
+        /// </summary>
+        public static double JumpCharge(double inputMegawatts, double seconds, double efficiency, double lacking)
+        {
+            if (inputMegawatts <= 0 || seconds <= 0 || efficiency <= 0 || lacking <= 0) return 0;
+            return Math.Min(inputMegawatts * seconds / 3600 * efficiency, lacking);
+        }
+
         /// <summary>The share of its rating a power producer was running at, 0..1.</summary>
         public static double OutputShare(double output, double maxOutput)
         {
@@ -220,6 +232,17 @@ public static class FrozenProduction
                     continue;
                 }
 
+                // a drive charging: the power it was getting then
+                if (block is MyJumpDrive drive)
+                {
+                    var input = JumpDriveInput(drive);
+                    var ingame = (Sandbox.ModAPI.Ingame.IMyJumpDrive)drive;
+                    FreezeLogic.CompensationLogs($"Frozen jump drive '{drive.DisplayNameText}' on {grid.DisplayName}: drawing {input:0.00} MW (functional {drive.IsFunctional}, on {drive.Enabled}, recharge {ingame.Recharge}, " +
+                                                 $"stored {ingame.CurrentStoredPower:0.000} of {ingame.MaxStoredPower:0.000}, sink input now {drive.ResourceSink?.CurrentInputByType(MyResourceDistributorComponent.ElectricityId) ?? -1:0.00})");
+                    if (input > 0) Stamps[drive.EntityId] = new Stamp { Frame = frame, Power = (float)input };
+                    continue;
+                }
+
                 // A plant grows in a component of its own, which keeps its own update registration
                 // and re-arms it whenever the block's state changes - clearing the flag here does
                 // not hold. The stamp is what stops it: FarmPlotFreeze skips the growth while it
@@ -247,6 +270,14 @@ public static class FrozenProduction
             if (Stamps.IsEmpty) return;
             Network network = null;
             List<string> done = null;
+            // a drive's charge goes into the network's energy budget as the network is made: made before the drives'
+            // stamps are taken off below
+            foreach (var block in grid.GetFatBlocks())
+                if (block is MyJumpDrive && Stamps.ContainsKey(block.EntityId))
+                {
+                    network = Network.For(grid, frame);
+                    break;
+                }
 
             foreach (var block in grid.GetFatBlocks())
             {
@@ -273,13 +304,16 @@ public static class FrozenProduction
                 var gasBefore = _gasCompensated;
                 var fuelBefore = _fuelBurned;
                 var kindStart = System.Diagnostics.Stopwatch.GetTimestamp();
-                if (block is MyGasGenerator generator) CompensateGenerator(generator, seconds, stamp, network);
+                if (block is MyJumpDrive drive) CompensateJumpDrive(drive, seconds, stamp);
+                else if (block is MyGasGenerator generator) CompensateGenerator(generator, seconds, stamp, network);
                 else if (block is MyOxygenFarm farm) CompensateFarm(farm, seconds, stamp, network);
                 else if (block is MyReactor reactor) CompensateReactor(reactor, seconds, stamp, network);
                 else if (block is MyGasFueledPowerProducer engine) CompensateEngine(engine, seconds, stamp, network);
                 var kind = block.GetType().Name;
                 LastKinds.TryGetValue(kind, out var was);
                 LastKinds[kind] = (was.Count + 1, was.Ms + (System.Diagnostics.Stopwatch.GetTimestamp() - kindStart) * 1000.0 / System.Diagnostics.Stopwatch.Frequency);
+                if (block is MyJumpDrive && LastJumpCharge > 0)
+                    (done ??= new List<string>()).Add($"'{block.DisplayNameText}' {seconds:0} s: {LastJumpCharge:0.000} MWh charged");
                 if (_gasCompensated != gasBefore || _fuelBurned != fuelBefore)
                     (done ??= new List<string>()).Add($"'{block.DisplayNameText}' {seconds:0} s: " +
                         (_gasCompensated != gasBefore ? $"{_gasCompensated - gasBefore} L gas" : "") +
@@ -332,6 +366,36 @@ public static class FrozenProduction
         }
     }
 
+    // ------------------------------------------------------------------ jump drives
+
+    /// <summary>The last drive's charge, MWh (for the compensation log).</summary>
+    private static double LastJumpCharge;
+
+    /// <summary>What a drive is drawing to charge, MW: nothing when it is full, not recharging, off or broken.</summary>
+    private static double JumpDriveInput(MyJumpDrive drive)
+    {
+        var ingame = (Sandbox.ModAPI.Ingame.IMyJumpDrive)drive;
+        if (!drive.IsFunctional || !drive.Enabled || !ingame.Recharge || ingame.CurrentStoredPower >= ingame.MaxStoredPower) return 0;
+        return drive.ResourceSink?.CurrentInputByType(MyResourceDistributorComponent.ElectricityId) ?? 0;
+    }
+
+    /// <summary>
+    /// The charge a drive would have taken over the freeze, from the power it was getting when it stopped. Where that
+    /// power came from is paid for with the rest of the network: a reactor's or an engine's fuel through the network's
+    /// energy budget (<see cref="Network"/> counts the drives' charge into it), a battery's charge by vanilla, which
+    /// works a battery's stored power out from a timestamp over the frozen period.
+    /// </summary>
+    private static void CompensateJumpDrive(MyJumpDrive drive, double seconds, Stamp stamp)
+    {
+        LastJumpCharge = 0;
+        var ingame = (Sandbox.ModAPI.Ingame.IMyJumpDrive)drive;
+        if (!drive.IsFunctional || !drive.Enabled || !ingame.Recharge || !(drive.BlockDefinition is MyJumpDriveDefinition definition)) return;
+        var charge = Rules.JumpCharge(stamp.Power, seconds, definition.PowerEfficiency, ingame.MaxStoredPower - ingame.CurrentStoredPower);
+        if (charge <= 0) return;
+        ((Sandbox.ModAPI.IMyJumpDrive)drive).CurrentStoredPower = (float)Math.Min(ingame.MaxStoredPower, ingame.CurrentStoredPower + charge);
+        LastJumpCharge = charge;
+    }
+
     // ------------------------------------------------------------------ the gas blocks
 
     /// <summary>
@@ -364,7 +428,7 @@ public static class FrozenProduction
             var grids = GridsAround(grid);
             var key = grids.Count == 0 ? grid.EntityId : grids.Min(g => g.EntityId);
             if (Built.TryGetValue(key, out var known)) return known;
-            var network = new Network(grids);
+            var network = new Network(grids, frame);
             Built[key] = network;
             return network;
         }
@@ -412,10 +476,20 @@ public static class FrozenProduction
         /// </summary>
         public double EnergyBudget { get; private set; }
 
-        private Network(List<MyCubeGrid> grids)
+        private Network(List<MyCubeGrid> grids, ulong frame)
         {
             foreach (var block in grids.SelectMany(g => g.GetFatBlocks()))
             {
+                // the energy a drive charging over the freeze drew from the network (before its efficiency)
+                if (block is MyJumpDrive drive && Stamps.TryGetValue(drive.EntityId, out var stamp) && drive.BlockDefinition is MyJumpDriveDefinition definition &&
+                    definition.PowerEfficiency > 0)
+                {
+                    var ingame = (Sandbox.ModAPI.Ingame.IMyJumpDrive)drive;
+                    var seconds = Rules.FrozenFrames(stamp.Frame, frame) / FramesPerSecond;
+                    EnergyBudget += Rules.JumpCharge(stamp.Power, seconds, definition.PowerEfficiency, ingame.MaxStoredPower - ingame.CurrentStoredPower) / definition.PowerEfficiency;
+                    continue;
+                }
+
                 if (block is MyGasTank tank)
                 {
                     _tanks.Add(tank);

@@ -70,11 +70,13 @@ public class FreezeLogic
             // A player is present both where their character is and where whatever they control is:
             // somebody flying a ship from a remote control block keeps two places alive, and their
             // own surroundings used to stay frozen because a player's position is the ship's.
-            if (!freezerEnabled || stepped && PlayerAnchors.AnyInRadius(gridsPosition, freezeDistance)
-                || WakeRequests.IsAwake(grids)
-                || isWakeUpTime)
+            var playerNear = stepped && PlayerAnchors.AnyInRadius(gridsPosition, freezeDistance);
+            var kept = WakeRequests.IsAwake(grids);
+            if (!freezerEnabled || playerNear || kept || isWakeUpTime)
             {
-                UnfreezeGrids(grids, isWakeUpTime);
+                // the bodies are kept fixed only for the compensation alone: a player near (in the wake-up's own seconds
+                // too) or a request to keep the grid awake hands them back to the physics
+                UnfreezeGrids(grids, isWakeUpTime, keepBodies: freezerEnabled && isWakeUpTime && !playerNear && !kept);
                 return;
             }
 
@@ -206,11 +208,12 @@ public class FreezeLogic
         return false;
     }
 
-    private void UnfreezeGrids(HashSet<MyCubeGrid> grids, bool isWakeUpTime)
+    private void UnfreezeGrids(HashSet<MyCubeGrid> grids, bool isWakeUpTime, bool keepBodies)
     {
         var minEntityId = MinEntityId(grids);
         InFreezeQueue.Remove(minEntityId);
-        if (!AnyFrozen(grids)) return;
+        // a group woken for its compensation keeps its bodies fixed (below): a player coming then hands them back
+        if (!AnyFrozen(grids) && (keepBodies || !AnyPhysicsFrozen(grids))) return;
         // the loop's set is reused for the next group: the thaw on the game thread keeps its own
         grids = new HashSet<MyCubeGrid>(grids);
 
@@ -220,10 +223,32 @@ public class FreezeLogic
         // (a top torn off in freezer_stress).
         MyAPIGateway.Utilities.InvokeOnGameThread(() =>
         {
-            foreach (var grid in grids)
+            var live = grids.Where(grid => !grid.Closed && !grid.MarkedForClose && !grid.IsPreview && grid.Parent == null).ToList();
+            // Woken for the compensation of its production, with nobody near: only the logic is needed - the
+            // blocks' updates and the catch-up - and the bodies stay fixed, as frozen. Made dynamic in a world nobody
+            // steps they only stand there, and whatever came between them and the ground meanwhile showed at that
+            // thaw. A group with a joint on its way (a piston moving, a rotor turning) is thawed whole as before: its
+            // logic would move the joint on while its bodies stand still, and the constraint snaps after.
+            keepBodies = keepBodies && !live.Any(HasMovingJoint);
+            var thawing = live.Where(grid => FrozenGrids.Contains(grid.EntityId) || !keepBodies && FrozenPhysicsGrids.Contains(grid.EntityId)).ToList();
+            List<MyCubeGrid> settle = null;
+            if (!keepBodies)
             {
-                if (grid.Closed || grid.MarkedForClose || grid.IsPreview || grid.Parent != null) continue;
-                if (!FrozenGrids.Contains(grid.EntityId)) continue;
+                // frozen for a moment only (a grid spawned where the world was not stepped yet): nothing to settle, and
+                // what is done to it right after the thaw - a ship given its speed - is not to be undone
+                var now = MySandboxGame.Static.SimulationFrameCounter;
+                settle = thawing.Where(grid => !FrozenAtFrame.TryGetValue(grid.EntityId, out var at) || now - at >= ThawGuard.MinFrozenFrames).ToList();
+                // out of the rock before the bodies are dynamic again, the whole group as one (ThawGuard): only when every
+                // moving grid of it is a body the freezer made fixed - one still dynamic is held by its constraints to the
+                // others - and none held by a static grid: a drill's piston top in the rock of a base is where it is meant to be
+                var bodies = thawing.Where(grid => !grid.IsStatic && grid.Physics != null).ToList();
+                if (bodies.Count > 0 && bodies.All(grid => FrozenPhysicsGrids.Contains(grid.EntityId)) && !thawing.Any(grid => grid.IsStatic) &&
+                    !MyCubeGridGroups.Static.Physical.GetGroupNodes(bodies[0]).Any(grid => grid.IsStatic))
+                    ThawGuard.LiftOutOfGround(bodies);
+            }
+            foreach (var grid in thawing)
+            {
+                var logicFrozen = FrozenGrids.Contains(grid.EntityId);
                 if (!isWakeUpTime)
                 {
                     lock (_wakeUpLock)
@@ -232,30 +257,45 @@ public class FreezeLogic
                     }
                 }
 
-                Log("Unfreeze grid " + grid.DisplayName);
+                Log("Unfreeze grid " + grid.DisplayName + (keepBodies ? " (logic only, bodies kept fixed)" : ""));
                 var t0 = System.Diagnostics.Stopwatch.GetTimestamp();
                 var physicsFrozen = FrozenPhysicsGrids.Contains(grid.EntityId);
-                FrozenGridSaveCache.Invalidate(grid.EntityId);
-                FrozenGrids.Remove(grid.EntityId);
-                FrozenAtFrame.TryRemove(grid.EntityId, out _);
-                InFreezeQueue.Remove(grid.EntityId);
-                CompensateFrozenFrames(grid);
+                if (logicFrozen)
+                {
+                    FrozenGridSaveCache.Invalidate(grid.EntityId);
+                    FrozenGrids.Remove(grid.EntityId);
+                    FrozenAtFrame.TryRemove(grid.EntityId, out _);
+                    InFreezeQueue.Remove(grid.EntityId);
+                    CompensateFrozenFrames(grid);
+                }
                 var t1 = System.Diagnostics.Stopwatch.GetTimestamp();
 
                 // Whatever the config or the group is now: a body the freezer made fixed goes back to
                 // dynamic. Gating this on FreezePhysics or on "the group has a fixed grid" left bodies
                 // fixed for good on a non-static grid once either changed while it was frozen.
-                DoUnfreezePhysics(grid);
+                if (!keepBodies) DoUnfreezePhysics(grid);
                 var t2 = System.Diagnostics.Stopwatch.GetTimestamp();
-                RegisterRecursive(grid);
-                grid.PlayerPresenceTier = MyUpdateTiersPlayerPresence.Normal;
+                if (logicFrozen)
+                {
+                    RegisterRecursive(grid);
+                    grid.PlayerPresenceTier = MyUpdateTiersPlayerPresence.Normal;
+                }
                 var t3 = System.Diagnostics.Stopwatch.GetTimestamp();
                 // (a heavy thaw said always: 370-440 ms frames of it on the stand, 19.10.2026, whose not known)
                 double Ms(long a, long b) => (b - a) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
                 if (Ms(t0, t3) > 50)
                     SentisOptimisationsPlugin.Log.Warn($"Freezer: thawing {grid.DisplayName} ({grid.BlocksCount} blocks, {(grid.IsStatic ? "static" : grid.GridSizeEnum.ToString())}, physics frozen {physicsFrozen}) took {Ms(t0, t3):0} ms: compensation {Ms(t0, t1):0} (frozen production {LastThawProductionMs:0}, its networks {FrozenProduction.LastNetworkMs:0}; {string.Join(", ", FrozenProduction.LastKinds.OrderByDescending(k => k.Value.Ms).Select(k => $"{k.Key} x{k.Value.Count} {k.Value.Ms:0}"))}), body {Ms(t1, t2):0}, updates {Ms(t2, t3):0}");
             }
+            // every grid of the thaw at rest, now and again a few ticks later (ThawGuard)
+            if (settle != null) ThawGuard.Settle(settle);
         });
+    }
+
+    private static bool AnyPhysicsFrozen(HashSet<MyCubeGrid> grids)
+    {
+        foreach (var grid in grids)
+            if (FrozenPhysicsGrids.Contains(grid.EntityId)) return true;
+        return false;
     }
 
     private static double LastThawProductionMs;
@@ -639,6 +679,8 @@ public class FreezeLogic
             // to voxels - is not the freezer's to take: noted as frozen, the thaw handed it back as
             // a dynamic body, and the chassis the gear held dropped off its lock with a kick.
             if (KeptFixed(grid)) return;
+            // fixed by the freezer still: the group was awake for its compensation with its bodies kept as they were
+            if (FrozenPhysicsGrids.Contains(grid.EntityId) && gridPhysics.RigidBody != null && gridPhysics.RigidBody.IsFixed) return;
             gridPhysics.ConvertToStatic();
             FrozenPhysicsGrids.Add(grid.EntityId);
             var body = gridPhysics.RigidBody;
@@ -764,7 +806,8 @@ public class FreezeLogic
         if (MyAPIGateway.Utilities == null || MySession.Static == null) return;
         MyAPIGateway.Utilities.InvokeOnGameThread(() =>
         {
-            var gridsList = new HashSet<long>(FrozenGrids);
+            // and the groups awake for their compensation with their bodies kept fixed
+            var gridsList = new HashSet<long>(FrozenGrids.Concat(FrozenPhysicsGrids));
             var groups = new List<HashSet<IMyCubeGrid>>();
             while (gridsList.Count > 0)
             {

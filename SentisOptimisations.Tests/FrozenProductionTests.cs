@@ -259,6 +259,27 @@ namespace SentisOptimisations.Tests
             Assert.Contains("FrozenProduction.Forget(block.EntityId)", source);
         }
 
+        [Fact]
+        public void A_jump_drive_charges_by_the_power_it_got_times_the_time_and_its_efficiency()
+        {
+            // 32 MW for 30 s at 0.8: 32 * 30 / 3600 * 0.8 = 0.2133 MWh
+            Assert.Equal(32.0 * 30 / 3600 * 0.8, FrozenProduction.Rules.JumpCharge(32, 30, 0.8, 3), 6);
+        }
+
+        [Fact]
+        public void A_jump_drive_never_charges_past_what_it_lacks()
+        {
+            Assert.Equal(0.5, FrozenProduction.Rules.JumpCharge(32, 3600, 0.8, 0.5), 6);
+        }
+
+        [Fact]
+        public void A_full_or_unpowered_jump_drive_takes_nothing()
+        {
+            Assert.Equal(0, FrozenProduction.Rules.JumpCharge(32, 600, 0.8, 0));
+            Assert.Equal(0, FrozenProduction.Rules.JumpCharge(0, 600, 0.8, 3));
+            Assert.Equal(0, FrozenProduction.Rules.JumpCharge(32, 0, 0.8, 3));
+        }
+
         /// <summary>The file itself, found by walking up from the test binaries to the repository.</summary>
         private static string FreezeLogicSource()
         {
