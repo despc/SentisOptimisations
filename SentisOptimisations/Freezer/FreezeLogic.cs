@@ -746,7 +746,8 @@ public class FreezeLogic
         (e.GameLogic as IMyGameLogicComponent)?.UnregisterForUpdate();
         if (e.Hierarchy == null) return;
 
-        foreach (var child in e.Hierarchy.Children) UnregisterRecursive((MyEntity)child.Container.Entity);
+        foreach (var child in e.Hierarchy.Children)
+            if (child?.Container?.Entity is MyEntity c) UnregisterRecursive(c);
     }
 
     private void RegisterRecursive(MyEntity e)
@@ -757,7 +758,8 @@ public class FreezeLogic
         (e.GameLogic as IMyGameLogicComponent)?.RegisterForUpdate();
         if (e.Hierarchy == null) return;
 
-        foreach (var child in e.Hierarchy.Children) RegisterRecursive((MyEntity)child.Container.Entity);
+        foreach (var child in e.Hierarchy.Children)
+            if (child?.Container?.Entity is MyEntity c) RegisterRecursive(c);
     }
 
 

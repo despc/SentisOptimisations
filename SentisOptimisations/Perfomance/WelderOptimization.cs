@@ -142,14 +142,20 @@ namespace Optimizer.Optimizations
         }
 
 
-        // Welders activate on the game thread only, one at a time, so the scratch collections of an
-        // activation are shared instead of allocated for each of them: an idle welder activates
-        // every quarter second whether or not it finds anything to weld.
-        private static readonly Dictionary<string, int> MissingComponents = new Dictionary<string, int>();
-        private static readonly HashSet<MySlimBlock> TargetsToWeld = new HashSet<MySlimBlock>();
-        private static readonly List<MyWelder.ProjectionRaycastData> ProjectedBlocks = new List<MyWelder.ProjectionRaycastData>();
-        private static readonly List<MyEntity> GridsInSphere = new List<MyEntity>();
-        private static readonly Dictionary<MyDefinitionId, int> ComponentsToPull = new Dictionary<MyDefinitionId, int>();
+        // The scratch collections of an activation are kept instead of allocated for each of them: an idle welder
+        // activates every quarter second whether or not it finds anything to weld. Welders activate on the game thread,
+        // one at a time; beside SentisClusters welders of different clusters activate at once, each on its cluster's
+        // thread, and each thread has its own set.
+        private static readonly global::SentisOptimisations.ClusterThreads.PerThread<Dictionary<string, int>> MissingComponentsOf = new global::SentisOptimisations.ClusterThreads.PerThread<Dictionary<string, int>>();
+        private static readonly global::SentisOptimisations.ClusterThreads.PerThread<HashSet<MySlimBlock>> TargetsToWeldOf = new global::SentisOptimisations.ClusterThreads.PerThread<HashSet<MySlimBlock>>();
+        private static readonly global::SentisOptimisations.ClusterThreads.PerThread<List<MyWelder.ProjectionRaycastData>> ProjectedBlocksOf = new global::SentisOptimisations.ClusterThreads.PerThread<List<MyWelder.ProjectionRaycastData>>();
+        private static readonly global::SentisOptimisations.ClusterThreads.PerThread<List<MyEntity>> GridsInSphereOf = new global::SentisOptimisations.ClusterThreads.PerThread<List<MyEntity>>();
+        private static readonly global::SentisOptimisations.ClusterThreads.PerThread<Dictionary<MyDefinitionId, int>> ComponentsToPullOf = new global::SentisOptimisations.ClusterThreads.PerThread<Dictionary<MyDefinitionId, int>>();
+        private static Dictionary<string, int> MissingComponents => MissingComponentsOf.Value;
+        private static HashSet<MySlimBlock> TargetsToWeld => TargetsToWeldOf.Value;
+        private static List<MyWelder.ProjectionRaycastData> ProjectedBlocks => ProjectedBlocksOf.Value;
+        private static List<MyEntity> GridsInSphere => GridsInSphereOf.Value;
+        private static Dictionary<MyDefinitionId, int> ComponentsToPull => ComponentsToPullOf.Value;
         /// <summary>
         /// The cells of a projection one welder can reach, and where it stopped testing them.
         ///
@@ -178,12 +184,16 @@ namespace Optimizer.Optimizations
 
         private static Reach ReachOf(long welderId)
         {
-            Reach reach;
-            if (Reaches.TryGetValue(welderId, out reach)) return reach;
-            if (Reaches.Count > 512) Reaches.Clear();   // tools come and go; this is only a cache
-            reach = new Reach();
-            Reaches[welderId] = reach;
-            return reach;
+            // one dictionary for every welder; a welder's own reach is only its own thread's
+            using (global::SentisOptimisations.ClusterThreads.Lock(Reaches))
+            {
+                Reach reach;
+                if (Reaches.TryGetValue(welderId, out reach)) return reach;
+                if (Reaches.Count > 512) Reaches.Clear();   // tools come and go; this is only a cache
+                reach = new Reach();
+                Reaches[welderId] = reach;
+                return reach;
+            }
         }
 
         public static void ActivateInternal(MyShipWelder welder, HashSet<MySlimBlock> targets)
@@ -342,12 +352,13 @@ namespace Optimizer.Optimizations
                     welder.EntityId, welder.OwnerId))
             {
                 WelderDiagnostics.Count(ref WelderDiagnostics.NoPermit);
-                if (DeferredIds.Add(welder.EntityId))
-                {
-                    if (!Deferred.TryGetValue(welder.OwnerId, out var queue))
-                        Deferred[welder.OwnerId] = queue = new Queue<MyShipWelder>();
-                    queue.Enqueue(welder);
-                }
+                using (global::SentisOptimisations.ClusterThreads.Lock(Deferred))
+                    if (DeferredIds.Add(welder.EntityId))
+                    {
+                        if (!Deferred.TryGetValue(welder.OwnerId, out var queue))
+                            Deferred[welder.OwnerId] = queue = new Queue<MyShipWelder>();
+                        queue.Enqueue(welder);
+                    }
                 return;
             }
 
@@ -388,38 +399,53 @@ namespace Optimizer.Optimizations
                 WaitingMax.Clear();
             }
             if (Deferred.Count == 0) return;
-            foreach (var pair in Deferred)
-                if (!WaitingMax.TryGetValue(pair.Key, out var most) || most < pair.Value.Count)
-                    WaitingMax[pair.Key] = pair.Value.Count;
+            using (global::SentisOptimisations.ClusterThreads.Lock(Deferred))
+                foreach (var pair in Deferred)
+                    if (!WaitingMax.TryGetValue(pair.Key, out var most) || most < pair.Value.Count)
+                        WaitingMax[pair.Key] = pair.Value.Count;
             try
             {
                 var config = SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config;
                 var limit = Math.Max(1, config.ProjectionBuildsPerFrame);
                 DeferredPlayers.Clear();
-                DeferredPlayers.AddRange(Deferred.Keys);
+                using (global::SentisOptimisations.ClusterThreads.Lock(Deferred))
+                    DeferredPlayers.AddRange(Deferred.Keys);
                 foreach (var player in DeferredPlayers)
                 {
-                    var queue = Deferred[player];
                     var scans = 0;
-                    while (queue.Count > 0 && scans < limit)
+                    while (scans < limit)
                     {
-                        var welder = queue.Peek();
-                        if (!ProjectionBudget.CanConsume(frame, limit, welder.EntityId, welder.OwnerId)) break;
-                        queue.Dequeue();
-                        DeferredIds.Remove(welder.EntityId);
+                        MyShipWelder welder;
+                        // beside SentisClusters welders of clusters' threads queue up while this runs
+                        using (global::SentisOptimisations.ClusterThreads.Lock(Deferred))
+                        {
+                            if (!Deferred.TryGetValue(player, out var queue)) break;
+                            if (queue.Count == 0)
+                            {
+                                Deferred.Remove(player);
+                                break;
+                            }
+                            welder = queue.Peek();
+                            if (!ProjectionBudget.CanConsume(frame, limit, welder.EntityId, welder.OwnerId)) break;
+                            queue.Dequeue();
+                            DeferredIds.Remove(welder.EntityId);
+                            if (queue.Count == 0) Deferred.Remove(player);
+                        }
                         if (!config.WelderTweaksEnabled || welder.MarkedForClose || welder.Closed || !welder.IsWorking)
                             continue;
                         scans++;
                         WelderDiagnostics.Count(ref WelderDiagnostics.DeferredScans);
                         ScanAndBuild(welder);
                     }
-                    if (queue.Count == 0) Deferred.Remove(player);
                 }
             }
             catch (Exception e)
             {
-                Deferred.Clear();
-                DeferredIds.Clear();
+                using (global::SentisOptimisations.ClusterThreads.Lock(Deferred))
+                {
+                    Deferred.Clear();
+                    DeferredIds.Clear();
+                }
                 _waiting = NoneWaiting;
                 SentisOptimisationsPlugin.SentisOptimisationsPlugin.Log.Error(e);
             }
@@ -556,7 +582,8 @@ namespace Optimizer.Optimizations
             var preview = projector?.ProjectedGrid;
             if (preview == null || built == null) return;
             ProjectionFrontierState state;
-            if (!ProjectionFrontiers.TryGetValue(projector.EntityId, out state)) return;
+            using (global::SentisOptimisations.ClusterThreads.Lock(ProjectionFrontiers))
+                if (!ProjectionFrontiers.TryGetValue(projector.EntityId, out state)) return;
             var min = built.Min;
             var max = built.Max;
             foreach (var direction in NeighborDirections)
@@ -598,12 +625,15 @@ namespace Optimizer.Optimizations
         private static ProjectionFrontierState FrontierState(MyProjectorBase projector, MyCubeGrid preview,
             long frame)
         {
+            // one dictionary for every projection; a projection's own state is only its welders' thread's (the welders
+            // of a projection are in its cluster)
             ProjectionFrontierState state;
-            if (!ProjectionFrontiers.TryGetValue(projector.EntityId, out state))
-            {
-                state = new ProjectionFrontierState();
-                ProjectionFrontiers[projector.EntityId] = state;
-            }
+            using (global::SentisOptimisations.ClusterThreads.Lock(ProjectionFrontiers))
+                if (!ProjectionFrontiers.TryGetValue(projector.EntityId, out state))
+                {
+                    state = new ProjectionFrontierState();
+                    ProjectionFrontiers[projector.EntityId] = state;
+                }
             // A build takes one block out of the preview, and that must not throw away what the
             // search has learnt: it used to, on every build, and the queue of blocks next to fresh
             // ones was emptied before anyone got to it - on a real ship the welders were left
@@ -616,14 +646,15 @@ namespace Optimizer.Optimizations
                 state.Compact();
             state.LastSeenFrame = frame;
 
-            if (ProjectionFrontiers.Count > 32)
-            {
-                var stale = ProjectionFrontiers
-                    .Where(pair => frame - pair.Value.LastSeenFrame > 600 || pair.Value.Preview == null ||
-                                   pair.Value.Preview.Closed)
-                    .Select(pair => pair.Key).ToList();
-                foreach (var key in stale) ProjectionFrontiers.Remove(key);
-            }
+            using (global::SentisOptimisations.ClusterThreads.Lock(ProjectionFrontiers))
+                if (ProjectionFrontiers.Count > 32)
+                {
+                    var stale = ProjectionFrontiers
+                        .Where(pair => frame - pair.Value.LastSeenFrame > 600 || pair.Value.Preview == null ||
+                                       pair.Value.Preview.Closed)
+                        .Select(pair => pair.Key).ToList();
+                    foreach (var key in stale) ProjectionFrontiers.Remove(key);
+                }
             return state;
         }
 

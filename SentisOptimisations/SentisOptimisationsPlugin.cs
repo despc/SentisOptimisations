@@ -59,6 +59,8 @@ namespace SentisOptimisationsPlugin
             Instance = this;
             DelayedProcessor.Instance = DelayedProcessor;
             Log.Info("Init SentisOptimisationsPlugin");
+            // beside SentisClusters the plugin's shared state is locked (see ClusterThreads); without it nothing changes
+            global::SentisOptimisations.ClusterThreads.Init();
             // first, before the plugins' patches are committed: Torch's patch jumps one instruction each
             CrashFix.TorchJumpFix.Install();
             // also before them: the fix goes into the same commits, see ReemitLeaveFix

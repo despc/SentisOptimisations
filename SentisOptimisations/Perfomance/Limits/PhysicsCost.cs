@@ -490,6 +490,20 @@ namespace Optimizer.Optimizations
             return work;
         }
 
+        private static readonly Dictionary<int, double> LastClusterParts = new Dictionary<int, double>();
+
+        /// <summary>
+        /// The parts of the step the last <see cref="Share"/> gave to each cluster of the physics (by its ClusterId, in the
+        /// unit of that call's total): what the cluster adds to the step, its own and its groups'. For SentisWatcher's
+        /// charts of the clusters. The game thread only. Returns the number of clusters.
+        /// </summary>
+        public static int ClusterParts(Dictionary<int, double> into)
+        {
+            into.Clear();
+            foreach (var pair in LastClusterParts) into[pair.Key] = pair.Value;
+            return into.Count;
+        }
+
         /// <summary>
         /// Shares <paramref name="total"/> (milliseconds, ticks - any unit) out between the grid groups the step is spent on
         /// (see the class): <paramref name="into"/> is cleared and gets each group's part by the id of its grid of the most
@@ -500,6 +514,7 @@ namespace Optimizer.Optimizations
         public static int Share(double total, Dictionary<long, double> into)
         {
             into.Clear();
+            LastClusterParts.Clear();
             GroupOf.Clear();
             GroupWork.Clear();
             GroupCluster.Clear();
@@ -579,6 +594,8 @@ namespace Optimizer.Optimizations
             // to less than the step when their jobs go side by side: that time is nobody's, as the characters' is. Only when
             // they come to more (a cluster's step grown since it was measured) are they scaled down to the step.
             var whole = Math.Max(sum, PhysicsLoadMonitor.AverageMs);
+            LastClusterParts.Clear();
+            foreach (var pair in ClusterBasis) LastClusterParts[pair.Key] = total * (pair.Value / whole);
             // within a cluster: its own step off first (nobody's; beside the others it overlaps as much as the rest of the
             // cluster does), the rest by the work of the bodies
             foreach (var pair in GroupWork)

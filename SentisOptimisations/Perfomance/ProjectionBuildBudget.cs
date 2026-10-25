@@ -27,19 +27,26 @@ namespace Optimizer.Optimizations
         /// <summary>Whether this welder of this player may still build in this frame.</summary>
         public bool CanConsume(long frame, int limit, long welder, long player)
         {
-            BeginFrame(frame);
-            if (limit < 1) limit = 1;
-            return (!_usedByPlayer.TryGetValue(player, out var used) || used < limit) && !_builtThisFrame.Contains(welder);
+            // welders of different clusters ask at once beside SentisClusters
+            using (global::SentisOptimisations.ClusterThreads.Lock(_builtThisFrame))
+            {
+                BeginFrame(frame);
+                if (limit < 1) limit = 1;
+                return (!_usedByPlayer.TryGetValue(player, out var used) || used < limit) && !_builtThisFrame.Contains(welder);
+            }
         }
 
         /// <summary>Takes one build out of the player's budget for the frame.</summary>
         public bool TryConsume(long frame, int limit, long welder, long player)
         {
-            if (!CanConsume(frame, limit, welder, player)) return false;
-            _usedByPlayer.TryGetValue(player, out var used);
-            _usedByPlayer[player] = used + 1;
-            _builtThisFrame.Add(welder);
-            return true;
+            using (global::SentisOptimisations.ClusterThreads.Lock(_builtThisFrame))
+            {
+                if (!CanConsume(frame, limit, welder, player)) return false;
+                _usedByPlayer.TryGetValue(player, out var used);
+                _usedByPlayer[player] = used + 1;
+                _builtThisFrame.Add(welder);
+                return true;
+            }
         }
 
         private void BeginFrame(long frame)

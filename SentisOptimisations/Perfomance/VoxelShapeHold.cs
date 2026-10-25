@@ -71,7 +71,7 @@ namespace Optimizer.Optimizations
             var game = MySandboxGame.Static;
             if (game == null || !ByBody.TryGetValue(__instance, out var asked)) return true;
             if (!Holds(Volatile.Read(ref asked.Frame), (long)game.SimulationFrameCounter)) return true;
-            Held++;
+            global::SentisOptimisations.ClusterThreads.Increment(ref Held);
             return false;
         }
 
