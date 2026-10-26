@@ -60,7 +60,17 @@ namespace SentisOptimisationsPlugin.CrashFix
             public long HeadId;
             public int Left;
             public ulong Next;
+            /// <summary>Checks in a row the head was off its place though attached and held by its constraint.</summary>
+            public int Strikes;
         }
+
+        /// <summary>
+        /// Checks in a row an attached head held by its constraint has to be off its place before it is put right: the
+        /// constraint pulls it there itself. A head made in a cluster detached by SentisClusters, stepped a moment before
+        /// it was attached, was 0.20-0.30 m off at the first check, was taken off and put on again, and its conveyors
+        /// came apart (reg_conveyor_mechanisms detached, 26.10.2026).
+        /// </summary>
+        public const int StrikesWhenHeld = 3;
 
         private static readonly Dictionary<long, Watch> Watched = new Dictionary<long, Watch>();
         private static readonly List<long> Done = new List<long>();
@@ -94,6 +104,10 @@ namespace SentisOptimisationsPlugin.CrashFix
         private static void MadeSuffix(MyMechanicalConnectionBlockBase __instance)
         {
             if (!On || !Sync.IsServer || __instance == null) return;
+            // a wheel is not where GetTopGridMatrix puts it but where its suspension holds it (its height, its travel):
+            // every wheel was "off its place" by 1.13-1.90 m and was taken off and put on again 12 times after it was
+            // placed - thousands a day on the stand, wheels thrown about (26.10.2026)
+            if (__instance is Sandbox.Game.Entities.Cube.MyMotorSuspension) return;
             Watched[__instance.EntityId] = new Watch
             {
                 Stator = __instance, Left = ChecksAfterPlacing, HeadId = HeadOf(__instance, 0)?.EntityId ?? 0,
@@ -131,7 +145,7 @@ namespace SentisOptimisationsPlugin.CrashFix
                 try
                 {
                     if (w.HeadId == 0) w.HeadId = HeadOf(w.Stator, 0)?.EntityId ?? 0;
-                    if (Check(w.Stator, w.HeadId)) Done.Add(pair.Key);
+                    if (Check(w)) Done.Add(pair.Key);
                 }
                 catch (Exception e)
                 {
@@ -171,9 +185,13 @@ namespace SentisOptimisationsPlugin.CrashFix
         }
 
         /// <summary>What is wrong with the head, or null.</summary>
-        public static string Problem(MyMechanicalConnectionBlockBase stator, long madeId, out MatrixD expected)
+        public static string Problem(MyMechanicalConnectionBlockBase stator, long madeId, out MatrixD expected) => Problem(stator, madeId, out expected, out _);
+
+        /// <summary><see cref="Problem(MyMechanicalConnectionBlockBase, long, out MatrixD)"/>; <paramref name="heldAttached"/>: the head attached and held by its constraint (or welded).</summary>
+        public static string Problem(MyMechanicalConnectionBlockBase stator, long madeId, out MatrixD expected, out bool heldAttached)
         {
             expected = MatrixD.Identity;
+            heldAttached = false;
             var top = HeadOf(stator, madeId);
             if (top == null || top.CubeGrid?.Physics == null) return null;
             // a head of its own grid, where the game made it: a head welded into something bigger is not ours to move
@@ -186,16 +204,25 @@ namespace SentisOptimisationsPlugin.CrashFix
             var welded = (bool)Welded.GetValue(stator);
             var hinge = Constraint.GetValue(stator) as HkConstraint;
             var held = welded || hinge != null && hinge.InWorld;
+            heldAttached = attached && held;
             if (offset <= MaxOffsetM && tilt <= MaxTiltDegrees && attached && held) return null;
             return $"off its place by {offset:0.00} m, its axis off the stator's by {tilt:0.0}°, {(attached ? "attached" : "not attached")}, " +
                    $"{(welded ? "welded" : hinge == null ? "no constraint" : hinge.InWorld ? "constraint in the world" : "constraint out of the world")}";
         }
 
         /// <summary>Puts the head right when it is wrong; true when the stator needs no more checks.</summary>
-        private static bool Check(MyMechanicalConnectionBlockBase stator, long madeId)
+        private static bool Check(Watch w)
         {
-            var problem = Problem(stator, madeId, out var expected);
-            if (problem == null) return false;
+            var stator = w.Stator;
+            var madeId = w.HeadId;
+            var problem = Problem(stator, madeId, out var expected, out var held);
+            if (problem == null)
+            {
+                w.Strikes = 0;
+                return false;
+            }
+            if (held && ++w.Strikes < StrikesWhenHeld) return false;
+            w.Strikes = 0;
             var top = HeadOf(stator, madeId);
             var head = top.CubeGrid;
             if (stator.TopBlock != null) DetachGroups.Invoke(stator, new object[] { true });

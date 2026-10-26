@@ -505,6 +505,23 @@ namespace Optimizer.Optimizations
         }
 
         /// <summary>
+        /// What each physics cluster adds to the frame's step, ms, by its ClusterId, as last measured (the clusters
+        /// stepped now and then alone, see the class). Only clusters the physics steps get measured. Used by
+        /// SentisClusters to detach a cluster whose physics is heavy. A measurement older than three minutes is left out
+        /// (a stepped cluster is measured again sooner; one not measured is likely not stepped any more). The game
+        /// thread only. Returns the number of clusters.
+        /// </summary>
+        public static int ClusterStepMs(Dictionary<int, double> into)
+        {
+            into.Clear();
+            if (Off) return 0;
+            var frame = Sandbox.MySandboxGame.Static?.SimulationFrameCounter ?? 0UL;
+            foreach (var pair in ClusterTimes)
+                if (frame - pair.Value.Frame <= 60UL * 180) into[pair.Key] = pair.Value.Adds;
+            return into.Count;
+        }
+
+        /// <summary>
         /// Shares <paramref name="total"/> (milliseconds, ticks - any unit) out between the grid groups the step is spent on
         /// (see the class): <paramref name="into"/> is cleared and gets each group's part by the id of its grid of the most
         /// blocks. What the characters and other bodies cost is nobody's, and so is the time of clusters stepped side by
