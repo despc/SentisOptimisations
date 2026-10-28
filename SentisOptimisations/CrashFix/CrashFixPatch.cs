@@ -314,7 +314,9 @@ namespace SentisOptimisationsPlugin.CrashFix
         public static Exception SuppressDispatchExceptionFinalizer(Exception __exception)
         {
             if (__exception == null) return null;
-            if (!global::SentisOptimisations.DiagLog.On) return null;
+            // written whatever the diagnostic logs: the rest of the pass is lost each time - every entity after the one
+            // that threw missed its update. A ship's thrust component never got one, and its pilot's keys moved nothing
+            // (reg_dampeners_off in the full regression, 28.10.2026), and the log said nothing
             try
             {
                 var trace = __exception.StackTrace ?? "";

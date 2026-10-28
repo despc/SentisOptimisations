@@ -155,10 +155,18 @@ namespace Optimizer.Optimizations
         private static readonly Dictionary<int, int> _controlled = new Dictionary<int, int>();
         private static ulong _controlledFrame = ulong.MaxValue;
 
-        /// <summary>The characters of a cluster, for the game's choice to step it: only the ones someone controls.</summary>
+        // the worlds of the ships players fly now (a seat, a remote control), taken once a frame
+        private static readonly HashSet<HkWorld> _piloted = new HashSet<HkWorld>();
+
+        /// <summary>
+        /// The characters of a cluster, for the game's choice to step it: only the ones someone controls - and a ship a
+        /// player flies counts as one. A pilot's character has no body in the world while seated, and the game steps the
+        /// ship's world only once the ship is streamed to that player: a ship just sat in on a loaded server stood there,
+        /// its thrust not even worked out (ThrustPrefix), the pilot's keys moving nothing (reg_dampeners_off with 350 fake
+        /// players, 28.10.2026).
+        /// </summary>
         private static void ClusterActivePrefix(int clusterId, ref int rigidBodiesCount)
         {
-            if (rigidBodiesCount == 0) return;
             try
             {
                 var frame = Sandbox.MySandboxGame.Static?.SimulationFrameCounter ?? 0UL;
@@ -166,9 +174,17 @@ namespace Optimizer.Optimizations
                 {
                     _controlledFrame = frame;
                     _controlled.Clear();
+                    _piloted.Clear();
+                    foreach (var player in Sandbox.Game.World.MySession.Static.Players.GetOnlinePlayers())
+                        if (player.Controller?.ControlledEntity is Sandbox.Game.Entities.MyShipController seat && seat.CubeGrid?.Physics?.HavokWorld is HkWorld flown)
+                            _piloted.Add(flown);
                     foreach (var cluster in MyPhysics.Clusters.GetClusters())
-                        if (cluster.UserData is HkWorld world && world.CharacterRigidBodies.Count > 0)
-                            _controlled[cluster.ClusterId] = Controlled(world);
+                    {
+                        if (!(cluster.UserData is HkWorld world)) continue;
+                        var piloted = _piloted.Contains(world) ? 1 : 0;
+                        if (world.CharacterRigidBodies.Count > 0 || piloted > 0)
+                            _controlled[cluster.ClusterId] = Controlled(world) + piloted;
+                    }
                 }
                 rigidBodiesCount = _controlled.TryGetValue(clusterId, out var count) ? count : rigidBodiesCount;
             }

@@ -55,10 +55,17 @@ public class FreezeLogic
             // enumerator and made a delegate each time (a steady share of the server's garbage)
             MyCubeGrid anyGrid = null;
             var isAnyGridStatic = false;
+            var controlled = false;
             foreach (var grid in grids)
             {
                 anyGrid ??= grid;
-                if (grid.IsStatic) { isAnyGridStatic = true; break; }
+                if (grid.IsStatic) isAnyGridStatic = true;
+                // a player flying it (a seat, a remote control): never frozen. The player's presence counts only where
+                // the physics steps, and a ship whose pilot sits in it has no character in its world - with its grids
+                // not streamed to the pilot yet, its world was not stepped, the ship froze at once with the pilot in the
+                // seat, and frozen it was never streamed nor stepped: it stayed frozen (reg_dampeners_off with 350 fake
+                // players, 28.10.2026)
+                if (grid.GridSystems?.ControlSystem?.IsControlled == true) controlled = true;
             }
             if (anyGrid == null) return;
             var gridsPosition = anyGrid.PositionComp.GetPosition();
@@ -72,11 +79,11 @@ public class FreezeLogic
             // own surroundings used to stay frozen because a player's position is the ship's.
             var playerNear = stepped && PlayerAnchors.AnyInRadius(gridsPosition, freezeDistance);
             var kept = WakeRequests.IsAwake(grids);
-            if (!freezerEnabled || playerNear || kept || isWakeUpTime)
+            if (!freezerEnabled || playerNear || controlled || kept || isWakeUpTime)
             {
                 // the bodies are kept fixed only for the compensation alone: a player near (in the wake-up's own seconds
                 // too) or a request to keep the grid awake hands them back to the physics
-                UnfreezeGrids(grids, isWakeUpTime, keepBodies: freezerEnabled && isWakeUpTime && !playerNear && !kept);
+                UnfreezeGrids(grids, isWakeUpTime, keepBodies: freezerEnabled && isWakeUpTime && !playerNear && !controlled && !kept);
                 return;
             }
 
