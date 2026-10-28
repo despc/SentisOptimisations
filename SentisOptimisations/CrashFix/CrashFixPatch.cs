@@ -227,13 +227,17 @@ namespace SentisOptimisationsPlugin.CrashFix
         /// follows: it is written with the diagnostic logs on (asked for, 06.10.2026: a production log read these as
         /// errors of the plugin, one of the game's own every time).
         /// </summary>
-        public static Exception SuppressExceptionFinalizer(Exception __exception, MethodBase __originalMethod)
+        /// The patched method is named from the exception's own stack (its last frame), not by __originalMethod: Harmony
+        /// makes that one with MethodBase.GetMethodFromHandle on every call, thrown or not - on the refineries' timer
+        /// ticks, 58 176 of them, a fifth of their time, and more with SentisClusters' threads contending in the
+        /// reflection's caches (parallel_gain, 28.10.2026).
+        public static Exception SuppressExceptionFinalizer(Exception __exception)
         {
             if (__exception == null) return null;
             if (!global::SentisOptimisations.DiagLog.On) return null;
             try
             {
-                var key = __originalMethod?.DeclaringType?.Name + "." + __originalMethod?.Name + ": " + __exception.GetType().Name;
+                var key = PatchedFrame(__exception) + ": " + __exception.GetType().Name;
                 var now = DateTime.UtcNow;
                 if (!SuppressedLogged.TryGetValue(key, out var last) || (now - last).TotalSeconds >= SuppressedLogEverySec)
                 {
@@ -248,6 +252,16 @@ namespace SentisOptimisationsPlugin.CrashFix
             return null;
         }
         
+        /// <summary>The outermost frame of the exception's stack: the patched method, where the finalizer caught it.</summary>
+        private static string PatchedFrame(Exception exception)
+        {
+            var lines = (exception.StackTrace ?? "").Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            var last = lines.Length == 0 ? "?" : lines[lines.Length - 1].Trim();
+            if (last.StartsWith("at ", StringComparison.Ordinal)) last = last.Substring(3);
+            var args = last.IndexOf('(');
+            return args > 0 ? last.Substring(0, args) : last;
+        }
+
         private static void DropBrokenEjectorBody(MyShipConnector __instance)
         {
             try
