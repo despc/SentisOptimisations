@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using HarmonyLib;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Multiplayer;
 using Torch.Managers.PatchManager;
@@ -34,7 +33,9 @@ namespace SentisOptimisationsPlugin.CrashFix
         {
             var method = typeof(MyCubeGrid).GetMethod("AddChangeOwnersRequestServerside", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public)
                          ?? throw new MissingMethodException("MyCubeGrid.AddChangeOwnersRequestServerside");
-            CrashFixPatch.harmony.Patch(method, prefix: new HarmonyMethod(typeof(OwnershipRequestCheck).GetMethod(nameof(Prefix), BindingFlags.Static | BindingFlags.NonPublic)));
+            // through Torch, as the others' patches of it (BlockLimiter's MyCubeGridPatch, ALE Ownership Logger's
+            // BlockOwnershipTransfer on V5): a Harmony patch beside them was not run (patch_conflicts, V5 29.10.2026)
+            c.GetPattern(method).Prefixes.Add(typeof(OwnershipRequestCheck).GetMethod(nameof(Prefix), BindingFlags.Static | BindingFlags.NonPublic));
         });
 
         private static void Prefix(List<MyCubeGrid.MySingleOwnershipRequest> requests)
