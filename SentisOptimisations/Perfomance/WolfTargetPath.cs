@@ -24,6 +24,13 @@ namespace SentisOptimisationsPlugin
     ///
     /// Here the priorities are compared first and the path is asked for only when the player would be taken; what the
     /// animal ends up with is the game's.
+    ///
+    /// A player the animal has no way to (one on a base, in a building, up a slope) was asked for again every 11th frame
+    /// all the same, the path search failing each time: 2.7 s of the animals' 3.9 s in 3 minutes on the stand's copy of
+    /// the prod, pieces of 5 ms in the long frames (dotTrace, 30.10.2026). So a "no way" is kept for
+    /// <see cref="NoWayFrames"/> for the animal's place and the player's (cells of <see cref="FromCell"/> and
+    /// <see cref="ToCell"/> m): asked again from there to there meanwhile, the answer is the same no way. A way found is
+    /// never kept - the player is taken at once.
     /// </summary>
     [PatchShim]
     public static class WolfTargetPath
@@ -33,6 +40,15 @@ namespace SentisOptimisationsPlugin
         // Read by SentisTests.
         public static long Paths;
         public static long Skipped;
+        public static long NoWayKept;
+
+        /// <summary>How long a "no way" from a place to a place stands: a second and a half.</summary>
+        private const int NoWayFrames = 90;
+        /// <summary>The cells the places are told by, in metres: the animal's, and the player's.</summary>
+        private const double FromCell = 4, ToCell = 2;
+        private const int MaxKept = 4096;
+
+        private static readonly Dictionary<(Vector3I From, Vector3I To), ulong> NoWayUntil = new Dictionary<(Vector3I, Vector3I), ulong>();
 
         public static void Patch(PatchContext ctx) => global::SentisOptimisations.PatchGuard.Run("WolfTargetPath", ctx, PatchImpl);
 
@@ -83,8 +99,28 @@ namespace SentisOptimisationsPlugin
                 Skipped++;
                 return false;
             }
+            var key = (Cell(begin, FromCell), Cell(end.GetDestination(), ToCell));
+            var now = Sandbox.MySandboxGame.Static?.SimulationFrameCounter ?? 0;
+            lock (NoWayUntil)
+                if (NoWayUntil.TryGetValue(key, out var until) && now < until)
+                {
+                    NoWayKept++;
+                    return false;
+                }
             Paths++;
-            return pathfinding.ReachableUnderThreshold(begin, end, threshold);
+            var reachable = pathfinding.ReachableUnderThreshold(begin, end, threshold);
+            if (!reachable)
+                lock (NoWayUntil)
+                {
+                    if (NoWayUntil.Count >= MaxKept)
+                        foreach (var old in NoWayUntil.Where(k => k.Value <= now).Select(k => k.Key).ToList()) NoWayUntil.Remove(old);
+                    if (NoWayUntil.Count >= MaxKept) NoWayUntil.Clear();
+                    NoWayUntil[key] = now + NoWayFrames;
+                }
+            return reachable;
         }
+
+        private static Vector3I Cell(Vector3D at, double size) =>
+            new Vector3I((int)Math.Floor(at.X / size), (int)Math.Floor(at.Y / size), (int)Math.Floor(at.Z / size));
     }
 }
