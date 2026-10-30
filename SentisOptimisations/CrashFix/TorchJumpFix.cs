@@ -39,6 +39,9 @@ namespace SentisOptimisationsPlugin.CrashFix
                 var writeJump = memory.GetMethod("WriteJump", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null,
                                     new[] { typeof(long), typeof(long) }, null)
                                 ?? throw new MissingMethodException(memory.FullName, "WriteJump");
+                // the plugin's first Harmony patch, before its PatchGuard: an abandoned Harmony mutex let go here too
+                var healed = global::SentisOptimisations.HarmonyMutex.Heal();
+                if (healed != null) SentisOptimisationsPlugin.Log.Warn("TorchJumpFix: " + healed);
                 CrashFixPatch.harmony.Patch(writeJump, prefix: new HarmonyMethod(typeof(TorchJumpFix).GetMethod(nameof(WriteJumpPrefix), BindingFlags.Static | BindingFlags.NonPublic)));
                 RewriteExisting();
                 SentisOptimisationsPlugin.Log.Info($"TorchJumpFix: {_rewritten} patch jumps rewritten as one instruction; later ones written so");
