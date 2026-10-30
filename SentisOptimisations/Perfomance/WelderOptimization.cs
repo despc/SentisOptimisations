@@ -293,8 +293,11 @@ namespace Optimizer.Optimizations
                 {
                     bool canWeld = false;
                     bool? flag2 = block.ComponentStack.WillFunctionalityRise(weldAmount);
+                    // the limits of the block's builder, by the world's limit type (the tag when it limits by tags), as
+                    // MyShipWelder.Activate asks: the server's local player is nobody on a dedicated server, and a
+                    // frame of a player out of PCU was welded to working past their limit
                     if (flag2 == null || !flag2.Value || MySession.Static.CheckLimitsAndNotify(
-                            MySession.Static.LocalPlayerId, block.BlockDefinition.BlockPairName,
+                            block.BuiltBy, block.BlockDefinition.GetLimitType(),
                             block.BlockDefinition.PCU - MyCubeBlockDefinition.PCU_CONSTRUCTION_STAGE_COST, 0, 0,
                             null))
                     {
@@ -525,8 +528,10 @@ namespace Optimizer.Optimizations
 
                 var componentId = components[0].Definition.Id;
                 WelderDiagnostics.Count(ref WelderDiagnostics.Candidates);
+                // the limit type as the game's welder asks it: the tag when the world limits blocks by tags (by the
+                // pair name a projection's drills went past the drills' limit)
                 if (!welder.IsWithinWorldLimits(projectionRaycastData.cubeProjector,
-                        projectionRaycastData.hitCube.BlockDefinition.BlockPairName,
+                        projectionRaycastData.hitCube.BlockDefinition.GetLimitType(),
                         projectionRaycastData.hitCube.BlockDefinition.PCU))
                 {
                     WelderDiagnostics.Count(ref WelderDiagnostics.OverLimits);
