@@ -104,6 +104,68 @@ namespace Optimizer.Optimizations
             ctx.GetPattern(MethodActivate).Prefixes.Add(
                 typeof(WelderOptimization).GetMethod(nameof(Activate),
                     BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+
+            // The gate sits before ActivateCommon, not before Activate: the common part is what
+            // runs the detector sphere query and collects the targets, and an idle tool pays for
+            // it four times a second even when there is never anything in range.
+            var activateCommon = typeof(MyShipToolBase).GetMethod("ActivateCommon",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            ctx.GetPattern(activateCommon).Prefixes.Add(
+                typeof(WelderOptimization).GetMethod(nameof(ActivateCommonGate),
+                    BindingFlags.Static | BindingFlags.NonPublic));
+        }
+
+        /// <summary>Pure decision rules of the idle slowdown, kept separate for the unit tests.</summary>
+        public static class WelderIdleGate
+        {
+            /// <summary>Frame of the next allowed activation; 0 means no slowdown (work, or the feature off).</summary>
+            public static long NextFrameAfter(bool hadWork, long frame, int idleSeconds) =>
+                hadWork || idleSeconds <= 0 ? 0L : frame + idleSeconds * 60L;
+
+            public static bool ShouldSkip(long nextFrame, long frame) => nextFrame != 0 && frame < nextFrame;
+        }
+
+        // The frame each welder may activate next; only idle tools get an entry. Same access
+        // discipline as the other welder dictionaries: activations are per-cluster-thread.
+        private static readonly Dictionary<long, long> IdleNextFrames = new Dictionary<long, long>();
+
+        private static bool ActivateCommonGate(MyShipToolBase __instance)
+        {
+            try
+            {
+                var welder = __instance as MyShipWelder;
+                if (welder == null) return true;
+                var config = SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config;
+                if (!config.WelderTweaksEnabled || config.WelderIdleActivationSeconds <= 0) return true;
+                long next;
+                using (global::SentisOptimisations.ClusterThreads.Lock(IdleNextFrames))
+                    if (!IdleNextFrames.TryGetValue(welder.EntityId, out next)) return true;
+                if (!WelderIdleGate.ShouldSkip(next, MySession.Static.GameplayFrameCounter)) return true;
+                WelderDiagnostics.Count(ref WelderDiagnostics.IdleSkips);
+                WelderDiagnostics.CountWelder(WelderDiagnostics.IdleSkipsByWelder, welder.EntityId);
+                return false;
+            }
+            catch (Exception e)
+            {
+                SentisOptimisationsPlugin.SentisOptimisationsPlugin.Log.Error("ActivateCommonGate exception " + e);
+                return true;
+            }
+        }
+
+        private static void RecordActivation(long welderId, bool hadWork)
+        {
+            var config = SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config;
+            var next = WelderIdleGate.NextFrameAfter(hadWork, MySession.Static.GameplayFrameCounter,
+                config.WelderIdleActivationSeconds);
+            using (global::SentisOptimisations.ClusterThreads.Lock(IdleNextFrames))
+            {
+                if (next == 0) IdleNextFrames.Remove(welderId);
+                else
+                {
+                    if (IdleNextFrames.Count > 512) IdleNextFrames.Clear(); // tools come and go
+                    IdleNextFrames[welderId] = next;
+                }
+            }
         }
 
         private static bool Activate(MyShipWelder __instance, ref bool __result, HashSet<MySlimBlock> targets)
@@ -128,6 +190,7 @@ namespace Optimizer.Optimizations
             }
 
             WelderDiagnostics.Count(ref WelderDiagnostics.Activations);
+            WelderDiagnostics.CountWelder(WelderDiagnostics.ActivationsByWelder, __instance.EntityId);
             ActivateInternal(__instance, targets);
             return false;
         
@@ -263,16 +326,20 @@ namespace Optimizer.Optimizations
             var welded = Weld(welder, targets, inventory, num);
             if (welded) WelderDiagnostics.Count(ref WelderDiagnostics.Welded);
 
-            WeldProjectionsWithWelding(welder, welded);
+            var projectionWork = WeldProjectionsWithWelding(welder, welded);
+            // An activation that found nothing - no damaged block, no buildable projection cell -
+            // puts the tool on the slow idle cadence; any work at all keeps the full 4 Hz.
+            RecordActivation(welder.EntityId, targetsToWeld.Count > 0 || welded || projectionWork);
         }
 
-        private static void WeldProjectionsWithWelding(MyShipWelder welder, bool welded)
+        private static bool WeldProjectionsWithWelding(MyShipWelder welder, bool welded)
         {
             if (!welded || SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config
                     .WelderTweaksCanWeldProjectionsIfWeldedOtherBlocks)
             {
-                WeldProjections(welder);
+                return WeldProjections(welder);
             }
+            return false;
         }
 
 
@@ -336,11 +403,11 @@ namespace Optimizer.Optimizations
             return weldedAnyThing;
         }
 
-        public static void WeldProjections(MyShipWelder welder)
+        public static bool WeldProjections(MyShipWelder welder)
         {
             if (welder.MarkedForClose || welder.Closed)
             {
-                return;
+                return false;
             }
 
             // Do not run the expensive projector/CanBuild scan when another welder of the same player
@@ -362,10 +429,9 @@ namespace Optimizer.Optimizations
                             Deferred[welder.OwnerId] = queue = new Queue<MyShipWelder>();
                         queue.Enqueue(welder);
                     }
-                return;
+                return true; // a spent budget means active projection work; stay on the fast cadence
             }
-
-            ScanAndBuild(welder);
+            return ScanAndBuild(welder);
         }
 
         // The welders turned away by their player's frame budget, a queue per player (the welder's owner).
@@ -470,13 +536,14 @@ namespace Optimizer.Optimizations
             return text.ToString();
         }
 
-        private static void ScanAndBuild(MyShipWelder welder)
+        private static bool ScanAndBuild(MyShipWelder welder)
         {
             WelderDiagnostics.Count(ref WelderDiagnostics.Scans);
             try
             {
                 var array = FindProjectedBlocks(welder);
                 DoWeldProjections(welder, array);
+                return array.Count > 0;
             }
             finally
             {

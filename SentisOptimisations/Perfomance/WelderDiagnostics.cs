@@ -24,19 +24,34 @@ namespace Optimizer.Optimizations
         public static long BudgetSpent;      // candidates skipped: the frame's builds were used up
         public static long PullsQueued;      // component pulls left to the conveyor system
         public static long PullsImmediate;   // component pulls fetched synchronously
+        public static long IdleSkips;        // ActivateCommon calls skipped for welders with nothing to weld
+
+        // Per-welder views of the two counters above: the totals mix every grid on the server,
+        // which makes a single tool's cadence impossible to see on a busy one. Diagnostics only,
+        // capped so old tools do not accumulate.
+        public static readonly System.Collections.Concurrent.ConcurrentDictionary<long, long> ActivationsByWelder =
+            new System.Collections.Concurrent.ConcurrentDictionary<long, long>();
+        public static readonly System.Collections.Concurrent.ConcurrentDictionary<long, long> IdleSkipsByWelder =
+            new System.Collections.Concurrent.ConcurrentDictionary<long, long>();
+
+        public static void CountWelder(System.Collections.Concurrent.ConcurrentDictionary<long, long> byWelder, long welderId)
+        {
+            if (byWelder.Count > 1024) byWelder.Clear();
+            byWelder.AddOrUpdate(welderId, 1, (id, n) => n + 1);
+        }
 
         public static void Count(ref long counter) => Interlocked.Increment(ref counter);
 
         public static string Snapshot() =>
             $"activations={Activations} welded={Welded} scans={Scans} noPermit={NoPermit} deferred={DeferredScans} " +
             $"candidates={Candidates} builds={Builds} noComponents={NoComponents} overLimits={OverLimits} noDlc={NoDlc} " +
-            $"budgetSpent={BudgetSpent} pulls={PullsQueued}q/{PullsImmediate}i " +
+            $"budgetSpent={BudgetSpent} pulls={PullsQueued}q/{PullsImmediate}i idleSkips={IdleSkips} " +
             $"targets={WelderTargets.FullScans}full/{WelderTargets.CachedScans}cached/{WelderTargets.Resyncs}resync/{WelderTargets.PreviewsSkipped}preview";
 
         public static void Reset()
         {
             Activations = Welded = Scans = NoPermit = DeferredScans = Candidates = Builds = 0;
-            NoComponents = NoDlc = OverLimits = BudgetSpent = PullsQueued = PullsImmediate = 0;
+            NoComponents = NoDlc = OverLimits = BudgetSpent = PullsQueued = PullsImmediate = IdleSkips = 0;
         }
     }
 }

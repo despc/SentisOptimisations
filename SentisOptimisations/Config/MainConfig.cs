@@ -20,6 +20,7 @@ namespace SentisOptimisationsPlugin
         private bool _welderCanWeldProjectionsIfWeldedOtherBlocks = false;
         private bool _welderSelfWelding = true;
         private int _projectionBuildsPerFrame = 1;
+        private int _welderIdleActivationSeconds = 5;
 
         //physics profile антипалочная защита
         private bool _enablePhysicsGuard = true;
@@ -162,6 +163,13 @@ namespace SentisOptimisationsPlugin
         {
             get => _projectionBuildsPerFrame;
             set => SetValue(ref _projectionBuildsPerFrame, value < 1 ? 1 : value);
+        }
+
+        [DisplayTab(Name = "Idle activation interval, seconds", GroupName = "Welder Tweaks", Tab = "Welder Optimizations", Order = 8, Description = "An enabled welder with nothing to weld activates once per this interval instead of four times a second (sphere query, projection scan). As soon as it finds work it runs at full speed again. 0 disables the slowdown; runtime adjustable.")]
+        public int WelderIdleActivationSeconds
+        {
+            get => _welderIdleActivationSeconds;
+            set => SetValue(ref _welderIdleActivationSeconds, value < 0 ? 0 : value);
         }
 
         // Shown, not saved: no setter, so the config file never holds it; the settings page reads it anew every second.
