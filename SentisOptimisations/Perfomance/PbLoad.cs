@@ -132,9 +132,18 @@ namespace SentisOptimisationsPlugin
             {
                 var perFrame = ms / frames;
                 stats.LoadSamples++;
+                // The average relaxes per FRAME, not per run. A script that runs rarely (a missile
+                // grid that wakes now and then) used to keep the average of one old spike for as
+                // many runs as it took to decay: every cheap run after the spike was then counted
+                // as over the load budget, and the block was destroyed with "run 0.00 ms, 3 ms of
+                // every frame" in the log (production report, 31.10.2026). With the
+                // decay tied to the frames that passed, a rare run's own per-frame cost - already
+                // an average over the frames since the previous run - replaces the stale figure
+                // almost at once, while a script on Update1 keeps the original smoothing.
+                var alpha = 1 - Math.Pow(1 - Alpha, frames);
                 stats.LoadMsPerFrame = stats.LoadSamples == 1
                     ? perFrame
-                    : stats.LoadMsPerFrame + (perFrame - stats.LoadMsPerFrame) * Alpha;
+                    : stats.LoadMsPerFrame + (perFrame - stats.LoadMsPerFrame) * alpha;
             }
 
             var overLoad = maxLoadMsPerFrame > 0 && stats.LoadSamples >= RunsBeforeLoadCounts &&

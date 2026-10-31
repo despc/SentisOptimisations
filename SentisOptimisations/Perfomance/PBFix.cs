@@ -473,6 +473,21 @@ namespace SentisOptimisationsPlugin
 
         private static void PunishNow(MyProgrammableBlock pb, long ownerId, string what, double ms, double load)
         {
+            // The verdict is thirty frames old by now. A script whose load was a blip - one heavy
+            // run, a targeting sweep that is already over - is within its budget again, and taking
+            // its block apart anyway is how production destroyed a LAMP with "0 of last 20 runs
+            // over budget" in its own log line (production report, 31.10.2026). Punish only a block that is
+            // still over budget when the punishment lands.
+            var config = SentisOptimisationsPlugin.Config;
+            var currentLoad = PbLoad.LoadMsPerFrame(pb);
+            var lastMs = PbLoad.LastMs(pb);
+            var loadOk = config.ScriptsMaxMsPerFrame <= 0 || currentLoad <= config.ScriptsMaxMsPerFrame;
+            if (loadOk && lastMs <= config.ScriptsMaxExecTime)
+            {
+                Log.Info($"PB punishment dropped, the block is within budget again: last run {lastMs:F2} ms, " +
+                         $"{currentLoad:F2} ms of every frame (was {load:F2}). {what}");
+                return;
+            }
             // Read the counters before forgetting the block, or the message reports zeroes.
             var overruns = PbLoad.Overruns(pb);
             pb.Enabled = false;

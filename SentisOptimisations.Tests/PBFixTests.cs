@@ -179,4 +179,49 @@ public class PBFixTests
         for (var i = 0; i < PbLoad.UnmeasuredRuns; i++) verdicts.Add(Run(stats, ref frame, 30.0, second));
         Assert.All(verdicts, v => Assert.Equal(PbVerdict.Ok, v));
     }
+
+    [Fact]
+    public void A_rare_script_is_not_punished_for_spikes_that_are_already_over()
+    {
+        // Production report: a grid that wakes now and then did one heavy run per wake,
+        // then ran free - and the block was destroyed with "run 0.00 ms, 2.99 ms of every frame".
+        // The average has to relax over the frames that passed, not over the runs: a cheap run
+        // long after a spike must not inherit the spike's cost.
+        var stats = new PbLoad.Stats();
+        var program = new object();
+        ulong frame = 0;
+        for (var i = 0; i < 22; i++) Run(stats, ref frame, 0.05, program, 60);
+        for (var i = 0; i < 3; i++) Run(stats, ref frame, 300.0, program, 60);
+        var verdicts = new List<PbVerdict>();
+        for (var i = 0; i < 20; i++) verdicts.Add(Run(stats, ref frame, 0.01, program, 60));
+        Assert.DoesNotContain(PbVerdict.Punish, verdicts);
+        Assert.True(stats.LoadMsPerFrame < 0.05, stats.LoadMsPerFrame.ToString());
+    }
+
+    [Fact]
+    public void A_rare_script_that_is_heavy_every_time_is_still_punished()
+    {
+        // The other side of the relaxation: 1.5 ms every other frame is 0.75 ms of every frame,
+        // over the 0.5 budget while each single run is under the 2 ms per-run limit.
+        var stats = new PbLoad.Stats();
+        var program = new object();
+        ulong frame = 0;
+        var punishedAt = 0;
+        for (var i = 1; i <= 60 && punishedAt == 0; i++)
+            if (Run(stats, ref frame, 1.5, program, 2) == PbVerdict.Punish) punishedAt = i;
+        Assert.InRange(punishedAt, PbLoad.UnmeasuredRuns + 1, 60);
+    }
+
+    [Fact]
+    public void The_average_of_a_frequent_script_keeps_its_old_smoothing()
+    {
+        // Update1: one run per frame, so per-frame and per-run relaxation coincide - the window
+        // that punishes a steady 1.5 ms/frame script is the one the plugin always had.
+        var stats = new PbLoad.Stats();
+        var program = new object();
+        ulong frame = 0;
+        for (var i = 0; i < 22; i++) Run(stats, ref frame, 0.05, program, 1);
+        for (var i = 0; i < 5; i++) Run(stats, ref frame, 1.5, program, 1);
+        Assert.True(stats.LoadMsPerFrame > 0.5, stats.LoadMsPerFrame.ToString());
+    }
 }
