@@ -757,7 +757,7 @@ public class FreezeLogic
             if (child?.Container?.Entity is MyEntity c) UnregisterRecursive(c);
     }
 
-    private void RegisterRecursive(MyEntity e)
+    internal static void RegisterRecursive(MyEntity e)
     {
         // the mark first: while it is on, the update lists do not take the entity in (FrozenUpdateGuard)
         e.Flags &= ~FrozenUpdateGuard.FrozenMark;
