@@ -326,6 +326,7 @@ namespace SentisOptimisationsPlugin
             Optimizer.Optimizations.WelderOptimization.RunDeferred();
             Freezer.FrozenProduction.Tick();
             Optimizer.Optimizations.SafeZoneGridTracking.Tick();
+            Optimizer.Optimizations.TurretControlTargetSelect.Tick();
             CrashFix.MechanicalTopCheck.Tick();
             CrashFix.DockedCollisions.Tick();
             ReplicableResend.Tick();
