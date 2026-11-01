@@ -115,19 +115,53 @@ namespace Optimizer.Optimizations
                     BindingFlags.Static | BindingFlags.NonPublic));
         }
 
+        /// <summary>Per-welder idle bookkeeping: consecutive empty activations and the slow-mode schedule.</summary>
+        public struct WelderIdleState
+        {
+            public int EmptyActivations;
+            public long NextFrame;   // 0 = no slowdown
+            public bool Slow;        // the phase was already applied on entering the slow mode
+        }
+
         /// <summary>Pure decision rules of the idle slowdown, kept separate for the unit tests.</summary>
         public static class WelderIdleGate
         {
-            /// <summary>Frame of the next allowed activation; 0 means no slowdown (work, or the feature off).</summary>
-            public static long NextFrameAfter(bool hadWork, long frame, int idleSeconds) =>
-                hadWork || idleSeconds <= 0 ? 0L : frame + idleSeconds * 60L;
-
             public static bool ShouldSkip(long nextFrame, long frame) => nextFrame != 0 && frame < nextFrame;
+
+            /// <summary>
+            /// Advance after one activation. Real work (welding or a projection build) resets the
+            /// counter and leaves the slow mode at once. Only idleActivations consecutive empty
+            /// activations engage the slowdown; entering it adds a per-welder phase, so welders
+            /// left on together spread their slow activations over different frames instead of
+            /// firing in one synchronized burst.
+            /// </summary>
+            public static void Advance(ref WelderIdleState state, long welderId, bool hadWork, long frame,
+                int idleSeconds, int idleActivations)
+            {
+                if (hadWork || idleSeconds <= 0)
+                {
+                    state = default(WelderIdleState);
+                    return;
+                }
+                state.EmptyActivations++;
+                if (state.EmptyActivations < System.Math.Max(1, idleActivations))
+                {
+                    state.NextFrame = 0;
+                    state.Slow = false;
+                    return;
+                }
+                var interval = idleSeconds * 60L;
+                // Multiplicative hash, not id % interval: sequential entity ids (a grid built in
+                // one go) must still land on different frames.
+                var phase = state.Slow ? 0L : (long)(((ulong)welderId * 2654435761UL) % (ulong)interval);
+                state.NextFrame = frame + interval + phase;
+                state.Slow = true;
+            }
         }
 
-        // The frame each welder may activate next; only idle tools get an entry. Same access
-        // discipline as the other welder dictionaries: activations are per-cluster-thread.
-        private static readonly Dictionary<long, long> IdleNextFrames = new Dictionary<long, long>();
+        // Idle state per welder; only tools with at least one empty activation get an entry.
+        // Same access discipline as the other welder dictionaries: activations are per-cluster-thread.
+        private static readonly Dictionary<long, WelderIdleState> IdleStates = new Dictionary<long, WelderIdleState>();
 
         private static bool ActivateCommonGate(MyShipToolBase __instance)
         {
@@ -137,10 +171,10 @@ namespace Optimizer.Optimizations
                 if (welder == null) return true;
                 var config = SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config;
                 if (!config.WelderTweaksEnabled || config.WelderIdleActivationSeconds <= 0) return true;
-                long next;
-                using (global::SentisOptimisations.ClusterThreads.Lock(IdleNextFrames))
-                    if (!IdleNextFrames.TryGetValue(welder.EntityId, out next)) return true;
-                if (!WelderIdleGate.ShouldSkip(next, MySession.Static.GameplayFrameCounter)) return true;
+                WelderIdleState state;
+                using (global::SentisOptimisations.ClusterThreads.Lock(IdleStates))
+                    if (!IdleStates.TryGetValue(welder.EntityId, out state)) return true;
+                if (!WelderIdleGate.ShouldSkip(state.NextFrame, MySession.Static.GameplayFrameCounter)) return true;
                 WelderDiagnostics.Count(ref WelderDiagnostics.IdleSkips);
                 WelderDiagnostics.CountWelder(WelderDiagnostics.IdleSkipsByWelder, welder.EntityId);
                 return false;
@@ -155,15 +189,16 @@ namespace Optimizer.Optimizations
         private static void RecordActivation(long welderId, bool hadWork)
         {
             var config = SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config;
-            var next = WelderIdleGate.NextFrameAfter(hadWork, MySession.Static.GameplayFrameCounter,
-                config.WelderIdleActivationSeconds);
-            using (global::SentisOptimisations.ClusterThreads.Lock(IdleNextFrames))
+            using (global::SentisOptimisations.ClusterThreads.Lock(IdleStates))
             {
-                if (next == 0) IdleNextFrames.Remove(welderId);
+                var state = IdleStates.TryGetValue(welderId, out var old) ? old : default(WelderIdleState);
+                WelderIdleGate.Advance(ref state, welderId, hadWork, MySession.Static.GameplayFrameCounter,
+                    config.WelderIdleActivationSeconds, config.WelderIdleActivationsBeforeSlowdown);
+                if (state.EmptyActivations == 0 && state.NextFrame == 0) IdleStates.Remove(welderId);
                 else
                 {
-                    if (IdleNextFrames.Count > 512) IdleNextFrames.Clear(); // tools come and go
-                    IdleNextFrames[welderId] = next;
+                    if (IdleStates.Count > 512) IdleStates.Clear(); // tools come and go
+                    IdleStates[welderId] = state;
                 }
             }
         }
@@ -191,6 +226,7 @@ namespace Optimizer.Optimizations
 
             WelderDiagnostics.Count(ref WelderDiagnostics.Activations);
             WelderDiagnostics.CountWelder(WelderDiagnostics.ActivationsByWelder, __instance.EntityId);
+            WelderDiagnostics.NoteActivationFrame(__instance.EntityId, MySession.Static.GameplayFrameCounter);
             ActivateInternal(__instance, targets);
             return false;
         
@@ -330,6 +366,7 @@ namespace Optimizer.Optimizations
             // An activation that found nothing - no damaged block, no buildable projection cell -
             // puts the tool on the slow idle cadence; any work at all keeps the full 4 Hz.
             RecordActivation(welder.EntityId, targetsToWeld.Count > 0 || welded || projectionWork);
+            WelderDiagnostics.NoteTargets(welder.EntityId, targetsToWeld.Count);
         }
 
         private static bool WeldProjectionsWithWelding(MyShipWelder welder, bool welded)

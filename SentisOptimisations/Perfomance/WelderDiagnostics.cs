@@ -40,6 +40,29 @@ namespace Optimizer.Optimizations
             byWelder.AddOrUpdate(welderId, 1, (id, n) => n + 1);
         }
 
+        // Damaged targets found on the welder's latest activation: separates "sees no work"
+        // from "found work but could not weld it".
+        public static readonly System.Collections.Concurrent.ConcurrentDictionary<long, int> LastTargetsByWelder =
+            new System.Collections.Concurrent.ConcurrentDictionary<long, int>();
+
+        public static void NoteTargets(long welderId, int targets)
+        {
+            if (LastTargetsByWelder.Count > 1024) LastTargetsByWelder.Clear();
+            LastTargetsByWelder[welderId] = targets;
+        }
+
+        // (welder id, gameplay frame) of recent activations: lets a live check prove that slow
+        // activations of different welders land on different frames, and how fast one wakes up.
+        public static readonly System.Collections.Concurrent.ConcurrentQueue<System.Collections.Generic.KeyValuePair<long, long>> RecentActivationFrames =
+            new System.Collections.Concurrent.ConcurrentQueue<System.Collections.Generic.KeyValuePair<long, long>>();
+
+        public static void NoteActivationFrame(long welderId, long frame)
+        {
+            RecentActivationFrames.Enqueue(new System.Collections.Generic.KeyValuePair<long, long>(welderId, frame));
+            while (RecentActivationFrames.Count > 8192)
+                RecentActivationFrames.TryDequeue(out _);
+        }
+
         public static void Count(ref long counter) => Interlocked.Increment(ref counter);
 
         public static string Snapshot() =>
