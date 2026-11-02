@@ -188,21 +188,10 @@ public static class FreezerPatches
         var timerFramesFromLastTrigger = timer.FramesFromLastTrigger;
         // The whole pull (queue read + PullItem) must run on the game thread: inventories and
         // the conveyor are not thread-safe. Vanilla did this on the game thread as well.
+        // Queued and run a few a frame (see RunAssemblerPulls), not all in the frame after the tick.
         try
         {
-            MyAPIGateway.Utilities.InvokeOnGameThread(() =>
-            {
-                try
-                {
-                    // a frame later: the assembler may be gone by now (its inventories are then null)
-                    if (__instance.Closed || __instance.MarkedForClose || __instance.InputInventory == null) return;
-                    AsyncCollectAssemblerRequiredItems(__instance, timerFramesFromLastTrigger);
-                }
-                catch (Exception e)
-                {
-                    SentisOptimisationsPlugin.Log.Error(e, "Assembler collect items exception");
-                }
-            });
+            AssemblerPulls.Enqueue(__instance.EntityId, new AssemblerPull(__instance, timerFramesFromLastTrigger), AssemblerPull.Merge);
         }
         catch (Exception e)
         {
@@ -211,6 +200,76 @@ public static class FreezerPatches
         }
 
         return false;
+    }
+
+    /// <summary>An assembler's pull waiting for the game thread: the frames its timer counted since the last one.</summary>
+    private readonly struct AssemblerPull
+    {
+        public readonly MyAssembler Assembler;
+        public readonly uint Frames;
+
+        public AssemblerPull(MyAssembler assembler, uint frames)
+        {
+            Assembler = assembler;
+            Frames = frames;
+        }
+
+        // fired again before its pull ran: the pull covers both windows
+        public static AssemblerPull Merge(AssemblerPull waiting, AssemblerPull again) =>
+            new AssemblerPull(again.Assembler, waiting.Frames + again.Frames);
+    }
+
+    private static readonly FrameBudgetQueue<AssemblerPull> AssemblerPulls = new FrameBudgetQueue<AssemblerPull>();
+    private static readonly System.Diagnostics.Stopwatch PullWatch = new System.Diagnostics.Stopwatch();
+    private static readonly Action<AssemblerPull> RunPull = RunAssemblerPull;
+    private static readonly Func<double> PullElapsed = () => PullWatch.Elapsed.TotalMilliseconds;
+    private static int _pullsDone, _pullsMostWaiting;
+    private static double _pullsMostMs;
+    private static long _pullsLogFrame;
+
+    /// <summary>
+    /// Once a frame, from the plugin's update (game thread): the assemblers' waiting pulls, oldest first, until the
+    /// frame's budget (Freezer tab) is spent, at least one.
+    /// </summary>
+    public static void RunAssemblerPulls()
+    {
+        var waiting = AssemblerPulls.Count;
+        if (waiting > 0)
+        {
+            PullWatch.Restart();
+            var budget = SentisOptimisationsPlugin.Config?.AssemblerPullBudgetMs ?? 1.5;
+            _pullsDone += AssemblerPulls.Drain(budget, PullElapsed, RunPull);
+            var ms = PullWatch.Elapsed.TotalMilliseconds;
+            if (ms > _pullsMostMs) _pullsMostMs = ms;
+            if (waiting > _pullsMostWaiting) _pullsMostWaiting = waiting;
+        }
+        var frame = MySession.Static?.GameplayFrameCounter ?? 0;
+        if (frame - _pullsLogFrame < 3600) return;
+        _pullsLogFrame = frame;
+        if (DiagLog.On && _pullsDone > 0)
+            SentisOptimisationsPlugin.Log.Info($"Assembler pulls in the last minute: {_pullsDone}, most waiting {_pullsMostWaiting}, longest frame {_pullsMostMs:0.0} ms");
+        _pullsDone = 0;
+        _pullsMostWaiting = 0;
+        _pullsMostMs = 0;
+    }
+
+    public static void ClearAssemblerPulls() => AssemblerPulls.Clear();
+
+    private static void RunAssemblerPull(AssemblerPull pull)
+    {
+        try
+        {
+            var assembler = pull.Assembler;
+            // frames later: the assembler may be gone by now (its inventories are then null)
+            if (assembler.Closed || assembler.MarkedForClose || assembler.InputInventory == null) return;
+            // frozen while it waited: a frozen block's inventories are not touched (the compensation counts its time)
+            if (CompensationTracker.IsFrozen(assembler.EntityId)) return;
+            AsyncCollectAssemblerRequiredItems(assembler, pull.Frames);
+        }
+        catch (Exception e)
+        {
+            SentisOptimisationsPlugin.Log.Error(e, "Assembler collect items exception");
+        }
     }
 
     private static void AsyncCollectAssemblerRequiredItems(MyAssembler __instance, uint timerFramesFromLastTrigger)

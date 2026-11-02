@@ -384,12 +384,17 @@ namespace SentisOptimisations.Tests
             Assert.True(Calls(assembler, "RunTrackedCompensationPass", typeof(CompensationTracker).FullName),
                 "assembler update no longer executes/records the compensation pass inline");
 
-            // GetComponentsFromConveyor can be entered by conveyor scheduling and keeps its
-            // explicit game-thread hop; its inner mutation is still a single inline pass.
+            // GetComponentsFromConveyor can be entered by conveyor scheduling: its pull waits in the
+            // assemblers' frame-budget queue for the game thread, and a block frozen while it waited
+            // is not pulled into; its inner mutation is still a single inline pass.
             var conveyor = PatchMethod("GetComponentsFromConveyorPatch");
             Assert.NotNull(conveyor);
-            Assert.True(Calls(conveyor, "InvokeOnGameThread"));
+            Assert.False(Calls(conveyor, "InvokeOnGameThread"));
             Assert.False(Calls(conveyor, "AddDelayedAction"));
+            var run = PatchMethod("RunAssemblerPull");
+            Assert.NotNull(run);
+            Assert.True(Calls(run, "IsFrozen", typeof(CompensationTracker).FullName),
+                "a queued assembler pull does not check the block was frozen while it waited");
         }
 
         [Theory]

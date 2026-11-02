@@ -45,6 +45,7 @@ namespace SentisOptimisationsPlugin
         private bool _freezePhysics = false;
         private string _antifreezeBlockSubtypes = "LargeBlockSmallContainer_admin2:LargeBlockSmallContainer_admin";
         private int _minWakeUpIntervalInSec = 600;
+        private double _assemblerPullBudgetMs = 1.5;
         private int _delayBeforeFreezeSec = 5;
         private int _delayBeforeFreezerStartSec = 5;
         
@@ -206,6 +207,10 @@ namespace SentisOptimisationsPlugin
         
         [DisplayTab(Name = "Min WakeUp Interval In Sec", GroupName = "Freezer", Tab = "Freezer", Order = 5, Description = "Min WakeUp Interval In Sec")]
         public int MinWakeUpIntervalInSec { get => _minWakeUpIntervalInSec; set => SetValue(ref _minWakeUpIntervalInSec, value); }
+
+        [DisplayTab(Name = "Assembler pulls a frame, ms", GroupName = "Freezer", Tab = "Freezer", Order = 9,
+            Description = "The assemblers' pulls of components from the conveyor wait in a queue and run a frame at a time until this many milliseconds are spent (at least one a frame), instead of all in one frame. Runtime adjustable.")]
+        public double AssemblerPullBudgetMs { get => _assemblerPullBudgetMs; set => SetValue(ref _assemblerPullBudgetMs, value < 0 ? 0 : value); }
         
         [DisplayTab(Name = "Freezer logs", GroupName = "Logs", Tab = "Logs", Order = 1, Description = "Every grid frozen and woken up (off by default)")]
         public bool EnableDebugLogs { get => _enableDebugLogs; set => SetValue(ref _enableDebugLogs, value); }

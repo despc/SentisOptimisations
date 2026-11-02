@@ -127,6 +127,7 @@ namespace SentisOptimisationsPlugin
                 Freezer.WakeRequests.ClearAll();
                 Freezer.FrozenProduction.ClearAll();
                 DelayedProcessor.OnUnloading();
+                Freezer.FreezerPatches.ClearAssemblerPulls();
                 MyEntities.OnEntityAdd -= EntitiesObserver.MyEntitiesOnOnEntityAdd;
                 MyEntities.OnEntityRemove -= EntitiesObserver.MyEntitiesOnOnEntityRemove;
                 EntitiesObserver.ClearAll();
@@ -324,6 +325,7 @@ namespace SentisOptimisationsPlugin
             Optimizer.Optimizations.GrinderPatches.Flush();
             Freezer.CpuLoadPeak.Sample(MySandboxGame.Static.CPULoad);
             Optimizer.Optimizations.WelderOptimization.RunDeferred();
+            Freezer.FreezerPatches.RunAssemblerPulls();
             Freezer.FrozenProduction.Tick();
             Optimizer.Optimizations.SafeZoneGridTracking.Tick();
             Optimizer.Optimizations.TurretControlTargetSelect.Tick();

@@ -34,9 +34,15 @@ namespace Optimizer.Optimizations
         public static readonly System.Collections.Concurrent.ConcurrentDictionary<long, long> IdleSkipsByWelder =
             new System.Collections.Concurrent.ConcurrentDictionary<long, long>();
 
+        // ConcurrentDictionary.Count takes every lock of the dictionary: on each activation it was the most of the
+        // welders' gate, 129 ms in 28 s (prod, dotTrace, 02.11.2026). The caps are looked at once in 256 writes.
+        private static int _capChecks;
+
+        public static bool CapDue() => (Interlocked.Increment(ref _capChecks) & 255) == 0;
+
         public static void CountWelder(System.Collections.Concurrent.ConcurrentDictionary<long, long> byWelder, long welderId)
         {
-            if (byWelder.Count > 1024) byWelder.Clear();
+            if (CapDue() && byWelder.Count > 1024) byWelder.Clear();
             byWelder.AddOrUpdate(welderId, 1, (id, n) => n + 1);
         }
 
@@ -47,7 +53,7 @@ namespace Optimizer.Optimizations
 
         public static void NoteTargets(long welderId, int targets)
         {
-            if (LastTargetsByWelder.Count > 1024) LastTargetsByWelder.Clear();
+            if (CapDue() && LastTargetsByWelder.Count > 1024) LastTargetsByWelder.Clear();
             LastTargetsByWelder[welderId] = targets;
         }
 
