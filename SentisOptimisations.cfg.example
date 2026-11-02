@@ -123,4 +123,5 @@
        ScriptsMaxExecTime или ScriptsMaxMsPerFrame. -->
   <ScriptOvertimeExecTimesBeforePunish>3</ScriptOvertimeExecTimesBeforePunish>
 
+  <PowerRecomputePauseFactor>8</PowerRecomputePauseFactor>
 </MainConfig>

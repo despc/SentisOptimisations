@@ -46,6 +46,7 @@ namespace SentisOptimisationsPlugin
         private string _antifreezeBlockSubtypes = "LargeBlockSmallContainer_admin2:LargeBlockSmallContainer_admin";
         private int _minWakeUpIntervalInSec = 600;
         private double _assemblerPullBudgetMs = 1.5;
+        private int _powerRecomputePauseFactor = 8;
         private int _delayBeforeFreezeSec = 5;
         private int _delayBeforeFreezerStartSec = 5;
         
@@ -207,6 +208,10 @@ namespace SentisOptimisationsPlugin
         
         [DisplayTab(Name = "Min WakeUp Interval In Sec", GroupName = "Freezer", Tab = "Freezer", Order = 5, Description = "Min WakeUp Interval In Sec")]
         public int MinWakeUpIntervalInSec { get => _minWakeUpIntervalInSec; set => SetValue(ref _minWakeUpIntervalInSec, value); }
+
+        [DisplayTab(Name = "Power recompute pause factor", GroupName = "Performance", Tab = "Performance", Order = 1,
+            Description = "A grid's power distribution taking a millisecond or more to recompute is recomputed again no sooner than this many times as long as it took (at most a second): a large ship welded block by block recomputes once for many blocks instead of for each. 0 disables it. Runtime adjustable.")]
+        public int PowerRecomputePauseFactor { get => _powerRecomputePauseFactor; set => SetValue(ref _powerRecomputePauseFactor, value < 0 ? 0 : value); }
 
         [DisplayTab(Name = "Assembler pulls a frame, ms", GroupName = "Freezer", Tab = "Freezer", Order = 9,
             Description = "The assemblers' pulls of components from the conveyor wait in a queue and run a frame at a time until this many milliseconds are spent (at least one a frame), instead of all in one frame. Runtime adjustable.")]
