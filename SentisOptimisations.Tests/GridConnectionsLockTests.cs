@@ -59,6 +59,26 @@ namespace SentisOptimisations.Tests
             }).Result, "the component's lock was left held after the throw");
         }
 
+        [Theory]
+        [InlineData(100, int.MinValue, false)]   // never made
+        [InlineData(100, 100, true)]             // made this frame
+        [InlineData(109, 100, true)]             // 9 frames on
+        [InlineData(110, 100, false)]            // KeepFrames on: made anew
+        [InlineData(50, 100, false)]             // a new session's counter is behind: made anew
+        public void A_list_is_kept_for_KeepFrames(int now, int made, bool fresh)
+        {
+            Assert.Equal(10, GridConnectionsLock.KeepFrames);
+            Assert.Equal(fresh, GridConnectionsLock.Fresh(now, made));
+        }
+
+        [Fact]
+        public void The_frame_field_the_game_checks_is_there()
+        {
+            var field = typeof(MyGridTargeting).GetField("m_gridGroupCache", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.NotNull(field);
+            Assert.Equal(typeof(int), field.FieldType);
+        }
+
         private sealed class Block { public int Id; }
 
         [Fact]
