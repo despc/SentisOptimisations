@@ -33,6 +33,11 @@ namespace Optimizer.Optimizations
         private const int ProjectionChecksPerActivation = 24;
 
         private static readonly ProjectionBuildBudget ProjectionBudget = new ProjectionBuildBudget();
+        // by the preview grid, not the projector: with MultigridProjector one projector shows a preview grid for every
+        // subgrid, all of them with that projector. Kept by the projector, the search state was rebuilt for whichever
+        // preview a welder looked at last, and a welder's reach of one subgrid's preview was taken for another's with the
+        // same number of blocks (two identical turrets): their cells were never tested until the counts drifted apart
+        // (the stand, 02.11.2026: blocks of small subgrids not welded for a long while, then welded)
         private static readonly Dictionary<long, ProjectionFrontierState> ProjectionFrontiers =
             new Dictionary<long, ProjectionFrontierState>();
         private static readonly Vector3I[] NeighborDirections =
@@ -273,24 +278,25 @@ namespace Optimizer.Optimizations
             public double Radius;
             public int PreviewBlocks;
             public long Frame = long.MinValue;
-            public long Projector;
+            public long Preview;
         }
 
         private const double ReachMovedM = 0.5;
         private const long ReachFrames = 60;
 
-        private static readonly Dictionary<long, Reach> Reaches = new Dictionary<long, Reach>();
+        private static readonly Dictionary<(long welder, long preview), Reach> Reaches = new Dictionary<(long, long), Reach>();
 
-        private static Reach ReachOf(long welderId)
+        /// <summary>A welder's reach of one preview grid (each subgrid of a multigrid projection has its own).</summary>
+        private static Reach ReachOf(long welderId, long previewId)
         {
             // one dictionary for every welder; a welder's own reach is only its own thread's
             using (global::SentisOptimisations.ClusterThreads.Lock(Reaches))
             {
                 Reach reach;
-                if (Reaches.TryGetValue(welderId, out reach)) return reach;
-                if (Reaches.Count > 512) Reaches.Clear();   // tools come and go; this is only a cache
+                if (Reaches.TryGetValue((welderId, previewId), out reach)) return reach;
+                if (Reaches.Count > 2048) Reaches.Clear();   // tools come and go; this is only a cache
                 reach = new Reach();
-                Reaches[welderId] = reach;
+                Reaches[(welderId, previewId)] = reach;
                 return reach;
             }
         }
@@ -671,7 +677,7 @@ namespace Optimizer.Optimizations
                         welder.EntityId,
                         builtBy: welder.BuiltBy);
                     WelderDiagnostics.Count(ref WelderDiagnostics.Builds);
-                    QueueProjectedNeighbors(invokedBlock.cubeProjector, invokedBlock.hitCube);
+                    QueueProjectedNeighbors(invokedBlock.hitCube);
                 }
                 catch (Exception e)
                 {
@@ -686,13 +692,15 @@ namespace Optimizer.Optimizations
         /// not only the six cells around its centre: a thruster or a turret is several cells
         /// across, and on a real ship most of what grows out of it touches it somewhere else.
         /// </summary>
-        private static void QueueProjectedNeighbors(MyProjectorBase projector, MySlimBlock built)
+        private static void QueueProjectedNeighbors(MySlimBlock built)
         {
-            var preview = projector?.ProjectedGrid;
-            if (preview == null || built == null) return;
+            // the preview grid the block was built from: the projector's own ProjectedGrid is only the first of a
+            // multigrid projection's
+            var preview = built?.CubeGrid;
+            if (preview == null) return;
             ProjectionFrontierState state;
             using (global::SentisOptimisations.ClusterThreads.Lock(ProjectionFrontiers))
-                if (!ProjectionFrontiers.TryGetValue(projector.EntityId, out state)) return;
+                if (!ProjectionFrontiers.TryGetValue(preview.EntityId, out state) || state.Preview != preview) return;
             var min = built.Min;
             var max = built.Max;
             foreach (var direction in NeighborDirections)
@@ -731,17 +739,16 @@ namespace Optimizer.Optimizations
             return false;
         }
 
-        private static ProjectionFrontierState FrontierState(MyProjectorBase projector, MyCubeGrid preview,
-            long frame)
+        private static ProjectionFrontierState FrontierState(MyCubeGrid preview, long frame)
         {
             // one dictionary for every projection; a projection's own state is only its welders' thread's (the welders
             // of a projection are in its cluster)
             ProjectionFrontierState state;
             using (global::SentisOptimisations.ClusterThreads.Lock(ProjectionFrontiers))
-                if (!ProjectionFrontiers.TryGetValue(projector.EntityId, out state))
+                if (!ProjectionFrontiers.TryGetValue(preview.EntityId, out state))
                 {
                     state = new ProjectionFrontierState();
-                    ProjectionFrontiers[projector.EntityId] = state;
+                    ProjectionFrontiers[preview.EntityId] = state;
                 }
             // A build takes one block out of the preview, and that must not throw away what the
             // search has learnt: it used to, on every build, and the queue of blocks next to fresh
@@ -756,7 +763,7 @@ namespace Optimizer.Optimizations
             state.LastSeenFrame = frame;
 
             using (global::SentisOptimisations.ClusterThreads.Lock(ProjectionFrontiers))
-                if (ProjectionFrontiers.Count > 32)
+                if (ProjectionFrontiers.Count > 256)
                 {
                     var stale = ProjectionFrontiers
                         .Where(pair => frame - pair.Value.LastSeenFrame > 600 || pair.Value.Preview == null ||
@@ -796,7 +803,7 @@ namespace Optimizer.Optimizations
                 if (myCubeGrid != null && myCubeGrid.Projector != null)
                 {
                     var projector = myCubeGrid.Projector;
-                    var state = FrontierState(projector, myCubeGrid, frame);
+                    var state = FrontierState(myCubeGrid, frame);
 
                     // Validate a few high-value frontier cells first. Stale entries are cheap and
                     // bounded; successful builds enqueue only their six grid neighbours.
@@ -836,8 +843,8 @@ namespace Optimizer.Optimizations
                     // spending its whole allowance on cells metres outside its own sensor: on the
                     // mixed slab the tools saw two candidates between twenty-two of them where
                     // vanilla saw fifty-four, and the ship sat over buildable blocks doing nothing.
-                    var reach = ReachOf(welder.EntityId);
-                    if (reach.Projector != projector.EntityId ||
+                    var reach = ReachOf(welder.EntityId, myCubeGrid.EntityId);
+                    if (reach.Preview != myCubeGrid.EntityId ||
                         reach.PreviewBlocks != state.Positions.Count ||
                         reach.Radius != boundingSphereD.Radius ||
                         frame - reach.Frame > ReachFrames ||
@@ -859,7 +866,7 @@ namespace Optimizer.Optimizations
                         reach.Center = boundingSphereD.Center;
                         reach.Radius = boundingSphereD.Radius;
                         reach.PreviewBlocks = state.Positions.Count;
-                        reach.Projector = projector.EntityId;
+                        reach.Preview = myCubeGrid.EntityId;
                         reach.Frame = frame;
                     }
 
