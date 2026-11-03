@@ -11,6 +11,9 @@ namespace SentisOptimisationsPlugin
         private bool _gasTankOptimisation = true;
         private bool _safeZoneGridTracking = true;
         private bool _mechanicalTopCheck = true;
+        private bool _headDetachLog = true;
+        private bool _headReattach = true;
+        private float _headReattachMaxDistanceM = 10;
         private bool _conveyorReach = true;
         private bool _dockedDampenersCalm = true;
         private bool _dockedCollisionsOff = true;
@@ -134,6 +137,27 @@ namespace SentisOptimisationsPlugin
         {
             get => _mechanicalTopCheck;
             set => SetValue(ref _mechanicalTopCheck, value);
+        }
+
+        [DisplayTab(Name = "Log heads coming off", GroupName = "Fixes", Tab = "Performance", Order = 1, Description = "Every head that comes off a rotor, hinge, piston or wheel is written to the log: torn off by the game (safety detach), by a player, a script, or its block destroyed; how far the joint was stretched, the speeds of both grids, the freezer's state of them and how long after its thaw, the nearest player. Takes effect at once")]
+        public bool HeadDetachLog
+        {
+            get => _headDetachLog;
+            set => SetValue(ref _headDetachLog, value);
+        }
+
+        [DisplayTab(Name = "Put torn-off heads back", GroupName = "Fixes", Tab = "Performance", Order = 2, Description = "A head the game tore off a rotor or hinge (safety detach) is attached again once that is quiet: the head and its stator still there and free, the head near and slow against the stator, and its whole group, moved onto the stator's axis, hitting no grid, rock or character there. Tried for 30 s. Takes effect at once")]
+        public bool HeadReattach
+        {
+            get => _headReattach;
+            set => SetValue(ref _headReattach, value);
+        }
+
+        [DisplayTab(Name = "Put heads back from at most, m", GroupName = "Fixes", Tab = "Performance", Order = 3, Description = "How far a torn-off head may be from its stator's pivot to be put back on")]
+        public float HeadReattachMaxDistanceM
+        {
+            get => _headReattachMaxDistanceM;
+            set => SetValue(ref _headReattachMaxDistanceM, value < 0 ? 0 : value);
         }
 
         [DisplayTab(Name = "Docked grids calm", GroupName = "Fixes", Tab = "Performance", Order = 0, Description = "A grid locked by a connector to another dynamic grid does not dampen while the whole locked group stands (under 5 cm/s): its dampeners kicked against the lock every frame and the docked grids shook. Gravity is still held. Takes effect at once")]

@@ -225,6 +225,15 @@ namespace SentisOptimisationsPlugin.CrashFix
             w.Strikes = 0;
             var top = HeadOf(stator, madeId);
             var head = top.CubeGrid;
+            // nothing where the head goes: moved into a block of the stator's ship or of another grid, the solver throws
+            // them apart (HeadDetachWatch's test, the head's grid where the stator puts it)
+            var blocked = HeadDetachWatch.InTheWay(new List<MyCubeGrid> { head }, stator.CubeGrid, head, MatrixD.Invert(head.WorldMatrix) * expected);
+            if (blocked != null)
+            {
+                SentisOptimisationsPlugin.Log.Warn($"MechanicalTopCheck: the head of {stator.BlockDefinition.Id.SubtypeName} '{stator.CustomName}' on {stator.CubeGrid.DisplayName} " +
+                                                   $"({stator.EntityId}) was {problem}; not put back: {blocked}");
+                return false;
+            }
             if (stator.TopBlock != null) DetachGroups.Invoke(stator, new object[] { true });
             if (head.Physics != null)
             {

@@ -330,6 +330,7 @@ namespace SentisOptimisationsPlugin
             Optimizer.Optimizations.SafeZoneGridTracking.Tick();
             Optimizer.Optimizations.TurretControlTargetSelect.Tick();
             CrashFix.MechanicalTopCheck.Tick();
+            CrashFix.HeadDetachWatch.Tick();
             CrashFix.DockedCollisions.Tick();
             ReplicableResend.Tick();
             RespawnPointsCache.Tick();

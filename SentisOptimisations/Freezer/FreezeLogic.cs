@@ -33,6 +33,8 @@ public class FreezeLogic
     // written by the background FreezerLoop; plain HashSet would race and can throw or tear.
     public static ConcurrentHashSet<long> FrozenGrids = new();
     public static ConcurrentHashSet<long> FrozenPhysicsGrids = new();
+    /// <summary>The simulation frame each grid was last thawed in (read by HeadDetachWatch for its log).</summary>
+    public static readonly System.Collections.Concurrent.ConcurrentDictionary<long, ulong> ThawedAtFrame = new();
     public static ConcurrentHashSet<long> InFreezeQueue = new();
     // Simulation frame at which each grid was frozen (written on the game thread at freeze time).
     public static readonly ConcurrentDictionary<long, ulong> FrozenAtFrame = new();
@@ -265,6 +267,8 @@ public class FreezeLogic
                 }
 
                 Log("Unfreeze grid " + grid.DisplayName + (keepBodies ? " (logic only, bodies kept fixed)" : ""));
+                if (ThawedAtFrame.Count > 100000) ThawedAtFrame.Clear();
+                ThawedAtFrame[grid.EntityId] = MySandboxGame.Static.SimulationFrameCounter;
                 var t0 = System.Diagnostics.Stopwatch.GetTimestamp();
                 var physicsFrozen = FrozenPhysicsGrids.Contains(grid.EntityId);
                 if (logicFrozen)
