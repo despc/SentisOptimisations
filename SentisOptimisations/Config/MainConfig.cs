@@ -14,6 +14,8 @@ namespace SentisOptimisationsPlugin
         private bool _headDetachLog = true;
         private bool _headReattach = true;
         private float _headReattachMaxDistanceM = 10;
+        private bool _pasteCollisionGuard = true;
+        private float _pasteCollisionGuardSeconds = 5;
         private bool _conveyorReach = true;
         private bool _dockedDampenersCalm = true;
         private bool _dockedCollisionsOff = true;
@@ -158,6 +160,20 @@ namespace SentisOptimisationsPlugin
         {
             get => _headReattachMaxDistanceM;
             set => SetValue(ref _headReattachMaxDistanceM, value < 0 ? 0 : value);
+        }
+
+        [DisplayTab(Name = "No collision damage from cut grids", GroupName = "Fixes", Tab = "Performance", Order = 4, Description = "Collision damage done by a grid that is leaving the world is taken away: a cut and paste (!fixship) makes the copy inside its original for a frame, and the hits blew up a ship's warhead torpedoes. Live grids ramming, weapons, explosions as ever. Takes effect at once")]
+        public bool PasteCollisionGuard
+        {
+            get => _pasteCollisionGuard;
+            set => SetValue(ref _pasteCollisionGuard, value);
+        }
+
+        [DisplayTab(Name = "No collision damage from cut grids, s", GroupName = "Fixes", Tab = "Performance", Order = 5, Description = "How long, in game seconds, a grid just added is spared collision damage from a grid already gone from the world")]
+        public float PasteCollisionGuardSeconds
+        {
+            get => _pasteCollisionGuardSeconds;
+            set => SetValue(ref _pasteCollisionGuardSeconds, value < 0 ? 0 : value > 60 ? 60 : value);
         }
 
         [DisplayTab(Name = "Docked grids calm", GroupName = "Fixes", Tab = "Performance", Order = 0, Description = "A grid locked by a connector to another dynamic grid does not dampen while the whole locked group stands (under 5 cm/s): its dampeners kicked against the lock every frame and the docked grids shook. Gravity is still held. Takes effect at once")]

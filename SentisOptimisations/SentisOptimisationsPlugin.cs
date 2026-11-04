@@ -149,6 +149,7 @@ namespace SentisOptimisationsPlugin
                 MyEntities.OnEntityRemove -= EntitiesObserver.MyEntitiesOnOnEntityRemove;
                 MyEntities.OnEntityRemove += EntitiesObserver.MyEntitiesOnOnEntityRemove;
                 EntitiesObserver.PrimeFromAllEntities();
+                CrashFix.PasteCollisionGuard.OnLoaded();
                 InitShieldApi();
             }
         }
@@ -331,6 +332,7 @@ namespace SentisOptimisationsPlugin
             Optimizer.Optimizations.TurretControlTargetSelect.Tick();
             CrashFix.MechanicalTopCheck.Tick();
             CrashFix.HeadDetachWatch.Tick();
+            CrashFix.PasteCollisionGuard.Tick();
             CrashFix.DockedCollisions.Tick();
             ReplicableResend.Tick();
             RespawnPointsCache.Tick();
