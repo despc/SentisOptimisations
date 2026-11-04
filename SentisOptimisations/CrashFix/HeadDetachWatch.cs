@@ -162,7 +162,44 @@ namespace SentisOptimisationsPlugin.CrashFix
                        $"stator's grid {Motion(grid)} {Freezer(grid)}, head's grid {Motion(headGrid)} {Freezer(headGrid)}; " +
                        $"nearest player {(double.IsNaN(nearest) ? "none" : nearest.ToString("0") + " m")}, simulation {Sync.ServerSimulationRatio:0.00}";
             if (cause == Cause.Safety || cause == Cause.Other && !removed) SentisOptimisationsPlugin.Log.Warn(line);
+            else if (cause == Cause.Other && removed) Leaving.Enqueue(new Left { Line = line, StatorGrid = grid, HeadGrid = headGrid });
             else SentisOptimisationsPlugin.Log.Info(line);
+        }
+
+        // A head off as its grid left the world is written a second later and only when one side stayed: a whole
+        // mechanism deleted (a cleanup took an NPC base with its rotors and pistons, prod 04.11.2026: a line for each)
+        // is only counted. A cleanup closes the grids one by one, so the other side is not marked yet at the detach.
+        private sealed class Left
+        {
+            public string Line;
+            public MyCubeGrid StatorGrid, HeadGrid;
+            public ulong At;
+        }
+
+        private const int LeftWaitFrames = 60;
+        private static readonly ConcurrentQueue<Left> Leaving = new ConcurrentQueue<Left>();
+        private static readonly List<Left> LeftWaiting = new List<Left>();
+
+        /// <summary>Heads off with their whole mechanism leaving the world (not written to the log).</summary>
+        public static long WholeLeft;
+
+        private static bool Gone(MyCubeGrid grid) => grid == null || grid.Closed || grid.MarkedForClose;
+
+        private static void TickLeft(ulong frame)
+        {
+            while (Leaving.TryDequeue(out var left))
+            {
+                left.At = frame;
+                LeftWaiting.Add(left);
+            }
+            for (var i = LeftWaiting.Count - 1; i >= 0; i--)
+            {
+                var left = LeftWaiting[i];
+                if (frame - left.At < LeftWaitFrames) continue;
+                LeftWaiting.RemoveAt(i);
+                if (Gone(left.StatorGrid) && Gone(left.HeadGrid)) WholeLeft++;
+                else SentisOptimisationsPlugin.Log.Info(left.Line);
+            }
         }
 
         private static string Motion(MyCubeGrid grid) =>
@@ -187,6 +224,7 @@ namespace SentisOptimisationsPlugin.CrashFix
         public static void Tick()
         {
             var frame = MySandboxGame.Static?.SimulationFrameCounter ?? 0;
+            TickLeft(frame);
             while (Incoming.TryDequeue(out var pending))
             {
                 pending.Since = frame;
