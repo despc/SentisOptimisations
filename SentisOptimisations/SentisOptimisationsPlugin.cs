@@ -245,26 +245,18 @@ namespace SentisOptimisationsPlugin
         {
             try
             {
-                ListReader<MyClusterTree.MyCluster> clusters = MyPhysics.Clusters.GetClusters();
-                var myPhysics = MySession.Static.GetComponent<MyPhysics>();
-                int active = 0;
-                foreach (MyClusterTree.MyCluster myCluster in new List<MyClusterTree.MyCluster>(clusters))
-                {
-                    if (myCluster.UserData is HkWorld userData && (bool) myPhysics.easyCallMethod("IsClusterActive",
-                            new object[] {myCluster.ClusterId, userData.CharacterRigidBodies.Count}))
-                    {
-                        active++;
-                    }
-                }
-
-                var clustersCount = clusters.Count;
+                // This runs on the DelayedProcessor thread: both numbers come from one pass of the freezer on the game
+                // thread (RefreshSteppedWorlds), not from walking the clusters and calling IsClusterActive from here.
+                var counts = FreezeLogic.ClusterCounts;
+                var clustersText = counts == null
+                    ? $"Count: {MyPhysics.Clusters.GetClusters().Count}, Active: n/a"
+                    : $"Count: {counts.Item1}, Active: {counts.Item2}";
                 LogCompensationSummary();
 
                 Instance.UpdateUI(x =>
                 {
                     var gui = x as ConfigGUI;
-                    gui.ClustersStatistic.Text =
-                        $"Count: {clustersCount}, Active: {active}";
+                    gui.ClustersStatistic.Text = clustersText;
                     try
                     {
                         gui.FreezerStatistic.Text =

@@ -151,12 +151,20 @@ namespace Optimizer.Optimizations
 
         private static readonly HashSet<HkWorld> Empty = new HashSet<HkWorld>();
 
-        // the characters someone controls, by cluster, counted once a frame
-        private static readonly Dictionary<int, int> _controlled = new Dictionary<int, int>();
-        private static ulong _controlledFrame = ulong.MaxValue;
+        /// <summary>The characters someone controls, by cluster, counted once a frame; never changed once published.</summary>
+        private sealed class ControlledSnapshot
+        {
+            public readonly ulong Frame;
+            public readonly Dictionary<int, int> ByCluster;
 
-        // the worlds of the ships players fly now (a seat, a remote control), taken once a frame
-        private static readonly HashSet<HkWorld> _piloted = new HashSet<HkWorld>();
+            public ControlledSnapshot(ulong frame, Dictionary<int, int> byCluster)
+            {
+                Frame = frame;
+                ByCluster = byCluster;
+            }
+        }
+
+        private static volatile ControlledSnapshot _controlled;
 
         /// <summary>
         /// The characters of a cluster, for the game's choice to step it: only the ones someone controls - and a ship a
@@ -164,34 +172,47 @@ namespace Optimizer.Optimizations
         /// ship's world only once the ship is streamed to that player: a ship just sat in on a loaded server stood there,
         /// its thrust not even worked out (ThrustPrefix), the pilot's keys moving nothing (reg_dampeners_off with 350 fake
         /// players, 28.10.2026).
+        /// It may be called from any thread (the panel, cluster threads beside SentisClusters): each frame's counts are
+        /// built in collections of their own and published whole, nobody clears or fills a shared set. Two threads that
+        /// cleared and filled the same set broke it, and the next Add on the game thread looped for ever (watchdog
+        /// freeze, 03.11.2026).
         /// </summary>
         private static void ClusterActivePrefix(int clusterId, ref int rigidBodiesCount)
         {
             try
             {
                 var frame = Sandbox.MySandboxGame.Static?.SimulationFrameCounter ?? 0UL;
-                if (frame != _controlledFrame)
+                var snapshot = _controlled;
+                if (snapshot == null || snapshot.Frame != frame)
                 {
-                    _controlledFrame = frame;
-                    _controlled.Clear();
-                    _piloted.Clear();
-                    foreach (var player in Sandbox.Game.World.MySession.Static.Players.GetOnlinePlayers())
-                        if (player.Controller?.ControlledEntity is Sandbox.Game.Entities.MyShipController seat && seat.CubeGrid?.Physics?.HavokWorld is HkWorld flown)
-                            _piloted.Add(flown);
-                    foreach (var cluster in MyPhysics.Clusters.GetClusters())
-                    {
-                        if (!(cluster.UserData is HkWorld world)) continue;
-                        var piloted = _piloted.Contains(world) ? 1 : 0;
-                        if (world.CharacterRigidBodies.Count > 0 || piloted > 0)
-                            _controlled[cluster.ClusterId] = Controlled(world) + piloted;
-                    }
+                    // two threads may both build the frame's counts: both are whole, the last one published stays
+                    snapshot = new ControlledSnapshot(frame, CountControlled());
+                    _controlled = snapshot;
                 }
-                rigidBodiesCount = _controlled.TryGetValue(clusterId, out var count) ? count : rigidBodiesCount;
+                rigidBodiesCount = snapshot.ByCluster.TryGetValue(clusterId, out var count) ? count : rigidBodiesCount;
             }
             catch (Exception)
             {
                 // the game's own count stands
             }
+        }
+
+        private static Dictionary<int, int> CountControlled()
+        {
+            // the worlds of the ships players fly now (a seat, a remote control)
+            var piloted = new HashSet<HkWorld>();
+            foreach (var player in Sandbox.Game.World.MySession.Static.Players.GetOnlinePlayers())
+                if (player.Controller?.ControlledEntity is Sandbox.Game.Entities.MyShipController seat && seat.CubeGrid?.Physics?.HavokWorld is HkWorld flown)
+                    piloted.Add(flown);
+            var byCluster = new Dictionary<int, int>();
+            foreach (var cluster in MyPhysics.Clusters.GetClusters())
+            {
+                if (!(cluster.UserData is HkWorld world)) continue;
+                var pilot = piloted.Contains(world) ? 1 : 0;
+                if (world.CharacterRigidBodies.Count > 0 || pilot > 0)
+                    byCluster[cluster.ClusterId] = Controlled(world) + pilot;
+            }
+            return byCluster;
         }
 
         private static int Controlled(HkWorld world)

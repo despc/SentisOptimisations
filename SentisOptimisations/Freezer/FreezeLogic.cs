@@ -119,17 +119,33 @@ public class FreezeLogic
     private static MyPhysics _boundPhysics;
     private static Func<int, int, bool> _isClusterActive;
 
+    /// <summary>
+    /// The clusters and the active (stepped) ones among them, counted in the same pass of RefreshSteppedWorlds on the
+    /// game thread, for the panel; null before the first pass or after a failed one. Any thread.
+    /// </summary>
+    public static Tuple<int, int> ClusterCounts => _clusterCounts;
+    private static volatile Tuple<int, int> _clusterCounts;
+
     /// <summary>Takes the set of Havok worlds MyPhysics steps. Game thread.</summary>
     public static void RefreshSteppedWorlds()
     {
         try
         {
             var physics = MySession.Static?.GetComponent<MyPhysics>();
-            if (physics == null || WorldObserverField == null || IsClusterActiveMethod == null || MyPhysics.Clusters == null ||
-                WorldObserverField.GetValue(physics) == null)
+            if (physics == null || WorldObserverField == null || IsClusterActiveMethod == null || MyPhysics.Clusters == null)
             {
                 _steppedWorlds = null;
                 _knownWorlds = null;
+                _clusterCounts = null;
+                return;
+            }
+            if (WorldObserverField.GetValue(physics) == null)
+            {
+                // selective updates are off: every cluster is stepped
+                _steppedWorlds = null;
+                _knownWorlds = null;
+                var all = MyPhysics.Clusters.GetClusters().Count;
+                _clusterCounts = Tuple.Create(all, all);
                 return;
             }
 
@@ -141,19 +157,25 @@ public class FreezeLogic
 
             var stepped = new HashSet<HkWorld>();
             var known = new HashSet<HkWorld>();
-            foreach (var cluster in MyPhysics.Clusters.GetClusters())
+            var clusters = MyPhysics.Clusters.GetClusters();
+            var active = 0;
+            foreach (var cluster in clusters)
             {
                 if (!(cluster.UserData is HkWorld world)) continue;
                 known.Add(world);
-                if (_isClusterActive(cluster.ClusterId, world.CharacterRigidBodies.Count)) stepped.Add(world);
+                if (!_isClusterActive(cluster.ClusterId, world.CharacterRigidBodies.Count)) continue;
+                stepped.Add(world);
+                active++;
             }
             _knownWorlds = known;
             _steppedWorlds = stepped;
+            _clusterCounts = Tuple.Create(clusters.Count, active);
         }
         catch (Exception e)
         {
             _steppedWorlds = null;
             _knownWorlds = null;
+            _clusterCounts = null;
             SentisOptimisationsPlugin.Log.Error(e, "Stepped Havok worlds");
         }
     }
