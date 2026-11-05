@@ -15,6 +15,7 @@ namespace SentisOptimisationsPlugin
         private bool _headReattach = true;
         private float _headReattachMaxDistanceM = 10;
         private bool _pasteCollisionGuard = true;
+        private bool _turretShootIdle = true;
         private float _pasteCollisionGuardSeconds = 5;
         private bool _conveyorReach = true;
         private bool _dockedDampenersCalm = true;
@@ -319,6 +320,13 @@ namespace SentisOptimisationsPlugin
         {
             get => _scriptOvertimeExecTimesBeforePunish;
             set => SetValue(ref _scriptOvertimeExecTimesBeforePunish, value);
+        }
+
+        [DisplayTab(Name = "No stop of idle turrets sent to the players", GroupName = "Scripts", Tab = "Scripts", Order = 4, Description = "A turret set to stop shooting (Shoot = false) while it is not shooting is not told so over the network: fire control scripts set it every tick, and each was a reliable event to every player. Turning shooting on and a turret that shoots as ever. Takes effect at once")]
+        public bool TurretShootIdle
+        {
+            get => _turretShootIdle;
+            set => SetValue(ref _turretShootIdle, value);
         }
         
         
