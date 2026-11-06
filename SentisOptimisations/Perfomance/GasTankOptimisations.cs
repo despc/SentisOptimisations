@@ -36,6 +36,12 @@ namespace SentisOptimisationsPlugin
     /// frame and the tank stayed empty while the ship's tanks gave to it (prod 06.11.2026, torpedoes welded on their
     /// racks took 750 L/s each and filled not at all; SentisTests torpedo_refill). The batches stay by entity id: a block
     /// a split or a merge makes again (a new object, the id kept) takes what its old self still held.
+    ///
+    /// A projection's tanks are not updated at all. The projection turns its blocks' updates off, but a tank turns its
+    /// per-frame update back on whenever its gas input or output changes - and the projection's own resource system
+    /// changes them - while the 100-frame check that would turn it off again stays off: every ghost tank ran an empty
+    /// transfer every frame for as long as it was projected (the stand on the prod save, 06.11.2026: 230 of them, the
+    /// only ghosts of 14016 updated; SentisTests projection_twins).
     /// </summary>
     [PatchShim]
     public static class GasTankOptimisations
@@ -130,6 +136,16 @@ namespace SentisOptimisationsPlugin
                 .Prefixes.Add(self.GetMethod(nameof(TankTransferPrefix), statics));
             ctx.GetPattern(typeof(MyAirVent).GetMethod("Transfer", instance))
                 .Prefixes.Add(self.GetMethod(nameof(VentTransferPrefix), statics));
+            ctx.GetPattern(typeof(MyGasTank).GetMethod(nameof(MyGasTank.UpdateAfterSimulation), BindingFlags.Instance | BindingFlags.Public, null, Type.EmptyTypes, null))
+                .Prefixes.Add(self.GetMethod(nameof(TankUpdatePrefix), statics));
+        }
+
+        /// <summary>A ghost tank of a projection: its per-frame update off, nothing run.</summary>
+        private static bool TankUpdatePrefix(MyGasTank __instance)
+        {
+            if (!InProjection(__instance)) return true;
+            __instance.NeedsUpdate &= ~VRage.ModAPI.MyEntityUpdateEnum.EACH_FRAME_AFTER;
+            return false;
         }
 
         private static bool TankTransferPrefix(MyGasTank __instance, ref double totalTransfer)
