@@ -147,7 +147,7 @@ namespace Optimizer.Optimizations
             }
         }
 
-        private static double Jitter(long entityId)
+        internal static double Jitter(long entityId)
         {
             var z = (ulong)entityId + 0x9E3779B97F4A7C15UL;
             z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9UL;
@@ -162,7 +162,7 @@ namespace Optimizer.Optimizations
             return (object)MyCubeGridGroups.Static?.Logical.GetGroup(grid) ?? grid;
         }
 
-        private static long Generation(MyCubeGrid grid)
+        internal static long Generation(MyCubeGrid grid)
         {
             var key = NetworkKey(grid);
             if (key == null) return 0;
