@@ -131,11 +131,19 @@ namespace SentisOptimisations.Tests
                 "game-thread-written collections iterated by background loops:\n" + string.Join("\n", offenders));
         }
 
+        /// <summary>The tests' tanks all have entity id 0: each starts with no batch held for it by another test's.</summary>
+        private static void ClearGasBatches()
+        {
+            var batches = typeof(GasTankOptimisations).GetField("Batches", BindingFlags.Static | BindingFlags.NonPublic)?.GetValue(null) as System.Collections.IDictionary;
+            batches?.Clear();
+        }
+
         // ---------------------------- finding: GasTank flush drops the current cycle's transfer
         [Fact]
         public void GasTank_flush_must_not_lose_the_current_transfer()
         {
             PluginHarness.SetConfig("GasTankOptimisation", true);
+            ClearGasBatches();
             var prefix = typeof(GasTankOptimisations).GetMethod("TankTransferPrefix",
                 BindingFlags.Static | BindingFlags.NonPublic);
             var tank = System.Runtime.Serialization.FormatterServices
@@ -157,11 +165,53 @@ namespace SentisOptimisations.Tests
                 "flush loses gas: handed over " + flush[1] + " of " + perFlush);
         }
 
+        // ------------- finding: a projector's built tank and its ghost share the entity id; the ghost took the batch
+        [Fact]
+        public void GasTank_batch_is_the_tanks_own_not_its_ids()
+        {
+            PluginHarness.SetConfig("GasTankOptimisation", true);
+            ClearGasBatches();
+            var prefix = typeof(GasTankOptimisations).GetMethod("TankTransferPrefix",
+                BindingFlags.Static | BindingFlags.NonPublic);
+            // two tanks of one entity id (uninitialized: both 0), as a built block and its ghost in the projection
+            var built = System.Runtime.Serialization.FormatterServices.GetUninitializedObject(typeof(Sandbox.Game.Entities.Blocks.MyGasTank));
+            var ghost = System.Runtime.Serialization.FormatterServices.GetUninitializedObject(typeof(Sandbox.Game.Entities.Blocks.MyGasTank));
+            var flushMethod = typeof(GasTankOptimisations).GetMethod("Flush", BindingFlags.Static | BindingFlags.Public);
+            flushMethod.Invoke(null, new object[] { built });
+            flushMethod.Invoke(null, new object[] { ghost });
+            for (var i = 0; i < 5; i++) Assert.False((bool)prefix.Invoke(null, new object[] { built, 12.5 }), "the built tank's transfer " + i + " handed over at once");
+            // the ghost, nothing to transfer, hands over what it holds - nothing - and must not take the built tank's
+            object[] idle = { ghost, 0.0 };
+            Assert.True((bool)prefix.Invoke(null, idle));
+            Assert.True(Math.Abs((double)idle[1]) < 1e-9, "the ghost was handed the built tank's gas: " + idle[1] + " L");
+            // the built tank's own stop hands over its five
+            object[] stop = { built, 0.0 };
+            Assert.True((bool)prefix.Invoke(null, stop));
+            Assert.True(Math.Abs((double)stop[1] - 62.5) < 1e-6, "the built tank was handed " + stop[1] + " L of its 62.5");
+        }
+
+        [Fact]
+        public void GasTank_batch_goes_to_the_same_block_made_again()
+        {
+            PluginHarness.SetConfig("GasTankOptimisation", true);
+            ClearGasBatches();
+            var prefix = typeof(GasTankOptimisations).GetMethod("TankTransferPrefix", BindingFlags.Static | BindingFlags.NonPublic);
+            // a split or a merge makes the block again: a new object of the same id, the old one closed
+            var old = System.Runtime.Serialization.FormatterServices.GetUninitializedObject(typeof(Sandbox.Game.Entities.Blocks.MyGasTank));
+            var again = System.Runtime.Serialization.FormatterServices.GetUninitializedObject(typeof(Sandbox.Game.Entities.Blocks.MyGasTank));
+            for (var i = 0; i < 4; i++) Assert.False((bool)prefix.Invoke(null, new object[] { old, 10.0 }));
+            typeof(VRage.Game.Entity.MyEntity).GetProperty("Closed").SetValue(old, true);
+            object[] stop = { again, 0.0 };
+            Assert.True((bool)prefix.Invoke(null, stop));
+            Assert.True(Math.Abs((double)stop[1] - 40) < 1e-6, "the block made again was handed " + stop[1] + " L of the 40 its old self held");
+        }
+
         // ------------- finding: a held transfer did not count, and the tank stopped its updates for good
         [Fact]
         public void GasTank_held_transfers_must_count_for_the_tank()
         {
             PluginHarness.SetConfig("GasTankOptimisation", true);
+            ClearGasBatches();
             var prefix = typeof(GasTankOptimisations).GetMethod("TankTransferPrefix",
                 BindingFlags.Static | BindingFlags.NonPublic);
             var sum = typeof(Sandbox.Game.Entities.Blocks.MyGasTank).GetField("m_prevSumTotalTransfer",

@@ -29,6 +29,13 @@ namespace SentisOptimisationsPlugin
     /// The withheld calls left the sum at zero: a tank whose 100-frame check came before its first
     /// batch of thirty stopped for good - its generator went on making gas and burning ice, the gas
     /// went nowhere (found by reg_generator_pulls_ice: 1000 kg of ice into a tank left empty).
+    ///
+    /// A projection's blocks are left to the game, and a batch is handed over only to the block it was gathered for.
+    /// A block a projector builds takes the entity id of its ghost in the projection, and the ghost tank goes on being
+    /// updated with nothing to transfer - which hands over what is held: the ghost took the built tank's gas every
+    /// frame and the tank stayed empty while the ship's tanks gave to it (prod 06.11.2026, torpedoes welded on their
+    /// racks took 750 L/s each and filled not at all; SentisTests torpedo_refill). The batches stay by entity id: a block
+    /// a split or a merge makes again (a new object, the id kept) takes what its old self still held.
     /// </summary>
     [PatchShim]
     public static class GasTankOptimisations
@@ -45,6 +52,22 @@ namespace SentisOptimisationsPlugin
             public double Amount;
             public int Count;
             public DateTime Since;
+            // the block it is gathered for (weakly: a batch left behind keeps no block alive)
+            public readonly WeakReference<MyEntity> Owner = new WeakReference<MyEntity>(null);
+
+            /// <summary>
+            /// Whether <paramref name="block"/> may take this batch: its own, or it was gathered for one gone - the same
+            /// block made again by a split or a merge. Another live block of the same id (a projection's ghost) may not.
+            /// </summary>
+            public bool Belongs(MyEntity block)
+            {
+                if (!Owner.TryGetTarget(out var owner) || ReferenceEquals(owner, block) || owner.Closed || owner.MarkedForClose)
+                {
+                    Owner.SetTarget(block);
+                    return true;
+                }
+                return false;
+            }
 
             /// <summary>
             /// Adds one transfer and says whether the batch is due. The amount is returned through
@@ -138,17 +161,21 @@ namespace SentisOptimisationsPlugin
             try
             {
                 if (_flushing || !SentisOptimisationsPlugin.Config.GasTankOptimisation) return true;
+                // a projection's ghost: the game's own way, nothing held for it
+                if (InProjection(block)) return true;
                 if (amount == 0.0)
                 {
                     // the flow has stopped: what is still held goes through with this update
                     if (Batches.TryGetValue(block.EntityId, out var held))
                         lock (held)
-                            held.Take(out total);
+                            if (held.Belongs(block)) held.Take(out total);
                     return true;
                 }
                 var batch = Batches.GetOrAdd(block.EntityId, _ => new Batch());
                 lock (batch)
                 {
+                    // another live block's batch under this id: this one goes the game's way
+                    if (!batch.Belongs(block)) return true;
                     return batch.Add(amount, DateTime.UtcNow, out total);
                 }
             }
@@ -159,16 +186,31 @@ namespace SentisOptimisationsPlugin
             }
         }
 
+        /// <summary>Whether the block is a ghost of a projection (a block not yet in the world reads as not).</summary>
+        private static bool InProjection(MyEntity block)
+        {
+            try
+            {
+                return (block as MyCubeBlock)?.SlimBlock?.CubeGrid?.IsPreview == true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
         /// <summary>
         /// Hands over what a block still owes. Called when the block goes away and when the world
         /// unloads, so gathered gas is never left behind.
         /// </summary>
         public static void Flush(MyEntity block)
         {
-            if (block == null || !Batches.TryRemove(block.EntityId, out var batch)) return;
+            if (block == null || !Batches.TryGetValue(block.EntityId, out var batch)) return;
             double owed;
             lock (batch)
             {
+                if (!batch.Belongs(block)) return;
+                Batches.TryRemove(block.EntityId, out _);
                 if (!batch.Take(out owed)) return;
             }
 
