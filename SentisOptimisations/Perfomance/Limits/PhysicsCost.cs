@@ -137,8 +137,11 @@ namespace Optimizer.Optimizations
         private static long _plainStart;
         private static bool _measureBroken, _measuredThisFrame, _wasOff;
 
-        /// <summary>The monitor turned off on the plugin's page: the step is the game's own, nothing is counted.</summary>
+        /// <summary>The monitor turned off on the plugin's page: the step is the game's own (each world begun finished, <see cref="Paired"/>), nothing is counted.</summary>
         internal static bool Off => SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config?.DisablePhysicsMonitor == true;
+
+        /// <summary>For the stand's tests: the worlds stepped by <see cref="Paired"/> (true unless a test turns it off, to compare with the game's own step).</summary>
+        internal static bool PairedStep = true;
 
         /// <summary>For the stand's tests: the clusters' steps are timed (true unless a test turns it off).</summary>
         internal static bool ClusterTiming = true;
@@ -306,7 +309,7 @@ namespace Optimizer.Optimizations
             {
                 _plainStart = 0;
                 _wasOff = true;
-                return true;
+                return Paired(__instance);
             }
             if (_wasOff)
             {
@@ -315,9 +318,9 @@ namespace Optimizer.Optimizations
                 Reset();
             }
             _plainStart = Stopwatch.GetTimestamp();
-            if (!ClusterTiming || _measureBroken) return true;
+            if (!ClusterTiming || _measureBroken) return Paired(__instance);
             var frame = Sandbox.MySandboxGame.Static?.SimulationFrameCounter ?? 0UL;
-            if (frame - _lastMeasured < (ulong)Math.Max(1, GapFrames)) return true;
+            if (frame - _lastMeasured < (ulong)Math.Max(1, GapFrames)) return Paired(__instance);
             if (frame - _lastForgot > 3600) Forget(frame);
 
             var clusters = MyPhysics.Clusters.GetClusters();
@@ -337,7 +340,7 @@ namespace Optimizer.Optimizations
                     pick = cluster;
                 }
             }
-            if (pick == null) return true;
+            if (pick == null) return Paired(__instance);
             _lastMeasured = frame;
             _plainStart = 0;
 
@@ -386,6 +389,7 @@ namespace Optimizer.Optimizations
                         {
                             if (cluster == pick) continue;
                             var world = (HkWorld)cluster.UserData;
+                            if (world.IsDisposed) continue;
                             world.FinishMtStep(queue, pool);
                             world.MarkForWrite();
                         }
@@ -408,6 +412,174 @@ namespace Optimizer.Optimizations
             ClustersMeasured++;
             _measuredThisFrame = true;
             return false;
+        }
+
+        private static readonly List<HkWorld> PairedWorlds = new List<HkWorld>();
+        private static readonly List<int> PairedIds = new List<int>();
+        private static readonly HashSet<int> PairedSet = new HashSet<int>();
+
+        /// <summary>
+        /// For the stand's tests and the log: the clusters whose being stepped changed while the frame's step was
+        /// finished - each one a world the game's own step would have left locked for good (stepped when its step
+        /// began, not when it was to end) or finished unbegun (the other way).
+        /// </summary>
+        internal static long StepFlipsLocked, StepFlipsUnbegun;
+
+        /// <summary>For the stand's tests: Havok's answers of no to a world's step begun or ended (the game takes neither).</summary>
+        internal static long StepInitFalse, StepFinishFalse;
+
+        /// <summary>For the stand's tests: worlds begun whose cluster the game, asking again right before its end, would have left unfinished.</summary>
+        internal static long StepFlipsMidway;
+
+        // hkpWorld::m_criticalOperationsLockCount (Havok.dll's addAction reads it: cmp dword ptr [rcx+0E8h], 0)
+        private const int CriticalLockOffset = 0xE8;
+        private static long _lockedTold;
+
+        /// <summary>
+        /// The game's step of its worlds (<c>MyPhysics.StepWorldsParallel</c>) with each world finished that was begun.
+        ///
+        /// The game asks whether a cluster is stepped (<c>IsClusterActive</c>: a world with no character in it is
+        /// stepped while the world observer counts something replicated in its cluster) twice: before
+        /// <c>InitMtStep</c> and again before <c>FinishMtStep</c>, and finishes the worlds one after another - Havok's
+        /// callbacks of one (contacts, damage, a character dying, an entity gone) change the counts of the next ones.
+        /// A world begun and then not finished stays locked for its critical operations for good: every body put into
+        /// it after is left out of it by Havok (its add put off), and the first one given gravity crashed the server -
+        /// an access violation in <c>HkRigidBody_AddGravityAction</c> reading a world at null+0xE8, the game's handler
+        /// of a crash killing the process without a word in Torch's log (the stand, 06-07.11.2026, eight times, with
+        /// SentisClusters' 5 km clusters: many worlds, each stepped for a few entities). Finished unbegun, Havok's
+        /// state of the world goes bad. Here the worlds are asked once: those begun are the ones finished, each in a
+        /// try of its own (one world's callback throwing leaves no other locked; the first exception is thrown on
+        /// after, as the game's step would have thrown it), and a world taken apart meanwhile is passed by.
+        /// </summary>
+        private static bool Paired(MyPhysics physics)
+        {
+            if (!PairedStep) return true;
+            var queue = (HkJobQueue)_jobQueue.GetValue(null);
+            var pool = (HkJobThreadPool)_threadPool.GetValue(null);
+            var dt = 1f / 60f * MyFakes.SIMULATION_SPEED;
+            PairedWorlds.Clear();
+            PairedIds.Clear();
+            Exception first = null;
+            using (MyEntities.StartAsyncUpdateBlock())
+            using (HkAccessControl.PushState(HkAccessControl.AccessState.SharedRead))
+            {
+                queue.WaitPolicy = HkJobQueue.WaitPolicyT.WAIT_INDEFINITELY;
+                pool.ExecuteJobQueue(queue);
+                TreeBefore.Clear();
+                foreach (var cluster in MyPhysics.Clusters.GetClusters())
+                {
+                    TreeBefore.Add(cluster);
+                    if (!Active(physics, cluster, out var world)) continue;
+                    world.ExecutePendingCriticalOperations();
+                    world.UnmarkForWrite();
+                    if (!world.InitMtStep(queue, dt)) StepInitFalse++;
+                    PairedWorlds.Add(world);
+                    PairedIds.Add(cluster.ClusterId);
+                }
+                queue.WaitPolicy = HkJobQueue.WaitPolicyT.WAIT_UNTIL_ALL_WORK_COMPLETE;
+                queue.ProcessAllJobs();
+                pool.WaitForCompletion();
+                for (var i = 0; i < PairedWorlds.Count; i++)
+                {
+                    var world = PairedWorlds[i];
+                    if (world.IsDisposed)
+                    {
+                        Log.Warn($"PhysicsCost: the world of cluster {PairedIds[i]} was taken apart during the step, not finished");
+                        continue;
+                    }
+                    // what the game asks here (IsClusterActive again, after the worlds finished before this one): a no is a
+                    // world its own step would have left locked - finished all the same
+                    if (!_clusterActive(physics, PairedIds[i], world.CharacterRigidBodies.Count))
+                    {
+                        var n = ++StepFlipsMidway;
+                        if (n <= 20 || n % 100 == 0)
+                            Log.Warn($"PhysicsCost: cluster {PairedIds[i]} ({world.RigidBodies.Count} bodies) stopped being stepped between its step's beginning and its end: " +
+                                     $"the game's step would have left its world locked for good; finished (#{n} since the start)");
+                    }
+                    try
+                    {
+                        if (!world.FinishMtStep(queue, pool)) StepFinishFalse++;
+                        world.MarkForWrite();
+                        // a world still locked for its critical operations after its step's end: none should be
+                        var locks = System.Runtime.InteropServices.Marshal.ReadInt32(world.NativeObject + CriticalLockOffset);
+                        if (locks != 0 && ++_lockedTold <= 20)
+                            Log.Warn($"PhysicsCost: the world of cluster {PairedIds[i]} ({world.RigidBodies.Count} bodies) is still locked ({locks}) after its step's end" +
+                                     $" (InitMtStep false {StepInitFalse} times, FinishMtStep false {StepFinishFalse} times since the start)");
+                    }
+                    catch (Exception e)
+                    {
+                        if (first == null) first = e;
+                    }
+                }
+            }
+            CountFlips(physics);
+            CountTreeChanges();
+            if (first != null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(first).Throw();
+            return false;
+        }
+
+        private static long _flipsTold, _treeChangesTold;
+        // the clusters (by reference: their ids are the tree's proxies, used again) before the step and after it
+        private static readonly HashSet<MyClusterTree.MyCluster> TreeBefore = new HashSet<MyClusterTree.MyCluster>();
+        private static readonly HashSet<MyClusterTree.MyCluster> TreeNow = new HashSet<MyClusterTree.MyCluster>();
+
+        /// <summary>
+        /// For the stand's tests: steps during which the cluster tree changed - a world begun gone from the clusters, or
+        /// one made - while the worlds were finished. The game's step finishes the worlds walking the tree's live list:
+        /// such a change moves the walk past a world begun, left locked for good.
+        /// </summary>
+        internal static long StepTreeChanges;
+
+        private static void CountTreeChanges()
+        {
+            try
+            {
+                TreeNow.Clear();
+                foreach (var cluster in MyPhysics.Clusters.GetClusters()) TreeNow.Add(cluster);
+                var gone = 0;
+                foreach (var cluster in TreeBefore) if (!TreeNow.Contains(cluster)) gone++;
+                var made = 0;
+                foreach (var cluster in TreeNow) if (!TreeBefore.Contains(cluster)) made++;
+                if (gone == 0 && made == 0) return;
+                StepTreeChanges++;
+                var n = ++_treeChangesTold;
+                if (n <= 20 || n % 100 == 0)
+                    Log.Warn($"PhysicsCost: the cluster tree changed during the step: {gone} clusters gone, {made} made " +
+                             $"(#{n}; the game's step walks the live list there and can pass a world begun by, leaving it locked)");
+            }
+            catch (Exception e)
+            {
+                Log.Warn("PhysicsCost: the check of the cluster tree after the step failed: " + e.Message);
+            }
+        }
+
+        /// <summary>What the game's own step would have done wrong this frame: told the first times, then every hundredth.</summary>
+        private static void CountFlips(MyPhysics physics)
+        {
+            try
+            {
+                PairedSet.Clear();
+                foreach (var id in PairedIds) PairedSet.Add(id);
+                foreach (var cluster in MyPhysics.Clusters.GetClusters())
+                {
+                    if (!(cluster.UserData is HkWorld world) || world.IsDisposed) continue;
+                    var began = PairedSet.Contains(cluster.ClusterId);
+                    var now = _clusterActive(physics, cluster.ClusterId, world.CharacterRigidBodies.Count);
+                    if (began == now) continue;
+                    if (began) StepFlipsLocked++;
+                    else StepFlipsUnbegun++;
+                    var n = ++_flipsTold;
+                    if (n <= 20 || n % 100 == 0)
+                        Log.Warn($"PhysicsCost: cluster {cluster.ClusterId} ({world.RigidBodies.Count} bodies) " +
+                                 (began ? "stopped being stepped while the step was finished: the game's step would have left its world locked for good"
+                                        : "started being stepped while the step was finished: the game's step would have finished its world unbegun") +
+                                 $" (#{n}; {StepFlipsLocked} would-be locked, {StepFlipsUnbegun} would-be unbegun since the start)");
+                }
+            }
+            catch (Exception e)
+            {
+                Log.Warn("PhysicsCost: the check of the clusters' stepping failed: " + e.Message);
+            }
         }
 
         /// <summary>
