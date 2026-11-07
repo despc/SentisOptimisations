@@ -255,6 +255,7 @@ public class FreezeLogic
                     !MyCubeGridGroups.Static.Physical.GetGroupNodes(bodies[0]).Any(grid => grid.IsStatic))
                     ThawGuard.LiftOutOfGround(bodies);
             }
+            if (thawing.Any(FreezeTrace.IsTraced)) FreezeTrace.Write("thaw, before (bodies " + (keepBodies ? "kept fixed" : "to dynamic") + ")", thawing);
             foreach (var grid in thawing)
             {
                 var logicFrozen = FrozenGrids.Contains(grid.EntityId);
@@ -299,6 +300,7 @@ public class FreezeLogic
             }
             // every grid of the thaw at rest, now and again a few ticks later (ThawGuard)
             if (settle != null) ThawGuard.Settle(settle);
+            FreezeTrace.AfterThaw(thawing);
         });
     }
 
@@ -504,6 +506,7 @@ public class FreezeLogic
                         freezePhysics = true;
                     }
                     var frame = MySandboxGame.Static.SimulationFrameCounter;
+                    var traced = FreezeTrace.AtFreeze(realyNeedToFreezeGrids);
                     foreach (var grid in realyNeedToFreezeGrids)
                     {
                         Log("Freeze grid " + grid.DisplayName);
@@ -541,6 +544,7 @@ public class FreezeLogic
                             }
                         }
                     }
+                    if (traced) FreezeTrace.Write("freeze, after (physics " + (freezePhysics ? "frozen" : "not frozen") + ")", realyNeedToFreezeGrids);
                 }
                 catch (Exception e)
                 {

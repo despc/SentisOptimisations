@@ -49,6 +49,7 @@ namespace SentisOptimisationsPlugin
         private bool _enableCompensationLogs = false;
         private bool _diagnosticLogs = false;
         private bool _freezePhysics = false;
+        private bool _freezeTraceLogs;
         private string _antifreezeBlockSubtypes = "LargeBlockSmallContainer_admin2:LargeBlockSmallContainer_admin";
         private int _minWakeUpIntervalInSec = 600;
         private double _assemblerPullBudgetMs = 1.5;
@@ -269,6 +270,10 @@ namespace SentisOptimisationsPlugin
 
         [DisplayTab(Name = "Compensation logs", GroupName = "Logs", Tab = "Logs", Order = 2, Description = "What frozen blocks are given for the time they were frozen (off by default)")]
         public bool EnableCompensationLogs { get => _enableCompensationLogs; set => SetValue(ref _enableCompensationLogs, value); }
+
+        [DisplayTab(Name = "Freezer trace of fast groups", GroupName = "Logs", Tab = "Logs", Order = 3,
+            Description = "A group with subgrids moving faster than 10 m/s when frozen: its grids' speeds and joints at the freeze and the thaw (a few lines a group, the first 30 groups since the start). Off by default")]
+        public bool FreezeTraceLogs { get => _freezeTraceLogs; set => SetValue(ref _freezeTraceLogs, value); }
 
         [DisplayTab(Name = "Diagnostic logs", GroupName = "Logs", Tab = "Logs", Order = 0,
             Description = "Timings and what the optimisations did (warm-ups, save and voxel timings, deferred deletes, economy steps...). Off by default; errors are logged anyway")]
