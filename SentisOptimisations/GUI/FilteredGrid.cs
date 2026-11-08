@@ -140,7 +140,8 @@ namespace SOPlugin.GUI
             }
 
             var curRow = 0;
-            foreach (var c in categories.OrderBy(x => x.Key))
+            // the freezer first, the fixes last, the rest by name between
+            foreach (var c in categories.OrderBy(x => x.Key == "Freezer" ? 0 : x.Key == "Fixes" ? 2 : 1).ThenBy(x => x.Key))
             {
                 grid.RowDefinitions.Add(new RowDefinition());
                 var cl = new TextBlock { Text = c.Key, VerticalAlignment = VerticalAlignment.Center };

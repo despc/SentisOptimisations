@@ -23,8 +23,8 @@ namespace SentisOptimisationsPlugin.Freezer;
 /// Before the bodies are made dynamic again the group is lifted out of the ground if a grid of it is in it
 /// (<see cref="LiftOutOfGround"/>; a single voxel's content says too little: blocks embedded half a voxel showed as in
 /// the rock, and settled rovers were lifted at every thaw); and the speeds of all its grids are put to zero at the thaw and again
-/// <see cref="CheckTicks"/> ticks after it (<see cref="Settle"/>). A lift, and a speed found above
-/// <see cref="Quiet"/>, are logged always, not only with the freezer's logs on.
+/// <see cref="CheckTicks"/> ticks after it (<see cref="Settle"/>). A lift is logged always, not only with the freezer's
+/// logs on.
 /// </summary>
 internal static class ThawGuard
 {
@@ -33,9 +33,6 @@ internal static class ThawGuard
 
     /// <summary>How long a grid must have been frozen for its speeds to be zeroed at the thaw, ticks (10 s).</summary>
     public const ulong MinFrozenFrames = 600;
-
-    /// <summary>Speed (m/s, rad/s) over which a zeroing is logged.</summary>
-    public const float Quiet = 0.5f;
 
     /// <summary>How far a group is lifted at most, metres: deeper than that it is left where it is.</summary>
     public const double MaxLift = 12;
@@ -117,21 +114,15 @@ internal static class ThawGuard
     {
         try
         {
-            List<string> fast = null;
             foreach (var grid in grids)
             {
                 var physics = grid?.Physics;
                 if (grid == null || grid.Closed || grid.MarkedForClose || grid.IsStatic || physics == null || physics.RigidBody == null) continue;
                 // frozen again meanwhile: the freeze put its speeds to zero itself
                 if (FreezeLogic.FrozenGrids.Contains(grid.EntityId)) continue;
-                var linear = physics.LinearVelocity.Length();
-                var angular = physics.AngularVelocity.Length();
-                if (linear > Quiet || angular > Quiet)
-                    (fast ??= new List<string>()).Add($"{grid.DisplayName} {linear:0.0} m/s, {angular:0.00} rad/s");
-                if (linear > 0 || angular > 0) physics.SetSpeeds(Vector3.Zero, Vector3.Zero);
+                if (physics.LinearVelocity.LengthSquared() > 0 || physics.AngularVelocity.LengthSquared() > 0)
+                    physics.SetSpeeds(Vector3.Zero, Vector3.Zero);
             }
-            if (fast != null)
-                SentisOptimisationsPlugin.Log.Warn($"Freezer: thawed {Names(grids)}, {(ticks == 0 ? "at the thaw" : ticks + " ticks after it")}: speeds put to zero - {string.Join("; ", fast)}");
         }
         catch (Exception e)
         {
