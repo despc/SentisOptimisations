@@ -9,6 +9,7 @@ namespace SentisOptimisationsPlugin
 
         //optimisations
         private bool _gasTankOptimisation = true;
+        private bool _airVentIdleUpdates = true;
         private bool _safeZoneGridTracking = true;
         private bool _mechanicalTopCheck = true;
         private bool _headDetachLog = true;
@@ -119,6 +120,13 @@ namespace SentisOptimisationsPlugin
         {
             get => _gasTankOptimisation;
             set => SetValue(ref _gasTankOptimisation, value);
+        }
+
+        [DisplayTab(Name = "Air vents updated less often", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "An air vent's per-frame update runs in full once in 100 frames when it moves no gas (an airtight room it cannot fill), once in 10 when it does, each vent on its own frame; its gas still moves every frame. Runtime adjustable")]
+        public bool AirVentIdleUpdates
+        {
+            get => _airVentIdleUpdates;
+            set => SetValue(ref _airVentIdleUpdates, value);
         }
 
         [DisplayTab(Name = "Safe zone grid tracking", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "Safe zones find dynamic grids by geometry instead of their physics phantom (welding inside a zone stops costing physics time). Applies to zones created or rebuilt after the change, all zones after a restart")]
