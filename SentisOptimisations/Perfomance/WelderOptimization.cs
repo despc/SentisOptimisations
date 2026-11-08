@@ -64,11 +64,36 @@ namespace Optimizer.Optimizations
             public readonly HashSet<Vector3I> Queued = new HashSet<Vector3I>();
             public long LastSeenFrame;
 
+            /// <summary>
+            /// Cells that passed CanBuild but were not built (the tool held none of the first component and the conveyor
+            /// had none, or the world's limits): the frame until which the search passes them over.
+            /// </summary>
+            public readonly Dictionary<Vector3I, long> Parked = new Dictionary<Vector3I, long>();
+
+            /// <summary>
+            /// Cells the search has seen built (CanBuild said AlreadyBuilt, or a welder built them). Their neighbours go
+            /// to the ready queue once, when the cell is first seen built, and a built cell is not queued itself: on an
+            /// almost finished ship the queue held ~2400 cells, most of them built, and each welder spent ~640 CanBuild
+            /// calls a second on them (the stand, 08.11.2026). The sweep still tests every cell, so a block ground
+            /// off since is found buildable again and leaves the set.
+            /// </summary>
+            public readonly HashSet<Vector3I> Built = new HashSet<Vector3I>();
+
+            public bool IsParked(Vector3I position, long frame)
+            {
+                if (!Parked.TryGetValue(position, out var until)) return false;
+                if (frame < until) return true;
+                Parked.Remove(position);
+                return false;
+            }
+
             public void Reset(MyCubeGrid preview)
             {
                 Preview = preview;
                 Ready.Clear();
                 Queued.Clear();
+                Parked.Clear();
+                Built.Clear();
                 Compact();
             }
 
@@ -279,7 +304,21 @@ namespace Optimizer.Optimizations
             public int PreviewBlocks;
             public long Frame = long.MinValue;
             public long Preview;
+
+            /// <summary>Cells of <see cref="Cells"/> tested since this welder last found a buildable one there.</summary>
+            public int SinceFound;
         }
+
+        /// <summary>
+        /// Set by <see cref="FindProjectedBlocks"/>: a welder's reach of a preview has cells not tested since its last
+        /// find. Until the sweep has gone round once without one the activation is not idle: a sweep takes 24 cells an
+        /// activation, and on the slow cadence after ten empty ones it took up to 8 minutes over a 4000-cell projection
+        /// with six buildable cells in it (the stand, 08.11.2026: "Не варится").
+        /// </summary>
+        [ThreadStatic] private static bool _sweepUnfinished;
+
+        /// <summary>How long a candidate that was not built is passed over, frames.</summary>
+        private const long ParkFrames = 300;
 
         private const double ReachMovedM = 0.5;
         private const long ReachFrames = 60;
@@ -584,9 +623,10 @@ namespace Optimizer.Optimizations
             WelderDiagnostics.Count(ref WelderDiagnostics.Scans);
             try
             {
+                _sweepUnfinished = false;
                 var array = FindProjectedBlocks(welder);
                 DoWeldProjections(welder, array);
-                return array.Count > 0;
+                return array.Count > 0 || _sweepUnfinished;
             }
             finally
             {
@@ -645,6 +685,7 @@ namespace Optimizer.Optimizations
                         projectionRaycastData.hitCube.BlockDefinition.PCU))
                 {
                     WelderDiagnostics.Count(ref WelderDiagnostics.OverLimits);
+                    Park(projectionRaycastData.hitCube);
                     continue;
                 }
 
@@ -652,6 +693,7 @@ namespace Optimizer.Optimizations
                     !inventory.ContainItems(new MyFixedPoint?(1), componentId, MyItemFlags.None))
                 {
                     WelderDiagnostics.Count(ref WelderDiagnostics.NoComponents);
+                    Park(projectionRaycastData.hitCube);
                     continue;
                 }
 
@@ -687,6 +729,22 @@ namespace Optimizer.Optimizations
         }
 
         /// <summary>
+        /// A candidate this welder could not build: passed over for <see cref="ParkFrames"/>, so that the search goes on
+        /// to the others. It went back into the ready queue, and while that queue gave a candidate the sweep did not run:
+        /// blocks needing a component the ship had none of held up the blocks it had components for.
+        /// </summary>
+        private static void Park(MySlimBlock block)
+        {
+            var preview = block?.CubeGrid;
+            if (preview == null) return;
+            ProjectionFrontierState state;
+            using (global::SentisOptimisations.ClusterThreads.Lock(ProjectionFrontiers))
+                if (!ProjectionFrontiers.TryGetValue(preview.EntityId, out state) || state.Preview != preview) return;
+            if (state.Parked.Count > 4096) state.Parked.Clear();
+            state.Parked[block.Position] = MySession.Static.GameplayFrameCounter + ParkFrames;
+        }
+
+        /// <summary>
         /// A block that was just built is what the blocks against it can now be built from, so
         /// they go to the front of the search. That means every block touching any of its faces,
         /// not only the six cells around its centre: a thruster or a turret is several cells
@@ -701,6 +759,13 @@ namespace Optimizer.Optimizations
             ProjectionFrontierState state;
             using (global::SentisOptimisations.ClusterThreads.Lock(ProjectionFrontiers))
                 if (!ProjectionFrontiers.TryGetValue(preview.EntityId, out state) || state.Preview != preview) return;
+            state.Built.Add(built.Position);
+            EnqueueNeighbors(state, preview, built);
+        }
+
+        /// <summary>The preview's cells touching any face of the block, into the search's ready queue.</summary>
+        private static void EnqueueNeighbors(ProjectionFrontierState state, MyCubeGrid preview, MySlimBlock built)
+        {
             var min = built.Min;
             var max = built.Max;
             foreach (var direction in NeighborDirections)
@@ -719,7 +784,7 @@ namespace Optimizer.Optimizations
                 for (var z = from.Z; z <= to.Z; z++)
                 {
                     var neighbour = preview.GetCubeBlock(new Vector3I(x, y, z));
-                    if (neighbour != null) state.Enqueue(neighbour.Position);
+                    if (neighbour != null && !state.Built.Contains(neighbour.Position)) state.Enqueue(neighbour.Position);
                 }
             }
         }
@@ -795,6 +860,9 @@ namespace Optimizer.Optimizations
             found.Clear();
             var frame = MySession.Static.GameplayFrameCounter;
             var checks = ProjectionChecksPerActivation;
+            // as many candidates as the frame may build: one an activation built 3-4 blocks a second a welder, while
+            // vanilla builds every buildable cell in its sphere each time
+            var want = Math.Max(1, Math.Min(8, SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config.ProjectionBuildsPerFrame));
             var ownerSteamId = MySession.Static.Players.TryGetSteamId(welder.OwnerId);
 
             foreach (MyEntity myEntity in entitiesInSphere)
@@ -813,29 +881,32 @@ namespace Optimizer.Optimizations
                     // is really built - this frame's build may go to another tool, or the component
                     // may still be on its way, and a candidate lost from the queue is left to the
                     // blind sweep below, which on a big blueprint takes a long time to come back.
-                    var readyChecks = 4;
+                    var readyChecks = 4 * want;
                     var readyLeft = state.Ready.Count;
-                    while (readyChecks > 0 && readyLeft-- > 0 && list.Count == 0)
+                    while (readyChecks > 0 && readyLeft-- > 0 && list.Count < want)
                     {
                         var position = state.Ready.Dequeue();
                         state.Queued.Remove(position);
                         var block = myCubeGrid.GetCubeBlock(position);
                         if (block == null) continue;
-                        if (!block.WorldAABB.Intersects(boundingSphereD))
+                        if (!block.WorldAABB.Intersects(boundingSphereD) || state.IsParked(position, frame))
                         {
                             state.Enqueue(position);
                             continue;
                         }
 
                         readyChecks--;
-                        if (projector.CanBuild(block, true) == BuildCheckResult.OK && OwnerHasDlc(block, ownerSteamId))
+                        var readyCheck = projector.CanBuild(block, true);
+                        if (readyCheck == BuildCheckResult.OK && OwnerHasDlc(block, ownerSteamId))
                         {
                             list.Add(new MyWelder.ProjectionRaycastData(BuildCheckResult.OK, block, projector));
                             state.Enqueue(position);
                         }
+                        else if (readyCheck == BuildCheckResult.AlreadyBuilt)
+                            state.Built.Add(position);
                     }
 
-                    if (list.Count != 0) continue;
+                    if (list.Count >= want) continue;
 
                     // Only the cells this welder could actually build are worth a CanBuild call -
                     // the expensive part - and the cursor has to walk those, not the whole
@@ -850,6 +921,7 @@ namespace Optimizer.Optimizations
                         frame - reach.Frame > ReachFrames ||
                         Vector3D.DistanceSquared(reach.Center, boundingSphereD.Center) > ReachMovedM * ReachMovedM)
                     {
+                        var before = reach.Cells.Count;
                         reach.Cells.Clear();
                         for (var i = 0; i < state.Positions.Count; i++)
                         {
@@ -863,6 +935,7 @@ namespace Optimizer.Optimizations
                             reach.Cells.Add(position);
                         }
 
+                        if (reach.Cells.Count != before) reach.SinceFound = 0;
                         reach.Center = boundingSphereD.Center;
                         reach.Radius = boundingSphereD.Radius;
                         reach.PreviewBlocks = state.Positions.Count;
@@ -877,14 +950,25 @@ namespace Optimizer.Optimizations
                     var start = reach.Cursor.Take(reach.Cells.Count, Math.Min(checks, reach.Cells.Count));
                     foreach (var index in start)
                     {
+                        reach.SinceFound++;
                         var block = myCubeGrid.GetCubeBlock(reach.Cells[index]);
-                        if (block != null && projector.CanBuild(block, true) == BuildCheckResult.OK &&
-                            OwnerHasDlc(block, ownerSteamId))
+                        if (block == null || state.IsParked(block.Position, frame)) continue;
+                        var check = projector.CanBuild(block, true);
+                        if (check == BuildCheckResult.OK && OwnerHasDlc(block, ownerSteamId))
                         {
+                            state.Built.Remove(block.Position);
                             list.Add(new MyWelder.ProjectionRaycastData(BuildCheckResult.OK, block, projector));
-                            break;
+                            reach.SinceFound = 0;
+                            if (list.Count >= want) break;
                         }
+                        // A built cell: what is buildable next is beside it. The blueprint's blocks lie in the list in
+                        // the order they were laid, so the buildable ones - the edge of what is built - sit together,
+                        // and the sweep reached them after ~160 activations: 3 found in 5 s with 281 buildable
+                        // (the stand, 08.11.2026). The cells against a built one go to the ready queue instead.
+                        else if (check == BuildCheckResult.AlreadyBuilt && state.Built.Add(block.Position))
+                            EnqueueNeighbors(state, myCubeGrid, block);
                     }
+                    if (reach.SinceFound < reach.Cells.Count) _sweepUnfinished = true;
                 }
             }
 
