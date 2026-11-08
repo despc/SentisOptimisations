@@ -183,9 +183,7 @@ public static class FreezerPatches
     {
         if (__instance.InputInventory.VolumeFillFactor >= 0.99)
             return false;
-        MyTimerComponent timer =
-            (MyTimerComponent)__instance.easyGetField("m_timer", typeof(MyFunctionalBlock));
-        var timerFramesFromLastTrigger = timer.FramesFromLastTrigger;
+        var timerFramesFromLastTrigger = BlockTimer(__instance).FramesFromLastTrigger;
         // The whole pull (queue read + PullItem) must run on the game thread: inventories and
         // the conveyor are not thread-safe. Vanilla did this on the game thread as well.
         // Queued and run a few a frame (see RunAssemblerPulls), not all in the frame after the tick.
@@ -220,6 +218,8 @@ public static class FreezerPatches
     }
 
     private static readonly FrameBudgetQueue<AssemblerPull> AssemblerPulls = new FrameBudgetQueue<AssemblerPull>();
+    /// <summary>The assemblers' pulls run a frame until this many milliseconds are spent, at least one.</summary>
+    private const double AssemblerPullBudgetMs = 1.5;
     private static readonly System.Diagnostics.Stopwatch PullWatch = new System.Diagnostics.Stopwatch();
     private static readonly Action<AssemblerPull> RunPull = RunAssemblerPull;
     private static readonly Func<double> PullElapsed = () => PullWatch.Elapsed.TotalMilliseconds;
@@ -229,7 +229,7 @@ public static class FreezerPatches
 
     /// <summary>
     /// Once a frame, from the plugin's update (game thread): the assemblers' waiting pulls, oldest first, until the
-    /// frame's budget (Freezer tab) is spent, at least one.
+    /// frame's budget (<see cref="AssemblerPullBudgetMs"/>) is spent, at least one.
     /// </summary>
     public static void RunAssemblerPulls()
     {
@@ -237,8 +237,7 @@ public static class FreezerPatches
         if (waiting > 0)
         {
             PullWatch.Restart();
-            var budget = SentisOptimisationsPlugin.Config?.AssemblerPullBudgetMs ?? 1.5;
-            _pullsDone += AssemblerPulls.Drain(budget, PullElapsed, RunPull);
+            _pullsDone += AssemblerPulls.Drain(AssemblerPullBudgetMs, PullElapsed, RunPull);
             var ms = PullWatch.Elapsed.TotalMilliseconds;
             if (ms > _pullsMostMs) _pullsMostMs = ms;
             if (waiting > _pullsMostWaiting) _pullsMostWaiting = waiting;
@@ -272,89 +271,83 @@ public static class FreezerPatches
         }
     }
 
+    private static readonly Func<MyFunctionalBlock, MyTimerComponent> BlockTimer =
+        Accessors.Field<MyFunctionalBlock, MyTimerComponent>("m_timer");
+    private static readonly Func<MyProductionBlock, List<MyProductionBlock.QueueItem>> ProductionQueue =
+        Accessors.Field<MyProductionBlock, List<MyProductionBlock.QueueItem>>("m_queue");
+    private static readonly Action<MyAssembler, float> GetItemFromOtherAssemblers =
+        Accessors.Method<MyAssembler, Action<MyAssembler, float>>("GetItemFromOtherAssemblers");
+    [ThreadStatic] private static List<MyTuple<MyFixedPoint, MyBlueprintDefinitionBase.Item>> _requiredComponents;
+
+    /// <summary>
+    /// The components of the whole queue summed up (each one's amount for its share of the 5 s ahead, scaled by the
+    /// seconds the timer counted), then each pulled once for what the input inventory lacks of it. It pulled the sums
+    /// again after every queue item before: a long queue of K kinds pulled N*K times what K pulls do - 1.2 s of
+    /// PullItem in 57 s on prod (07.11.2026), 8-9 ms for one assembler, and the inventory ends the same.
+    /// </summary>
     private static void AsyncCollectAssemblerRequiredItems(MyAssembler __instance, uint timerFramesFromLastTrigger)
     {
-        // frames -> seconds at the simulation rate; integer division used to truncate any
-        // window shorter than a second to zero (no pull at all during normal operation)
+        // frames -> seconds at the simulation rate
         var elapsedSeconds = timerFramesFromLastTrigger / 60f;
         float num1 = 0.0f;
-        List<MyProductionBlock.QueueItem> m_queue =
-            (List<MyProductionBlock.QueueItem>)__instance.easyGetField("m_queue");
-        List<MyTuple<MyFixedPoint, MyBlueprintDefinitionBase.Item>> m_requiredComponents =
-            new List<MyTuple<MyFixedPoint, MyBlueprintDefinitionBase.Item>>();
-        foreach (var queueItem in m_queue)
+        var queue = ProductionQueue(__instance);
+        var required = _requiredComponents ?? (_requiredComponents = new List<MyTuple<MyFixedPoint, MyBlueprintDefinitionBase.Item>>());
+        required.Clear();
+        var speed = MySession.Static.AssemblerSpeedMultiplier *
+                    (((MyAssemblerDefinition)__instance.BlockDefinition).AssemblySpeed + __instance.UpgradeValues["Productivity"]);
+        foreach (var queueItem in queue)
         {
             float num3 = 5f - num1;
-            float num4 = MySession.Static.AssemblerSpeedMultiplier *
-                         (((MyAssemblerDefinition)__instance.BlockDefinition).AssemblySpeed +
-                          __instance.UpgradeValues["Productivity"]);
             int num5 = 1;
-            if (queueItem.Blueprint.BaseProductionTimeInSeconds / (double)num4 < num3)
+            if (queueItem.Blueprint.BaseProductionTimeInSeconds / (double)speed < num3)
                 num5 = Math.Min((int)queueItem.Amount,
-                    Convert.ToInt32(Math.Ceiling(num3 /
-                                                 (queueItem.Blueprint.BaseProductionTimeInSeconds /
-                                                  (double)num4))));
-            num1 += num5 * queueItem.Blueprint.BaseProductionTimeInSeconds / num4;
-            MyFixedPoint myFixedPoint1 =
-                (MyFixedPoint)(1f / __instance.GetEfficiencyMultiplierForBlueprint(queueItem.Blueprint));
+                    Convert.ToInt32(Math.Ceiling(num3 / (queueItem.Blueprint.BaseProductionTimeInSeconds / (double)speed))));
+            num1 += num5 * queueItem.Blueprint.BaseProductionTimeInSeconds / speed;
+            MyFixedPoint efficiency = (MyFixedPoint)(1f / __instance.GetEfficiencyMultiplierForBlueprint(queueItem.Blueprint));
             foreach (MyBlueprintDefinitionBase.Item prerequisite in queueItem.Blueprint.Prerequisites)
             {
-                MyFixedPoint myFixedPoint2 = prerequisite.Amount * myFixedPoint1;
-                MyFixedPoint myFixedPoint3 = myFixedPoint2 * num5;
-                bool flag2 = false;
-                for (int index = 0; index < m_requiredComponents.Count; ++index)
+                MyFixedPoint one = prerequisite.Amount * efficiency;
+                MyFixedPoint all = one * num5;
+                bool found = false;
+                for (int index = 0; index < required.Count; ++index)
                 {
-                    MyBlueprintDefinitionBase.Item obj = m_requiredComponents[index].Item2;
-                    if (obj.Id == prerequisite.Id)
-                    {
-                        obj.Amount += myFixedPoint3;
-                        MyFixedPoint myFixedPoint4 = m_requiredComponents[index].Item1 + myFixedPoint2;
-                        m_requiredComponents[index] =
-                            MyTuple.Create(myFixedPoint4, obj);
-                        flag2 = true;
-                        // break;
-                    }
+                    MyBlueprintDefinitionBase.Item obj = required[index].Item2;
+                    if (obj.Id != prerequisite.Id) continue;
+                    obj.Amount += all;
+                    required[index] = MyTuple.Create(required[index].Item1 + one, obj);
+                    found = true;
+                    break;
                 }
 
-                if (!flag2)
-                    m_requiredComponents.Add(MyTuple.Create(myFixedPoint2, new MyBlueprintDefinitionBase.Item()
-                    {
-                        Amount = myFixedPoint3,
-                        Id = prerequisite.Id
-                    }));
-            }
-
-            foreach (MyTuple<MyFixedPoint, MyBlueprintDefinitionBase.Item> requiredComponent in
-                     m_requiredComponents)
-            {
-                // already running on the game thread (see GetComponentsFromConveyorPatch)
-                try
-                {
-                    MyBlueprintDefinitionBase.Item obj = requiredComponent.Item2;
-                    MyFixedPoint itemAmount =
-                        __instance.InputInventory.GetItemAmount(obj.Id, MyItemFlags.None, false);
-
-                    MyFixedPoint myFixedPoint = (obj.Amount * elapsedSeconds) - itemAmount;
-                    if (!(myFixedPoint <= 0))
-                    {
-                        var fixedPoint = __instance.CubeGrid.GridSystems.ConveyorSystem.PullItem(obj.Id,
-                            new MyFixedPoint?(myFixedPoint),
-                            __instance, __instance.InputInventory, false, false);
-                    }
-                }
-                catch (Exception e)
-                {
-                    SentisOptimisationsPlugin.Log.Error(e, "Assembler collect items exception");
-                }
+                if (!found)
+                    required.Add(MyTuple.Create(one, new MyBlueprintDefinitionBase.Item { Amount = all, Id = prerequisite.Id }));
             }
         }
+
+        // already running on the game thread (see GetComponentsFromConveyorPatch)
+        foreach (var requiredComponent in required)
+        {
+            try
+            {
+                MyBlueprintDefinitionBase.Item obj = requiredComponent.Item2;
+                MyFixedPoint itemAmount = __instance.InputInventory.GetItemAmount(obj.Id, MyItemFlags.None, false);
+                MyFixedPoint lacking = (obj.Amount * elapsedSeconds) - itemAmount;
+                if (!(lacking <= 0))
+                    __instance.CubeGrid.GridSystems.ConveyorSystem.PullItem(obj.Id, lacking, __instance, __instance.InputInventory, false, false);
+            }
+            catch (Exception e)
+            {
+                SentisOptimisationsPlugin.Log.Error(e, "Assembler collect items exception");
+            }
+        }
+        required.Clear();
 
         if (!__instance.IsSlave || __instance.RepeatEnabled)
             return;
         float remainingTime = 5f - num1;
         if (remainingTime <= 0.0)
             return;
-        __instance.easyCallMethod("GetItemFromOtherAssemblers", new object[] { remainingTime });
+        GetItemFromOtherAssemblers(__instance, remainingTime);
     }
 
 
