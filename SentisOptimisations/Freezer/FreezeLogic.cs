@@ -204,6 +204,18 @@ public class FreezeLogic
         return min;
     }
 
+    /// <summary>Whether the grid's Havok world was stepped at the freezer's last pass ("all" with selective updates off, "new" for a world not seen yet).</summary>
+    internal static string WorldStepped(MyCubeGrid grid)
+    {
+        var stepped = _steppedWorlds;
+        var known = _knownWorlds;
+        if (stepped == null || known == null) return "all";
+        var world = grid?.Physics?.HavokWorld;
+        if (world == null) return "no world";
+        if (!known.Contains(world)) return "new";
+        return stepped.Contains(world) ? "yes" : "no";
+    }
+
     private static bool IsPhysicsStepped(HashSet<MyCubeGrid> grids)
     {
         var stepped = _steppedWorlds;
@@ -590,6 +602,7 @@ public class FreezeLogic
         FrozenGrids.Remove(grid.EntityId);
         FrozenAtFrame.TryRemove(grid.EntityId, out _);
         FrozenPhysicsGrids.Remove(grid.EntityId);
+        HeldBodies.Forget(grid.EntityId);
         InFreezeQueue.Remove(grid.EntityId);
         lock (_wakeUpLock)
         {
@@ -718,7 +731,9 @@ public class FreezeLogic
             if (KeptFixed(grid)) return;
             // fixed by the freezer still: the group was awake for its compensation with its bodies kept as they were
             if (FrozenPhysicsGrids.Contains(grid.EntityId) && gridPhysics.RigidBody != null && gridPhysics.RigidBody.IsFixed) return;
+            var held = HeldBodies.Collect(grid);
             gridPhysics.ConvertToStatic();
+            HeldBodies.Stop(grid, held);
             FrozenPhysicsGrids.Add(grid.EntityId);
             var body = gridPhysics.RigidBody;
             if (RigidBodyDeactivated != null && body != null && body.IsFixed && body.InWorld && gridPhysics.HavokWorld != null)
@@ -734,12 +749,15 @@ public class FreezeLogic
     {
         if (!FrozenPhysicsGrids.Remove(grid.EntityId))
         {
+            HeldBodies.Forget(grid.EntityId);
             return;
         }
 
         try
         {
             var gridPhysics = grid.Physics;
+            // before the body is dynamic again: the blocks tie their own bodies back to it on this change (HeldBodies)
+            HeldBodies.PutBack(grid);
             if (grid.IsStatic || gridPhysics == null || !gridPhysics.IsStatic) return;
             gridPhysics.ConvertToDynamic(grid.GridSizeEnum == MyCubeSize.Large, grid.IsClientPredicted);
             gridPhysics.SetSpeeds(Vector3.Zero, Vector3.Zero);

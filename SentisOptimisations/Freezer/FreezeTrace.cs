@@ -15,7 +15,7 @@ namespace SentisOptimisationsPlugin.Freezer
     /// was frozen; at the thaw its grids were at the very same 104 m/s again, the heads 5-6 m off their joints, and
     /// torn off). With the config's FreezeTraceLogs on (off by default), a group with subgrids and a grid over
     /// <see cref="FastMps"/> at its freeze is traced: every grid's speeds, whether its body is fixed, whether its client
-    /// predicts it, how far each head is from its stator - at the freeze before and after, at the thaw before and after,
+    /// predicts it, whether its world was stepped at the freezer's last pass, how far each head is from its stator - at the freeze before and after, at the thaw before and after,
     /// and 1 and 10 ticks after the thaw; the first <see cref="MaxGroups"/> groups since the start.
     /// </summary>
     internal static class FreezeTrace
@@ -93,7 +93,7 @@ namespace SentisOptimisationsPlugin.Freezer
             var at = g.PositionComp.GetPosition();
             return $"{g.DisplayName} ({g.EntityId}) v {p.LinearVelocity.Length():0.0} m/s w {p.AngularVelocity.Length():0.00} rad/s" +
                    $" [body v {(body == null ? -1 : body.LinearVelocity.Length()):0.0} w {(body == null ? -1 : body.AngularVelocity.Length()):0.00}]" +
-                   $" fixed {body?.IsFixed}, static {g.IsStatic}, predicted {g.IsClientPredicted}, at ({at.X:0.0}, {at.Y:0.0}, {at.Z:0.0})";
+                   $" fixed {body?.IsFixed}, static {g.IsStatic}, predicted {g.IsClientPredicted}, world stepped {FreezeLogic.WorldStepped(g)}, at ({at.X:0.0}, {at.Y:0.0}, {at.Z:0.0})";
         }
 
         private static string Joints(List<MyCubeGrid> grids)
