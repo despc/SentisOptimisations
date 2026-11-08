@@ -93,7 +93,8 @@ namespace SentisOptimisationsPlugin.Freezer
                     held.Add(new Held { Body = body, Rigid = rigid, ToGrid = rigid.GetRigidBodyMatrix() * inverse, Name = Name(body) });
                 }
                 ByGrid[grid.EntityId] = held;
-                if (fastest > 1f)
+                // (the freezer's logs only: what was done, not a fault)
+                if (fastest > 1f && SentisOptimisationsPlugin.Config?.EnableDebugLogs == true)
                 {
                     var n = Interlocked.Increment(ref _stoppedTold);
                     if (n <= 10 || n % 100 == 0)
@@ -132,7 +133,7 @@ namespace SentisOptimisationsPlugin.Freezer
                     h.Rigid.LinearVelocity = Vector3.Zero;
                     h.Rigid.AngularVelocity = Vector3.Zero;
                 }
-                if (moved.Count > 0)
+                if (moved.Count > 0 && SentisOptimisationsPlugin.Config?.EnableDebugLogs == true)
                 {
                     var n = Interlocked.Increment(ref _putBackTold);
                     if (n <= 20 || n % 100 == 0)
