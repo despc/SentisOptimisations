@@ -550,6 +550,7 @@ public static class FreezerPatches
         BeginProductionPrefix(__instance.EntityId);
         if (CompensationTracker.IsFrozen(__instance.EntityId))
             return false; // frozen: skip, never run production for a frozen block
+        DropLateProductionStart(__instance, framesFromLastTrigger);
 
         if (__instance is MySurvivalKit)
         {
@@ -577,6 +578,22 @@ public static class FreezerPatches
         }
 
         return false;
+    }
+
+    private static readonly System.Reflection.FieldInfo RealProductionStart =
+        typeof(MyProductionBlock).GetField("m_realProductionStart", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+    /// <summary>
+    /// The frame of its timer's interval the queue started at, past the frames the pass is given: dropped, the pass
+    /// counting them all. The time worked is (frames - start) in unsigned frames, vanilla's and ours alike: given
+    /// fewer than the start - a compensation catch-up's 60 frames against a queue started 80 frames into the interval
+    /// - it was four billion frames, the whole heap of an assembler taken apart in one pass (freeze_disassembly's
+    /// running site, 405 thruster components in a moment after a thaw of one second, 09.11.2026).
+    /// </summary>
+    private static void DropLateProductionStart(MyAssembler assembler, uint frames)
+    {
+        if (RealProductionStart?.GetValue(assembler) is uint start && start > frames)
+            RealProductionStart.SetValue(assembler, null);
     }
 
     // Once the custom pass starts it may already have changed progress, queue and inventories.

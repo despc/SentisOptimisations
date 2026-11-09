@@ -55,6 +55,12 @@ public static class CompensationCatchUp
         public readonly Dictionary<long, int> WaitingSince = new Dictionary<long, int>();
         public readonly Dictionary<long, int> PowerWaitSince = new Dictionary<long, int>();
         public readonly List<string> Dropped = new List<string>();
+        /// <summary>The blocks of the step under way still to be stepped, in order: refineries, assemblers, the rest.</summary>
+        public readonly Queue<MyCubeBlock> StepQueue = new Queue<MyCubeBlock>();
+        /// <summary>Whether any block of the step under way did its step (none: all wait for power).</summary>
+        public bool StepMoved;
+        /// <summary>A step is under way (its queue taken from <see cref="Blocks"/>).</summary>
+        public bool StepStarted;
         public int Steps, Frames;
         public double Refined, LastPulled;
         public readonly Dictionary<long, (string Name, int Steps, uint Frames)> Done = new Dictionary<long, (string, int, uint)>();
@@ -94,6 +100,9 @@ public static class CompensationCatchUp
         MyAPIGateway.Utilities.InvokeOnGameThread(Tick, "CompensationCatchUp", startAt);
     }
 
+    /// <summary>Which job a frame starts with (they take turns).</summary>
+    private static int _turn;
+
     private static uint Owed(MyCubeBlock block) => CompensationTracker.PeekPending(block.EntityId) ?? 0;
 
     private static void Tick()
@@ -101,9 +110,17 @@ public static class CompensationCatchUp
         _scheduled = false;
         var frame = (int)MySandboxGame.Static.SimulationFrameCounter;
         var watch = Stopwatch.StartNew();
-        foreach (var job in Jobs.Values.ToList())
+        var budgetMs = Optimizer.Optimizations.FrameClock.Allowed(BudgetMs, 0.2);
+        // a block of the whole frame always, not of each job: a block each for 25 grids thawed together was 10 ms
+        // (production_freezer_stress, 09.11.2026). The jobs take turns being first, so that none waits for all the others.
+        var first = true;
+        var jobs = Jobs.Values.ToList();
+        var start = jobs.Count == 0 ? 0 : (_turn++ & int.MaxValue) % jobs.Count;
+        for (var n = 0; n < jobs.Count; n++)
         {
+            var job = jobs[(start + n) % jobs.Count];
             if (frame < job.StartAt) continue;
+            if (!first && watch.Elapsed.TotalMilliseconds >= budgetMs) break;
             try
             {
                 job.Blocks.RemoveAll(b =>
@@ -111,14 +128,27 @@ public static class CompensationCatchUp
                     if (b.Closed || b.MarkedForClose) { CompensationTracker.Forget(b.EntityId); return true; }
                     return CompensationTracker.IsFrozen(b.EntityId) || Owed(b) == 0;
                 });
-                // no more than the frame has left (a step always)
-                var budgetMs = Optimizer.Optimizations.FrameClock.Allowed(BudgetMs, 0.2);
-                while (job.Blocks.Count > 0 && watch.Elapsed.TotalMilliseconds < budgetMs)
+                // no more than the frame has left, a block at a time (a block always). A step of the whole grid at once was
+                // every refinery's and assembler's pull with its conveyor path worked out there and then: 59 ms in one frame
+                // on prod (23:40:29, 08.11.2026) against the budget of 2. The step goes on in the next frame where it stopped.
+                while (job.Blocks.Count > 0 && (first || watch.Elapsed.TotalMilliseconds < budgetMs))
                 {
-                    var before = job.Steps;
-                    Step(job);
-                    if (job.Steps == before) break;             // all of them waiting for power: next frame
-                    job.Blocks.RemoveAll(b => b.Closed || b.MarkedForClose || Owed(b) == 0);
+                    first = false;
+                    if (job.StepQueue.Count == 0)
+                    {
+                        if (job.StepStarted)
+                        {
+                            // a step done: the blocks it paid off go; a step in which none could work - next frame
+                            job.StepStarted = false;
+                            job.Blocks.RemoveAll(b => b.Closed || b.MarkedForClose || Owed(b) == 0);
+                            if (!job.StepMoved) break;
+                            continue;
+                        }
+                        BeginStep(job);
+                        job.StepStarted = true;
+                        if (job.StepQueue.Count == 0) break;
+                    }
+                    StepOne(job, job.StepQueue.Dequeue());
                 }
             }
             catch (Exception e)
@@ -204,26 +234,47 @@ public static class CompensationCatchUp
         return false;
     }
 
-    private static void Step(Job job)
+    /// <summary>
+    /// The next step's blocks, in the order a step goes in: all the refineries before the assemblers, so the ingots
+    /// of a step reach the assemblers in it; then anything else the freezer compensates.
+    /// </summary>
+    private static void BeginStep(Job job)
     {
-        foreach (var block in job.Blocks.OfType<MyRefinery>().ToList())
-            if (Ready(job, block))
+        job.StepMoved = false;
+        foreach (var block in job.Blocks.OfType<MyRefinery>()) job.StepQueue.Enqueue(block);
+        foreach (var block in job.Blocks.OfType<MyAssembler>()) job.StepQueue.Enqueue(block);
+        foreach (var block in job.Blocks.Where(b => !(b is MyRefinery) && !(b is MyAssembler))) job.StepQueue.Enqueue(block);
+    }
+
+    /// <summary>One block's part of the step under way.</summary>
+    private static void StepOne(Job job, MyCubeBlock block)
+    {
+        if (block.Closed || block.MarkedForClose || CompensationTracker.IsFrozen(block.EntityId) || Owed(block) == 0) return;
+        if (block is MyRefinery refinery)
+        {
+            if (!Ready(job, refinery)) return;
+            var ore = Ore(refinery);
+            if (!RefineryStep(job, refinery)) return;
+            var after = Ore(refinery) - job.LastPulled;
+            job.Refined += ore - after;
+            job.Steps++;
+            job.StepMoved = true;
+        }
+        else if (block is MyAssembler assembler)
+        {
+            if (Ready(job, assembler) && AssemblerStep(job, assembler))
             {
-                var ore = Ore(block);
-                if (!RefineryStep(job, block)) continue;
-                var after = Ore(block) - job.LastPulled;
-                job.Refined += ore - after;
                 job.Steps++;
+                job.StepMoved = true;
             }
-        foreach (var block in job.Blocks.OfType<MyAssembler>().ToList())
-            if (Ready(job, block) && AssemblerStep(job, block)) job.Steps++;
+        }
         // anything else the freezer compensates: its frames as they are
-        foreach (var block in job.Blocks.Where(b => !(b is MyRefinery) && !(b is MyAssembler)).ToList())
-            if (CompensationTracker.TryTakeCompensation(block.EntityId, uint.MaxValue, out var frames))
-            {
-                GiveToTimer(block, frames);
-                job.Count(block, frames);
-            }
+        else if (CompensationTracker.TryTakeCompensation(block.EntityId, uint.MaxValue, out var frames))
+        {
+            GiveToTimer(block, frames);
+            job.Count(block, frames);
+            job.StepMoved = true;
+        }
     }
 
     private static double Ore(MyRefinery refinery) =>

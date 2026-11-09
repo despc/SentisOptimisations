@@ -237,7 +237,8 @@ public class FreezeLogic
         {
             if (DateTime.Now < data && data < DateTime.Now.AddSeconds(_wakeupTimeInSec))
             {
-                if (GetAvgCpuLoad() > 70)
+                var maxLoad = SentisOptimisationsPlugin.Config.WakeUpMaxCpuLoad;
+                if (maxLoad > 0 && GetAvgCpuLoad() > maxLoad)
                 {
                     WakeUpDatas[minEntityId] = DateTime.Now.AddSeconds(SentisOptimisationsPlugin.Config.MinWakeUpIntervalInSec);
                     return false;
