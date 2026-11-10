@@ -19,6 +19,9 @@ namespace SentisOptimisationsPlugin
         private bool _turretShootIdle = true;
         private float _pasteCollisionGuardSeconds = 5;
         private bool _conveyorReach = true;
+        private bool _gridStreamNearestFirst = true;
+        private int _gridStreamsInFlight = 2;
+        private bool _streamLogs;
         private bool _dockedDampenersCalm = true;
         private bool _dockedCollisionsOff = true;
         
@@ -143,6 +146,23 @@ namespace SentisOptimisationsPlugin
             get => _conveyorReach;
             set => SetValue(ref _conveyorReach, value);
         }
+
+        [DisplayTab(Name = "Grid streams nearest first", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "The grids a client is streamed go nearest to its player first (by distance, as the voxel maps), not in the game's order of chance within a layer. Off: vanilla. Takes effect at once")]
+        public bool GridStreamNearestFirst
+        {
+            get => _gridStreamNearestFirst;
+            set => SetValue(ref _gridStreamNearestFirst, value);
+        }
+
+        [DisplayTab(Name = "Grids loading on a client at once", GroupName = "Performance", Tab = "Performance", Order = 0, Description = "A new grid stream to a client is not started while this many grids it was streamed are not built on it yet (it answers ready): the client builds grids one or two at a time instead of many in one freeze. The grid it controls never waits; one not ready in 20 s no longer holds the others back. 0: vanilla (no limit). Takes effect at once")]
+        public int GridStreamsInFlight
+        {
+            get => _gridStreamsInFlight;
+            set => SetValue(ref _gridStreamsInFlight, value < 0 ? 0 : value);
+        }
+
+        [DisplayTab(Name = "Stream logs", GroupName = "Logs", Tab = "Logs", Order = 4, Description = "Once a minute a line for each client: the grids it was streamed, how long they took to be built on it, how often one waited, what was created on it without a stream by type. Off by default")]
+        public bool StreamLogs { get => _streamLogs; set => SetValue(ref _streamLogs, value); }
 
         [DisplayTab(Name = "Rotor head check", GroupName = "Fixes", Tab = "Performance", Order = 0, Description = "After a rotor, hinge or advanced rotor is placed or given a head from the terminal, its head is checked for a few seconds: one off its place, tilted, not attached or without its constraint is put back where the stator puts it and attached again, and the clients are sent the connection again. Takes effect at once")]
         public bool MechanicalTopCheck
