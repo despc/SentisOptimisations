@@ -273,7 +273,7 @@ namespace SentisOptimisationsPlugin
                     {
                         gui.ScriptsExpander.Header =
                             $"Scripts: {PbLoad.Running()} running, {PbLoad.TotalMsPerFrame():F2} ms/frame in total";
-                        gui.ScriptsStatistic.Text = PbLoad.Report(20);
+                        gui.ScriptsStatistic.Text = PbLoad.Report();
                     }
                     catch (Exception e)
                     {

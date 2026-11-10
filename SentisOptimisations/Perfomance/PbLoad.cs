@@ -196,19 +196,24 @@ namespace SentisOptimisationsPlugin
         }
 
         /// <summary>
-        /// The heaviest blocks, one per line: what each costs a frame, its last run, its worst run
-        /// and how many of its recent runs were over a threshold.
+        /// Every block that runs a script, one per line, by its name (then its grid's, then its id: the order does not
+        /// change from one refresh to the next): its name and grid, what it costs a frame, its last run, its worst run and
+        /// how many of its recent runs were over a threshold. By the load the lines jumped about every second.
         /// </summary>
-        public static string Report(int count)
+        public static string Report()
         {
-            var lines = Blocks.Where(pair => !pair.Key.Closed && !Idle(pair.Value))
-                .OrderByDescending(pair => pair.Value.LoadMsPerFrame)
-                .Take(count)
-                .Select(pair => $"{pair.Value.LoadMsPerFrame,6:F2} ms/frame   run {pair.Value.LastMs,6:F2} ms   " +
-                                $"peak {pair.Value.PeakMs,6:F2} ms   over {Overruns(pair.Value.Window)}/{WindowRuns}   " +
-                                $"{pair.Key.CustomName} ({pair.Key.CubeGrid?.DisplayName})")
+            var rows = Blocks.Where(pair => !pair.Key.Closed && !Idle(pair.Value))
+                .Select(pair => (Block: pair.Key, Stats: pair.Value, Name: $"{pair.Key.CustomName} ({pair.Key.CubeGrid?.DisplayName})"))
+                .OrderBy(row => row.Block.CustomName?.ToString() ?? "", StringComparer.OrdinalIgnoreCase)
+                .ThenBy(row => row.Block.CubeGrid?.DisplayName ?? "", StringComparer.OrdinalIgnoreCase)
+                .ThenBy(row => row.Block.EntityId)
                 .ToList();
-            return lines.Count == 0 ? "No script is running." : string.Join(Environment.NewLine, lines);
+            if (rows.Count == 0) return "No script is running.";
+            var width = Math.Min(60, rows.Max(row => row.Name.Length));
+            return string.Join(Environment.NewLine, rows.Select(row =>
+                $"{(row.Name.Length > width ? row.Name.Substring(0, width - 1) + "~" : row.Name.PadRight(width))}   " +
+                $"{row.Stats.LoadMsPerFrame,6:F2} ms/frame   run {row.Stats.LastMs,6:F2} ms   " +
+                $"peak {row.Stats.PeakMs,6:F2} ms   over {Overruns(row.Stats.Window)}/{WindowRuns}"));
         }
 
         /// <summary>How many blocks have run a script recently.</summary>
