@@ -329,6 +329,7 @@ namespace SentisOptimisationsPlugin
             ReplicableResend.Tick();
             RespawnPointsCache.Tick();
             FaunaSpawnPrefetch.Tick();
+            SentisOptimisations.Commands.VoxelRestoreCommands.Tick();
         }
 
         public UserControl GetControl()
