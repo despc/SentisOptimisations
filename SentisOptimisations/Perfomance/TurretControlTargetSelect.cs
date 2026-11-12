@@ -125,7 +125,29 @@ namespace Optimizer.Optimizations
         {
             EnsureSession();
             if (_session != null && Sync.IsServer && MySandboxGame.Static != null)
-                Vanilla.Tick(MySandboxGame.Static.SimulationFrameCounter, SearchIdle);
+            {
+                var frame = MySandboxGame.Static.SimulationFrameCounter;
+                if (SearchSlowed(frame))
+                {
+                    SlowedRounds++;
+                    return;
+                }
+                Vanilla.Tick(frame, SearchIdle);
+            }
+        }
+
+        /// <summary>Frames of the idle turrets' searches skipped at the peak load (Slowdowns), since the start.</summary>
+        public static long SlowedRounds;
+
+        /// <summary>
+        /// At the peak load (Slowdowns: "Turret target search half as often") every other round of <see cref="Period"/>
+        /// frames is skipped: a turret without a target looks for one every 40 frames instead of 20.
+        /// </summary>
+        public static bool SearchSlowed(ulong frame)
+        {
+            if (!global::SentisOptimisations.Slowdowns.PeakLoad.Active) return false;
+            var config = SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config;
+            return config != null && config.SlowTurretSearch && frame / (ulong)Period % 2 == 1;
         }
 
         private static void EnsureSession()

@@ -361,7 +361,50 @@ namespace SentisOptimisationsPlugin
             get => _turretShootIdle;
             set => SetValue(ref _turretShootIdle, value);
         }
-        
-        
+
+        //Slowdowns: systems that do less while the server is loaded
+        private bool _slowdownsEnabled;
+        private bool _slowdownsAlways;
+        private int _slowdownsLoadPercent = 70;
+        private int _slowdownsOffLoadPercent = 60;
+        private bool _slowScripts = true;
+        private bool _slowTurretSearch = true;
+        private bool _slowIdleTurrets = true;
+        private bool _slowWelderScans = true;
+        private bool _slowStateSync = true;
+        private bool _slowdownLogs;
+
+        // the load everywhere here is the server load the clients are shown: the game thread's time of a frame against
+        // the 16.67 ms of one, averaged over a second (100%: the server just keeps real time, 200%: the game at half speed)
+        [DisplayTab(Name = "Slowdowns enabled", GroupName = "Slowdowns", Tab = "Slowdowns", Order = 0, Description = "Master switch of all the slowdowns below, off by default. Off: no slowdown ever. The load here is the server load the players are shown: the game thread's time of a frame against 16.67 ms, averaged over a second (100% - the server just keeps real time, 200% - the game runs at half speed). Takes effect at once")]
+        public bool SlowdownsEnabled { get => _slowdownsEnabled; set => SetValue(ref _slowdownsEnabled, value); }
+
+        [DisplayTab(Name = "Slowdowns always on", GroupName = "Slowdowns", Tab = "Slowdowns", Order = 1, Description = "All the slowdowns work whatever the load (to try them). Off by default")]
+        public bool SlowdownsAlways { get => _slowdownsAlways; set => SetValue(ref _slowdownsAlways, value); }
+
+        [DisplayTab(Name = "Slowdowns on at server load over, %", GroupName = "Slowdowns", Tab = "Slowdowns", Order = 2, Description = "A second with the server load over this turns the slowdowns below on. Default 70")]
+        public int SlowdownsLoadPercent { get => _slowdownsLoadPercent; set => SetValue(ref _slowdownsLoadPercent, value); }
+
+        [DisplayTab(Name = "Slowdowns off at server load under, %", GroupName = "Slowdowns", Tab = "Slowdowns", Order = 3, Description = "A second with the server load under this turns the slowdowns off; between the two thresholds they stay as they were (the slowdowns lower the load themselves). Not above the 'on' threshold. Default 60")]
+        public int SlowdownsOffLoadPercent { get => _slowdownsOffLoadPercent; set => SetValue(ref _slowdownsOffLoadPercent, value); }
+
+        [DisplayTab(Name = "Scripts three times less often", GroupName = "Slowdowns", Tab = "Slowdowns", Order = 10, Description = "A programmable block's Update1 runs on one frame in 3, only when no player is within 5 km of it; Update10 runs every 30 frames and Update100 every 300 (players near or not); Once as ever. Each block on its own frames")]
+        public bool SlowScripts { get => _slowScripts; set => SetValue(ref _slowScripts, value); }
+
+        [DisplayTab(Name = "Turret target search half as often", GroupName = "Slowdowns", Tab = "Slowdowns", Order = 11, Description = "A turret without a target looks for one every 40 frames instead of 20; one with a target as ever")]
+        public bool SlowTurretSearch { get => _slowTurretSearch; set => SetValue(ref _slowTurretSearch, value); }
+
+        [DisplayTab(Name = "Idle turrets updated once in 3 frames", GroupName = "Slowdowns", Tab = "Slowdowns", Order = 11, Description = "A turret without a target, not controlled by a player, runs its per-frame update on one frame in 3, each turret on its own frame (it idles round at a third of its speed); one with a target as ever")]
+        public bool SlowIdleTurrets { get => _slowIdleTurrets; set => SetValue(ref _slowIdleTurrets, value); }
+
+        [DisplayTab(Name = "Welders look for projections half as often", GroupName = "Slowdowns", Tab = "Slowdowns", Order = 12, Description = "A welder looks for projected blocks to build on every other activation; welding of built blocks as ever")]
+        public bool SlowWelderScans { get => _slowWelderScans; set => SetValue(ref _slowWelderScans, value); }
+
+
+        [DisplayTab(Name = "Far grids synced less often", GroupName = "Slowdowns", Tab = "Slowdowns", Order = 15, Description = "The state (position, properties) of grids far from a client is sent to it half as often; the client's own and near grids as ever")]
+        public bool SlowStateSync { get => _slowStateSync; set => SetValue(ref _slowStateSync, value); }
+
+        [DisplayTab(Name = "Slowdown logs", GroupName = "Logs", Tab = "Logs", Order = 6, Description = "The slowdowns going on and off, and once a minute while on: how much each slowdown held back. Off by default")]
+        public bool SlowdownLogs { get => _slowdownLogs; set => SetValue(ref _slowdownLogs, value); }
     }
 }

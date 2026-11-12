@@ -492,6 +492,14 @@ namespace Optimizer.Optimizations
                 return false;
             }
 
+            // At the peak load (Slowdowns: "Welders look for projections half as often") every other activation of a
+            // welder does not look for projected blocks; it stays on the fast cadence of projection work.
+            if (ScanSlowed(welder))
+            {
+                WelderDiagnostics.Count(ref SlowedScans);
+                return true;
+            }
+
             // Do not run the expensive projector/CanBuild scan when another welder of the same player
             // has already spent the player's materialization budget for this frame - but do not drop
             // the turn either. Welders of one ship activate in the same frame, a quarter of a
@@ -514,6 +522,31 @@ namespace Optimizer.Optimizations
                 return true; // a spent budget means active projection work; stay on the fast cadence
             }
             return ScanAndBuild(welder);
+        }
+
+        /// <summary>Projection scans skipped at the peak load (Slowdowns), since the start.</summary>
+        public static long SlowedScans;
+
+        private sealed class ScanTurn
+        {
+            public bool Skip;
+        }
+
+        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<MyShipWelder, ScanTurn> ScanTurns =
+            new System.Runtime.CompilerServices.ConditionalWeakTable<MyShipWelder, ScanTurn>();
+
+        /// <summary>At the peak load, every other call for a welder: true when this one is skipped.</summary>
+        public static bool ScanSlowed(MyShipWelder welder)
+        {
+            if (!global::SentisOptimisations.Slowdowns.PeakLoad.Active) return false;
+            var config = SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config;
+            if (config == null || !config.SlowWelderScans) return false;
+            var turn = ScanTurns.GetOrCreateValue(welder);
+            lock (turn)
+            {
+                turn.Skip = !turn.Skip;
+                return turn.Skip;
+            }
         }
 
         // The welders turned away by their player's frame budget, a queue per player (the welder's owner).
