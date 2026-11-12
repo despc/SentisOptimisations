@@ -113,6 +113,10 @@ namespace SentisOptimisations.Slowdowns
             public long LastMoveFrame = long.MinValue / 2;
             // where the projection was put relative to its projector when last moved (the terminal's offset and rotation)
             public Vector3I Offset, Rotation;
+            // the projector's matrix when the projection was last moved: a projection left behind (moved once a second)
+            // is looked at where it belongs now, not where it was left
+            public MatrixD MovedWith;
+            public bool Moved;
         }
 
         private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<object, State> States = new System.Runtime.CompilerServices.ConditionalWeakTable<object, State>();
@@ -159,10 +163,10 @@ namespace SentisOptimisations.Slowdowns
                         Interlocked.Increment(ref IdleSkipped);
                         return false;
                     }
-                    state.LastMoveFrame = frame;
+                    Moving(state, frame);
                     return true;
                 }
-                state.LastMoveFrame = frame;
+                Moving(state, frame);
                 return true;
             }
             catch (Exception)
@@ -171,10 +175,27 @@ namespace SentisOptimisations.Slowdowns
             }
         }
 
+        private static void Moving(State state, long frame)
+        {
+            state.LastMoveFrame = frame;
+            if (state.Projector == null) return;
+            state.MovedWith = state.Projector.WorldMatrix;
+            state.Moved = true;
+        }
+
         private static readonly List<MyEntity> Found = new List<MyEntity>();
         private static readonly VRage.ObjectBuilders.MyObjectBuilderType WelderType = typeof(MyObjectBuilder_ShipWelder);
 
-        /// <summary>Every frame on the game thread: a part of the projections looked at, each once a second.</summary>
+        // a ship welder switched on: every projection looked at in the next frame, not within a second
+        private static volatile bool _lookAll;
+
+        /// <summary>A ship tool switched on or off (MyShipToolBase.OnEnabledChanged): a welder on makes all projections look round at once.</summary>
+        public static void ToolEnabledChanged(object tool)
+        {
+            if (tool is SpaceEngineers.Game.Entities.Blocks.MyShipWelder welder && welder.Enabled) _lookAll = true;
+        }
+
+        /// <summary>Every frame on the game thread: a part of the projections looked at, each once a second; all of them after a welder came on.</summary>
         public static void Refresh()
         {
             if (_previewGrids == null || _buildable == null) return;
@@ -187,7 +208,8 @@ namespace SentisOptimisations.Slowdowns
                 foreach (var s in All) if (s.WeldersNear) near++;
                 WithWelders = near;
                 if (All.Count == 0) return;
-                var count = (All.Count + IdleFrames - 1) / IdleFrames;
+                var count = _lookAll ? All.Count : (All.Count + IdleFrames - 1) / IdleFrames;
+                _lookAll = false;
                 some = new State[count];
                 for (var i = 0; i < count; i++)
                 {
@@ -207,6 +229,9 @@ namespace SentisOptimisations.Slowdowns
                 // the blocks a welder could build now: their box in the world
                 var box = BoundingBoxD.CreateInvalid();
                 var any = false;
+                // where the projection's blocks belong now: moved with the projector since the projection's last move (the
+                // lookup runs on the game thread between the frames' updates, nothing moves the projection meanwhile)
+                var since = state.Moved ? MatrixD.Invert(state.MovedWith) * projector.WorldMatrix : MatrixD.Identity;
                 foreach (var subgrid in _subgrids(state.Projection))
                 {
                     var preview = _previewGrid(subgrid);
@@ -216,7 +241,7 @@ namespace SentisOptimisations.Slowdowns
                     var half = new Vector3D(preview.GridSize / 2);
                     foreach (var cell in Cells)
                     {
-                        var at = preview.GridIntegerToWorld(cell);
+                        var at = Vector3D.Transform(preview.GridIntegerToWorld(cell), since);
                         box.Include(new BoundingBoxD(at - half, at + half));
                         any = true;
                     }
