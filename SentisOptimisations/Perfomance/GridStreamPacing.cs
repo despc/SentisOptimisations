@@ -139,14 +139,20 @@ namespace Optimizer.Optimizations
             var entry = Expression.Parameter(typeof(MyStateDataEntry));
             var at = Expression.Parameter(typeof(long));
             var dirty = Expression.Field(client, queue);
-            var contains = queue.FieldType.GetMethod("Contains") ?? throw new MissingMethodException("DirtyQueue.Contains");
             var update = queue.FieldType.GetMethod("UpdatePriority") ?? throw new MissingMethodException("DirtyQueue.UpdatePriority");
             var enqueue = queue.FieldType.GetMethod("Enqueue") ?? throw new MissingMethodException("DirtyQueue.Enqueue");
-            _queued = Expression.Lambda<Func<object, MyStateDataEntry, bool>>(Expression.Call(dirty, contains, entry), o, entry).Compile();
+            // the game's Contains reads m_nodes[node.QueueIndex] unchecked: an entry kept from the client's previous connection
+            // (the same endpoint, a new queue) threw IndexOutOfRangeException on every stream of that client (production,
+            // 13.11.2026); the queue's own array, bounds checked
+            var nodes = Expression.Field(dirty, queue.FieldType.GetField("m_nodes", instance) ?? throw new MissingFieldException("DirtyQueue.m_nodes"));
+            var queueIndex = typeof(MyStateDataEntry).BaseType?.GetField("QueueIndex", instance) ?? throw new MissingFieldException("FastPriorityQueue.Node.QueueIndex");
+            var holds = Expression.Call(typeof(GridStreamPacing).GetMethod(nameof(Holds), BindingFlags.Static | BindingFlags.Public),
+                Expression.Convert(nodes, typeof(object[])), Expression.Field(entry, queueIndex), entry);
+            _queued = Expression.Lambda<Func<object, MyStateDataEntry, bool>>(holds, o, entry).Compile();
             _reschedule = Expression.Lambda<Action<object, MyStateDataEntry, long>>(
                 Expression.Call(dirty, update, entry, Expression.Convert(at, update.GetParameters()[1].ParameterType)), o, entry, at).Compile();
             _enqueue = Expression.Lambda<Action<object, MyStateDataEntry, long>>(
-                Expression.IfThen(Expression.Not(Expression.Call(dirty, contains, entry)),
+                Expression.IfThen(Expression.Not(holds),
                     Expression.Call(dirty, enqueue, entry, Expression.Convert(at, enqueue.GetParameters()[1].ParameterType))), o, entry, at).Compile();
             var s = Expression.Parameter(server);
             var frame = typeof(MyReplicationLayer).GetField("SyncFrameCounter", instance) ?? throw new MissingFieldException("MyReplicationLayer.SyncFrameCounter");
@@ -198,6 +204,15 @@ namespace Optimizer.Optimizations
                 SentisOptimisationsPlugin.SentisOptimisationsPlugin.Log.Error(e, "GridStreamPacing (schedule)");
             }
         }
+
+        /// <summary>
+        /// Whether <paramref name="node"/>, at <paramref name="index"/> (its <c>QueueIndex</c>), is in the priority queue whose
+        /// node array is <paramref name="nodes"/>: the game's
+        /// <c>FastPriorityQueue.Contains</c> with the bounds checked - false for a node of another queue, or of a queue
+        /// gone (the client connected again), whose index is past this one's array.
+        /// </summary>
+        public static bool Holds(object[] nodes, int index, object node) =>
+            nodes != null && node != null && index > 0 && index < nodes.Length && ReferenceEquals(nodes[index], node);
 
         /// <summary>Frames a grid's stream is put later by for its distance: one for every <see cref="MetresPerFrame"/> m, <see cref="MaxFarFrames"/> at most.</summary>
         public static long Far(IMyReplicable grid, VRageMath.Vector3D at) =>
