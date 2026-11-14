@@ -331,6 +331,7 @@ namespace SentisOptimisationsPlugin
             FaunaSpawnPrefetch.Tick();
             SentisOptimisations.Commands.VoxelRestoreCommands.Tick();
             SentisOptimisations.Slowdowns.SlowdownTick.Run();
+            Optimizer.Optimizations.ConveyorRecomputeDebounce.Tick();
         }
 
         public UserControl GetControl()

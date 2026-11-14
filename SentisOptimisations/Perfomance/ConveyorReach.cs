@@ -38,8 +38,16 @@ namespace Optimizer.Optimizations
     ///    but may not pass is still taken as a source (not walked through), and the destination's access is asked apart;
     ///  - an inventory to an inventory of the same block: reachable, as in vanilla (the search starts on its target).
     ///
-    /// An answer is good for the frame and only while nothing it was made of has changed - checked, not trusted to the
-    /// frame as vanilla's answers are:
+    /// The game's own background question goes the same way: a pull or push of a block (an assembler, a generator for
+    /// ice, a turret for ammo, a refinery) asks <c>MyGridConveyorSystem.ComputeCanTransfer</c> for each pair on a worker
+    /// (<c>TransferData.ComputeTransfer</c>) and keeps the answer until the network is recomputed - a whole walk of the
+    /// network per pair. On a big base being welded or fought over its answers were dropped all the time, and these walks
+    /// held four cores without a break and kept the workers so busy that the game thread waited for an entity being
+    /// made, up to half a second (prod trace 14.11.2026: 142 s of walks in 35.7 s). ComputeCanTransfer itself is answered
+    /// here, on any thread.
+    ///
+    /// An answer is kept while nothing it was made of has changed - checked, not trusted as vanilla's answers are - and
+    /// for the frame on the game thread (a worker is given one of the last second):
     ///  - the network: any change of a conveyor line (working or not, its ends, merged, cut, reversed), of the lines of
     ///    a block, of a connector's or rotor's link, the game's own "recompute the network" signals;
     ///  - whose a block is: a block's owner or sharing, factions (members, war and peace, reputation);
@@ -48,8 +56,9 @@ namespace Optimizer.Optimizations
     ///    and compared before it is given again - as the network's own changes are not always seen: a small method of
     ///    the game may be inlined into its caller, where no patch reaches it;
     ///  - whether the source's owner is an admin who may use any terminal: part of what an answer is kept under.
-    /// If any of the game's methods watched for this is missing, nothing here is patched: vanilla answers. Off the game
-    /// thread, vanilla. "Conveyor reach cache" on the Performance tab switches it off and on at once (off: vanilla; what
+    /// Every thread asks the one store of answers under a lock; an answer, once made, is not changed (a new one replaces
+    /// it), and a search uses the asking thread's own pathfinding, as the game's does (its search state is per thread).
+    /// If any of the game's methods watched for this is missing, nothing here is patched: vanilla answers. "Conveyor reach cache" on the Performance tab switches it off and on at once (off: vanilla; what
     /// was kept is dropped, so nothing from before is given when it is on again).
     /// </summary>
     [PatchShim]
@@ -64,22 +73,34 @@ namespace Optimizer.Optimizations
         private static Func<MyDefinitionId, bool> _needsLargeTube;
         private static FieldInfo _accessField, _largeField;
 
+        /// <summary>One search's answer; not changed once it is in the store.</summary>
         private sealed class Reach
         {
             public readonly HashSet<MyEntity> Sources = new HashSet<MyEntity>();
             /// <summary>The sorters and connectors the search met, and their state then.</summary>
             public readonly List<(MyCubeBlock Block, int State)> Watched = new List<(MyCubeBlock, int)>();
             public bool TargetPassable;
+            /// <summary>The count of changes when the search began, and the frame.</summary>
+            public long Epoch;
+            public int Frame;
         }
 
-        private static readonly Dictionary<(IMyConveyorEndpoint, MyDefinitionId, long, bool), Reach> Answers = new Dictionary<(IMyConveyorEndpoint, MyDefinitionId, long, bool), Reach>();
-        private static readonly Stack<Reach> Spare = new Stack<Reach>();
-        private static readonly List<IMyConveyorEndpoint> Found = new List<IMyConveyorEndpoint>();
-        private static int _frame = -1;
-        private static bool _changed;
+        /// <summary>How old, in frames, an answer a worker is given may be (the game thread's: of this frame).</summary>
+        public const int WorkerFrames = 60;
 
-        /// <summary>Searches of the network made, and questions answered from them (since the start).</summary>
-        public static long Searches, Answered;
+        /// <summary>Answers kept before the stale ones are thrown out.</summary>
+        private const int PruneAt = 4096;
+
+        private static readonly Dictionary<(IMyConveyorEndpoint, MyDefinitionId, long, bool), Reach> Answers = new Dictionary<(IMyConveyorEndpoint, MyDefinitionId, long, bool), Reach>();
+        private static readonly object Gate = new object();
+        [ThreadStatic] private static List<IMyConveyorEndpoint> _found;
+        private static long _epoch;
+
+        /// <summary>For a check: the game's own search, not this one, on this thread.</summary>
+        [ThreadStatic] public static bool Vanilla;
+
+        /// <summary>Searches of the network made, questions answered from them, and of those, asked off the game thread (since the start).</summary>
+        public static long Searches, Answered, AnsweredOffGameThread;
 
         public static void Patch(PatchContext ctx) => global::SentisOptimisations.PatchGuard.Run("ConveyorReach", ctx, _ =>
         {
@@ -136,6 +157,10 @@ namespace Optimizer.Optimizations
             foreach (var method in watched) harmony.Patch(method, postfix: changed);
             harmony.Patch(working, prefix: new HarmonyMethod(typeof(ConveyorReach).GetMethod(nameof(WorkingPrefix), Static)));
             harmony.Patch(question, prefix: new HarmonyMethod(typeof(ConveyorReach).GetMethod(nameof(CanTransferToPrefix), Static)));
+            var compute = system.GetMethod(nameof(MyGridConveyorSystem.ComputeCanTransfer), Static, null,
+                              new[] { typeof(IMyConveyorEndpointBlock), typeof(IMyConveyorEndpointBlock), typeof(MyDefinitionId?) }, null)
+                          ?? throw new MissingMethodException("MyGridConveyorSystem.ComputeCanTransfer");
+            harmony.Patch(compute, prefix: new HarmonyMethod(typeof(ConveyorReach).GetMethod(nameof(ComputeCanTransferPrefix), Static)));
         });
 
         private static MethodInfo Method(Type type, string name, BindingFlags flags)
@@ -150,11 +175,11 @@ namespace Optimizer.Optimizations
             return found ?? throw new MissingMethodException($"{type.Name}.{name}");
         }
 
-        private static void Changed() => _changed = true;
+        private static void Changed() => System.Threading.Interlocked.Increment(ref _epoch);
 
         private static void WorkingPrefix(MyConveyorLine __instance, bool value)
         {
-            if (__instance.IsWorking != value) _changed = true;
+            if (__instance.IsWorking != value) Changed();
         }
 
         private static IMyConveyorEndpointBlock EndpointOf(MyEntity entity)
@@ -165,17 +190,31 @@ namespace Optimizer.Optimizations
 
         private static bool CanTransferToPrefix(MyInventory __instance, MyInventory dstInventory, MyDefinitionId? itemType, ref bool __result)
         {
-            if (SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config?.ConveyorReach != true)
-            {
-                _changed = true;        // nothing kept from before it was off
-                return true;
-            }
-            if (System.Threading.Thread.CurrentThread != MySandboxGame.Static?.UpdateThread || MySession.Static == null) return true;
+            if (!On()) return true;
             var source = EndpointOf(__instance.Owner);
             var target = EndpointOf(dstInventory?.Owner);
             if (source?.ConveyorEndpoint?.CubeBlock == null || target?.ConveyorEndpoint?.CubeBlock == null) return true;
             __result = Reaches(source, target, itemType);
             return false;
+        }
+
+        /// <summary>The game's own question, from the game thread or a worker (a block's pull or push).</summary>
+        private static bool ComputeCanTransferPrefix(IMyConveyorEndpointBlock start, IMyConveyorEndpointBlock end, MyDefinitionId? itemId, ref bool __result)
+        {
+            if (!On()) return true;
+            if (start?.ConveyorEndpoint?.CubeBlock == null || end?.ConveyorEndpoint?.CubeBlock == null) return true;
+            __result = Reaches(start, end, itemId);
+            return false;
+        }
+
+        private static bool On()
+        {
+            if (SentisOptimisationsPlugin.SentisOptimisationsPlugin.Config?.ConveyorReach != true)
+            {
+                Changed();        // nothing kept from before it was off
+                return false;
+            }
+            return !Vanilla && MySession.Static != null && MySandboxGame.Static != null;
         }
 
         /// <summary>What of a sorter, a connector or a mechanical block a search depends on, besides whose it is.</summary>
@@ -218,45 +257,63 @@ namespace Optimizer.Optimizations
             if (from == to.CubeBlock) return true;
 
             var frame = MySession.Static.GameplayFrameCounter;
-            if (frame != _frame || _changed)
-            {
-                foreach (var reach in Answers.Values)
-                {
-                    reach.Sources.Clear();
-                    reach.Watched.Clear();
-                    Spare.Push(reach);
-                }
-                Answers.Clear();
-                _frame = frame;
-                _changed = false;
-            }
-
+            var epoch = System.Threading.Interlocked.Read(ref _epoch);
+            var onGame = System.Threading.Thread.CurrentThread == MySandboxGame.Static.UpdateThread;
             var owner = from.OwnerId;
             var key = (to, item ?? default(MyDefinitionId), owner, AdminTerminals(owner));
-            if (Answers.TryGetValue(key, out var answer))
+            Reach answer;
+            lock (Gate) Answers.TryGetValue(key, out answer);
+            if (!Fresh(answer, epoch, frame, onGame))
             {
-                foreach (var (block, state) in answer.Watched)
+                answer = new Reach { Epoch = epoch, Frame = frame };
+                Search(to, item, owner, answer);
+                lock (Gate)
                 {
-                    if (StateOf(block) == state) continue;
-                    answer.Sources.Clear();
-                    answer.Watched.Clear();
-                    Search(to, item, owner, answer);
-                    break;
+                    if (Answers.Count >= PruneAt) Prune(epoch, frame);
+                    Answers[key] = answer;
                 }
             }
-            else
-            {
-                answer = Spare.Count > 0 ? Spare.Pop() : new Reach();
-                Search(to, item, owner, answer);
-                Answers[key] = answer;
-            }
-            Answered++;
+            System.Threading.Interlocked.Increment(ref Answered);
+            if (!onGame) System.Threading.Interlocked.Increment(ref AnsweredOffGameThread);
             return answer.TargetPassable && answer.Sources.Contains(from);
+        }
+
+        /// <summary>
+        /// Whether an answer may be given: nothing changed since its search began, of this frame for the game thread (of
+        /// the last <see cref="WorkerFrames"/> for a worker), and the sorters, connectors and mechanical blocks it met as
+        /// they were.
+        /// </summary>
+        private static bool Fresh(Reach answer, long epoch, int frame, bool onGame)
+        {
+            if (answer == null || answer.Epoch != epoch) return false;
+            if (onGame ? answer.Frame != frame : frame < answer.Frame || frame - answer.Frame > WorkerFrames) return false;
+            foreach (var (block, state) in answer.Watched)
+                if (StateOf(block) != state) return false;
+            return true;
+        }
+
+        /// <summary>Throws out the answers no thread may be given any more (under the lock).</summary>
+        private static void Prune(long epoch, int frame)
+        {
+            var stale = new List<(IMyConveyorEndpoint, MyDefinitionId, long, bool)>();
+            foreach (var pair in Answers)
+                if (pair.Value.Epoch != epoch || frame - pair.Value.Frame > WorkerFrames) stale.Add(pair.Key);
+            foreach (var key in stale) Answers.Remove(key);
+            // all of the last second, and still too many: begin anew
+            if (Answers.Count >= PruneAt) Answers.Clear();
+        }
+
+        /// <summary>How many answers are kept, for the stand.</summary>
+        public static int Kept()
+        {
+            lock (Gate) return Answers.Count;
         }
 
         private static void Search(IMyConveyorEndpoint target, MyDefinitionId? item, long owner, Reach answer)
         {
-            Searches++;
+            System.Threading.Interlocked.Increment(ref Searches);
+            var found = _found ?? (_found = new List<IMyConveyorEndpoint>());
+            // the asking thread's own pathfinding (the game's is per thread), locked as the game locks it
             lock (_pathfinding.Invoke(null, null))
             {
                 // the rules of ComputeCanTransfer: the source's owner, the item (for sorters), large conveyors for a large item
@@ -268,10 +325,10 @@ namespace Optimizer.Optimizations
                 var met = answer.Watched;
                 if (IsWatched(target.CubeBlock)) met.Add((target.CubeBlock, StateOf(target.CubeBlock)));
                 answer.TargetPassable = access(target);
-                Found.Clear();
+                found.Clear();
                 try
                 {
-                    MyGridConveyorSystem.FindReachableInverted(target, Found, null, e =>
+                    MyGridConveyorSystem.FindReachableInverted(target, found, null, e =>
                     {
                         var block = e?.CubeBlock;
                         if (block != null && IsWatched(block)) met.Add((block, StateOf(block)));
@@ -280,12 +337,12 @@ namespace Optimizer.Optimizations
                         if (block != null) sources.Add(block);
                         return false;
                     }, edges);
-                    foreach (var e in Found)
+                    foreach (var e in found)
                         if (e?.CubeBlock != null) sources.Add(e.CubeBlock);
                 }
                 finally
                 {
-                    Found.Clear();
+                    found.Clear();
                 }
             }
         }
