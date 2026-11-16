@@ -34,6 +34,12 @@ namespace SentisOptimisationsPlugin.CrashFix
     /// it a door on a grid locked to a static one (15.10.2026, in a safe zone on the server) kept its leaves in the old
     /// group: they collided with their own grid, stood a metre off where they are drawn and stopped the player in an
     /// open door, and a leaf touching the grid while the door closed opened it again, for good (docked_door).
+    ///
+    /// The grid gets back the collision system group it had before it was held, kept when it was taken: the game's own
+    /// record of it (<c>HavokCollisionSystemID</c>) is the heavy grid's by then, set by the same telling. Restored from
+    /// that record, a piston's head with a connector stayed in the group of the station it had been locked to, and so
+    /// did its connector's detector: it never saw the station come again, and the connector never locked to it a second
+    /// time (reg_connector_on_piston, 16.11.2026).
     /// </summary>
     [PatchShim]
     public static class DockedCollisions
@@ -48,8 +54,8 @@ namespace SentisOptimisationsPlugin.CrashFix
             public MyCubeGrid Light, Heavy;
             public MyShipConnector Connector;
             public ulong PartedFrame;
-            /// <summary>The light grid's own subsystem and the one it does not collide with, before it was held.</summary>
-            public int Sub = -1, DontCollide;
+            /// <summary>The light grid's own system group, subsystem and the one it does not collide with, before it was held.</summary>
+            public int System = -1, Sub = -1, DontCollide;
         }
 
         private static readonly Action<MyCubeGrid, int> HavokSystemIDChanged =
@@ -96,6 +102,7 @@ namespace SentisOptimisationsPlugin.CrashFix
             {
                 held = new Held { Light = light, Heavy = heavy, Connector = light == a ? connector : other };
                 var info = light.Physics.RigidBody?.GetCollisionFilterInfo() ?? 0;
+                held.System = (int)(info >> 16);
                 held.Sub = (int)((info >> 5) & 31);
                 held.DontCollide = (int)((info >> 10) & 31);
                 Pairs[light.EntityId] = held;
@@ -177,11 +184,13 @@ namespace SentisOptimisationsPlugin.CrashFix
             var light = held.Light;
             var body = light.Physics?.RigidBody;
             if (body == null) return;
-            var own = HkGroupFilter.CalcFilterInfo(body.Layer, light.Physics.HavokCollisionSystemID, Math.Max(0, held.Sub), held.DontCollide);
-            if (body.GetCollisionFilterInfo() == own) return;
+            // its group as it was (the grid's HavokCollisionSystemID is the heavy one's by now: Apply told it so)
+            var system = held.System > 0 ? held.System : light.Physics.HavokCollisionSystemID;
+            var own = HkGroupFilter.CalcFilterInfo(body.Layer, system, Math.Max(0, held.Sub), held.DontCollide);
+            if (body.GetCollisionFilterInfo() == own && light.Physics.HavokCollisionSystemID == system) return;
             body.SetCollisionFilterInfo(own);
             MyPhysics.RefreshCollisionFilter(light.Physics);
-            HavokSystemIDChanged(light, light.Physics.HavokCollisionSystemID);
+            HavokSystemIDChanged(light, system);
         }
 
         /// <summary>Whether the two grids' shapes still reach into each other.</summary>
