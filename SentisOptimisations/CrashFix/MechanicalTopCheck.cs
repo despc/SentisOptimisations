@@ -49,7 +49,6 @@ namespace SentisOptimisationsPlugin.CrashFix
         private static readonly MethodInfo TopGridMatrix = typeof(MyMechanicalConnectionBlockBase).GetMethod("GetTopGridMatrix", Any);
         private static readonly PropertyInfo Constraint = typeof(MyMechanicalConnectionBlockBase).GetProperty("Constraint", Any);
         private static readonly FieldInfo ConnectionState = typeof(MyMechanicalConnectionBlockBase).GetField("m_connectionState", Any);
-        private static readonly PropertyInfo Welded = typeof(MyMechanicalConnectionBlockBase).GetProperty("m_welded", Any);
         private static readonly MethodInfo DetachGroups = Array.Find(typeof(MyMechanicalConnectionBlockBase).GetMethods(Any),
             m => m.Name == "Detach" && m.GetParameters().Length == 1 && m.GetParameters()[0].ParameterType == typeof(bool));
 
@@ -80,8 +79,8 @@ namespace SentisOptimisationsPlugin.CrashFix
 
         public static void Patch(PatchContext ctx) => global::SentisOptimisations.PatchGuard.Run("MechanicalTopCheck", ctx, c =>
         {
-            if (TopGridMatrix == null || Constraint == null || Welded == null || DetachGroups == null || ConnectionState == null)
-                throw new MissingMemberException("MyMechanicalConnectionBlockBase: GetTopGridMatrix, Constraint, m_welded or Detach(bool)");
+            if (TopGridMatrix == null || Constraint == null || DetachGroups == null || ConnectionState == null)
+                throw new MissingMemberException("MyMechanicalConnectionBlockBase: GetTopGridMatrix, Constraint, m_connectionState or Detach(bool)");
             var type = typeof(MyMechanicalConnectionBlockBase);
             var built = type.GetMethod(nameof(MyMechanicalConnectionBlockBase.OnBuildSuccess), Any)
                         ?? throw new MissingMethodException("MyMechanicalConnectionBlockBase.OnBuildSuccess");
@@ -187,7 +186,7 @@ namespace SentisOptimisationsPlugin.CrashFix
         /// <summary>What is wrong with the head, or null.</summary>
         public static string Problem(MyMechanicalConnectionBlockBase stator, long madeId, out MatrixD expected) => Problem(stator, madeId, out expected, out _);
 
-        /// <summary><see cref="Problem(MyMechanicalConnectionBlockBase, long, out MatrixD)"/>; <paramref name="heldAttached"/>: the head attached and held by its constraint (or welded).</summary>
+        /// <summary><see cref="Problem(MyMechanicalConnectionBlockBase, long, out MatrixD)"/>; <paramref name="heldAttached"/>: the head attached and held by its constraint.</summary>
         public static string Problem(MyMechanicalConnectionBlockBase stator, long madeId, out MatrixD expected, out bool heldAttached)
         {
             expected = MatrixD.Identity;
@@ -201,13 +200,14 @@ namespace SentisOptimisationsPlugin.CrashFix
             var offset = (actual.Translation - expected.Translation).Length();
             var tilt = MathHelper.ToDegrees(Math.Acos(MathHelper.Clamp(Vector3D.Dot(actual.Up, expected.Up), -1, 1)));
             var attached = ((Sandbox.ModAPI.Ingame.IMyMechanicalConnectionBlock)stator).IsAttached;
-            var welded = (bool)Welded.GetValue(stator);
+            // the game no longer welds a head to its stator (the safety lock and MyWeldingGroups are gone, 16.11.2026):
+            // a head is held by its constraint only
             var hinge = Constraint.GetValue(stator) as HkConstraint;
-            var held = welded || hinge != null && hinge.InWorld;
+            var held = hinge != null && hinge.InWorld;
             heldAttached = attached && held;
             if (offset <= MaxOffsetM && tilt <= MaxTiltDegrees && attached && held) return null;
             return $"off its place by {offset:0.00} m, its axis off the stator's by {tilt:0.0}°, {(attached ? "attached" : "not attached")}, " +
-                   $"{(welded ? "welded" : hinge == null ? "no constraint" : hinge.InWorld ? "constraint in the world" : "constraint out of the world")}";
+                   $"{(hinge == null ? "no constraint" : hinge.InWorld ? "constraint in the world" : "constraint out of the world")}";
         }
 
         /// <summary>Puts the head right when it is wrong; true when the stator needs no more checks.</summary>

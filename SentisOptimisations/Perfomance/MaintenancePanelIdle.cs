@@ -21,6 +21,10 @@ namespace SentisOptimisationsPlugin
     /// Here, on a dedicated server: the state from the save, a change of the status and the first look for the use
     /// objects run the game's own update as before; "update the door instantly" does that one step
     /// (<c>GoToNextPositionStage</c>) and is done; with nothing pending the call is left out.
+    ///
+    /// Since the game's update of 16.11.2026 every pass also puts the use object of a cover that starts opened where the
+    /// open cover is (<c>MoveDetectorToInitialOpenedRotation</c>, once: it does nothing after); a pass done or left out
+    /// here does that too, or a cover whose model came after its use objects kept its use object where the closed one is.
     /// </summary>
     [PatchShim]
     public static class MaintenancePanelIdle
@@ -37,6 +41,8 @@ namespace SentisOptimisationsPlugin
 
         private static Func<object, bool> _gameWork, _instant;
         private static Action<object> _finishMove;
+        /// <summary>The game's <c>MoveDetectorToInitialOpenedRotation</c>; null in a game without it.</summary>
+        private static Action<object> _moveDetector;
 
         public static void Patch(PatchContext ctx) => global::SentisOptimisations.PatchGuard.Run("MaintenancePanelIdle", ctx, PatchImpl);
 
@@ -65,6 +71,9 @@ namespace SentisOptimisationsPlugin
                 Expression.Assign(Expression.Field(self, instant), Expression.Constant(false)),
                 Expression.Call(self, goToNext)), arg).Compile();
 
+            var moveDetector = type.GetMethod("MoveDetectorToInitialOpenedRotation", any, null, Type.EmptyTypes, null);
+            _moveDetector = moveDetector == null ? null : Expression.Lambda<Action<object>>(Expression.Call(self, moveDetector), arg).Compile();
+
             var method = type.GetMethod("OnUpdateOnceBeforeNextFrame", any) ?? throw new MissingMethodException(type.Name, "OnUpdateOnceBeforeNextFrame");
             ctx.GetPattern(method).Prefixes.Add(typeof(MaintenancePanelIdle).GetMethod(nameof(Prefix), BindingFlags.Static | BindingFlags.NonPublic));
         }
@@ -83,9 +92,11 @@ namespace SentisOptimisationsPlugin
                 switch (Decide(Sandbox.Engine.Platform.Game.IsDedicated, _gameWork(__instance), _instant(__instance)))
                 {
                     case Action.FinishMove:
+                        _moveDetector?.Invoke(__instance);
                         _finishMove(__instance);
                         return false;
                     case Action.Skip:
+                        _moveDetector?.Invoke(__instance);
                         return false;
                     default:
                         return true;

@@ -93,7 +93,7 @@ namespace SentisOptimisationsPlugin.CrashFix
         internal static void PatchImpl(PatchContext ctx)
         {
             var type = typeof(MyMechanicalConnectionBlockBase);
-            if (Constraint == null || TryAttach == null) throw new MissingMemberException("MyMechanicalConnectionBlockBase: Constraint or TryAttach");
+            if (Constraint == null || TryAttach == null || DisplacementSq == null) throw new MissingMemberException("MyMechanicalConnectionBlockBase: Constraint, TryAttach or GetConstraintDisplacementSq");
             var detach = type.GetMethod("Detach", Any, null, new[] { typeof(MyCubeGrid), typeof(bool) }, null)
                          ?? throw new MissingMethodException(type.Name, "Detach(MyCubeGrid, bool)");
             var safety = type.GetMethod("CheckSafetyDetach", Any, null, Type.EmptyTypes, null) ?? throw new MissingMethodException(type.Name, "CheckSafetyDetach");
@@ -114,6 +114,16 @@ namespace SentisOptimisationsPlugin.CrashFix
         }
 
         private static void SafetyCause() => _cause = Cause.Safety;
+
+        private static readonly MethodInfo DisplacementSq = typeof(MyMechanicalConnectionBlockBase).GetMethod("GetConstraintDisplacementSq", Any, null, Type.EmptyTypes, null);
+
+        /// <summary>The joint stretched past the block's safety detach: what CheckSafetyDetach takes the head off for.</summary>
+        private static bool Stretched(MyMechanicalConnectionBlockBase block)
+        {
+            if (DisplacementSq == null || Constraint?.GetValue(block) == null) return false;
+            var safety = block.SafetyDetach;
+            return (float)DisplacementSq.Invoke(block, null) > safety * safety;
+        }
         private static void PlayerCause() => _cause = Cause.Player;
         private static void ScriptCause() => _cause = Cause.Script;
         private static void ClearCause() => _cause = Cause.Other;
@@ -127,6 +137,9 @@ namespace SentisOptimisationsPlugin.CrashFix
                 // welding, a merge, the world closing: not a head coming off
                 if (head == null || !updateGroups || MyEntities.IsClosingAll || !Sync.IsServer) return;
                 var cause = _cause;
+                // SentisClusters runs a cluster's grids on a thread of its own and puts the Detach that CheckSafetyDetach
+                // calls off to the game thread, where this thread's cause is not set: the game's own test of it, again
+                if (cause == Cause.Other && Stretched(__instance)) cause = Cause.Safety;
                 System.Threading.Interlocked.Increment(ref Detached);
                 if (cause == Cause.Safety) System.Threading.Interlocked.Increment(ref SafetyDetached);
                 if (LogOn) Write(__instance, head, topGrid ?? head.CubeGrid, cause);
