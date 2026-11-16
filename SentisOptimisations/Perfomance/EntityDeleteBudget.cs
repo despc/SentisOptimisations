@@ -20,6 +20,12 @@ namespace SentisOptimisationsPlugin
     /// least), and the rest wait in the set the game itself keeps for the next frame (where it puts a pinned entity) -
     /// closed already, only their removal a frame or a few later. Any other call (the creation thread's, which deletes
     /// until none are left; the unloading) is the game's own.
+    ///
+    /// An entity waits <see cref="MaxWaitFrames"/> frames at most, then goes whatever the budget. Mods count on a closed
+    /// grid being gone soon: WeaponCore cleans up a grid's AI 30 frames after the grid was marked to close, and the
+    /// weapons removed from the scene after that throw (their AI's grid is null) and leave the cleaned AI in its map;
+    /// the next change of a group of grids then calls it and the server falls (NRE in Ai.SubGridChanges, V5.1
+    /// 16.11.2026: VirtualGarage put 1025 groups of absent players into their garages, ~50 a second, the queue grew).
     /// </summary>
     [PatchShim]
     public static class EntityDeleteBudget
@@ -27,9 +33,15 @@ namespace SentisOptimisationsPlugin
         /// <summary>The deleting a frame-end call does before the rest waits for the next frame.</summary>
         public const double BudgetMs = 4;
 
+        /// <summary>The frames a closed entity may wait; well under WeaponCore's 30.</summary>
+        public const int MaxWaitFrames = 10;
+
         private static readonly NLog.Logger Log = NLog.LogManager.GetCurrentClassLogger();
         private static FieldInfo _toDelete, _nextFrame;
         [ThreadStatic] private static bool _inFrameEnd;
+        // the frame-end calls counted, and since which of them each waiting entity waits (game thread only)
+        private static int _frame;
+        private static Dictionary<MyEntity, int> _waiting = new Dictionary<MyEntity, int>(), _stillWaiting = new Dictionary<MyEntity, int>();
 
         public static void Patch(PatchContext ctx) => global::SentisOptimisations.PatchGuard.Run("EntityDeleteBudget", ctx, PatchImpl);
 
@@ -53,12 +65,20 @@ namespace SentisOptimisationsPlugin
         /// <summary>How many of the waiting ones a call deletes: all while there is time, the first always.</summary>
         public static bool GoOn(int deleted, long elapsedTicks, long budgetTicks) => deleted == 0 || elapsedTicks < budgetTicks;
 
+        /// <summary>Whether an entity waiting since frame-end call <paramref name="since"/> goes now, whatever the budget.</summary>
+        public static bool Overdue(int frame, int since) => frame - since >= MaxWaitFrames;
+
         private static bool DeletePrefix()
         {
             if (!_inFrameEnd || MySession.Static?.Ready != true) return true;
             var toDelete = (HashSet<MyEntity>)_toDelete.GetValue(null);
-            if (toDelete == null || toDelete.Count <= 1) return true;
+            if (toDelete == null || toDelete.Count <= 1)
+            {
+                _waiting.Clear(); // the game's loop deletes all of them
+                return true;
+            }
             var nextFrame = (HashSet<MyEntity>)_nextFrame.GetValue(null);
+            var frame = ++_frame;
             var started = Stopwatch.GetTimestamp();
             // no more than the frame has left (one entity always, as before)
             var budget = (long)(Optimizer.Optimizations.FrameClock.Allowed(BudgetMs, 0) * Stopwatch.Frequency / 1000);
@@ -70,13 +90,14 @@ namespace SentisOptimisationsPlugin
                 // place, so the planet makes it anew under the same id; while the closed one waited here its id stayed
                 // taken, the new one threw DuplicateIdException (swallowed by CrashFixPatch), and the ground under the
                 // grids there was gone: hundreds of grids thawed by the freezer fell to the planet's centre (10.10.2026).
-                foreach (var sector in toDelete.Where(IsPlanetSector).ToList())
+                // So does whatever has waited MaxWaitFrames.
+                foreach (var urgent in toDelete.Where(e => IsPlanetSector(e) || (_waiting.TryGetValue(e, out var since) && Overdue(frame, since))).ToList())
                 {
                     using (MyEntities.EntityCloseLock.AcquireExclusiveUsing())
                     {
-                        if (sector.Pinned) continue;
-                        RaiseDelete(sector);
-                        sector.Delete();
+                        if (urgent.Pinned) continue;
+                        RaiseDelete(urgent);
+                        urgent.Delete();
                     }
                 }
                 // the game's own loop, but for the time it may take
@@ -102,7 +123,14 @@ namespace SentisOptimisationsPlugin
                 // what time did not allow: next frame, with the pinned ones
                 if (toDelete.Count > 0)
                     if (global::SentisOptimisations.DiagLog.On) Log.Info($"EntityDeleteBudget: {deleted} deleted in {(Stopwatch.GetTimestamp() - started) * 1000.0 / Stopwatch.Frequency:0.0} ms, {toDelete.Count} left for the next frame");
-                foreach (var entity in toDelete) nextFrame.Add(entity);
+                _stillWaiting.Clear();
+                foreach (var entity in toDelete)
+                {
+                    nextFrame.Add(entity);
+                    _stillWaiting[entity] = _waiting.TryGetValue(entity, out var since) ? since : frame;
+                }
+                (_waiting, _stillWaiting) = (_stillWaiting, _waiting);
+                _stillWaiting.Clear();
                 toDelete.Clear();
             }
             finally

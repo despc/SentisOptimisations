@@ -22,5 +22,13 @@ namespace SentisOptimisations.Tests
         {
             Assert.False(EntityDeleteBudget.GoOn(5, 10, 10));
         }
+
+        [Fact]
+        public void A_waiting_entity_goes_after_max_wait_frames_well_before_weaponcore_cleans_its_grid_ai()
+        {
+            Assert.False(EntityDeleteBudget.Overdue(100 + EntityDeleteBudget.MaxWaitFrames - 1, 100));
+            Assert.True(EntityDeleteBudget.Overdue(100 + EntityDeleteBudget.MaxWaitFrames, 100));
+            Assert.True(EntityDeleteBudget.MaxWaitFrames < 30);
+        }
     }
 }
