@@ -89,9 +89,18 @@ namespace SentisOptimisationsPlugin
             var stringCondition2 = "contains('${message}','Trying to remove entity with name')";
             var stringCondition3 = "contains('${message}','Sound on different thread')";
             
+            // The game's own lines (MyLog.WriteLine) come as Debug: they are dropped, but not the errors of a world load -
+            // the game writes those at the same level ("ERROR Entity init", "Exceptions during entities load"; the world
+            // that did not load said nothing of why). The definitions' MOD_ERROR lines stay dropped: a thousand a start.
+            var debugNoise = "level == LogLevel.Debug and not (contains('${message}','ERROR Entity init') or contains('${message}','xception') or " +
+                             "contains('${message}','ShowLoadingError') or contains('${message}','Planet skipped'))";
             foreach (var rule in LogManager.Configuration.LoggingRules)
             {
-               rule.DisableLoggingForLevel(LogLevel.Debug);
+               rule.Filters.Insert(0, new ConditionBasedFilter()
+               {
+                   Condition = debugNoise,
+                   Action = FilterResult.Ignore
+               });
                rule.Filters.Add(new ConditionBasedFilter()
                {
                    Condition = stringCondition,
