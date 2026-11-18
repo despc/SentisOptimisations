@@ -149,9 +149,10 @@ public class PBFixTests
         var program = new object();
         ulong frame = 0;
         var punishedAt = 0;
-        for (var i = 1; i <= 200 && punishedAt == 0; i++)
+        for (var i = 1; i <= 1000 && punishedAt == 0; i++)
             if (Run(stats, ref frame, 1.5, program, 1) == PbVerdict.Punish) punishedAt = i;
-        Assert.InRange(punishedAt, PbLoad.UnmeasuredRuns + 10, PbLoad.UnmeasuredRuns + 20);
+        // its load is judged once its grace after the start is over, and it is over the budget then: at once
+        Assert.InRange(punishedAt, (int)PbLoad.LoadGraceFrames, (int)PbLoad.LoadGraceFrames + 10);
     }
 
     [Fact]
@@ -207,21 +208,101 @@ public class PBFixTests
         var program = new object();
         ulong frame = 0;
         var punishedAt = 0;
-        for (var i = 1; i <= 60 && punishedAt == 0; i++)
+        for (var i = 1; i <= 1000 && punishedAt == 0; i++)
             if (Run(stats, ref frame, 1.5, program, 2) == PbVerdict.Punish) punishedAt = i;
-        Assert.InRange(punishedAt, PbLoad.UnmeasuredRuns + 1, 60);
+        Assert.InRange(punishedAt, (int)PbLoad.LoadGraceFrames / 2, (int)PbLoad.LoadGraceFrames / 2 + 10);
     }
 
     [Fact]
-    public void The_average_of_a_frequent_script_keeps_its_old_smoothing()
+    public void A_steady_script_over_its_budget_is_over_it_within_a_second()
     {
-        // Update1: one run per frame, so per-frame and per-run relaxation coincide - the window
-        // that punishes a steady 1.5 ms/frame script is the one the plugin always had.
+        // The longer average still catches a script over the budget on every frame: within a second of it.
         var stats = new PbLoad.Stats();
         var program = new object();
         ulong frame = 0;
-        for (var i = 0; i < 22; i++) Run(stats, ref frame, 0.05, program, 1);
-        for (var i = 0; i < 5; i++) Run(stats, ref frame, 1.5, program, 1);
-        Assert.True(stats.LoadMsPerFrame > 0.5, stats.LoadMsPerFrame.ToString());
+        for (var i = 0; i < (int)PbLoad.LoadGraceFrames; i++) Run(stats, ref frame, 0.05, program, 1);
+        var overAt = 0;
+        for (var i = 1; i <= 120 && overAt == 0; i++)
+        {
+            Run(stats, ref frame, 1.5, program, 1);
+            if (stats.LoadMsPerFrame > 0.5) overAt = i;
+        }
+        Assert.InRange(overAt, 1, 60);
+    }
+
+    // ------------------------------------------------------------------ RTAS (vanilla production, 18.11.2026)
+
+    private static PbVerdict Rtas(PbLoad.Stats stats, ref ulong frame, double ms, object program)
+    {
+        frame += 1;
+        // the production's limits: 0.3 ms a frame, 8 ms a run, 3 overruns of the 20 tolerated
+        return PbLoad.Record(stats, frame, ms, false, 8, 0.3, 3, program);
+    }
+
+    /// <summary>A run of RTAS on Update1: its main pass every 4th tick, its search every 8th, its blocks anew every 300th.</summary>
+    private static double RtasRun(ulong frame) =>
+        frame % 300 == 0 ? 4.0 : frame % 300 == 1 ? 2.0 : frame % 8 == 0 ? 0.6 : frame % 4 == 0 ? 0.3 : 0.06;
+
+    [Fact]
+    public void A_script_heavy_now_and_then_but_light_in_the_second_is_not_punished()
+    {
+        // 0.22 ms a frame over a second, its heavy frames a few in each second: the old third of a second
+        // average put it over 0.3 for a handful of runs at each of them, and a handful was enough
+        var stats = new PbLoad.Stats();
+        var program = new object();
+        ulong frame = 0;
+        var verdicts = new List<PbVerdict>();
+        for (var i = 0; i < 60 * 60; i++) verdicts.Add(Rtas(stats, ref frame, RtasRun(frame + 1), program));
+        Assert.DoesNotContain(PbVerdict.Punish, verdicts);
+    }
+
+    [Fact]
+    public void A_script_setting_itself_up_for_seconds_after_a_recompile_is_not_punished()
+    {
+        // RTAS after a recompile: 1.2 ms of every frame for five seconds while it gathers its blocks and starts its scans
+        var stats = new PbLoad.Stats();
+        ulong frame = 0;
+        var before = new object();
+        for (var i = 0; i < 4000; i++) Rtas(stats, ref frame, RtasRun(frame + 1), before);
+        var program = new object();
+        var verdicts = new List<PbVerdict>();
+        for (var i = 0; i < 300; i++) verdicts.Add(Rtas(stats, ref frame, 1.2, program));
+        for (var i = 0; i < 60 * 60; i++) verdicts.Add(Rtas(stats, ref frame, RtasRun(frame + 1), program));
+        Assert.DoesNotContain(PbVerdict.Punish, verdicts);
+    }
+
+    [Fact]
+    public void A_script_recompiled_again_soon_is_charged_its_setup_over_the_second()
+    {
+        // RTAS recompiled twice in half a minute (stand, 18.11.2026): the second instance has no grace, and its setup -
+        // 0.6 ms a frame for a fifth of a second, its usual work after it: about 0.27 ms of that second, as measured on the
+        // stand - not 0.6 ms "of every frame"
+        var stats = new PbLoad.Stats();
+        ulong frame = 0;
+        var first = new object();
+        for (var i = 0; i < 4000; i++) Rtas(stats, ref frame, RtasRun(frame + 1), first);
+        var second = new object();
+        for (var i = 0; i < 1500; i++) Rtas(stats, ref frame, RtasRun(frame + 1), second);
+        var third = new object();
+        var verdicts = new List<PbVerdict>();
+        for (var i = 0; i < PbLoad.UnmeasuredRuns + 12; i++) verdicts.Add(Rtas(stats, ref frame, 0.6, third));
+        for (var i = 0; i < 60 * 30; i++) verdicts.Add(Rtas(stats, ref frame, RtasRun(frame + 1), third));
+        Assert.DoesNotContain(PbVerdict.Punish, verdicts);
+    }
+
+    [Fact]
+    public void A_script_recompiled_again_and_again_gets_the_grace_once_a_minute()
+    {
+        // 1.2 ms of every frame, recompiled every 5 seconds to stay in the grace: the second instance has none
+        var stats = new PbLoad.Stats();
+        ulong frame = 0;
+        var punished = false;
+        for (var compile = 0; compile < 6 && !punished; compile++)
+        {
+            var program = new object();
+            for (var i = 0; i < 300 && !punished; i++) punished = Rtas(stats, ref frame, 1.2, program) == PbVerdict.Punish;
+        }
+        Assert.True(punished);
+        Assert.InRange(frame, 300UL, 700UL);
     }
 }
