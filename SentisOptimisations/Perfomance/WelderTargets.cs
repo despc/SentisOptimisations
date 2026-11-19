@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
+using System.Reflection.Emit;
 using Sandbox.Engine.Utils;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Cube;
@@ -8,6 +11,7 @@ using Sandbox.Game.Weapons;
 using Sandbox.Game.World;
 using SpaceEngineers.Game.Entities.Blocks;
 using Torch.Managers.PatchManager;
+using Torch.Managers.PatchManager.MSIL;
 using VRageMath;
 
 namespace Optimizer.Optimizations
@@ -94,7 +98,7 @@ namespace Optimizer.Optimizations
         {
             public MyShipWelder Welder;
             public long Frame = -1;
-            public bool Inner;
+            public MyCubeGrid ScanGrid;
         }
 
         private static readonly global::SentisOptimisations.ClusterThreads.PerThread<Activation> Activations = new global::SentisOptimisations.ClusterThreads.PerThread<Activation>();
@@ -120,11 +124,48 @@ namespace Optimizer.Optimizations
             var pattern = ctx.GetPattern(activateCommon);
             pattern.Prefixes.Add(Method(nameof(ActivateCommonPrefix)));
             pattern.Suffixes.Add(Method(nameof(ActivateCommonSuffix)));
-            ctx.GetPattern(forTool).Prefixes.Add(Method(nameof(BlocksInSpherePrefix)));
+            var sphere = ctx.GetPattern(forTool);
+            sphere.Prefixes.Add(Method(nameof(BlocksInSpherePrefix)));
+            sphere.Transpilers.Add(Method(nameof(SphereCountTranspiler)));
         }
 
         private static MethodInfo Method(string name) =>
-            typeof(WelderTargets).GetMethod(name, BindingFlags.Static | BindingFlags.NonPublic);
+            typeof(WelderTargets).GetMethod(name, BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+
+        private static IEnumerable<MsilInstruction> SphereCountTranspiler(IEnumerable<MsilInstruction> instructions)
+        {
+            var list = instructions.ToList();
+            var count = typeof(ConcurrentDictionary<Vector3I, MyCube>).GetProperty("Count").GetGetMethod();
+            var cubes = typeof(MyCubeGrid).GetField("m_cubes", BindingFlags.Instance | BindingFlags.NonPublic);
+            var indices = Enumerable.Range(1, list.Count - 1).Where(i => list[i].OpCode == OpCodes.Callvirt &&
+                list[i].Operand is MsilOperandInline<MethodBase> method && method.Value == count &&
+                cubes != null && list[i - 1].Operand is MsilOperandInline<FieldInfo> field && field.Value == cubes).ToList();
+            if (indices.Count == 1 && indices[0] + 1 < list.Count)
+            {
+                var i = indices[0];
+                var compare = list[i + 1];
+                if ((compare.OpCode == OpCodes.Bge || compare.OpCode == OpCodes.Bge_S) &&
+                    compare.Operand is MsilOperandBrTarget target && compare.Labels.Count == 0 &&
+                    compare.TryCatchOperations.Count == 0 && list[i].TryCatchOperations.Count == 0)
+                {
+                    // The stack holds (volume, cubes). Keep the game's branch and both walks, only shorten the comparison.
+                    var loadGrid = new MsilInstruction(OpCodes.Ldarg_0);
+                    loadGrid.Labels.UnionWith(list[i].Labels);
+                    var branch = new MsilInstruction(OpCodes.Brfalse);
+                    ((MsilOperandBrTarget)branch.Operand).Target = target.Target;
+                    list[i] = new MsilInstruction(OpCodes.Call).InlineValue((MethodBase)Method(nameof(WalkSphereCells)));
+                    list[i + 1] = branch;
+                    list.Insert(i, loadGrid);
+                    return list;
+                }
+            }
+            SentisOptimisationsPlugin.SentisOptimisationsPlugin.Log.Warn("WelderTargets: sphere query IL changed; using the game's count");
+            return list;
+        }
+
+        public static bool WalkSphereCells(int volume, ConcurrentDictionary<Vector3I, MyCube> cubes, MyCubeGrid grid) =>
+            // Each block accounts for at least one cell. Use the lower bound only if it proves the original branch.
+            (grid != null && ReferenceEquals(Activations.Value.ScanGrid, grid) && volume < grid.BlocksCount) || volume < cubes.Count;
 
         private static void ActivateCommonPrefix(MyShipToolBase __instance)
         {
@@ -142,7 +183,7 @@ namespace Optimizer.Optimizations
         {
             var now = Activations.Value;
             var welder = now.Welder;
-            if (welder == null || now.Inner || now.Frame != MySession.Static.GameplayFrameCounter ||
+            if (welder == null || now.ScanGrid != null || now.Frame != MySession.Static.GameplayFrameCounter ||
                 __instance == welder.CubeGrid)
                 return true;
 
@@ -196,9 +237,9 @@ namespace Optimizer.Optimizations
             {
                 // the game's own walk, once
                 var now = Activations.Value;
-                now.Inner = true;
+                now.ScanGrid = grid;
                 try { grid.GetBlocksForTool(ref sphere, Scratch); }
-                finally { now.Inner = false; }
+                finally { now.ScanGrid = null; }
                 reach.Blocks.Clear();
                 reach.Blocks.AddRange(Scratch);
                 Scratch.Clear();
