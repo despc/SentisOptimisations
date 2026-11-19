@@ -884,6 +884,42 @@ namespace Optimizer.Optimizations
             return state;
         }
 
+        /// <summary>One preview's transform for a scan. Uses the game's cell centers and world AABBs.</summary>
+        public struct ProjectionGeometry
+        {
+            private MatrixD _world;
+            private readonly float _size;
+            private readonly Vector3 _half;
+            private readonly bool _affine;
+
+            public ProjectionGeometry(ref MatrixD world, float size, Vector3 half)
+            {
+                _world = world;
+                _size = size;
+                _half = half;
+                _affine = world.M14 == 0 && world.M24 == 0 && world.M34 == 0 && world.M44 == 1;
+            }
+
+            public BoundingBoxD BlockBounds(Vector3I min, Vector3I max)
+            {
+                var local = new BoundingBoxD(min * _size - _half, max * _size + _half);
+                var world = default(BoundingBoxD);
+                local.TransformFast(ref _world, ref world);
+                return world;
+            }
+
+            public Vector3D CellCenter(Vector3I cell)
+            {
+                var local = (Vector3D)(Vector3)cell * (double)_size;
+                if (!_affine) return Vector3D.Transform(local, ref _world);
+                // Same operation order as Vector3D.Transform, without a homogeneous divide by 1.
+                return new Vector3D(
+                    local.X * _world.M11 + local.Y * _world.M21 + local.Z * _world.M31 + _world.M41,
+                    local.X * _world.M12 + local.Y * _world.M22 + local.Z * _world.M32 + _world.M42,
+                    local.X * _world.M13 + local.Y * _world.M23 + local.Z * _world.M33 + _world.M43);
+            }
+        }
+
         private static List<MyWelder.ProjectionRaycastData> FindProjectedBlocks(MyShipWelder welder)
         {
             var w = welder.WorldMatrix;
@@ -919,6 +955,8 @@ namespace Optimizer.Optimizations
                     var state = FrontierState(myCubeGrid, frame);
                     using (global::SentisOptimisations.ClusterThreads.Lock(state))
                     {
+                        var world = myCubeGrid.WorldMatrix;
+                        var geometry = new ProjectionGeometry(ref world, myCubeGrid.GridSize, myCubeGrid.GridSizeHalfVector);
 
                         // Validate a few high-value frontier cells first. Stale entries are cheap and
                         // bounded; successful builds enqueue only their six grid neighbours.
@@ -936,7 +974,8 @@ namespace Optimizer.Optimizations
                             state.Queued.Remove(position);
                             var block = myCubeGrid.GetCubeBlock(position);
                             if (block == null) continue;
-                            if (!block.WorldAABB.Intersects(boundingSphereD) || state.IsParked(position, frame))
+                            var bounds = block.CubeGrid == myCubeGrid ? geometry.BlockBounds(block.Min, block.Max) : block.WorldAABB;
+                            if (!bounds.Intersects(boundingSphereD) || state.IsParked(position, frame))
                             {
                                 state.Enqueue(position);
                                 continue;
@@ -977,7 +1016,7 @@ namespace Optimizer.Optimizations
                                 // whose face is right against the tool would otherwise never be found.
                                 var extent = i < state.Extents.Count ? state.Extents[i] : 0f;
                                 var reachable = boundingSphereD.Radius + extent;
-                                if (Vector3D.DistanceSquared(myCubeGrid.GridIntegerToWorld(position),
+                                if (Vector3D.DistanceSquared(geometry.CellCenter(position),
                                         boundingSphereD.Center) > reachable * reachable) continue;
                                 reach.Cells.Add(position);
                             }
