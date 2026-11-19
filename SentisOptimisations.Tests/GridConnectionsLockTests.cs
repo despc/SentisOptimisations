@@ -79,6 +79,28 @@ namespace SentisOptimisations.Tests
             Assert.Equal(typeof(int), field.FieldType);
         }
 
+        [Fact]
+        public void Cached_groups_refill_private_buffers_after_target_filtering()
+        {
+            var source = new List<List<long>> { new List<long> { 1, 2 }, new List<long> { 3 } };
+            var first = new List<long> { 2, 55 };
+            var second = new List<long> { 3, 55 };
+            var buffers = new List<List<long>> { first, second };
+            Assert.True(GridConnectionsLock.RefillGroups(source, buffers));
+            Assert.Same(first, buffers[0]);
+            Assert.Same(second, buffers[1]);
+            Assert.Equal(new long[] { 1, 2 }, first);
+            Assert.Equal(new long[] { 3 }, second);
+            first.Remove(1);
+            second.Add(99);
+            Assert.Equal(new long[] { 1, 2 }, source[0]);
+            Assert.Equal(new long[] { 3 }, source[1]);
+            source.RemoveAt(1);
+            Assert.False(GridConnectionsLock.RefillGroups(source, buffers));
+            Assert.Equal(new long[] { 2 }, first);
+            Assert.Equal(new long[] { 3, 99 }, second);
+        }
+
         private sealed class Block { public int Id; }
 
         [Fact]

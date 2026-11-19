@@ -5,12 +5,14 @@ using System.Reflection;
 using System.Linq.Expressions;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
+using Sandbox.Game.Entities;
 using Sandbox.Game.EntityComponents;
 using Sandbox.Game.World;
 using Sandbox.Game.Weapons;
 using Torch.Managers.PatchManager;
 using Torch.Managers.PatchManager.MSIL;
 using VRage.Game.Entity;
+using VRage.Game.ModAPI;
 
 namespace Optimizer.Optimizations
 {
@@ -46,6 +48,9 @@ namespace Optimizer.Optimizations
         private static readonly FieldInfo CacheField = typeof(MyGridTargeting).GetField("m_gridGroupCache", BindingFlags.Instance | BindingFlags.NonPublic);
         private static readonly Func<MyGridTargeting, int> GetCache = CacheField == null ? null : Getter();
         private static readonly Action<MyGridTargeting, int> SetCache = CacheField == null ? null : Setter();
+        private static readonly FieldInfo ConnectionsField = typeof(MyGridTargeting).GetField("m_targetConnections", BindingFlags.Instance | BindingFlags.NonPublic);
+        private static readonly Func<MyGridTargeting, List<List<long>>> Connections = ConnectionsField?.FieldType == typeof(List<List<long>>)
+            ? SentisOptimisationsPlugin.Accessors.Field<MyGridTargeting, List<List<long>>>("m_targetConnections") : null;
 
         private sealed class Made
         {
@@ -107,6 +112,27 @@ namespace Optimizer.Optimizations
             return list;
         }
 
+        /// <summary>Reuse this search's buffers, not their contents: the worker filters and appends IDs in place.</summary>
+        public static bool RefillGroups(List<List<long>> source, List<List<long>> buffers)
+        {
+            if (source.Count != buffers.Count) return false; // the game rents or returns the difference
+            for (var i = 0; i < source.Count; i++)
+            {
+                buffers[i].Clear();
+                buffers[i].AddRange(source[i]);
+            }
+            return true;
+        }
+
+        private static void RefillSuggested(List<List<long>> source, List<long> buffer, MyEntity suggestedEntity)
+        {
+            buffer.Clear();
+            if (!(suggestedEntity?.GetTopMostParent() is MyCubeGrid grid)) return;
+            var group = source.GetWith(grid.EntityId);
+            if (group != null) buffer.AddRange(group);
+            else grid.GetConnectedGrids(GridLinkTypeEnum.Physical, connected => buffer.Add(connected.EntityId));
+        }
+
         /// <summary><c>targeting.UpdateGridConnections(...)</c> under the component's lock.</summary>
         public static void UpdateLocked(MyGridTargeting targeting, List<List<long>> gridGroups, List<long> gridsGroupsForSuggested, MyEntity suggestedEntity)
         {
@@ -123,7 +149,11 @@ namespace Optimizer.Optimizations
                 var keep = made != null && Fresh(now, made.Frame);
                 // the game makes the list anew when its field is not this frame: kept, the field is moved to this frame
                 if (keep && GetCache(targeting) != now) SetCache(targeting, now);
-                targeting.UpdateGridConnections(gridGroups, gridsGroupsForSuggested, suggestedEntity);
+                var source = keep && Connections != null ? Connections(targeting) : null;
+                if (source != null && RefillGroups(source, gridGroups))
+                    RefillSuggested(source, gridsGroupsForSuggested, suggestedEntity);
+                else
+                    targeting.UpdateGridConnections(gridGroups, gridsGroupsForSuggested, suggestedEntity);
                 if (made == null) return;
                 if (keep) global::SentisOptimisations.ClusterThreads.Increment(ref Kept);
                 else if (made.Frame != now)

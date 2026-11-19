@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using HarmonyLib;
 using NLog;
@@ -13,6 +14,7 @@ using Sandbox.Game.Weapons;
 using Sandbox.Game.World;
 using VRage.Game.Entity;
 using VRageMath;
+using ShipWelder = SpaceEngineers.Game.Entities.Blocks.MyShipWelder;
 
 namespace SentisOptimisations.Slowdowns
 {
@@ -185,6 +187,46 @@ namespace SentisOptimisations.Slowdowns
 
         private static readonly List<MyEntity> Found = new List<MyEntity>();
         private static readonly VRage.ObjectBuilders.MyObjectBuilderType WelderType = typeof(MyObjectBuilder_ShipWelder);
+        private static readonly ConditionalWeakTable<MyCubeGrid, GridWelders> WeldersByGrid = new ConditionalWeakTable<MyCubeGrid, GridWelders>();
+        private static readonly ConditionalWeakTable<MyCubeGrid, GridWelders>.CreateValueCallback IndexWelders = grid => new GridWelders(grid);
+
+        // Block events can run on cluster workers; only the main-thread refresh touches the cached list.
+        private sealed class GridWelders
+        {
+            private readonly List<ShipWelder> _welders = new List<ShipWelder>();
+            private int _dirty = 1;
+            private int _count;
+
+            public GridWelders(MyCubeGrid grid)
+            {
+                grid.OnBlockAdded += Changed;
+                grid.OnBlockRemoved += Changed;
+            }
+
+            private void Changed(Sandbox.Game.Entities.Cube.MySlimBlock block)
+            {
+                if (block.FatBlock is ShipWelder || block.BlockDefinition.Id.TypeId == WelderType)
+                    Interlocked.Exchange(ref _dirty, 1);
+            }
+
+            public List<ShipWelder> Get(MyCubeGrid grid, int count)
+            {
+                if (Volatile.Read(ref _dirty) == 0 && count == _count) return _welders;
+                Interlocked.Exchange(ref _dirty, 0);
+                try
+                {
+                    _welders.Clear();
+                    foreach (var welder in grid.GetFatBlocks<ShipWelder>()) _welders.Add(welder);
+                    _count = count;
+                    return _welders;
+                }
+                catch
+                {
+                    Volatile.Write(ref _dirty, 1);
+                    throw;
+                }
+            }
+        }
 
         // a ship welder switched on: every projection looked at in the next frame, not within a second
         private static volatile bool _lookAll;
@@ -261,9 +303,9 @@ namespace SentisOptimisations.Slowdowns
                     }
                     if (!(entity is MyCubeGrid grid) || grid.IsPreview || grid.Closed) continue;
                     if (!grid.BlocksCounters.TryGetValue(WelderType, out var welders) || welders <= 0) continue;
-                    foreach (var welder in grid.GetFatBlocks<SpaceEngineers.Game.Entities.Blocks.MyShipWelder>())
+                    foreach (var welder in WeldersByGrid.GetValue(grid, IndexWelders).Get(grid, welders))
                     {
-                        if (!welder.Enabled || !welder.IsFunctional) continue;
+                        if (welder.CubeGrid != grid || welder.Closed || welder.MarkedForClose || !welder.Enabled || !welder.IsFunctional) continue;
                         // its sensor sphere sits in front of it: within its diameter and a block of the box
                         var welderReach = 2 * SentisOptimisationsPlugin.ShipTool.ShipToolPatch.GetWelderRadius(welder) + 5;
                         if (box.Distance(welder.PositionComp.GetPosition()) <= welderReach) return true;
