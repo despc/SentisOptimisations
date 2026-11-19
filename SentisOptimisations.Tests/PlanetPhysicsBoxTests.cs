@@ -1,4 +1,11 @@
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using System.Reflection.Emit;
+using Sandbox.Game.Entities;
 using SentisOptimisationsPlugin.CrashFix;
+using Torch.Managers.PatchManager;
+using Torch.Managers.PatchManager.MSIL;
 using VRageMath;
 using Xunit;
 
@@ -7,6 +14,37 @@ namespace SentisOptimisations.Tests
     public class PlanetPhysicsBoxTests
     {
         private static readonly BoundingBoxD Planet = new BoundingBoxD(new Vector3D(-60000), new Vector3D(60000));
+
+        [Fact]
+        public void Move_checks_the_games_single_computed_box_and_reuses_its_exit()
+        {
+            var move = typeof(MyGamePruningStructure).GetMethod("MoveInternal", BindingFlags.NonPublic | BindingFlags.Instance);
+            var original = PatchUtilities.ReadInstructions(move).ToList();
+            var rewritten = original.ToList();
+            var transform = typeof(PlanetPhysicsBox).GetMethod("GuardComputedBox", BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.True((bool)transform.Invoke(null, new object[] { rewritten }));
+
+            var index = original.FindIndex(op => op.Operand is MsilOperandInline<MethodBase> call && call.Value.Name == "GetEntityAABB");
+            Assert.True(index >= 0);
+            var insertion = index + 2;
+            Assert.Equal(4 + original.Count, rewritten.Count);
+            Assert.Equal(original.Take(insertion), rewritten.Take(insertion));
+            Assert.Equal(original.Skip(insertion), rewritten.Skip(insertion + 4));
+            Assert.Equal(OpCodes.Ldarg_1, rewritten[insertion].OpCode);
+            Assert.Equal(0, ((MsilOperandInline<MsilLocal>)rewritten[insertion + 1].Operand).Value.Index);
+            Assert.Equal("MoveBoxAllowed", ((MsilOperandInline<MethodBase>)rewritten[insertion + 2].Operand).Value.Name);
+            Assert.Equal(OpCodes.Brfalse, rewritten[insertion + 3].OpCode);
+            Assert.Same(((MsilOperandBrTarget)original[3].Operand).Target, ((MsilOperandBrTarget)rewritten[insertion + 3].Operand).Target);
+        }
+
+        [Fact]
+        public void Unknown_move_shape_is_left_for_the_original_guard()
+        {
+            var il = new List<MsilInstruction> { new MsilInstruction(OpCodes.Ret) };
+            var transform = typeof(PlanetPhysicsBox).GetMethod("GuardComputedBox", BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.False((bool)transform.Invoke(null, new object[] { il }));
+            Assert.Equal(OpCodes.Ret, Assert.Single(il).OpCode);
+        }
 
         [Fact]
         public void A_huge_box_is_cut_to_the_planet()

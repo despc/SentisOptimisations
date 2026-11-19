@@ -1,8 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
+using System.Reflection.Emit;
 using Sandbox.Game.Entities;
 using Torch.Managers.PatchManager;
+using Torch.Managers.PatchManager.MSIL;
 using VRage.Game.Entity;
 using VRageMath;
 
@@ -42,10 +45,54 @@ namespace SentisOptimisationsPlugin.CrashFix
             ctx.GetPattern(method).Prefixes.Add(typeof(PlanetPhysicsBox).GetMethod(nameof(Prefix), BindingFlags.Static | BindingFlags.NonPublic));
             var move = typeof(MyGamePruningStructure).GetMethod("MoveInternal", BindingFlags.Instance | BindingFlags.NonPublic, null, new[] { typeof(MyEntity) }, null)
                        ?? throw new MissingMethodException("MyGamePruningStructure", "MoveInternal");
-            ctx.GetPattern(move).Prefixes.Add(typeof(PlanetPhysicsBox).GetMethod(nameof(MovePrefix), BindingFlags.Static | BindingFlags.NonPublic));
+            var pattern = ctx.GetPattern(move);
+            pattern.Prefixes.Add(Own(nameof(MovePrefix)));
+            pattern.Transpilers.Add(Own(nameof(MoveTranspiler)));
         }
 
         private static DateTime _moveLoggedAt = DateTime.MinValue;
+        private static bool _guardInMove;
+
+        private static MethodInfo Own(string name) => typeof(PlanetPhysicsBox).GetMethod(name, BindingFlags.Static | BindingFlags.NonPublic);
+
+        private static IEnumerable<MsilInstruction> MoveTranspiler(IEnumerable<MsilInstruction> instructions)
+        {
+            var list = instructions.ToList();
+            _guardInMove = GuardComputedBox(list);
+            if (!_guardInMove)
+                SentisOptimisationsPlugin.Log.Warn("PlanetPhysicsBox: MoveInternal IL changed; keeping the separate bounds check");
+            return list;
+        }
+
+        private static bool GuardComputedBox(List<MsilInstruction> list)
+        {
+            var getBox = typeof(MyGamePruningStructure).GetMethod(nameof(MyGamePruningStructure.GetEntityAABB), new[] { typeof(MyEntity) });
+            var sites = list.Select((op, i) => (op, i)).Where(x => x.op.OpCode == OpCodes.Call &&
+                x.op.Operand is MsilOperandInline<MethodBase> method && method.Value == getBox).Select(x => x.i).ToList();
+            if (sites.Count != 1 || sites[0] < 5 || sites[0] + 2 >= list.Count || list.Any(x => x.TryCatchOperations.Count != 0)) return false;
+            var i = sites[0];
+            var exit = list[3];
+            var proxy = typeof(MyEntity).GetField(nameof(MyEntity.TopMostPruningProxyId));
+            if (list[0].OpCode != OpCodes.Ldarg_1 || list[1].OpCode != OpCodes.Ldfld ||
+                !(list[1].Operand is MsilOperandInline<FieldInfo> field) || field.Value != proxy ||
+                list[2].OpCode != OpCodes.Ldc_I4_M1 || (exit.OpCode != OpCodes.Beq && exit.OpCode != OpCodes.Beq_S) ||
+                !(exit.Operand is MsilOperandBrTarget target) || !list.Any(x => x.OpCode == OpCodes.Ret && x.Labels.Contains(target.Target)) ||
+                list[i - 1].OpCode != OpCodes.Ldarg_1 || list[i + 1].OpCode != OpCodes.Stloc_0 ||
+                (list[i + 2].OpCode != OpCodes.Ldloca && list[i + 2].OpCode != OpCodes.Ldloca_S) ||
+                !(list[i + 2].Operand is MsilOperandInline<MsilLocal> box) || box.Value.Index != 0 || box.Value.Type != typeof(BoundingBoxD)) return false;
+
+            // Validate the actual box the game is about to insert, then reuse its existing early return.
+            var reject = new MsilInstruction(OpCodes.Brfalse);
+            ((MsilOperandBrTarget)reject.Operand).Target = target.Target;
+            list.InsertRange(i + 2, new[]
+            {
+                new MsilInstruction(OpCodes.Ldarg_1),
+                new MsilInstruction(OpCodes.Ldloca).InlineValue(box.Value),
+                new MsilInstruction(OpCodes.Call).InlineValue((MethodBase)Own(nameof(MoveBoxAllowed))),
+                reject,
+            });
+            return true;
+        }
 
         /// <summary>
         /// An insane box never gets into the tree: the leaf stays where it was until the entity's box is sane again
@@ -54,11 +101,25 @@ namespace SentisOptimisationsPlugin.CrashFix
         /// </summary>
         private static bool MovePrefix(MyEntity entity)
         {
+            if (_guardInMove) return true;
             try
             {
                 if (entity.TopMostPruningProxyId == -1) return true;
                 var box = MyGamePruningStructure.GetEntityAABB(entity);
-                if (Sane(box)) return true;
+                return MoveBoxAllowed(entity, ref box);
+            }
+            catch (Exception e)
+            {
+                SentisOptimisationsPlugin.Log.Error(e, "PlanetPhysicsBox.MovePrefix");
+                return true;
+            }
+        }
+
+        private static bool MoveBoxAllowed(MyEntity entity, ref BoundingBoxD box)
+        {
+            if (Sane(box)) return true;
+            try
+            {
                 var straighten = Scaled(entity.PositionComp.WorldMatrixRef);
                 if ((DateTime.UtcNow - _moveLoggedAt).TotalSeconds > 60)
                 {
@@ -73,8 +134,8 @@ namespace SentisOptimisationsPlugin.CrashFix
             }
             catch (Exception e)
             {
-                SentisOptimisationsPlugin.Log.Error(e, "PlanetPhysicsBox.MovePrefix");
-                return true;
+                SentisOptimisationsPlugin.Log.Error(e, "PlanetPhysicsBox.MoveBoxAllowed");
+                return false;
             }
         }
 
