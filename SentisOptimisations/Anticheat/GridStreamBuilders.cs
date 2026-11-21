@@ -153,14 +153,40 @@ namespace SentisOptimisationsPlugin
                 if (VerifyCachedBuilders) Verify(entry, replicable, forClient);
             }
 
+            MyObjectBuilder_CubeGrid variant;
             switch (access)
             {
                 case Access.Faction:
-                    return entry.Faction ?? (entry.Faction = Mask(entry.Full, keepFactionShared: true));
+                    variant = entry.Faction ?? (entry.Faction = Mask(entry.Full, keepFactionShared: true));
+                    break;
                 case Access.None:
-                    return entry.None ?? (entry.None = Mask(entry.Full, keepFactionShared: false));
+                    variant = entry.None ?? (entry.None = Mask(entry.Full, keepFactionShared: false));
+                    break;
                 default:
-                    return entry.Full;
+                    variant = entry.Full;
+                    break;
+            }
+            return ClientMask == null ? variant : ApplyClientMask(grid, forClient, variant);
+        }
+
+        /// <summary>
+        /// A hook for another plugin: the builder sent to this one client, made from the shared variant. It returns
+        /// the argument itself when nothing is to change; a changed one has to be a copy, the shared builders are kept
+        /// for the next client. Game thread. A hook that throws is logged and the variant is sent as it is.
+        /// </summary>
+        public static Func<MyCubeGrid, Endpoint, MyObjectBuilder_CubeGrid, MyObjectBuilder_CubeGrid> ClientMask;
+
+        private static MyObjectBuilder_CubeGrid ApplyClientMask(MyCubeGrid grid, Endpoint forClient, MyObjectBuilder_CubeGrid variant)
+        {
+            try
+            {
+                return ClientMask(grid, forClient, variant) ?? variant;
+            }
+            catch (Exception e)
+            {
+                global::SentisOptimisationsPlugin.SentisOptimisationsPlugin.Log.Error(e,
+                    "the per-client mask of grid " + grid.EntityId + " failed, its builder is sent as it is");
+                return variant;
             }
         }
 
