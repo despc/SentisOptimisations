@@ -62,6 +62,10 @@ public static class CompensationCatchUp
         /// <summary>A step is under way (its queue taken from <see cref="Blocks"/>).</summary>
         public bool StepStarted;
         public int Steps, Frames;
+        /// <summary>The steps begun: the ore the network holds is counted again with each.</summary>
+        public int StepNumber;
+        /// <summary>The ore each conveyor network (logical group, by its least grid id) holds, counted once a step.</summary>
+        public readonly Dictionary<long, (int Step, Dictionary<MyDefinitionId, double> Ore)> NetworkOre = new Dictionary<long, (int, Dictionary<MyDefinitionId, double>)>();
         public double Refined, LastPulled;
         public readonly Dictionary<long, (string Name, int Steps, uint Frames)> Done = new Dictionary<long, (string, int, uint)>();
 
@@ -241,6 +245,7 @@ public static class CompensationCatchUp
     private static void BeginStep(Job job)
     {
         job.StepMoved = false;
+        job.StepNumber++;
         foreach (var block in job.Blocks.OfType<MyRefinery>()) job.StepQueue.Enqueue(block);
         foreach (var block in job.Blocks.OfType<MyAssembler>()) job.StepQueue.Enqueue(block);
         foreach (var block in job.Blocks.Where(b => !(b is MyRefinery) && !(b is MyAssembler))) job.StepQueue.Enqueue(block);
@@ -290,14 +295,22 @@ public static class CompensationCatchUp
             // ore by ore, the conveyor path worked out now (PullItems skips a source whose path is not known yet
             // and only starts working it out - and just after a thaw none is, while the whole catch-up takes a
             // frame or two)
+            // (only the ores the network holds: a pull goes through every inventory of the network for its ore, and a
+            // refinery takes ten kinds of it - ten walks of the whole base a refinery a step, mostly for ores there were
+            // none of; 7.7% of the game thread on prod, PullItem's GetItemAmount most of it, 24.11.2026)
             if (need > 1 && input.Constraint != null)
+            {
+                var held = NetworkOre(job, refinery);
                 foreach (var id in input.Constraint.ConstrainedIds)
                 {
                     if (need <= 1 || input.VolumeFillFactor >= 0.99f) break;
-                    var pulled = (double)refinery.CubeGrid.GridSystems.ConveyorSystem.PullItem(id, (MyFixedPoint)need, refinery, input, false, true);
+                    if (!held.TryGetValue(id, out var there) || there < 1) continue;
+                    var pulled = (double)refinery.CubeGrid.GridSystems.ConveyorSystem.PullItem(id, (MyFixedPoint)Math.Min(need, there), refinery, input, false, true);
+                    held[id] = there - pulled;
                     need -= pulled;
                     job.LastPulled += pulled;
                 }
+            }
         }
         if (Ore(refinery) > 0 && !Powered(job, refinery)) return false;
         if (!CompensationTracker.TryTakeCompensation(refinery.EntityId, StepFrames, out var frames)) return false;
@@ -306,6 +319,37 @@ public static class CompensationCatchUp
         if (refinery.UseConveyorSystem && refinery.OutputInventory.VolumeFillFactor > 0.25f)
             MyGridConveyorSystem.PushAnyRequest(refinery, refinery.OutputInventory);
         return true;
+    }
+
+    /// <summary>
+    /// The ore the refinery's network holds outside the refineries' inputs (what a pull can take), counted once a step for
+    /// all the refineries on it; what each pulls is taken off for the next.
+    /// </summary>
+    private static Dictionary<MyDefinitionId, double> NetworkOre(Job job, MyRefinery refinery)
+    {
+        var nodes = MyCubeGridGroups.Static.Logical.GetGroupNodes(refinery.CubeGrid);
+        var key = nodes.Count == 0 ? refinery.CubeGrid.EntityId : nodes.Min(g => g.EntityId);
+        if (job.NetworkOre.TryGetValue(key, out var known) && known.Step == job.StepNumber) return known.Ore;
+        var ore = new Dictionary<MyDefinitionId, double>();
+        foreach (var grid in nodes.Count == 0 ? new List<MyCubeGrid> { refinery.CubeGrid } : nodes)
+            foreach (var block in grid.GetFatBlocks())
+            {
+                if (!block.HasInventory) continue;
+                for (var i = 0; i < block.InventoryCount; i++)
+                {
+                    if (!(block.GetInventory(i) is MyInventory inventory)) continue;
+                    // (a refinery's input is its own ore, not the network's to give)
+                    if (block is MyRefinery other && inventory == other.InputInventory) continue;
+                    foreach (var item in inventory.GetItems())
+                    {
+                        if (!(item.Content is MyObjectBuilder_Ore)) continue;
+                        var id = item.Content.GetId();
+                        ore[id] = (ore.TryGetValue(id, out var had) ? had : 0) + (double)item.Amount;
+                    }
+                }
+            }
+        job.NetworkOre[key] = (job.StepNumber, ore);
+        return ore;
     }
 
     private static bool AssemblerStep(Job job, MyAssembler assembler)
