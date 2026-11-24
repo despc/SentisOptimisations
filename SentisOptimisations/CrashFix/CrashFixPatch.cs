@@ -417,7 +417,7 @@ namespace SentisOptimisationsPlugin.CrashFix
             return string.Join("\n", lines);
         }
 
-        private static string DescribeCharacter(MyCharacter character)
+        internal static string DescribeCharacter(MyCharacter character)
         {
             try
             {

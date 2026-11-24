@@ -7,6 +7,7 @@ using Sandbox.Engine.Physics;
 using Sandbox.Game;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Blocks;
+using Sandbox.Game.Entities.Character;
 using Sandbox.Game.Multiplayer;
 using Sandbox.Game.Screens.Helpers;
 using Sandbox.Game.World;
@@ -135,6 +136,102 @@ namespace SentisOptimisations.Commands
                 }
                 
             });
+        }
+
+        /// <summary>
+        /// Live characters whose identity is gone: no player and no identity, left by a bot removed while it lay in a
+        /// cryo chamber (RemovePlayer keeps a body in cryo, CleanUnusedIdentities takes the identity later). Out in the
+        /// world, such a body threw in its weapon position's update every frame and stopped the entities' update pass
+        /// (25.11.2026). Seated ones are found through the seats: a pilot is not among the world's entities. Runs from
+        /// Essentials' auto commands as well (they call it from the server, on the game thread).
+        /// </summary>
+        [Command("ai_npc ghosts", "Lists live characters without an identity; '!ai_npc ghosts clean' removes them")]
+        [Permission(MyPromoteLevel.Admin)]
+        public void AI_NPC_Ghosts(string action = null)
+        {
+            var clean = string.Equals(action, "clean", StringComparison.OrdinalIgnoreCase);
+            if (action != null && !clean)
+            {
+                Context.Respond("Usage: !ai_npc ghosts [clean]");
+                return;
+            }
+
+            var ghosts = new List<KeyValuePair<MyCharacter, MyCockpit>>();
+            var seen = new HashSet<long>();
+
+            void Consider(MyCharacter character, MyCockpit seat)
+            {
+                if (character == null || character.IsDead || character.MarkedForClose || character.Closed || !seen.Add(character.EntityId))
+                    return;
+                if (MySession.Static.Players.TryGetIdentity(character.GetPlayerIdentityId()) != null)
+                    return;
+                ghosts.Add(new KeyValuePair<MyCharacter, MyCockpit>(character, seat));
+            }
+
+            foreach (var entity in MyEntities.GetEntities().ToList())
+            {
+                if (entity is MyCharacter character)
+                {
+                    Consider(character, null);
+                    continue;
+                }
+                if (!(entity is MyCubeGrid grid) || grid.MarkedForClose)
+                    continue;
+                foreach (var block in grid.GetFatBlocks().ToList())
+                {
+                    if (!(block is MyCockpit cockpit))
+                        continue;
+                    Consider(cockpit.IsBeingUsedBy as MyCharacter, cockpit);
+                    // a pilot RemovePilot let go of without detaching it stays the seat's child
+                    var hierarchy = cockpit.Hierarchy;
+                    if (hierarchy == null)
+                        continue;
+                    var seated = new List<MyCharacter>();
+                    foreach (var child in hierarchy.Children)
+                        if (child?.Container?.Entity is MyCharacter childCharacter)
+                            seated.Add(childCharacter);
+                    foreach (var childCharacter in seated)
+                        Consider(childCharacter, cockpit);
+                }
+            }
+
+            if (ghosts.Count == 0)
+            {
+                Context.Respond("No live characters without an identity.");
+                return;
+            }
+
+            var lines = new List<string>();
+            var removed = 0;
+            foreach (var pair in ghosts)
+            {
+                var character = pair.Key;
+                var seat = pair.Value;
+                var where = seat == null ? "in the world" : "in '" + seat.DisplayNameText + "' (" + seat.EntityId + ") on '" + seat.CubeGrid?.DisplayName + "' (" + seat.CubeGrid?.EntityId + ")";
+                var line = global::SentisOptimisationsPlugin.CrashFix.CrashFixPatch.DescribeCharacter(character) + ", " + where;
+                if (clean)
+                {
+                    try
+                    {
+                        if (seat != null && seat.IsBeingUsedBy == character)
+                            seat.RemovePilot();
+                        if (!character.MarkedForClose)
+                            character.Close();
+                        removed++;
+                        line = "removed " + line;
+                    }
+                    catch (Exception e)
+                    {
+                        Log.Error(e, "ai_npc ghosts clean: " + line);
+                        line = "FAILED " + line + " (" + e.GetType().Name + ")";
+                    }
+                }
+                Log.Warn("ai_npc ghosts: " + line);
+                lines.Add(line);
+            }
+
+            Context.Respond((clean ? $"Removed {removed} of {ghosts.Count}" : $"Found {ghosts.Count}") + " live character(s) without an identity" +
+                            (clean ? "" : " (!ai_npc ghosts clean to remove)") + ":\n" + string.Join("\n", lines));
         }
 
         [Command("ai_npc clean", "Cleans up NPC junk data from the sandbox file")]
