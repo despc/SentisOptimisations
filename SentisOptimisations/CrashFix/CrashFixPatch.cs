@@ -14,6 +14,8 @@ using Sandbox.Game;
 using Sandbox.Game.AI;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Blocks;
+using Sandbox.Game.Entities.Character;
+using Sandbox.Game.Entities.Character.Components;
 using Sandbox.Game.Entities.Cube;
 using Sandbox.Game.Multiplayer;
 using Sandbox.Game.Replication;
@@ -169,6 +171,20 @@ namespace SentisOptimisationsPlugin.CrashFix
             // by Torch, not Harmony: SentisAi has a Torch prefix on it, which writes over a Harmony patch (patch_conflicts)
             ctx.GetPattern(MethodHandDrillUpdate100).Prefixes.Add(typeof(CrashFixPatch).GetMethod(nameof(HandDrillWithOwner), BindingFlags.Static | BindingFlags.NonPublic));
 
+            // A character with neither a player nor an identity: on the dedicated server the weapon position's update
+            // reads Character.GetIdentity().IdentityId first thing, and that is null. Its NullReferenceException came out
+            // of the entities' dispatch every frame (25.11.2026, production, 100 000 in an hour, kept over a restart as
+            // the body was in the save): the pass stopped at it, and every entity after it missed its update - players
+            // and rovers fell through the planets, grinders and hand tools did nothing, a character at 0 HP did not die.
+            // Such a character is skipped here (it has no one to aim a weapon for), and any other exception of this
+            // update stays in it: only that one character misses its weapon position. Each one is written once, with
+            // what is needed to find it.
+            var MethodWeaponPositionUpdate = typeof(MyCharacterWeaponPositionComponent).GetMethod(nameof(MyCharacterWeaponPositionComponent.Update),
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly) ?? throw new MissingMethodException("MyCharacterWeaponPositionComponent.Update");
+            harmony.Patch(MethodWeaponPositionUpdate,
+                prefix: new HarmonyMethod(typeof(CrashFixPatch).GetMethod(nameof(WeaponPositionOfCharacterWithIdentity), BindingFlags.Static | BindingFlags.NonPublic)),
+                finalizer: new HarmonyMethod(typeof(CrashFixPatch).GetMethod(nameof(WeaponPositionFinalizer), BindingFlags.Static | BindingFlags.NonPublic)));
+
             // A character's radiation damage is done a frame later (MyRadiationStat.DoRadiationDamage queues it with
             // MySandboxGame.Invoke): a character deleted in between (closed and deleted at the end of that frame, as when a
             // player leaves or a body goes) left the queued call without its stats, and its NullReferenceException took the
@@ -313,6 +329,53 @@ namespace SentisOptimisationsPlugin.CrashFix
             catch
             {
                 return false;
+            }
+        }
+
+        // Characters already written by the weapon position guards: each one once (the update runs every frame).
+        private static readonly ConcurrentDictionary<long, byte> WeaponPositionLogged = new ConcurrentDictionary<long, byte>();
+
+        /// <summary>Whether the character has an identity to update its weapon position for (see where it is patched).</summary>
+        private static bool WeaponPositionOfCharacterWithIdentity(MyCharacterWeaponPositionComponent __instance)
+        {
+            var character = __instance.Character;
+            if (character == null) return false;
+            if (!Sync.IsDedicated || character.GetIdentity() != null) return true;
+            if (WeaponPositionLogged.TryAdd(character.EntityId, 0))
+                SentisOptimisationsPlugin.Log.Warn("Character without an identity, its weapon position not updated: " + DescribeCharacter(character));
+            return false;
+        }
+
+        private static Exception WeaponPositionFinalizer(Exception __exception, MyCharacterWeaponPositionComponent __instance)
+        {
+            if (__exception == null) return null;
+            try
+            {
+                var character = __instance?.Character;
+                if (WeaponPositionLogged.TryAdd(character?.EntityId ?? 0, 0))
+                    SentisOptimisationsPlugin.Log.Error(__exception, "Weapon position update of " + (character == null ? "a component without its character" : DescribeCharacter(character)) +
+                                                                     " threw; only this character missed it (written once per character)");
+            }
+            catch
+            {
+                // the log must not throw from a finalizer
+            }
+            return null;
+        }
+
+        private static string DescribeCharacter(MyCharacter character)
+        {
+            try
+            {
+                var p = character.PositionComp?.GetPosition() ?? default;
+                return "'" + character.DisplayName + "' (" + character.EntityId + "), identity id " + character.GetPlayerIdentityId() +
+                       ", steam " + character.ControlSteamId + ", dead " + character.IsDead + ", closed " + character.Closed + ", marked " + character.MarkedForClose +
+                       ", client online " + character.IsClientOnline + ", at GPS:" + (character.DisplayName ?? "character") + ":" +
+                       Math.Round(p.X, 1) + ":" + Math.Round(p.Y, 1) + ":" + Math.Round(p.Z, 1) + ":";
+            }
+            catch (Exception e)
+            {
+                return "character " + character.EntityId + " (" + e.GetType().Name + " describing it)";
             }
         }
 
