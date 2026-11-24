@@ -195,7 +195,9 @@ namespace SentisOptimisationsPlugin.CrashFix
             var MethodRemovePlayer = typeof(MyPlayerCollection).GetMethod(nameof(MyPlayerCollection.RemovePlayer),
                 BindingFlags.Instance | BindingFlags.Public, null, new[] { typeof(MyPlayer), typeof(bool) }, null)
                 ?? throw new MissingMethodException("MyPlayerCollection.RemovePlayer(MyPlayer, bool)");
-            harmony.Patch(MethodRemovePlayer, prefix: new HarmonyMethod(typeof(CrashFixPatch).GetMethod(nameof(BotOutOfCryoBeforeRemoval), BindingFlags.Static | BindingFlags.NonPublic)));
+            // by Torch, not Harmony: a Torch patch on the same method by another plugin would write over a Harmony one
+            // without a word (as SentisAi's did on the hand drill), and this guard only ever acts on a rare removal
+            ctx.GetPattern(MethodRemovePlayer).Prefixes.Add(typeof(CrashFixPatch).GetMethod(nameof(BotOutOfCryoBeforeRemoval), BindingFlags.Static | BindingFlags.NonPublic));
 
             // A character's radiation damage is done a frame later (MyRadiationStat.DoRadiationDamage queues it with
             // MySandboxGame.Invoke): a character deleted in between (closed and deleted at the end of that frame, as when a
@@ -394,7 +396,7 @@ namespace SentisOptimisationsPlugin.CrashFix
                 }
                 SentisOptimisationsPlugin.Log.Warn("Bot removed while in cryo chamber '" + cryo.DisplayNameText + "' (" + cryo.EntityId + ") on '" + cryo.CubeGrid?.DisplayName +
                                                    "' (" + cryo.CubeGrid?.EntityId + "): taken out" + (closedHere ? " and closed" : "") + " so its body goes with it - " + description +
-                                                   "; removed by:\n" + CallerFrames(12));
+                                                   "; removed by:\n" + CallerFrames("RemovePlayer", 12));
             }
             catch (Exception e)
             {
@@ -402,15 +404,24 @@ namespace SentisOptimisationsPlugin.CrashFix
             }
         }
 
-        /// <summary>The first frames of the current stack above Harmony's own: who called the patched method.</summary>
-        private static string CallerFrames(int count)
+        /// <summary>
+        /// Who called the patched method: the frames above the guard (this one and the prefix skipped), with the patched
+        /// method's own frames (named <paramref name="patchedName" />, whatever the patcher made of them) dropped from the top.
+        /// </summary>
+        private static string CallerFrames(string patchedName, int count)
         {
             var frames = new StackTrace(2, false).GetFrames() ?? new StackFrame[0];
             var lines = new List<string>();
+            var abovePatched = false;
             foreach (var frame in frames)
             {
                 var method = frame.GetMethod();
                 if (method == null) continue;
+                if (!abovePatched)
+                {
+                    if (method.Name.Contains(patchedName)) continue;
+                    abovePatched = true;
+                }
                 lines.Add("   at " + (method.DeclaringType?.FullName ?? "?") + "." + method.Name);
                 if (lines.Count >= count) break;
             }
@@ -424,7 +435,7 @@ namespace SentisOptimisationsPlugin.CrashFix
                 var p = character.PositionComp?.GetPosition() ?? default;
                 return "'" + character.DisplayName + "' (" + character.EntityId + "), identity id " + character.GetPlayerIdentityId() +
                        ", steam " + character.ControlSteamId + ", dead " + character.IsDead + ", closed " + character.Closed + ", marked " + character.MarkedForClose +
-                       ", client online " + character.IsClientOnline + ", at GPS:" + (character.DisplayName ?? "character") + ":" +
+                       ", client online " + character.IsClientOnline + ", at GPS:" + (character.DisplayName ?? "character").Replace(':', ' ') + ":" +
                        Math.Round(p.X, 1) + ":" + Math.Round(p.Y, 1) + ":" + Math.Round(p.Z, 1) + ":";
             }
             catch (Exception e)

@@ -163,7 +163,8 @@ namespace SentisOptimisations.Commands
             {
                 if (character == null || character.IsDead || character.MarkedForClose || character.Closed || !seen.Add(character.EntityId))
                     return;
-                if (MySession.Static.Players.TryGetIdentity(character.GetPlayerIdentityId()) != null)
+                // the same test as the weapon position's guard: the controlling player's identity first, then the owner's
+                if (character.GetIdentity() != null)
                     return;
                 ghosts.Add(new KeyValuePair<MyCharacter, MyCockpit>(character, seat));
             }
@@ -211,10 +212,18 @@ namespace SentisOptimisations.Commands
                 var line = global::SentisOptimisationsPlugin.CrashFix.CrashFixPatch.DescribeCharacter(character) + ", " + where;
                 if (clean)
                 {
+                    // the body is closed even when taking it out of its seat threw (the seat lets go of it on close)
                     try
                     {
                         if (seat != null && seat.IsBeingUsedBy == character)
                             seat.RemovePilot();
+                    }
+                    catch (Exception e)
+                    {
+                        Log.Error(e, "ai_npc ghosts clean, RemovePilot: " + line);
+                    }
+                    try
+                    {
                         if (!character.MarkedForClose)
                             character.Close();
                         removed++;
