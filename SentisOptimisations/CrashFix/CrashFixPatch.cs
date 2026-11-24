@@ -22,6 +22,7 @@ using Sandbox.Game.Replication;
 using Sandbox.Game.Replication.StateGroups;
 using Sandbox.Game.SessionComponents;
 using Sandbox.Game.Weapons;
+using Sandbox.Game.World;
 using SentisOptimisations;
 using SpaceEngineers.Game.AI;
 using SpaceEngineers.Game.Entities.Blocks;
@@ -184,6 +185,17 @@ namespace SentisOptimisationsPlugin.CrashFix
             harmony.Patch(MethodWeaponPositionUpdate,
                 prefix: new HarmonyMethod(typeof(CrashFixPatch).GetMethod(nameof(WeaponPositionOfCharacterWithIdentity), BindingFlags.Static | BindingFlags.NonPublic)),
                 finalizer: new HarmonyMethod(typeof(CrashFixPatch).GetMethod(nameof(WeaponPositionFinalizer), BindingFlags.Static | BindingFlags.NonPublic)));
+
+            // Where such a character comes from: RemovePlayer closes the player's body unless it lies in a cryo chamber
+            // (a bed is one) - kept for a human who logged off in cryo. A bot removed there kept its body in the bed,
+            // and CleanUnusedIdentities took its identity afterwards: a body with no player and no identity (25.11.2026,
+            // a crew bot of a Military Barracks, "Astronaut 125"). The crew's own despawn takes its bots out of their
+            // seats first; whatever removed this one did not. A bot's body is taken out of the cryo chamber here, so
+            // the game closes it with its player, and the caller is written to find the path.
+            var MethodRemovePlayer = typeof(MyPlayerCollection).GetMethod(nameof(MyPlayerCollection.RemovePlayer),
+                BindingFlags.Instance | BindingFlags.Public, null, new[] { typeof(MyPlayer), typeof(bool) }, null)
+                ?? throw new MissingMethodException("MyPlayerCollection.RemovePlayer(MyPlayer, bool)");
+            harmony.Patch(MethodRemovePlayer, prefix: new HarmonyMethod(typeof(CrashFixPatch).GetMethod(nameof(BotOutOfCryoBeforeRemoval), BindingFlags.Static | BindingFlags.NonPublic)));
 
             // A character's radiation damage is done a frame later (MyRadiationStat.DoRadiationDamage queues it with
             // MySandboxGame.Invoke): a character deleted in between (closed and deleted at the end of that frame, as when a
@@ -361,6 +373,48 @@ namespace SentisOptimisationsPlugin.CrashFix
                 // the log must not throw from a finalizer
             }
             return null;
+        }
+
+        /// <summary>A bot's body is taken out of its cryo chamber before its player goes (see where it is patched).</summary>
+        private static void BotOutOfCryoBeforeRemoval(MyPlayer player, bool removeCharacter)
+        {
+            try
+            {
+                if (!removeCharacter || !Sync.IsServer || player == null || !player.IsBot) return;
+                var character = player.Character;
+                if (!(character?.Parent is MyCryoChamber cryo) || character.MarkedForClose) return;
+                var description = DescribeCharacter(character);
+                cryo.RemovePilot();
+                // RemovePilot leaves a pilot without its physics in the hierarchy: closed here, the chamber lets it go
+                var closedHere = false;
+                if (character.Parent is MyCryoChamber && !character.MarkedForClose)
+                {
+                    character.Close();
+                    closedHere = true;
+                }
+                SentisOptimisationsPlugin.Log.Warn("Bot removed while in cryo chamber '" + cryo.DisplayNameText + "' (" + cryo.EntityId + ") on '" + cryo.CubeGrid?.DisplayName +
+                                                   "' (" + cryo.CubeGrid?.EntityId + "): taken out" + (closedHere ? " and closed" : "") + " so its body goes with it - " + description +
+                                                   "; removed by:\n" + CallerFrames(12));
+            }
+            catch (Exception e)
+            {
+                SentisOptimisationsPlugin.Log.Error(e, "BotOutOfCryoBeforeRemoval");
+            }
+        }
+
+        /// <summary>The first frames of the current stack above Harmony's own: who called the patched method.</summary>
+        private static string CallerFrames(int count)
+        {
+            var frames = new StackTrace(2, false).GetFrames() ?? new StackFrame[0];
+            var lines = new List<string>();
+            foreach (var frame in frames)
+            {
+                var method = frame.GetMethod();
+                if (method == null) continue;
+                lines.Add("   at " + (method.DeclaringType?.FullName ?? "?") + "." + method.Name);
+                if (lines.Count >= count) break;
+            }
+            return string.Join("\n", lines);
         }
 
         private static string DescribeCharacter(MyCharacter character)
