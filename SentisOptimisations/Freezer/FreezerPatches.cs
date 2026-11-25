@@ -1097,7 +1097,10 @@ public static class FreezerPatches
         amount = itemsCountCanBeAdded;
 
         var myProductionBlock = (MyProductionBlock)entity;
-        SentisOptimisationsPlugin.Log.Error("Compensated items cant be added to " + myProductionBlock.DisplayNameText +
+        // (the usual work of a compensation burst, a line per batch: under "Compensation logs", not an error - the prod's
+        // log filled with them, 25.11.2026)
+        var log = SentisOptimisationsPlugin.Config?.EnableCompensationLogs == true;
+        if (log) SentisOptimisationsPlugin.Log.Info("Compensated items cant be added to " + myProductionBlock.DisplayNameText +
                                      " inventory, move " + amountToAddToAnotherInventory + " items of " +
                                      id.SubtypeName + " to container");
 
@@ -1107,7 +1110,7 @@ public static class FreezerPatches
             {
                 myCargoContainer.GetInventory().AddItems(amountToAddToAnotherInventory, objectBuilder);
 
-                SentisOptimisationsPlugin.Log.Error("Move items to " + myCargoContainer.DisplayNameText +
+                if (log) SentisOptimisationsPlugin.Log.Info("Move items to " + myCargoContainer.DisplayNameText +
                                                     " inventory, count - "
                                                     + amountToAddToAnotherInventory + " item - " + id.SubtypeName +
                                                     " on grid " + myProductionBlock.CubeGrid.DisplayName);
