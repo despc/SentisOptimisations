@@ -142,10 +142,11 @@ namespace SentisOptimisations.Commands
         /// Live characters whose identity is gone: no player and no identity, left by a bot removed while it lay in a
         /// cryo chamber (RemovePlayer keeps a body in cryo, CleanUnusedIdentities takes the identity later). Out in the
         /// world, such a body threw in its weapon position's update every frame and stopped the entities' update pass
-        /// (25.11.2026). Seated ones are found through the seats: a pilot is not among the world's entities. Runs from
-        /// Essentials' auto commands as well (they call it from the server, on the game thread).
+        /// (25.11.2026). Also those whose identity number went to a new identity after a restart (ids are reused), which
+        /// that identity does not hold as its body. Seated ones are found through the seats: a pilot is not among the
+        /// world's entities. Runs from Essentials' auto commands as well (they call it from the server, on the game thread).
         /// </summary>
-        [Command("ai_npc ghosts", "Lists live characters without an identity; '!ai_npc ghosts clean' removes them")]
+        [Command("ai_npc ghosts", "Lists live characters without an identity of their own; '!ai_npc ghosts clean' removes them")]
         [Permission(MyPromoteLevel.Admin)]
         public void AI_NPC_Ghosts(string action = null)
         {
@@ -157,6 +158,7 @@ namespace SentisOptimisations.Commands
             }
 
             var ghosts = new List<KeyValuePair<MyCharacter, MyCockpit>>();
+            var reasons = new Dictionary<long, string>();
             var seen = new HashSet<long>();
 
             void Consider(MyCharacter character, MyCockpit seat)
@@ -164,8 +166,22 @@ namespace SentisOptimisations.Commands
                 if (character == null || character.IsDead || character.MarkedForClose || character.Closed || !seen.Add(character.EntityId))
                     return;
                 // the same test as the weapon position's guard: the controlling player's identity first, then the owner's
-                if (character.GetIdentity() != null)
-                    return;
+                var identity = character.GetIdentity();
+                if (identity == null)
+                {
+                    reasons[character.EntityId] = "no identity";
+                }
+                else
+                {
+                    // Identity ids are handed out in order from the highest one loaded, so after a restart the number of a
+                    // removed bot goes to a new identity, and its body left behind looks owned again. An identity takes
+                    // every body it is given into SavedCharacters (ChangeCharacter) and lets go of it only when it
+                    // closes: a body nobody controls that its identity does not hold is not that identity's.
+                    if (character.ControllerInfo?.Controller != null || identity.Character == character ||
+                        identity.SavedCharacters?.Contains(character.EntityId) == true)
+                        return;
+                    reasons[character.EntityId] = "identity " + identity.IdentityId + " '" + identity.DisplayName + "' does not hold it";
+                }
                 ghosts.Add(new KeyValuePair<MyCharacter, MyCockpit>(character, seat));
             }
 
@@ -198,7 +214,7 @@ namespace SentisOptimisations.Commands
 
             if (ghosts.Count == 0)
             {
-                Context.Respond("No live characters without an identity.");
+                Context.Respond("No live characters without an identity of their own.");
                 return;
             }
 
@@ -209,7 +225,7 @@ namespace SentisOptimisations.Commands
                 var character = pair.Key;
                 var seat = pair.Value;
                 var where = seat == null ? "in the world" : "in '" + seat.DisplayNameText + "' (" + seat.EntityId + ") on '" + seat.CubeGrid?.DisplayName + "' (" + seat.CubeGrid?.EntityId + ")";
-                var line = global::SentisOptimisationsPlugin.CrashFix.CrashFixPatch.DescribeCharacter(character) + ", " + where;
+                var line = global::SentisOptimisationsPlugin.CrashFix.CrashFixPatch.DescribeCharacter(character) + ", " + where + ", " + reasons[character.EntityId];
                 if (clean)
                 {
                     // the body is closed even when taking it out of its seat threw (the seat lets go of it on close)
@@ -239,7 +255,7 @@ namespace SentisOptimisations.Commands
                 lines.Add(line);
             }
 
-            Context.Respond((clean ? $"Removed {removed} of {ghosts.Count}" : $"Found {ghosts.Count}") + " live character(s) without an identity" +
+            Context.Respond((clean ? $"Removed {removed} of {ghosts.Count}" : $"Found {ghosts.Count}") + " live character(s) without an identity of their own" +
                             (clean ? "" : " (!ai_npc ghosts clean to remove)") + ":\n" + string.Join("\n", lines));
         }
 
