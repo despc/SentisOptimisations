@@ -15,15 +15,18 @@ namespace SentisOptimisationsPlugin.CrashFix
     ///
     /// The prod server fell on 23.11.2026 (13:10:47) with a NullReferenceException in
     /// <c>MyVoxelBase.IsAnyOfPointInside</c>, called from <c>MyGridStorageHelper.IsInsideVoxels</c> in the
-    /// retrieval of a grid from the Services Terminal (<c>LoadGrid_Internal_Phase4</c>). <c>IsInsideVoxels</c> puts
-    /// the static entities in the grid's box into a static list, <c>m_potentialPenetrations</c>, and clears it only
-    /// when the grid is not in voxels: a grid that was in voxels leaves the planet's voxel physics there. A planet
-    /// deletes those physics sectors when nothing is near them any more, and a deleted <c>MyVoxelPhysics</c> has no
-    /// <c>Storage</c> (<c>BeforeDelete</c>). The next retrieval walks the stale entry and reads its storage.
+    /// retrieval of a grid from the Services Terminal (<c>LoadGrid_Internal_Phase4</c>, the completion of a parallel
+    /// task: the game thread). <c>IsInsideVoxels</c> adds the static entities in the grid's box to a static list,
+    /// <c>m_potentialPenetrations</c> (the pruning query appends, it does not clear), and clears it only when the grid
+    /// is not in voxels: a grid that was in voxels leaves the planet's voxel physics there. A planet deletes those
+    /// physics sectors when nothing is near them any more, and a deleted <c>MyVoxelPhysics</c> has no <c>Storage</c>
+    /// (<c>BeforeDelete</c>). The next retrieval walks the stale entry and reads its storage.
     ///
-    /// Fixed at both ends: the list is cleared before every check (the game fills it anew from the pruning structure,
-    /// where there are only live entities), and a closed voxel or one without storage is "not inside" instead of
-    /// dereferenced. Each stale or dead voxel found is written to the log.
+    /// The list is cleared after every check, both ways it ends (so it holds no entity between checks), and before one
+    /// as well, should a check have ended in an exception: the game fills it anew from the pruning structure, where there
+    /// are only live entities. And a voxel without storage is "not inside" instead of dereferenced: on that alone, not on
+    /// a voxel being closed - <c>IsAnyOfPointInside</c> is called by everyone (the plugins too), and a voxel marked for
+    /// close keeps its storage and is read as the game reads it.
     /// </summary>
     [PatchShim]
     public static class GarageVoxelCheck
@@ -32,7 +35,13 @@ namespace SentisOptimisationsPlugin.CrashFix
         private static readonly Harmony Harmony = new Harmony("SentisOptimisations.GarageVoxelCheck");
 
         private static FieldInfo _penetrationsField;
+        private static List<MyEntity> _penetrations;
         private static DateTime _deadLoggedAt = DateTime.MinValue;
+
+        /// <summary>Entities found left in the list before a check (an earlier one ended in an exception), since the start.</summary>
+        public static int StaleCleared;
+        /// <summary>Voxels without storage answered "not inside" instead of read, since the start.</summary>
+        public static int DeadSkipped;
 
         public static void Patch(PatchContext ctx) => global::SentisOptimisations.PatchGuard.Run("GarageVoxelCheck", ctx, PatchImpl);
 
@@ -42,15 +51,17 @@ namespace SentisOptimisationsPlugin.CrashFix
             var helper = typeof(MyGridStorageHelper);
             _penetrationsField = helper.GetField("m_potentialPenetrations", BindingFlags.Static | BindingFlags.NonPublic)
                                  ?? throw new MissingFieldException("MyGridStorageHelper", "m_potentialPenetrations");
-            if (!typeof(List<MyEntity>).IsAssignableFrom(_penetrationsField.FieldType))
-                throw new InvalidOperationException("MyGridStorageHelper.m_potentialPenetrations is not what GarageVoxelCheck knows");
+            _penetrations = _penetrationsField.GetValue(null) as List<MyEntity>
+                            ?? throw new InvalidOperationException("MyGridStorageHelper.m_potentialPenetrations is not what GarageVoxelCheck knows");
             var isInside = helper.GetMethod("IsInsideVoxels", instance)
                            ?? throw new MissingMethodException("MyGridStorageHelper", "IsInsideVoxels");
             var anyInside = typeof(MyVoxelBase).GetMethod(nameof(MyVoxelBase.IsAnyOfPointInside), instance, null, new[] { typeof(VRageMath.Vector3D[]) }, null)
                             ?? throw new MissingMethodException("MyVoxelBase", "IsAnyOfPointInside");
 
-            ctx.GetPattern(isInside).Prefixes.Add(Own(nameof(IsInsidePrefix)));
-            // By Harmony right away: the Torch prefix above is already registered, so a failure here must not be
+            var pattern = ctx.GetPattern(isInside);
+            pattern.Prefixes.Add(Own(nameof(IsInsidePrefix)));
+            pattern.Suffixes.Add(Own(nameof(IsInsideSuffix)));
+            // By Harmony right away: the Torch patches above are already registered, so a failure here must not be
             // reported by PatchGuard as "patches from this class are skipped" - the list is still cleared.
             try
             {
@@ -64,20 +75,19 @@ namespace SentisOptimisationsPlugin.CrashFix
 
         private static MethodInfo Own(string name) => typeof(GarageVoxelCheck).GetMethod(name, BindingFlags.Static | BindingFlags.NonPublic);
 
-        /// <summary>Whether a voxel cannot be read: closed, being closed or without storage.</summary>
-        public static bool Dead(bool closed, bool markedForClose, bool hasStorage) => closed || markedForClose || !hasStorage;
+        /// <summary>Whether a voxel cannot be read: it has no storage (a deleted voxel physics sector).</summary>
+        public static bool Unreadable(bool hasStorage) => !hasStorage;
 
         private static void IsInsidePrefix()
         {
             try
             {
-                if (!(_penetrationsField.GetValue(null) is List<MyEntity> list) || list.Count == 0) return;
-                var dead = 0;
-                foreach (var e in list)
-                    if (e == null || (e is MyVoxelBase v ? Dead(v.Closed, v.MarkedForClose, v.Storage != null) : e.Closed))
-                        dead++;
-                Log.Info($"Garage voxel check: {list.Count} entities left from an earlier check cleared ({dead} of them deleted)");
-                list.Clear();
+                if (_penetrations == null || _penetrations.Count == 0) return;
+                var count = _penetrations.Count;
+                StaleCleared += count;
+                _penetrations.Clear();
+                if (global::SentisOptimisations.DiagLog.On)
+                    Log.Info($"Garage voxel check: {count} entities left from an earlier check cleared");
             }
             catch (Exception e)
             {
@@ -85,15 +95,28 @@ namespace SentisOptimisationsPlugin.CrashFix
             }
         }
 
+        private static void IsInsideSuffix()
+        {
+            try
+            {
+                _penetrations?.Clear();
+            }
+            catch (Exception e)
+            {
+                Log.Error(e, "Garage voxel check: the list was not cleared after a check");
+            }
+        }
+
         private static bool AnyInsidePrefix(MyVoxelBase __instance, ref bool __result)
         {
-            if (!Dead(__instance.Closed, __instance.MarkedForClose, __instance.Storage != null)) return true;
+            if (!Unreadable(__instance.Storage != null)) return true;
             __result = false;
+            System.Threading.Interlocked.Increment(ref DeadSkipped);   // (the plugins call it on their workers too)
             var now = DateTime.UtcNow;
             if (now - _deadLoggedAt >= TimeSpan.FromMinutes(1))
             {
                 _deadLoggedAt = now;
-                Log.Warn($"Voxel check on a deleted voxel '{__instance.StorageName}' ({__instance.EntityId}, closed {__instance.Closed}, marked {__instance.MarkedForClose}, storage {__instance.Storage != null}): not inside\n{Environment.StackTrace}");
+                Log.Warn($"Voxel check on a voxel without storage '{__instance.StorageName}' ({__instance.EntityId}, closed {__instance.Closed}, marked {__instance.MarkedForClose}): not inside\n{Environment.StackTrace}");
             }
             return false;
         }
