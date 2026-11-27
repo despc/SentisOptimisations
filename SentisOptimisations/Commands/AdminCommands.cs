@@ -139,79 +139,25 @@ namespace SentisOptimisations.Commands
         }
 
         /// <summary>
-        /// Live characters whose identity is gone: no player and no identity, left by a bot removed while it lay in a
-        /// cryo chamber (RemovePlayer keeps a body in cryo, CleanUnusedIdentities takes the identity later). Out in the
-        /// world, such a body threw in its weapon position's update every frame and stopped the entities' update pass
-        /// (25.11.2026). Also those whose identity number went to a new identity after a restart (ids are reused), which
-        /// that identity does not hold as its body. Seated ones are found through the seats: a pilot is not among the
-        /// world's entities. Runs from Essentials' auto commands as well (they call it from the server, on the game thread).
+        /// Live characters without an identity of their own (<see cref="CharacterGhosts"/>): a body with no identity at all,
+        /// left by a bot removed while it lay in a cryo chamber, threw in its weapon position's update every frame once out
+        /// in the world and stopped the entities' update pass (25.11.2026). A plain clean removes only those, so it is safe
+        /// from Essentials' auto commands (they call it from the server, on the game thread); bodies whose identity exists
+        /// but does not hold them are listed, and removed only by <c>clean all</c>.
         /// </summary>
-        [Command("ai_npc ghosts", "Lists live characters without an identity of their own; '!ai_npc ghosts clean' removes them")]
+        [Command("ai_npc ghosts", "Lists live characters without an identity of their own; 'clean' removes those with no identity, 'clean all' also those their identity does not hold")]
         [Permission(MyPromoteLevel.Admin)]
-        public void AI_NPC_Ghosts(string action = null)
+        public void AI_NPC_Ghosts(string action = null, string scope = null)
         {
             var clean = string.Equals(action, "clean", StringComparison.OrdinalIgnoreCase);
-            if (action != null && !clean)
+            var all = string.Equals(scope, "all", StringComparison.OrdinalIgnoreCase);
+            if ((action != null && !clean) || (scope != null && !(clean && all)))
             {
-                Context.Respond("Usage: !ai_npc ghosts [clean]");
+                Context.Respond("Usage: !ai_npc ghosts [clean [all]]");
                 return;
             }
 
-            var ghosts = new List<KeyValuePair<MyCharacter, MyCockpit>>();
-            var reasons = new Dictionary<long, string>();
-            var seen = new HashSet<long>();
-
-            void Consider(MyCharacter character, MyCockpit seat)
-            {
-                if (character == null || character.IsDead || character.MarkedForClose || character.Closed || !seen.Add(character.EntityId))
-                    return;
-                // the same test as the weapon position's guard: the controlling player's identity first, then the owner's
-                var identity = character.GetIdentity();
-                if (identity == null)
-                {
-                    reasons[character.EntityId] = "no identity";
-                }
-                else
-                {
-                    // Identity ids are handed out in order from the highest one loaded, so after a restart the number of a
-                    // removed bot goes to a new identity, and its body left behind looks owned again. An identity takes
-                    // every body it is given into SavedCharacters (ChangeCharacter) and lets go of it only when it
-                    // closes: a body nobody controls that its identity does not hold is not that identity's.
-                    if (character.ControllerInfo?.Controller != null || identity.Character == character ||
-                        identity.SavedCharacters?.Contains(character.EntityId) == true)
-                        return;
-                    reasons[character.EntityId] = "identity " + identity.IdentityId + " '" + identity.DisplayName + "' does not hold it";
-                }
-                ghosts.Add(new KeyValuePair<MyCharacter, MyCockpit>(character, seat));
-            }
-
-            foreach (var entity in MyEntities.GetEntities().ToList())
-            {
-                if (entity is MyCharacter character)
-                {
-                    Consider(character, null);
-                    continue;
-                }
-                if (!(entity is MyCubeGrid grid) || grid.MarkedForClose)
-                    continue;
-                foreach (var block in grid.GetFatBlocks().ToList())
-                {
-                    if (!(block is MyCockpit cockpit))
-                        continue;
-                    Consider(cockpit.IsBeingUsedBy as MyCharacter, cockpit);
-                    // a pilot RemovePilot let go of without detaching it stays the seat's child
-                    var hierarchy = cockpit.Hierarchy;
-                    if (hierarchy == null)
-                        continue;
-                    var seated = new List<MyCharacter>();
-                    foreach (var child in hierarchy.Children)
-                        if (child?.Container?.Entity is MyCharacter childCharacter)
-                            seated.Add(childCharacter);
-                    foreach (var childCharacter in seated)
-                        Consider(childCharacter, cockpit);
-                }
-            }
-
+            var ghosts = CharacterGhosts.Find();
             if (ghosts.Count == 0)
             {
                 Context.Respond("No live characters without an identity of their own.");
@@ -220,43 +166,38 @@ namespace SentisOptimisations.Commands
 
             var lines = new List<string>();
             var removed = 0;
-            foreach (var pair in ghosts)
+            var kept = 0;
+            foreach (var ghost in ghosts)
             {
-                var character = pair.Key;
-                var seat = pair.Value;
-                var where = seat == null ? "in the world" : "in '" + seat.DisplayNameText + "' (" + seat.EntityId + ") on '" + seat.CubeGrid?.DisplayName + "' (" + seat.CubeGrid?.EntityId + ")";
-                var line = global::SentisOptimisationsPlugin.CrashFix.CrashFixPatch.DescribeCharacter(character) + ", " + where + ", " + reasons[character.EntityId];
-                if (clean)
+                var line = global::SentisOptimisationsPlugin.CrashFix.CrashFixPatch.DescribeCharacter(ghost.Character) + ", " +
+                           CharacterGhosts.Where(ghost) + ", " + ghost.Reason;
+                if (clean && CharacterGhosts.Removes(ghost.Kind, all))
                 {
-                    // the body is closed even when taking it out of its seat threw (the seat lets go of it on close)
-                    try
+                    var failed = CharacterGhosts.Remove(ghost, e => Log.Error(e, "ai_npc ghosts clean, RemovePilot: " + line));
+                    if (failed == null)
                     {
-                        if (seat != null && seat.IsBeingUsedBy == character)
-                            seat.RemovePilot();
-                    }
-                    catch (Exception e)
-                    {
-                        Log.Error(e, "ai_npc ghosts clean, RemovePilot: " + line);
-                    }
-                    try
-                    {
-                        if (!character.MarkedForClose)
-                            character.Close();
                         removed++;
                         line = "removed " + line;
                     }
-                    catch (Exception e)
+                    else
                     {
-                        Log.Error(e, "ai_npc ghosts clean: " + line);
-                        line = "FAILED " + line + " (" + e.GetType().Name + ")";
+                        Log.Error(failed, "ai_npc ghosts clean: " + line);
+                        line = "FAILED " + line + " (" + failed.GetType().Name + ")";
                     }
+                }
+                else if (clean)
+                {
+                    kept++;
+                    line = "kept " + line;
                 }
                 Log.Warn("ai_npc ghosts: " + line);
                 lines.Add(line);
             }
 
-            Context.Respond((clean ? $"Removed {removed} of {ghosts.Count}" : $"Found {ghosts.Count}") + " live character(s) without an identity of their own" +
-                            (clean ? "" : " (!ai_npc ghosts clean to remove)") + ":\n" + string.Join("\n", lines));
+            var summary = $"{ghosts.Count} live character(s) without an identity of their own; " + (clean
+                ? $"removed {removed}" + (kept > 0 ? $", kept {kept} whose identity does not hold them (!ai_npc ghosts clean all removes them)" : "")
+                : "!ai_npc ghosts clean removes those with no identity, clean all also the rest");
+            Context.Respond(summary + ":\n" + string.Join("\n", lines));
         }
 
         [Command("ai_npc clean", "Cleans up NPC junk data from the sandbox file")]
